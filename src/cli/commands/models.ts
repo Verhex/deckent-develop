@@ -21,10 +21,12 @@ import { buildPickerLabels } from '../repl/picker-labels.js';
 import type { PickerCandidate, PickerSpec } from '../repl/picker.js';
 import {
   ModelActivationStore,
+  readProjectModelActivationSnapshot,
   resolveActiveModelPolicy,
   PROVIDER_POLICY_MODES,
   type ProviderPolicyMode,
 } from '../../core/model-activation-store.js';
+import { buildModelActivationPolicyJson, buildModelCatalogListJson, buildModelsJsonError } from './models-json.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
@@ -148,7 +150,8 @@ export function registerModels(program: Command): void {
       memoryCatalogMessage('cli.memcat.models.opt.provider_filter', getLanguage(undefined), { providers: knownProviderNames() }),
     )
     .option('--offline', memoryCatalogMessage('cli.memcat.models.opt.offline', getLanguage(undefined)))
-    .action(async (opts: { provider?: string; offline?: boolean }) => {
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json', getLanguage(undefined)))
+    .action(async (opts: { provider?: string; offline?: boolean; json?: boolean }) => {
       try {
         const loaderOpts: CatalogLoadOptions = { offline: opts.offline };
         const result = await loadCatalog(loaderOpts);
@@ -161,6 +164,14 @@ export function registerModels(program: Command): void {
           );
         }
 
+        if (opts.json) {
+          print(JSON.stringify(buildModelCatalogListJson({
+            catalog: result,
+            offline: opts.offline === true,
+            provider: opts.provider ? opts.provider.toLowerCase().trim() : null,
+          }), null, 2));
+          return;
+        }
         const lang = outputLang();
         const badge = sourceBadge(result.source, lang);
         print(`\n  ${theme.bold(out('catalog_header', lang))}  [${badge}]  ${out('model_count', lang, { n: models.length })}\n`);
@@ -174,7 +185,8 @@ export function registerModels(program: Command): void {
         }
         print('');
       } catch (err) {
-        printError(err);
+        if (opts.json) print(JSON.stringify(buildModelsJsonError('model-catalog-list', 'MODEL_CATALOG_READ_FAILED'), null, 2));
+        else printError(err);
         process.exitCode = 1;
       }
     });
@@ -393,9 +405,22 @@ export function registerModels(program: Command): void {
   models
     .command('active-set')
     .description(getMessage('cli.models.active_set.desc', getLanguage(undefined)))
-    .action(() => {
+    .option('--offline', memoryCatalogMessage('cli.memcat.models.opt.offline', getLanguage(undefined)))
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json', getLanguage(undefined)))
+    .action(async (opts: { offline?: boolean; json?: boolean }) => {
       try {
         const lang = outputLang();
+        if (opts.json) {
+          const snapshot = readProjectModelActivationSnapshot(resolveProjectRoot());
+          if (snapshot.state === 'hold') {
+            print(JSON.stringify(buildModelActivationPolicyJson({ snapshot, offline: opts.offline === true }), null, 2));
+            process.exitCode = 1;
+            return;
+          }
+          const catalog = await loadCatalog({ offline: opts.offline });
+          print(JSON.stringify(buildModelActivationPolicyJson({ snapshot, catalog, offline: opts.offline === true }), null, 2));
+          return;
+        }
         const policy = resolveActiveModelPolicy(resolveProjectRoot());
         print(`\n  ${theme.bold(out('active_set_header', lang))}  `
           + `${theme.muted(`sha256:${policy.snapshotDigest.slice(0, 16)}…`)}`);
@@ -411,7 +436,8 @@ export function registerModels(program: Command): void {
         }
         print('');
       } catch (err) {
-        printError(err);
+        if (opts.json) print(JSON.stringify(buildModelsJsonError('model-active-set', 'MODEL_ACTIVE_SET_READ_FAILED'), null, 2));
+        else printError(err);
         process.exitCode = 1;
       }
     });

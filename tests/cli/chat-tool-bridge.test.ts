@@ -5,6 +5,7 @@ import {
   resolveCliChildEnv,
   type CliToolSpawnFn,
 } from '../../src/cli/commands/chat-tool-bridge.js';
+import { createSessionToolContentStore } from '../../src/agent/session-tool-content.js';
 
 // All tests inject a fake spawnFn — no real subprocess is ever launched, so
 // the suite is hermetic (no dist/, no deckent state, no network).
@@ -231,5 +232,56 @@ describe('cliArgsFor — resolved argv (shared by dispatch + confirm modal)', ()
   it('returns null for a tool not in the allow-list', () => {
     expect(cliArgsFor('deckent_made_up', {})).toBeNull();
     expect(cliArgsFor('deckent_memory_query', { query: 'x' })).toBeNull();
+  });
+});
+
+describe('structured read dispatch', () => {
+  it('revalidates the request, spawns one canonical offline command, and preserves useful nonzero JSON', async () => {
+    const store = createSessionToolContentStore();
+    const captureSpawnFn = vi.fn(async (args: readonly string[], ownedStore: typeof store) => {
+      const stdout = ownedStore.beginCapture({ channel: 'stdout', previewBytes: 1024 });
+      const stderr = ownedStore.beginCapture({ channel: 'stderr', previewBytes: 1024 });
+      stdout.append(Buffer.from('  {"schemaVersion":1,"kind":"model-active-set","authority":{"state":"hold"}}\n  '));
+      stderr.append(Buffer.from('diagnostic\n'));
+      return { stdout: stdout.finish(), stderr: stderr.finish(), exitCode: 1, signal: null, pid: 123 };
+    });
+    try {
+      const dispatcher = createCliToolDispatcher({ sessionContentStore: store, captureSpawnFn });
+      const result = await dispatcher.dispatchRead({ kind: 'model-active-set' });
+      expect(captureSpawnFn).toHaveBeenCalledOnce();
+      expect(captureSpawnFn).toHaveBeenCalledWith(['models', 'active-set', '--offline', '--json'], store);
+      expect(result.envelope.ok).toBe(false);
+      expect(result.envelope.exitCode).toBe(1);
+      expect(result.stdoutCapture.preview).toContain('model-active-set');
+      expect(result.stdoutCapture.preview.startsWith('  ')).toBe(true);
+      expect(result.stderrCapture.preview).toBe('diagnostic\n');
+      expect(result.rendered).toContain('model-active-set');
+      expect(result.rendered.startsWith('  ')).toBe(false);
+      expect(result.envelope.sha256).toBe(result.stdoutCapture.observedSha256);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('rejects a forged request before invoking the capture spawn', async () => {
+    const captureSpawnFn = vi.fn();
+    const dispatcher = createCliToolDispatcher({ captureSpawnFn });
+    await expect(dispatcher.dispatchRead({ kind: 'models', cliArgs: ['kill'] } as never))
+      .rejects.toThrow('invalid CLI read request');
+    expect(captureSpawnFn).not.toHaveBeenCalled();
+  });
+
+  it('returns a sanitized typed envelope when session capture admission is unavailable', async () => {
+    const store = createSessionToolContentStore({ maxActive: 1 });
+    try {
+      const dispatcher = createCliToolDispatcher({ sessionContentStore: store });
+      const result = await dispatcher.dispatchRead({ kind: 'doctor' });
+      expect(result.containmentReason).toBe('capture-admission');
+      expect(result.envelope).toMatchObject({ ok: false, reason: 'tool-error', contentRef: null });
+      expect(result.stdoutCapture).toMatchObject({ complete: false, detailRef: null, legacyContentRef: null });
+      expect(result.stderrCapture).toMatchObject({ complete: false, detailRef: null, legacyContentRef: null });
+    } finally {
+      store.close();
+    }
   });
 });

@@ -17,7 +17,6 @@
 // Tests inject `opts.spawnFn` / `opts.spawnDetachedFn` to stay hermetic (no
 // real subprocess spawns).
 
-import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 import type { McpToolDispatcher } from './chat-native.js';
@@ -26,10 +25,23 @@ import { getLanguage } from '../helpers/messages.js';
 // NT-01/04/05 — the ONE tool-result containment chokepoint.
 import {
   brokerToolResult,
+  containCapturedToolResult,
   createSessionContentStore,
+  renderToolResultEnvelope,
   type ContentWriter,
   type RawToolResult,
+  type ToolResultEnvelope,
 } from '../../agent/tool-result-broker.js';
+import type { SessionToolContentStore, ToolCaptureReceipt } from '../../agent/session-tool-content.js';
+import {
+  captureCliTool,
+  cliArgsForReadRequest,
+  createMemoryPreviewContentStore,
+  resolveCliReadRequest,
+  type CliCapturedOutcome,
+  type CliCaptureFailureReason,
+  type CliReadRequest,
+} from '../helpers/cli-tool-capture.js';
 
 // ─── Tool → CLI subcommand map ─────────────────────────────────────────────
 //
@@ -124,6 +136,13 @@ export interface CliSpawnOutcome {
   stderr: string;
   exitCode: number | null;
   signal: NodeJS.Signals | null;
+  /** False means the bounded standalone preview omitted observed bytes. */
+  stdoutComplete?: boolean;
+  stderrComplete?: boolean;
+  stdoutBytes?: number;
+  stderrBytes?: number;
+  stdoutSha256?: string;
+  stderrSha256?: string;
 }
 
 /** Async function that invokes the deckent CLI and reports the real outcome. */
@@ -156,6 +175,10 @@ export interface CliToolDispatcherOptions {
   spawnOutcomeFn?: CliToolSpawnOutcomeFn;
   /** NT-01/04 — overflow content store; omitted → lazy session-scoped mkdtemp. */
   contentStore?: ContentWriter;
+  /** Structured same-session store used by bounded process capture. */
+  sessionContentStore?: SessionToolContentStore;
+  /** Hermetic structured-capture seam; production uses captureCliTool. */
+  captureSpawnFn?: (args: readonly string[], store: SessionToolContentStore) => Promise<CliCapturedOutcome>;
   /** NT-01/04 — preview budget in bytes. Default/clamp live in the broker. */
   maxPreviewBytes?: number;
   /** Inject a fake detached-spawn for hermetic tests; omit for the real spawnDetachedDeckent. */
@@ -166,6 +189,20 @@ export interface CliToolDispatcherOptions {
   detachedLabels?: Partial<DetachedStartLabels>;
   /** Override the English-default permission-denied classification label — see DEFAULT_PERMISSION_DENIED_LABEL. */
   permissionDeniedLabel?: string;
+}
+
+export interface CliToolReadResult {
+  readonly request: CliReadRequest;
+  readonly rendered: string;
+  readonly envelope: ToolResultEnvelope;
+  readonly stdoutCapture: ToolCaptureReceipt;
+  readonly stderrCapture: ToolCaptureReceipt;
+  readonly signal: NodeJS.Signals | null;
+  readonly containmentReason: CliCaptureFailureReason | null;
+}
+
+export interface CliToolDispatcher extends McpToolDispatcher {
+  dispatchRead(request: CliReadRequest): Promise<CliToolReadResult>;
 }
 
 function resolveEntryPath(): string {
@@ -193,52 +230,37 @@ export function resolveCliChildEnv(language?: string, base: NodeJS.ProcessEnv = 
   return { ...base, DECKENT_LANGUAGE: resolveCliLanguage(language) };
 }
 
-export function defaultSpawnOutcomeFn(args: string[], language?: string): Promise<CliSpawnOutcome> {
-  return new Promise<CliSpawnOutcome>((resolve, reject) => {
-    const entryPath = resolveEntryPath();
-    const child = spawn(process.execPath, [entryPath, ...args], {
-      stdio: ['ignore', 'pipe', 'pipe'],
+export async function defaultSpawnOutcomeFn(args: string[], language?: string): Promise<CliSpawnOutcome> {
+  const timeoutMs = resolveSpawnTimeoutMs(args);
+  const store = createMemoryPreviewContentStore();
+  try {
+    const captured = await captureCliTool({
+      command: process.execPath,
+      args: [resolveEntryPath(), ...args],
       env: resolveCliChildEnv(language),
+      store,
+      timeoutMs,
+      previewBytes: 64 * 1024,
     });
-    let out = '';
-    let errOut = '';
-    let settled = false;
-    // Safety net: if a command runs past its budget (an unexpectedly slow or
-    // auth-blocked subcommand), kill it and surface a tagged error rather than
-    // freezing the REPL turn forever. Budget is per-command-class — see
-    // resolveSpawnTimeoutMs.
-    const timeoutMs = resolveSpawnTimeoutMs(args);
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      try { child.kill('SIGKILL'); } catch { /* already gone */ }
-      reject(new CliSpawnTimeoutError(timeoutMs));
-    }, timeoutMs);
-    child.stdout?.setEncoding('utf-8');
-    child.stderr?.setEncoding('utf-8');
-    child.stdout?.on('data', (chunk: string) => { out += chunk; });
-    child.stderr?.on('data', (chunk: string) => { errOut += chunk; });
-    // born-509 spawn-hardening: without this, a spawn-level failure (e.g. ENOENT)
-    // is silently dropped and the promise hangs until the timeout fires instead
-    // of surfacing the real error immediately.
-    child.once('error', (err) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      reject(err);
-    });
-    child.once('close', (code, signal) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve({
-        stdout: out.trim(),
-        stderr: errOut.trim(),
-        exitCode: typeof code === 'number' ? code : null,
-        signal: signal ?? null,
-      });
-    });
-  });
+    if (captured.reason === 'timeout' || captured.reason === 'REAP_UNVERIFIED') {
+      throw new CliSpawnTimeoutError(timeoutMs);
+    }
+    if (captured.reason === 'spawn-error') throw captured.spawnError ?? new Error('CLI spawn failed');
+    return {
+      stdout: captured.stdout.preview.trim(),
+      stderr: captured.stderr.preview.trim(),
+      exitCode: captured.exitCode,
+      signal: captured.signal,
+      stdoutComplete: captured.stdout.complete,
+      stderrComplete: captured.stderr.complete,
+      stdoutBytes: captured.stdout.observedBytes,
+      stderrBytes: captured.stderr.observedBytes,
+      stdoutSha256: captured.stdout.observedSha256,
+      stderrSha256: captured.stderr.observedSha256,
+    };
+  } finally {
+    store.close();
+  }
 }
 
 /**
@@ -499,15 +521,50 @@ function formatDetachedStartMessage(
  * process group, logged to `.deckent/recently-works/`) so a multi-minute
  * sprint/task never blocks the REPL turn — see isDetachedCommandClass.
  */
-export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): McpToolDispatcher {
+export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): CliToolDispatcher {
   // A caller-injected legacy string fn wins (existing hermetic tests); nothing
   // injected → the structured spawn, so production keeps the real exit code.
   const spawnFn = opts.spawnFn;
-  const spawnOutcomeFn = opts.spawnOutcomeFn ?? ((args) => defaultSpawnOutcomeFn(args, opts.language));
+  const spawnOutcomeFn = opts.spawnOutcomeFn;
   const spawnDetachedFn = opts.spawnDetachedFn ?? spawnDetachedDeckent;
   const labels: DetachedStartLabels = { ...DEFAULT_DETACHED_START_LABELS, ...opts.detachedLabels };
   const permissionDeniedLabel = opts.permissionDeniedLabel ?? DEFAULT_PERMISSION_DENIED_LABEL;
-  const contentStore = opts.contentStore ?? createSessionContentStore();
+  const sessionContentStore = opts.sessionContentStore
+    ?? (opts.contentStore && 'beginCapture' in opts.contentStore
+      ? opts.contentStore as SessionToolContentStore
+      : createSessionContentStore());
+  const contentStore = opts.contentStore ?? sessionContentStore;
+
+  const captureSpawn = opts.captureSpawnFn ?? ((args: readonly string[], store: SessionToolContentStore) =>
+    captureCliTool({
+      command: process.execPath,
+      args: [resolveEntryPath(), ...args],
+      env: resolveCliChildEnv(opts.language),
+      store,
+      timeoutMs: resolveSpawnTimeoutMs(args),
+      previewBytes: opts.maxPreviewBytes ?? 16 * 1024,
+    }));
+
+  const capturedEnvelope = (captured: CliCapturedOutcome): ToolResultEnvelope => {
+    const envelope = containCapturedToolResult({
+      stdout: captured.stdout,
+      stderr: captured.stderr,
+      exitCode: captured.exitCode,
+      signal: captured.signal,
+      reason: captured.reason === 'timeout'
+        ? 'timeout'
+        : captured.reason === 'spawn-error'
+          ? 'spawn-error'
+          : captured.reason === 'capture-admission' || captured.reason === 'REAP_UNVERIFIED'
+            ? 'tool-error'
+            : undefined,
+    });
+    return {
+      ...envelope,
+      boundedPreview: envelope.boundedPreview.trim(),
+      stderr: envelope.stderr?.trim() || null,
+    };
+  };
 
   const failure = (output: string, reason: RawToolResult['reason']): RawToolResult =>
     ({ output, ok: false, reason });
@@ -519,14 +576,19 @@ export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): Mc
     return failure(`[mcp-error] ${name}: ${msg}`, 'spawn-error');
   };
 
-  const runTool = async (name: string, args: Record<string, unknown>): Promise<RawToolResult> => {
+  type InternalToolResult =
+    | { readonly kind: 'raw'; readonly value: RawToolResult }
+    | { readonly kind: 'captured'; readonly value: CliCapturedOutcome };
+  const raw = (value: RawToolResult): InternalToolResult => ({ kind: 'raw', value });
+
+  const runTool = async (name: string, args: Record<string, unknown>): Promise<InternalToolResult> => {
       let cliArgs: string[];
       if (name === 'deckent_memory_query') {
         const query = typeof args['query'] === 'string' ? (args['query'] as string).trim() : '';
         const cursor = typeof args['cursor'] === 'string' ? (args['cursor'] as string).trim() : '';
         const detailRef = typeof args['detail_ref'] === 'string' ? (args['detail_ref'] as string).trim() : '';
         if (query.length === 0 && detailRef.length === 0) {
-          return failure('[mcp-error] recall: query or detail_ref required', 'tool-error');
+          return raw(failure('[mcp-error] recall: query or detail_ref required', 'tool-error'));
         }
         cliArgs = [
           'recall',
@@ -536,7 +598,7 @@ export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): Mc
         ];
       } else {
         const built = cliArgsFor(name, args);
-        if (!built) return failure(`[mcp-error] tool not allowed: ${name}`, 'tool-error');
+        if (!built) return raw(failure(`[mcp-error] tool not allowed: ${name}`, 'tool-error'));
         cliArgs = built;
       }
       if (isDetachedCommandClass(cliArgs)) {
@@ -550,32 +612,36 @@ export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): Mc
           });
           // Fire-and-forget: the spawn SUCCEEDED, the sprint's own outcome is
           // reported later through its log — never asserted here.
-          return { output: formatDetachedStartMessage(cliArgs, result, labels), ok: true };
+          return raw({ output: formatDetachedStartMessage(cliArgs, result, labels), ok: true });
         } catch (err) {
-          return classifySpawnError(name, err);
+          return raw(classifySpawnError(name, err));
         }
       }
       try {
         if (spawnFn !== undefined) {
           // Legacy seam: no exit code exists, so ok is left to the output's own
           // protocol markers rather than invented here.
-          return { output: await spawnFn(cliArgs), ok: true };
+          return raw({ output: await spawnFn(cliArgs), ok: true });
         }
         // NT-05: ok comes from the REAL exit code / signal — never from the
         // mere fact that the promise resolved.
+        if (spawnOutcomeFn === undefined) {
+          return { kind: 'captured', value: await captureSpawn(cliArgs, sessionContentStore) };
+        }
         const outcome = await spawnOutcomeFn(cliArgs);
         const failedBySignal = outcome.signal !== null;
         const failedByExit = outcome.exitCode !== null && outcome.exitCode !== 0;
-        return {
+        const failedByCapture = outcome.stdoutComplete === false || outcome.stderrComplete === false;
+        return raw({
           output: outcome.stdout,
           stderr: outcome.stderr,
           exitCode: outcome.exitCode,
           signal: outcome.signal,
-          ok: !failedBySignal && !failedByExit,
-          reason: failedBySignal ? 'signal' : failedByExit ? 'exit-code' : undefined,
-        };
+          ok: !failedBySignal && !failedByExit && !failedByCapture,
+          reason: failedBySignal ? 'signal' : failedByExit ? 'exit-code' : failedByCapture ? 'tool-error' : undefined,
+        });
       } catch (err) {
-        return classifySpawnError(name, err);
+        return raw(classifySpawnError(name, err));
       }
   };
 
@@ -584,10 +650,30 @@ export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): Mc
       // NT-01/04/05: the single exit — every bridged result is contained and
       // exit-truthed here, so no branch above can hand the loop raw, unbounded
       // output or a fabricated success.
-      return brokerToolResult(await runTool(name, args), {
+      const result = await runTool(name, args);
+      if (result.kind === 'captured') return renderToolResultEnvelope(capturedEnvelope(result.value));
+      return brokerToolResult(result.value, {
         store: contentStore,
         maxPreviewBytes: opts.maxPreviewBytes,
       });
     },
+    async dispatchRead(request) {
+      const cliArgs = cliArgsForReadRequest(request);
+      if (cliArgs === null) throw new TypeError('invalid CLI read request');
+      const captured = await captureSpawn(cliArgs, sessionContentStore);
+      const envelope = capturedEnvelope(captured);
+      return {
+        request,
+        envelope,
+        rendered: renderToolResultEnvelope(envelope),
+        stdoutCapture: captured.stdout,
+        stderrCapture: captured.stderr,
+        signal: captured.signal,
+        containmentReason: captured.reason ?? null,
+      };
+    },
   };
 }
+
+export { resolveCliReadRequest };
+export type { CliReadRequest };

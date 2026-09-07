@@ -20,6 +20,7 @@ import {
   readInactiveModels,
   resolveActiveModelPolicy,
   resolveProjectModelExecutionAuthority,
+  readProjectModelActivationSnapshot,
   emptyModelActivationPolicy,
 } from '../../src/core/model-activation-store.js';
 import { detectAndRegisterModels } from '../../src/core/model-auto-detect.js';
@@ -132,6 +133,53 @@ describe('ModelActivationStore — default-preserving activation', () => {
 });
 
 describe('project-scoped execution authority', () => {
+  it('returns one immutable strict snapshot with complete owner records', () => {
+    const store = open();
+    try {
+      store.setProviderPolicy('codex', 'explicit-active', 'operator');
+      store.setActivation('codex', 'known', true, 'operator');
+      store.setActivation('codex', 'blocked', false, 'operator');
+    } finally {
+      store.close();
+    }
+    const snapshot = readProjectModelActivationSnapshot(root);
+    expect(snapshot.state).toBe('ready');
+    if (snapshot.state !== 'ready') return;
+    expect(snapshot.activationRecords.map(({ provider, modelId, active }) => ({ provider, modelId, active }))).toEqual([
+      { provider: 'codex', modelId: 'blocked', active: false },
+      { provider: 'codex', modelId: 'known', active: true },
+    ]);
+    expect(snapshot.providerPolicies).toMatchObject([{ provider: 'codex', mode: 'explicit-active' }]);
+    expect(snapshot.policy.isExecutable('codex', 'known')).toBe(true);
+    expect(snapshot.policy.isExecutable('codex', 'unrecorded')).toBe(false);
+    expect(Object.isFrozen(snapshot)).toBe(true);
+    expect(Object.isFrozen(snapshot.activationRecords)).toBe(true);
+    expect(Object.isFrozen(snapshot.policy)).toBe(true);
+    expect(Object.isFrozen(snapshot.policy.explicitProviders)).toBe(true);
+    const digest = snapshot.snapshotDigest;
+    expect(() => (snapshot.policy.explicitProviders as Set<string>).add('claude')).toThrow();
+    expect(() => (snapshot.policy.activeModels as Array<{ provider: string; modelId: string }>).push({
+      provider: 'codex', modelId: 'injected',
+    })).toThrow();
+    expect(() => {
+      (snapshot.policy.activeModels[0] as { provider: string }).provider = 'claude';
+    }).toThrow();
+    expect(snapshot.policy.isExecutable('codex', 'known')).toBe(true);
+    expect(snapshot.policy.isExecutable('codex', 'unrecorded')).toBe(false);
+    expect([...snapshot.policy.explicitProviders]).toEqual(['codex']);
+    expect(snapshot.snapshotDigest).toBe(digest);
+    expect(snapshot.activationRecords.map(({ provider, modelId, active }) => ({ provider, modelId, active }))).toEqual([
+      { provider: 'codex', modelId: 'blocked', active: false },
+      { provider: 'codex', modelId: 'known', active: true },
+    ]);
+  });
+
+  it('gives absent storage the documented ready empty snapshot', () => {
+    expect(readProjectModelActivationSnapshot(root)).toMatchObject({
+      state: 'ready', activationRecords: [], providerPolicies: [], reasonCode: null,
+    });
+  });
+
   it('treats an absent store as the documented implicit-active default', () => {
     expect(resolveProjectModelExecutionAuthority(root, 'claude', 'claude-fable-5-1'))
       .toMatchObject({ state: 'ready', executable: true, reasonCode: null });
@@ -178,6 +226,9 @@ describe('project-scoped execution authority', () => {
       reasonCode: 'MODEL_ACTIVATION_AUTHORITY_UNAVAILABLE',
     });
     expect(authority.snapshotDigest).toMatch(/^[a-f0-9]{64}$/);
+    expect(readProjectModelActivationSnapshot(root)).toMatchObject({
+      state: 'hold', reasonCode: 'MODEL_ACTIVATION_AUTHORITY_UNAVAILABLE',
+    });
   });
 
   it('holds when a structurally readable store contains an invalid policy decision', () => {

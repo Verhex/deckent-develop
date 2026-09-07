@@ -192,6 +192,16 @@ describe('deckent models list', () => {
     expect(printed).not.toContain('gpt-5');
   });
 
+  it('emits one ANSI-free JSON catalog document and preserves offline loading', async () => {
+    hoisted.loadCatalog.mockResolvedValue(CATALOG_RESULT);
+    await runModelsCommand(['list', '--offline', '--json']);
+    expect(hoisted.loadCatalog).toHaveBeenCalledWith({ offline: true });
+    expect(hoisted.print).toHaveBeenCalledTimes(1);
+    const parsed = JSON.parse(hoisted.print.mock.calls[0]![0] as string);
+    expect(parsed).toMatchObject({ schemaVersion: 1, kind: 'model-catalog-list', offline: true, count: 3 });
+    expect(hoisted.print.mock.calls[0]![0]).not.toContain('\u001b');
+  });
+
   it('shows a "no models" message when provider filter matches nothing', async () => {
     hoisted.loadCatalog.mockResolvedValue(CATALOG_RESULT);
 
@@ -219,6 +229,19 @@ describe('deckent models list', () => {
     await runModelsCommand(['list']);
 
     expect(hoisted.printError).toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+    process.exitCode = 0;
+  });
+
+  it('keeps JSON failure stdout machine-readable and does not expose the raw error', async () => {
+    hoisted.loadCatalog.mockRejectedValue(new Error('secret catalog path'));
+    await runModelsCommand(['list', '--json']);
+    expect(hoisted.printError).not.toHaveBeenCalled();
+    expect(hoisted.print).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(hoisted.print.mock.calls[0]![0] as string)).toEqual({
+      schemaVersion: 1, kind: 'model-catalog-list', error: { code: 'MODEL_CATALOG_READ_FAILED' },
+    });
+    expect(hoisted.print.mock.calls[0]![0]).not.toContain('secret');
     expect(process.exitCode).toBe(1);
     process.exitCode = 0;
   });

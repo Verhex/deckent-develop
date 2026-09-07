@@ -154,6 +154,58 @@ describe('entry.ts — topLevelCommandName / shouldBootstrapCatalogFor (SEC-04)'
   });
 });
 
+describe('entry.ts — parsed offline bootstrap intent', () => {
+  let resolveCatalogBootstrapOffline: (
+    command: { optsWithGlobals(): Record<string, unknown> },
+    env?: NodeJS.ProcessEnv,
+  ) => boolean;
+
+  beforeAll(async () => {
+    ({ resolveCatalogBootstrapOffline } = await import('../../src/cli/entry.js'));
+  });
+
+  it('honors the parsed command-local --offline option before catalog bootstrap', () => {
+    expect(resolveCatalogBootstrapOffline({ optsWithGlobals: () => ({ offline: true }) }, {})).toBe(true);
+    expect(resolveCatalogBootstrapOffline({ optsWithGlobals: () => ({ offline: false }) }, {})).toBe(false);
+  });
+
+  it('preserves DECKENT_OFFLINE=1 without treating other values as offline', () => {
+    const command = { optsWithGlobals: () => ({}) };
+    expect(resolveCatalogBootstrapOffline(command, { DECKENT_OFFLINE: '1' })).toBe(true);
+    expect(resolveCatalogBootstrapOffline(command, { DECKENT_OFFLINE: '0' })).toBe(false);
+  });
+});
+
+describe('entry.ts — command-owned model JSON catalog reads', () => {
+  let parsedCommandOwnsCatalogRead: (command: {
+    name(): string;
+    parent?: { name(): string } | null;
+    optsWithGlobals(): Record<string, unknown>;
+  }) => boolean;
+
+  beforeAll(async () => {
+    ({ parsedCommandOwnsCatalogRead } = await import('../../src/cli/entry.js'));
+  });
+
+  const command = (parent: string, leaf: string, json: boolean) => ({
+    name: () => leaf,
+    parent: { name: () => parent },
+    optsWithGlobals: () => ({ json }),
+  });
+
+  it('skips redundant global bootstrap only for models list/active-set JSON reads', () => {
+    expect(parsedCommandOwnsCatalogRead(command('models', 'list', true))).toBe(true);
+    expect(parsedCommandOwnsCatalogRead(command('models', 'active-set', true))).toBe(true);
+  });
+
+  it('keeps human, mutating, unknown, and sibling commands on normal bootstrap policy', () => {
+    expect(parsedCommandOwnsCatalogRead(command('models', 'list', false))).toBe(false);
+    expect(parsedCommandOwnsCatalogRead(command('models', 'refresh', true))).toBe(false);
+    expect(parsedCommandOwnsCatalogRead(command('models', 'future-action', true))).toBe(false);
+    expect(parsedCommandOwnsCatalogRead(command('agent', 'list', true))).toBe(false);
+  });
+});
+
 // ─── (3) onFetchAttempt network-policy hook (model-catalog.ts) ───────────
 
 describe('loadCatalog / bootstrapFromCatalog — onFetchAttempt network-policy hook (SEC-04)', () => {

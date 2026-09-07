@@ -9,11 +9,11 @@
 // it via an input iterator + output callback and renders the state. String-free:
 // all user-facing labels arrive via props (getMessage resolved by the caller).
 
-import { Box, Text, Static, useInput, useApp } from 'ink';
+import { Box, Text, Static, useInput, useApp, useStdout, measureElement, type DOMElement } from 'ink';
 import { InkPaletteContext, useInkPalette } from './ink-palette-context.js';
 import type { SessionAuthority } from './session-authority.js';
 import type { InkPalette } from './ink-palette.js';
-import { useState, useRef, useEffect, Component, type ReactElement, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useContext, Component, type ReactElement, type ReactNode } from 'react';
 import { homedir } from 'node:os';
 import { lstatSync } from 'node:fs';
 import { join } from 'node:path';
@@ -26,6 +26,7 @@ import { InputBar, type CaretStyle, type ShortcutsPanel } from './input-bar.js';
 import { StatusRow, formatSessionIdForTerminal } from './status-row.js';
 import { resolveCtrlC, CTRL_C_EXIT_WINDOW_MS } from './interrupt-policy.js';
 import { useTerminalColumns } from './use-terminal-columns.js';
+import { TerminalViewportContext } from './terminal-resize-mediator.js';
 import { expandAtRefs } from './at-ref.js';
 import { resolveSlash, type SlashRegistry } from '../commands/chat-slash-registry.js';
 import type { ChatMode } from '../commands/chat-mode.js';
@@ -80,8 +81,29 @@ import type { InboxRow, InboxLabels, InboxDecisionVerb } from './run-flow-inbox.
 import type { RunFlowContext, PlanPreview } from '../../core/run-flow-contract.js';
 import type { RunFlowController } from './run-flow-controller.js';
 import { RunFlowProviderHoldError, type RunFlowProviderHoldDetails } from './run-flow-controller.js';
+import { ToolReadCard } from './tool-read-card.js';
+import { parseToolReadJson, safeTerminalText, type ToolReadKind, type ToolReadProjection } from './tool-read-model.js';
+import type { ToolReadLabels } from './tool-read-labels.js';
+import type { CliReadRequest, CliToolDispatcher, CliToolReadResult } from '../commands/chat-tool-bridge.js';
+import { resolveCliReadRequest } from '../commands/chat-tool-bridge.js';
+import type { SessionToolContentStore } from '../../agent/session-tool-content.js';
 
 export type ConfirmAnswer = 'y' | 'a' | 'n';
+
+/** Decode only complete UTF-8 scalar boundaries from an overlapped range. The
+ * nominal page cursor remains byte-based; display bytes may start earlier so a
+ * scalar split at the preceding page edge is shown once on this page. */
+export function decodeToolReadUtf8Window(bytes: Uint8Array, nominalOffset: number, fetchedOffset: number, nominalBytes: number): string {
+  const localStart = Math.max(0, nominalOffset - fetchedOffset);
+  const localEnd = Math.min(bytes.length, localStart + nominalBytes);
+  let start = localStart;
+  while (start > Math.max(0, localStart - 3) && (bytes[start]! & 0xc0) === 0x80) start -= 1;
+  let end = localEnd;
+  while (end > Math.max(start, localEnd - 3) && end < bytes.length && (bytes[end]! & 0xc0) === 0x80) end -= 1;
+  // Adjust only range edges. Invalid bytes inside a window must not erase its
+  // remainder; their replacement is display-only, with raw bytes in custody.
+  return safeTerminalText(new TextDecoder('utf-8').decode(bytes.subarray(start, end)));
+}
 // toolName is optional: the dispatcher passes it so an 'a' (always) decision can
 // be applied to the SAME-tool remainder still waiting in the confirm queue. The
 // ALWAYS-confirm tier (kill/cleanup) omits it on purpose (never auto-applies 'a').
@@ -1400,6 +1422,14 @@ export interface ReplAppProps {
   resumeLedgerOptions?: LedgerStoreOptions;
   /** When set (native flag on), drives the turn INSTEAD of runChatNativeLoop. */
   nativeEngine?: ReplEngine;
+  /** Same-session, opaque structured-read capability; absent preserves the
+   * established dispatcher path. The App never receives a content path. */
+  toolRead?: {
+    dispatchRead: CliToolDispatcher['dispatchRead'];
+    readDetailRange: SessionToolContentStore['readDetailRange'];
+    labels: ToolReadLabels;
+    now?: () => string;
+  };
   /** repl_surface.enabled config-flag seam (default-off). The caller (run.tsx)
    * resolves the real project-config flag and passes it here; absent/false →
    * this component renders byte-identical to the pre-354-001 App. */
@@ -1618,11 +1648,13 @@ export async function routeNativeMcpInput(options: NativeMcpRouteOptions): Promi
 
 export function ReplApp(props: ReplAppProps): ReactElement {
   const palette = useInkPalette();
-  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, nativeMcpSlash, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, startupRecentSessions = false, sprintHistoricalContext, renderSprintContextReason, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false, dualStreamOverflow } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, nativeMcpSlash, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, startupRecentSessions = false, sprintHistoricalContext, renderSprintContextReason, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false, dualStreamOverflow, toolRead } = props;
   const resumeLedgerOptions: LedgerStoreOptions = { ...props.resumeLedgerOptions, cwd: props.cwd };
   const { exit } = useApp();
   // TERMINAL-TOOLS-004 — live width for the status row + queue preview (reflows on resize).
-  const columns = useTerminalColumns();
+  const fallbackColumns = useTerminalColumns();
+  const mediatedViewport = useContext(TerminalViewportContext);
+  const columns = mediatedViewport?.columns ?? fallbackColumns;
   const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
   const [approval, setApproval] = useState<ApprovalMode>('suggest');
   const [cwd, setCwd] = useState(props.cwd);
@@ -1650,6 +1682,44 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   };
   const [queued, setQueued] = useState<string[]>([]);
   const [confirm, setConfirm] = useState<ConfirmHead | null>(null);
+  const [toolReadModel, setToolReadModel] = useState<ToolReadProjection | null>(null);
+  const [toolReadOpen, setToolReadOpen] = useState(false);
+  const [toolReadRaw, setToolReadRaw] = useState<{ detailRef: string; sha: string; offset: number; totalBytes: number; text: string } | null>(null);
+  const [toolReadStderr, setToolReadStderr] = useState<typeof toolReadRaw>(null);
+  const worklineNode = useRef<DOMElement>(null);
+  const readCardNode = useRef<DOMElement>(null);
+  const { stdout: terminalOutput } = useStdout();
+  const readRows = (): number => Number.isFinite(terminalOutput.rows) && terminalOutput.rows > 0 ? Math.floor(terminalOutput.rows) : 24;
+  const [terminalRows, setTerminalRows] = useState(readRows);
+  const effectiveTerminalRows = mediatedViewport?.rows ?? terminalRows;
+  const [readReservedRows, setReadReservedRows] = useState(0);
+  useEffect(() => {
+    const resize = (): void => setTerminalRows(readRows());
+    terminalOutput.on('resize', resize);
+    return () => { terminalOutput.off('resize', resize); };
+  }, [terminalOutput]);
+  useEffect(() => {
+    if (!worklineNode.current) return;
+    // Account for actual surrounding Workline layout, including translated
+    // footer wrapping. A full-height card plus a second footer would force Ink
+    // to clear native scrollback on each update.
+    const outer = measureElement(worklineNode.current).height;
+    const card = readCardNode.current ? measureElement(readCardNode.current).height : 0;
+    const reserved = Math.max(0, Math.ceil(outer - card));
+    setReadReservedRows((previous) => previous === reserved ? previous : reserved);
+  });
+  const toolReadGeneration = useRef(0);
+  const toolReadPageSequence = useRef({ stdout: 0, stderr: 0 });
+  const toolReadAbort = useRef<AbortController | null>(null);
+  const invalidateToolRead = (): void => {
+    toolReadGeneration.current += 1;
+    toolReadAbort.current?.abort();
+    toolReadAbort.current = null;
+    setToolReadOpen(false);
+    setToolReadRaw(null);
+    setToolReadStderr(null);
+  };
+  useEffect(() => () => { toolReadGeneration.current += 1; toolReadAbort.current?.abort(); }, []);
 
   const [sessionTok, setSessionTok] = useState(0);
   const idRef = useRef(1);
@@ -1791,6 +1861,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       // A hydrated chat has no new outbound request yet. Do not present the
       // previous chat's measurement as its current/last request.
       clearNativeRequestMeasurementAfterResume();
+      invalidateToolRead();
       pushTurn('seg', line);
       return true;
     }
@@ -2470,6 +2541,144 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     return { result, pendingTool };
   };
 
+  const loadToolRead = async (request: CliReadRequest): Promise<void> => {
+    if (!toolRead) return;
+    const generation = ++toolReadGeneration.current;
+    toolReadAbort.current?.abort();
+    const controller = new AbortController();
+    toolReadAbort.current = controller;
+    const current = (): boolean => generation === toolReadGeneration.current && !controller.signal.aborted;
+    const kind = request.kind as ToolReadKind;
+    let execution: ToolReadProjection['execution'];
+    let observation: ToolReadProjection['observation'];
+    const publish = (projection: ToolReadProjection): void => {
+      if (current()) setToolReadModel({ ...projection, ...(execution ? { execution } : {}), ...(observation ? { observation } : {}) });
+    };
+    const unavailable = (reasonCode: string): void => publish({ kind, state: 'unavailable', count: null, rows: [], reasonCode });
+    setToolReadRaw(null);
+    setToolReadStderr(null);
+    setToolReadModel({ kind, state: 'loading', count: null, rows: [], reasonCode: null });
+    setToolReadOpen(true);
+    try {
+      const result: CliToolReadResult = await toolRead.dispatchRead(request);
+      if (!current()) return;
+      const capture = result.stdoutCapture;
+      observation = {
+        observedAt: toolRead.now?.() ?? new Date().toISOString(),
+        stdoutObservedBytes: capture.observedBytes, stdoutStoredBytes: capture.storedBytes,
+        stdoutComplete: capture.complete, stdoutObservedSha256: capture.observedSha256,
+        stdoutStoredSha256: capture.storedSha256,
+        stderrObservedBytes: result.stderrCapture.observedBytes, stderrStoredBytes: result.stderrCapture.storedBytes,
+        stderrComplete: result.stderrCapture.complete, stderrObservedSha256: result.stderrCapture.observedSha256,
+        stderrStoredSha256: result.stderrCapture.storedSha256,
+      };
+      const stderr = safeTerminalText(result.stderrCapture.preview);
+      execution = {
+        exitCode: result.envelope.exitCode, signal: result.signal,
+        reason: result.containmentReason ?? result.envelope.reason,
+        stderr: stderr.length > 0 ? stderr : null,
+      };
+      // Diagnostics have independent custody. Keep stdout/schema truth usable
+      // even when the stderr reader is unavailable; never call its preview the
+      // full error output. Both channels page through the same session owner.
+      const diagnostics = result.stderrCapture;
+      if (diagnostics.observedBytes > 0) {
+        if (!diagnostics.detailRef || !diagnostics.storedSha256 || diagnostics.storedBytes === 0) {
+          execution = { ...execution, stderrReadReason: diagnostics.reasonCode ?? 'READ_DETAIL_UNAVAILABLE' };
+        } else {
+          try {
+            const detail = await toolRead.readDetailRange({ detailRef: diagnostics.detailRef, offset: 0, limit: 8 * 1024 + 3, expectedStoredSha256: diagnostics.storedSha256 }, controller.signal);
+            if (!current()) return;
+            if (detail.kind === 'hold') execution = { ...execution, stderrReadReason: detail.reasonCode };
+            else if (detail.offset !== 0 || detail.totalBytes !== diagnostics.storedBytes || detail.storedSha256 !== diagnostics.storedSha256
+              || detail.bytes.length === 0 || detail.completeCapture !== diagnostics.complete) {
+              execution = { ...execution, stderrReadReason: 'READ_CAPTURE_LENGTH_MISMATCH' };
+            } else {
+              setToolReadStderr({ detailRef: diagnostics.detailRef, sha: diagnostics.storedSha256,
+                offset: 0, totalBytes: detail.totalBytes, text: decodeToolReadUtf8Window(detail.bytes, 0, detail.offset, 8 * 1024) });
+              if (!diagnostics.complete) execution = { ...execution, stderrReadReason: diagnostics.reasonCode ?? 'READ_CAPTURE_PARTIAL' };
+            }
+          } catch { if (current()) execution = { ...execution, stderrReadReason: 'READ_DETAIL_UNAVAILABLE' }; }
+        }
+      }
+      if (!current()) return;
+      if (!capture.detailRef || !capture.storedSha256) {
+        unavailable(capture.reasonCode ?? result.containmentReason ?? 'READ_DETAIL_UNAVAILABLE');
+        return;
+      }
+      const { detailRef, storedSha256 } = capture;
+      const installRaw = (bytes: Uint8Array, offset: number, totalBytes: number): void => {
+        if (current()) setToolReadRaw({ detailRef, sha: storedSha256, offset: 0, totalBytes,
+          text: decodeToolReadUtf8Window(bytes, 0, offset, 8 * 1024) });
+      };
+      if (!capture.complete || capture.storedBytes > 4 * 1024 * 1024) {
+        const detail = await toolRead.readDetailRange({ detailRef, offset: 0, limit: 8 * 1024 + 3, expectedStoredSha256: storedSha256 }, controller.signal);
+        if (!current()) return;
+        if (detail.kind === 'hold') { unavailable(detail.reasonCode); return; }
+        installRaw(detail.bytes, detail.offset, detail.totalBytes);
+        publish({ kind, state: capture.complete ? 'raw' : 'partial', count: null, rows: [],
+          reasonCode: capture.complete ? null : (capture.reasonCode ?? 'READ_CAPTURE_PARTIAL') });
+        return;
+      }
+      const bytes = Buffer.alloc(capture.storedBytes);
+      let offset = 0;
+      while (offset < capture.storedBytes) {
+        const detail = await toolRead.readDetailRange({ detailRef, offset, limit: 256 * 1024, expectedStoredSha256: storedSha256 }, controller.signal);
+        if (!current()) return;
+        if (detail.kind === 'hold') { unavailable(detail.reasonCode); return; }
+        if (detail.offset !== offset || detail.totalBytes !== capture.storedBytes || !detail.completeCapture
+          || detail.storedSha256 !== storedSha256 || detail.bytes.length === 0
+          || offset + detail.bytes.length > bytes.length) {
+          unavailable('READ_CAPTURE_LENGTH_MISMATCH'); return;
+        }
+        bytes.set(detail.bytes, offset);
+        offset += detail.bytes.length;
+        if (detail.nextOffset !== (offset < bytes.length ? offset : null)) {
+          unavailable('READ_CAPTURE_LENGTH_MISMATCH'); return;
+        }
+      }
+      let projection: ToolReadProjection;
+      try { projection = parseToolReadJson(kind, new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
+      catch { projection = { kind, state: 'schema-unknown', count: null, rows: [], reasonCode: 'READ_UTF8_INVALID' }; }
+      if (projection.state === 'schema-unknown') installRaw(bytes.subarray(0, 8 * 1024 + 3), 0, bytes.length);
+      publish(projection);
+    } catch { unavailable('READ_DETAIL_UNAVAILABLE'); }
+  };
+  const pageToolReadRaw = async (direction: -1 | 1, channel: 'stdout' | 'stderr' = 'stdout'): Promise<void> => {
+    const raw = channel === 'stdout' ? toolReadRaw : toolReadStderr;
+    if (!toolRead || !raw || toolReadAbort.current?.signal.aborted) return;
+    const generation = toolReadGeneration.current;
+    const sequence = ++toolReadPageSequence.current[channel];
+    const signal = toolReadAbort.current?.signal;
+    const current = (): boolean => generation === toolReadGeneration.current
+      && sequence === toolReadPageSequence.current[channel] && !signal?.aborted;
+    const reportReadHold = (reasonCode: string): void => {
+      if (!current()) return;
+      setToolReadModel((model) => model ? channel === 'stderr'
+        ? { ...model, ...(model.execution ? { execution: { ...model.execution, stderrReadReason: reasonCode } } : {}) }
+        : { ...model, state: 'unavailable', reasonCode } : model);
+    };
+    const lastOffset = Math.floor(Math.max(0, raw.totalBytes - 1) / (8 * 1024)) * 8 * 1024;
+    const nextOffset = Math.max(0, Math.min(lastOffset, raw.offset + direction * 8 * 1024));
+    if (nextOffset === raw.offset) return;
+    const fetchOffset = Math.max(0, nextOffset - 3);
+    try {
+      const detail = await toolRead.readDetailRange({ detailRef: raw.detailRef, offset: fetchOffset, limit: 8 * 1024 + 6, expectedStoredSha256: raw.sha }, signal);
+      if (!current()) return;
+      if (detail.kind === 'hold') {
+        reportReadHold(detail.reasonCode);
+        return;
+      }
+      if (detail.offset !== fetchOffset || detail.totalBytes !== raw.totalBytes || detail.storedSha256 !== raw.sha || detail.bytes.length === 0) {
+        reportReadHold('READ_CAPTURE_LENGTH_MISMATCH'); return;
+      }
+      const setWindow = channel === 'stdout' ? setToolReadRaw : setToolReadStderr;
+      setWindow({ ...raw, offset: nextOffset, totalBytes: detail.totalBytes,
+        text: decodeToolReadUtf8Window(detail.bytes, nextOffset, detail.offset, 8 * 1024) });
+    } catch {
+      reportReadHold('READ_DETAIL_UNAVAILABLE');
+    }
+  };
   const handleSubmit = async (line: string): Promise<void> => {
     let trimmed = line.trim();
     if (trimmed.length === 0) return;
@@ -2537,6 +2746,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     }
     // /clear must clear the Ink screen (history), not just the loop transcript.
     if (trimmed.toLowerCase() === '/clear') {
+      invalidateToolRead();
       clearScreen();
       return;
     }
@@ -2646,6 +2856,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
             activeSessionIdRef.current = literalId;
             setSessionTok(attempt.result.outputTokens);
             clearNativeRequestMeasurementAfterResume();
+            invalidateToolRead();
             pushTurn('seg', requireInjectedLabel('resumeSwitched', labels.resumeSwitched).replace('{id}', literalId));
           }
           return;
@@ -2763,6 +2974,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           const entry = slashRegistry.find((c) => c.agenticTool === bridged.tool);
           const gate = gateAction(termModeRef.current, { tool: bridged.tool, args: bridged.args, declaredRisk: entry?.risk });
           if (gate.kind === 'deny') { pushTurn('seg', denyLine(gate, trimmed)); return; }
+          const readRequest = replSurfaceEnabled && toolRead ? resolveCliReadRequest(bridged.tool, bridged.args) : null;
+          if (readRequest) {
+            await loadToolRead(readRequest);
+            return;
+          }
           const dispatchResult = await dispatcher.dispatch(bridged.tool, bridged.args);
           const localDetail = bridged.tool === 'deckent_status' ? await nativeStatusDetail() : undefined;
           pushTurn('seg', localDetail ? `${dispatchResult}\n${localDetail}` : dispatchResult);
@@ -2870,7 +3086,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   };
   // While a modal/card owns stdin the InputBar is inactive, so Ctrl-C must
   // still reach the policy (otherwise it would be silently swallowed).
-  const inputBarActiveNow = stdinOwner.inputBarActive && !runFlowPending && !inboxOpen && picker === null;
+  const inputBarActiveNow = stdinOwner.inputBarActive && !runFlowPending && !inboxOpen && picker === null && !toolReadOpen;
   useInput((input, key) => {
     if (key.ctrl && input === 'c') handleInterrupt('int', false);
   }, { isActive: resolveGlobalInterruptActive(inputBarActiveNow, resolvePickerCardActive(confirm !== null, approvalPending, runFlowPending, inboxOpen) && picker !== null) });
@@ -2908,7 +3124,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     : null;
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" ref={worklineNode}>
       <Static items={turns}>{(turn) => <TurnView key={turn.id} turn={turn} hyperlinks={props.hyperlinks === true} />}</Static>
 
       {/* In-progress (incomplete) line — the only streamed text in the dynamic
@@ -2986,6 +3202,24 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         />
       )}
 
+      {replSurfaceEnabled && toolRead && (
+        <Box ref={readCardNode} flexDirection="column">
+        <ToolReadCard
+          open={toolReadOpen}
+          model={toolReadModel}
+          labels={toolRead.labels}
+          columns={columns}
+          rows={Math.max(1, effectiveTerminalRows - readReservedRows)}
+          overflow={dualStreamOverflow ?? '...'}
+          ascii={pickerAscii}
+          isActive={stdinOwner.inputBarActive && !runFlowPending && !inboxOpen && picker === null}
+          {...(toolReadRaw ? { raw: { ...toolReadRaw, onPage: pageToolReadRaw } } : {})}
+          {...(toolReadStderr ? { stderrRaw: { ...toolReadStderr, onPage: (direction: -1 | 1) => pageToolReadRaw(direction, 'stderr') } } : {})}
+          onClose={invalidateToolRead}
+        />
+        </Box>
+      )}
+
       {/* TERMINAL-PICKER-002 — the interactive value picker (bare /model,
           /provider …). Rendered after the inbox card: the lowest-priority
           stdin consumer (resolvePickerCardActive). While a turn is in flight
@@ -2997,7 +3231,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           labels={pickerLabels}
           glyphs={resolvePickerGlyphs(pickerAscii)}
           columns={columns}
-          rows={process.stdout.rows ?? 24}
+          rows={effectiveTerminalRows}
           noColor={pickerNoColor}
           isActive={resolvePickerCardActive(stdinOwner.confirmActive, approvalPending, runFlowPending, inboxOpen)}
           readOnlyReason={working
@@ -3046,7 +3280,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         // SURF-3 D3a: the live `/runs --follow` card is a fifth consumer —
         // typing is suspended while it is up (Esc closes it), same no-op-when-off
         // property (`inboxOpen` is false until `--follow`).
-        active={stdinOwner.inputBarActive && !runFlowPending && !inboxOpen && picker === null}
+        active={inputBarActiveNow}
         onSubmit={handleSubmit}
         onInterrupt={handleInterrupt}
         onEscape={handleEscapeInterrupt}

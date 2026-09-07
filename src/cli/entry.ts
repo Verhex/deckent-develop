@@ -181,6 +181,26 @@ export function shouldBootstrapCatalogFor(argv: readonly string[]): boolean {
   return name !== undefined && isCatalogDependent(name);
 }
 
+/** Resolve offline intent from Commander's parsed leaf/global options plus the legacy env gate. */
+export function resolveCatalogBootstrapOffline(
+  actionCommand: { optsWithGlobals(): Record<string, unknown> },
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return actionCommand.optsWithGlobals()['offline'] === true || env['DECKENT_OFFLINE'] === '1';
+}
+
+/** JSON model read commands own their one catalog snapshot inside their action. */
+export function parsedCommandOwnsCatalogRead(actionCommand: {
+  name(): string;
+  readonly parent?: { name(): string } | null;
+  optsWithGlobals(): Record<string, unknown>;
+}): boolean {
+  const leaf = actionCommand.name();
+  return actionCommand.parent?.name() === 'models'
+    && (leaf === 'list' || leaf === 'active-set')
+    && actionCommand.optsWithGlobals()['json'] === true;
+}
+
 /**
  * Build the argv that `parseAsync` should consume. When the default REPL is
  * triggered, append `chat --native` after argv[0] and argv[1]; otherwise
@@ -1337,16 +1357,17 @@ async function runCommanderInvocation(): Promise<void> {
     await buildProgram({
       ...(providerAuthority ? { providerAuthority } : {}),
     })
-      .hook('preAction', async () => {
+      .hook('preAction', async (_program, actionCommand) => {
         // SEC-04 (task 418-003): lazy catalog-bootstrap — only commands whose
         // execution path actually needs model-catalog data trigger this (see
         // command-registry.ts `catalogDependent`). Read-only commands like
         // `status`/`doctor`/`history`/`config` skip this entirely: no cache
         // read, no network, no bootstrap call at all.
         if (!shouldBootstrapCatalogFor(process.argv)) return;
+        if (parsedCommandOwnsCatalogRead(actionCommand)) return;
         const lang = getLangFromConfig(process.cwd());
         await bootstrapFromCatalog({
-          offline: process.env['DECKENT_OFFLINE'] === '1',
+          offline: resolveCatalogBootstrapOffline(actionCommand, process.env),
           onFetchAttempt: () => {
             process.stderr.write(`${getMessage('catalog.network_fetch_notice', lang)}\n`);
           },

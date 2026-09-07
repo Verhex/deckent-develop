@@ -25,9 +25,7 @@
 // `[deckent] truncated (…)` returns. User-facing text stays in messages.ts.
 
 import { createHash } from 'node:crypto';
-import { chmodSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { createSessionToolContentStore, type ToolCaptureReceipt } from './session-tool-content.js';
 
 // ─── Budget constants ───────────────────────────────────────────────────────
 
@@ -303,10 +301,61 @@ export function brokerToolResult(raw: RawToolResult, opts: ContainToolResultOpti
   return renderToolResultEnvelope(containToolResult(raw, opts));
 }
 
+export interface CapturedToolResult {
+  stdout: ToolCaptureReceipt;
+  stderr: ToolCaptureReceipt;
+  exitCode: number | null;
+  signal: string | null;
+  reason?: ToolResultFailureReason;
+}
+
+/** Adapts incremental capture receipts without reconstructing the full output. */
+export function containCapturedToolResult(
+  raw: CapturedToolResult,
+): ToolResultEnvelope {
+  const protocolMarker = raw.stdout.protocolFailure === "denied"
+    ? "[deckent-denied]"
+    : raw.stdout.protocolFailure === "timeout"
+      ? "[mcp-error] timed out after"
+      : raw.stdout.protocolFailure === "tool-error" ? "[mcp-error]" : "";
+  const truth = resolveExitTruth({
+    // A trailing exit marker often follows a multi-megabyte JSON payload.  The
+    // capture keeps this bounded tail specifically so marker truth is not
+    // accidentally limited to the model preview.
+    // Keep the exit suffix even when a prior marker was retained. Prefixing
+    // the raw tail avoids mistaking a clipped mid-line token for a line start.
+    output: `${protocolMarker}\nx${raw.stdout.protocolTail}`,
+    ok:
+      raw.exitCode === 0 &&
+      raw.signal === null &&
+      raw.stdout.complete &&
+      raw.stderr.complete,
+    exitCode: raw.exitCode,
+    signal: raw.signal,
+    reason:
+      raw.reason ??
+      (!raw.stdout.complete || !raw.stderr.complete ? "tool-error" : undefined),
+  });
+  return {
+    summary: firstNonEmptyLine(raw.stdout.preview),
+    boundedPreview: raw.stdout.preview,
+    contentRef: raw.stdout.complete ? raw.stdout.legacyContentRef : null,
+    sha256: raw.stdout.observedSha256,
+    bytes: raw.stdout.observedBytes,
+    approxTokens: Math.ceil(raw.stdout.observedBytes / BYTES_PER_TOKEN),
+    truncated: raw.stdout.observedBytes > Buffer.byteLength(raw.stdout.preview),
+    exitCode: truth.exitCode,
+    ok: truth.ok,
+    reason: truth.reason,
+    stderr: raw.stderr.preview.length > 0 ? raw.stderr.preview : null,
+    storeError: raw.stdout.reasonCode ?? raw.stderr.reasonCode,
+  };
+}
+
 // ─── Standalone session content store ───────────────────────────────────────
 
 /** Leaf directory the store creates when it is anchored to a session scratch root. */
-export const CONTENT_STORE_DIR = 'tool-content';
+export const CONTENT_STORE_DIR = "tool-content";
 
 /**
  * Session-scoped content store: a lazily-created directory (never the source
@@ -324,42 +373,15 @@ export const CONTENT_STORE_DIR = 'tool-content';
  * Mode bits are best-effort: Windows has no POSIX mode, so a chmod failure is
  * tolerated rather than turning a working session into a hard error.
  */
-export function createSessionContentStore(opts: { dir?: string; prefix?: string } = {}): ContentWriter {
-  const prefix = opts.prefix ?? 'deckent-tool-content-';
-  const anchor = opts.dir;
-  let root: string | null = null;
-  const ensureRoot = (): string => {
-    if (root !== null) return root;
-    const created = anchor === undefined
-      ? mkdtempSync(join(tmpdir(), prefix))
-      : join(anchor, CONTENT_STORE_DIR);
-    if (anchor !== undefined) mkdirSync(created, { recursive: true, mode: 0o700 });
-    if (process.platform !== 'win32') {
-      try { chmodSync(created, 0o700); } catch { /* best-effort */ }
-    }
-    root = created;
-    return created;
-  };
-  return {
-    write(bytes: Buffer): ContentWriteReceipt {
-      const dir = ensureRoot();
-      const sha256 = createHash('sha256').update(bytes).digest('hex');
-      const target = join(dir, `content-${sha256}.bin`);
-      const temporary = join(dir, `.content-${sha256}.${process.pid}.tmp`);
-      writeFileSync(temporary, bytes, { mode: 0o600 });
-      renameSync(temporary, target);
-      if (process.platform !== 'win32') {
-        try { chmodSync(target, 0o600); } catch { /* best-effort */ }
-      }
-      return { path: target, sha256 };
-    },
-    /** Removes ONLY a directory this store actually created; idempotent, and
-     *  fail-open so a teardown error never propagates into session close. */
-    close(): void {
-      const created = root;
-      root = null;
-      if (created === null) return;
-      try { rmSync(created, { recursive: true, force: true }); } catch { /* best-effort teardown */ }
-    },
-  };
+export { TOOL_DETAIL_RANGE_MAX_BYTES } from "./session-tool-content.js";
+export type {
+  SessionToolContentStore,
+  ToolCapture,
+  ToolCaptureReceipt,
+  ToolDetailRead,
+} from "./session-tool-content.js";
+export function createSessionContentStore(
+  opts: { dir?: string; prefix?: string } = {},
+): import("./session-tool-content.js").SessionToolContentStore {
+  return createSessionToolContentStore(opts);
 }

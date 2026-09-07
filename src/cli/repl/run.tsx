@@ -5,6 +5,7 @@
 // and injected into the string-free component.
 
 import { render } from 'ink';
+import { createTerminalResizeMediator, TerminalViewportProvider } from './terminal-resize-mediator.js';
 import { ReplApp, ReplErrorBoundary, type ConfirmTrigger, type ToolSink, type ToolInfo, type ReplLabels } from './app.js';
 import type { ApprovalCardLabels } from './approval-card.js';
 import {
@@ -181,7 +182,7 @@ import type { HealthField } from '../helpers/health-snapshot.js';
 import { buildLedgerRecorder, buildTurnRecorder, composeTurnRecorders, resolveTraceEnabled } from './trace-wire.js';
 import { composeSystemPrompt } from '../../agent/identity.js';
 import { resolveScratchRoot } from '../../agent/scratch-checkpoint.js';
-import { createSessionContentStore } from '../../agent/tool-result-broker.js';
+import { createSessionToolContentStore } from '../../agent/session-tool-content.js';
 import { projectSlug } from '../../core/project-slug.js';
 import type { ChatProviderAdapter } from '../commands/chat-native.js';
 import { createCliToolDispatcher, cliArgsFor } from '../commands/chat-tool-bridge.js';
@@ -203,6 +204,7 @@ import { createSessionAuthority } from './session-authority.js';
 import { createSwitchableProvider, type ActiveSelection } from './provider-switch.js';
 import { createRunStateFeed } from '../helpers/run-state-feed.js';
 import type { LiveFooterLabels } from '../helpers/live-footer.js';
+import type { ToolReadLabels } from './tool-read-labels.js';
 import { InjectedLabelMissingError } from '../helpers/injected-label.js';
 import { ApprovalBroker } from '../../core/approval-broker.js';
 import { ApprovalRelay } from '../../core/approval-relay.js';
@@ -372,6 +374,43 @@ export function buildReplLabels(t: (key: string) => string): ReplLabels {
     // TERMINAL-TOOLS-013 — one-time confirm hint + paused-input anchor.
     confirmHintOnce: t('tui.confirm_hint_once'),
     inputPaused: t('tui.input_paused'),
+  };
+}
+
+/** L3 read-card labels; rendering/parsing receives this injected set only. */
+export function buildToolReadLabels(t: (key: string) => string): ToolReadLabels {
+  return {
+    title: {
+      doctor: t('tui.tool_read.title.doctor'),
+      history: t('tui.tool_read.title.history'),
+      models: t('tui.tool_read.title.models'),
+      'model-active-set': t('tui.tool_read.title.model_active_set'),
+      agents: t('tui.tool_read.title.agents'),
+      skills: t('tui.tool_read.title.skills'),
+    },
+    sectionAuthority: t('tui.tool_read.section.authority'),
+    sectionSummary: t('tui.tool_read.section.summary'),
+    sectionCapture: t('tui.tool_read.section.capture'),
+    sectionExecution: t('tui.tool_read.section.execution'),
+    sectionStderr: t('tui.tool_read.section.stderr'),
+    snapshot: t('tui.tool_read.snapshot'),
+    unknownCount: t('tui.tool_read.unknown_count'),
+    loading: t('tui.tool_read.loading'),
+    empty: t('tui.tool_read.empty'),
+    schemaUnknown: t('tui.tool_read.schema_unknown'),
+    partial: t('tui.tool_read.partial'),
+    rawComplete: t('tui.tool_read.raw_complete'),
+    unavailable: t('tui.tool_read.unavailable'),
+    executionFailed: t('tui.tool_read.execution_failed'),
+    executionSignal: t('tui.tool_read.execution_signal'),
+    executionStderr: t('tui.tool_read.execution_stderr'),
+    detailHint: t('tui.tool_read.detail_hint'),
+    listHint: t('tui.tool_read.list_hint'),
+    page: t('tui.tool_read.page'),
+    moreAbove: t('tui.tool_read.more_above'),
+    moreBelow: t('tui.tool_read.more_below'),
+    field: (key, value) => t('tui.tool_read.field').replace(/\{key\}|\{value\}/g, (token) => token === '{key}' ? key : value),
+    reason: (code) => t('tui.tool_read.reason').replace('{code}', code),
   };
 }
 
@@ -1597,9 +1636,24 @@ export async function runInkRepl(
     return answer !== 'n';
   };
 
-  const cliDispatcher = createCliToolDispatcher({ language: lang });
+  // One opaque capture owner is composed before every CLI/exec/native
+  // consumer. Native success uses its canonical scratch identity; legacy keeps
+  // the session store's isolated temporary layout.
+  const sharedNativeSessionId = nativeSelected && nativeBoot ? (sessionId ?? `native-${Date.now()}`) : undefined;
+  const sharedScratchIds = sharedNativeSessionId ? {
+    tenantId: (projectCfg as { approval?: { authority?: { tenant_id?: string } } }).approval?.authority?.tenant_id ?? 'main',
+    projectId: attendedExecutionProjectId(process.cwd()), sessionId: sharedNativeSessionId, checkpointProjectRoot: process.cwd(),
+  } : undefined;
+  const sessionContentStore = (() => {
+    try {
+      return sharedScratchIds
+        ? createSessionToolContentStore({ dir: resolveScratchRoot({ ...sharedScratchIds, slug: projectSlug(process.cwd()) }).root })
+        : createSessionToolContentStore();
+    } catch { return createSessionToolContentStore(); }
+  })();
+  const cliDispatcher = createCliToolDispatcher({ language: lang, sessionContentStore });
   // REPL-575 K5 — localized confirm-prompt summaries (i18n-FIRST).
-  const execDispatcher = createToolExecDispatcher({ cwd: () => process.cwd(), confirm: askConfirm, labels: buildToolExecLabels(lang) });
+  const execDispatcher = createToolExecDispatcher({ cwd: () => process.cwd(), confirm: askConfirm, labels: buildToolExecLabels(lang), contentStore: sessionContentStore });
 
   // Tool/change block sink: after a side-effecting tool completes, emit a
   // localized ToolInfo so the App renders a claude-code-style change block.
@@ -1790,18 +1844,12 @@ export async function runInkRepl(
       // NATIVE-AGENT-HORIZON-001 NT-03 (553-002) — the memory-session id when the chat
       // DB opened, else a fresh native-only fallback; shared by the trace recorder below
       // and the scratch-store ids so both name the SAME logical session.
-      const nativeSessionId = sessionId ?? `native-${Date.now()}`;
+      const nativeSessionId = sharedNativeSessionId!;
       // NATIVE-AGENT-HORIZON-001 NT-03 (553-002) — scratch-session identity threaded into
       // the bridge (which appends the fixed checkpointInstruction before calling
       // createAgentSession). tenant_id authority: approval.authority.tenant_id, falling
       // back to 'main' when unconfigured (single-tenant local REPL default).
-      const scratchTenantId = (cfg as { approval?: { authority?: { tenant_id?: string } } }).approval?.authority?.tenant_id ?? 'main';
-      const scratchIds = {
-        tenantId: scratchTenantId,
-        projectId: attendedExecutionProjectId(process.cwd()),
-        sessionId: nativeSessionId,
-        checkpointProjectRoot: process.cwd(),
-      };
+      const scratchIds = sharedScratchIds!;
       // 7089 (564-002 hand-completion) — ONE session-scoped overflow store,
       // anchored at the session's scratch root so tool-result spill bytes live
       // in the same swept namespace as the checkpoints (single-namespace
@@ -1809,15 +1857,6 @@ export async function runInkRepl(
       // registry's shared exec dispatcher AND to the engine, whose session
       // close() owns its teardown. Fail-soft: an unresolvable layout degrades
       // to the store's legacy per-process layout instead of killing the REPL.
-      const sessionContentStore = ((): ReturnType<typeof createSessionContentStore> => {
-        try {
-          return createSessionContentStore({
-            dir: resolveScratchRoot({ ...scratchIds, slug: projectSlug(process.cwd()) }).root,
-          });
-        } catch {
-          return createSessionContentStore();
-        }
-      })();
       // 7089 — the trace must record the system prompt the model ACTUALLY received.
       // loop.ts composes it with the session's resolved scratch dir, which does not
       // exist at boot, so this resolves the SAME canonical layout the session opens
@@ -1995,7 +2034,7 @@ export async function runInkRepl(
   // TERMINAL-READABILITY-001 — the palette is resolved ONCE from the color gate
   // (host-theme-mapped 16-color unless a dark background is proven; nothing
   // when suppressed) and provided to every card through context.
-  const { unmount, waitUntilExit } = render(
+  const appElement = (
     <InkPaletteProvider palette={resolveInkPalette(colorTier())}>
     <ReplErrorBoundary label={t('tui.render_error')} describeError={buildReplErrorDescriber(lang)}>
     <ReplApp
@@ -2078,6 +2117,13 @@ export async function runInkRepl(
       caretStyle={isColorSuppressed() ? 'marker' : 'inverse'}
       shortcutsPanel={buildShortcutsPanel(t)}
       {...(nativeEngine ? { nativeEngine } : {})}
+      {...(nativeEngine ? {
+        toolRead: {
+          dispatchRead: cliDispatcher.dispatchRead,
+          readDetailRange: sessionContentStore.readDetailRange,
+          labels: buildToolReadLabels(t),
+        },
+      } : {})}
       replSurfaceEnabled={replSurfaceEnabled}
       startupRecentSessions={projectCfg.terminal?.startup?.recent_sessions === true}
       {...(stateFeed ? { stateFeed } : {})}
@@ -2093,14 +2139,24 @@ export async function runInkRepl(
       } : {})}
     />
     </ReplErrorBoundary>
-    </InkPaletteProvider>,
+    </InkPaletteProvider>
+  );
+  const resizeMediator = createTerminalResizeMediator({
+    stdout: process.stdout,
+    onFailure: ({ code }) => { process.stderr.write(`${t('tui.resize.failed').replace('{code}', () => code)}\n`); },
+  });
+  const inkTree = <TerminalViewportProvider mediator={resizeMediator}>{appElement}</TerminalViewportProvider>;
+  const inkInstance = render(
+    inkTree,
     // TERMINAL-TOOLS-006 — Ctrl-C is a policy decision (interrupt-policy.ts,
     // app.tsx handleInterrupt), never Ink's unconditional unmount: a draft is
     // discarded, a running turn is interrupted, and only a second press
     // inside the window exits. External SIGINT/SIGTERM still run the
     // registered teardown (entry.ts onSignal).
-    { exitOnCtrlC: false },
+    { exitOnCtrlC: false, stdout: resizeMediator.stdout },
   );
+  resizeMediator.bind(inkInstance);
+  const { unmount, waitUntilExit } = inkInstance;
 
   // born-549 (SIGTERM-TEARDOWN) — ONE teardown shared by normal `/exit` and an
   // external SIGINT/SIGTERM (registered with entry.ts's onSignal via the
@@ -2109,7 +2165,7 @@ export async function runInkRepl(
   // before any of it (warm-child claude session, MCP broker child, alt-screen)
   // ever ran.
   const teardown = buildReplTeardown({
-    unmountInk: unmount,
+    unmountInk: () => { resizeMediator.dispose(); unmount(); },
     altScreen,
     restoreAltScreen: () => { process.stdout.write('\x1b[?1049l'); },
     ...(approvalWatch ? { approvalWatch } : {}),
@@ -2128,6 +2184,8 @@ export async function runInkRepl(
   // Deterministic exit (Ink unmount + restored stdin can otherwise keep the
   // event loop alive) — bounded so a slow MCP close() cannot hang a plain `/exit`.
   unregisterTeardown();
+  resizeMediator.dispose();
   await Promise.race([teardown(), new Promise((r) => setTimeout(r, REPL_TEARDOWN_TIMEOUT_MS))]);
+  sessionContentStore.close();
   process.exit(0);
 }

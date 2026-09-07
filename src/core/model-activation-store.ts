@@ -433,6 +433,36 @@ export function emptyModelActivationPolicy(): ModelActivationPolicy {
   };
 }
 
+function immutableSetView<T>(source: ReadonlySet<T>): ReadonlySet<T> {
+  const values = Object.freeze([...source]);
+  const view: ReadonlySet<T> = {
+    get size(): number { return values.length; },
+    has(value: T): boolean { return values.includes(value); },
+    entries(): SetIterator<[T, T]> {
+      return values.map((value) => [value, value] as [T, T]).values();
+    },
+    keys(): SetIterator<T> { return values.values(); },
+    values(): SetIterator<T> { return values.values(); },
+    forEach(callbackfn: (value: T, value2: T, set: ReadonlySet<T>) => void, thisArg?: unknown): void {
+      for (const value of values) callbackfn.call(thisArg, value, value, view);
+    },
+    [Symbol.iterator](): SetIterator<T> { return values.values(); },
+  };
+  return Object.freeze(view);
+}
+
+function immutablePolicyView(policy: ModelActivationPolicy): ModelActivationPolicy {
+  const explicitProviders = immutableSetView(policy.explicitProviders);
+  const activeModels = Object.freeze(policy.activeModels.map((model) => Object.freeze({ ...model })));
+  return Object.freeze({
+    explicitProviders,
+    activeModels,
+    snapshotDigest: policy.snapshotDigest,
+    providerMode: policy.providerMode.bind(policy),
+    isExecutable: policy.isExecutable.bind(policy),
+  });
+}
+
 /**
  * Resolve the owner's activation decisions into an immutable in-memory policy
  * WITHOUT holding a connection open. Fail-safe: an absent or unreadable store
@@ -471,16 +501,30 @@ export interface ProjectModelExecutionAuthority {
   readonly reasonCode: 'MODEL_ACTIVATION_AUTHORITY_UNAVAILABLE' | null;
 }
 
+export type ProjectModelActivationSnapshot =
+  | {
+    readonly state: 'ready';
+    readonly policy: ModelActivationPolicy;
+    readonly activationRecords: readonly ModelActivationRecord[];
+    readonly providerPolicies: readonly ProviderPolicyRecord[];
+    readonly snapshotDigest: string;
+    readonly reasonCode: null;
+  }
+  | {
+    readonly state: 'hold';
+    readonly snapshotDigest: string;
+    readonly reasonCode: 'MODEL_ACTIVATION_AUTHORITY_UNAVAILABLE';
+  };
+
 const MODEL_ACTIVATION_AUTHORITY_UNAVAILABLE_DIGEST = createHash('sha256')
   .update('model-activation-execution-authority unavailable v1')
   .digest('hex');
 
-export function resolveProjectModelExecutionAuthority(
+/** Strict, immutable project activation snapshot shared by execution and read surfaces. */
+export function readProjectModelActivationSnapshot(
   projectRoot: string,
-  provider: string,
-  modelId: string,
   options: ModelActivationStoreOptions = {},
-): ProjectModelExecutionAuthority {
+): ProjectModelActivationSnapshot {
   const dbPath = options.dbPath ?? join(projectRoot, '.deckent', 'models.db');
   let store: ModelActivationStore | undefined;
   try {
@@ -490,42 +534,67 @@ export function resolveProjectModelExecutionAuthority(
       readOnly: true,
       strictRead: true,
     });
-    const policy = buildPolicy(store.list(), store.listProviderPolicies());
-    return {
+    const activationRecords = store.list().map((record) => Object.freeze({ ...record }));
+    const providerPolicies = store.listProviderPolicies().map((record) => Object.freeze({ ...record }));
+    const policy = immutablePolicyView(buildPolicy(activationRecords, providerPolicies));
+    return Object.freeze({
       state: 'ready',
-      executable: policy.isExecutable(provider, modelId),
-      providerMode: policy.providerMode(provider),
+      policy,
+      activationRecords: Object.freeze(activationRecords),
+      providerPolicies: Object.freeze(providerPolicies),
       snapshotDigest: policy.snapshotDigest,
       reasonCode: null,
-    };
+    });
   } catch {
-    // A truly absent store is the documented implicit-active default. Inspect
-    // after the failed open so a concurrent create never slips through an
-    // exists-then-open race; every non-ENOENT state is a fail-closed HOLD.
     try {
       statSync(dbPath);
     } catch (presenceError) {
       if ((presenceError as NodeJS.ErrnoException).code === 'ENOENT') {
-        const policy = emptyModelActivationPolicy();
-        return {
+        const policy = immutablePolicyView(emptyModelActivationPolicy());
+        return Object.freeze({
           state: 'ready',
-          executable: policy.isExecutable(provider, modelId),
-          providerMode: policy.providerMode(provider),
+          policy,
+          activationRecords: Object.freeze([]),
+          providerPolicies: Object.freeze([]),
           snapshotDigest: policy.snapshotDigest,
           reasonCode: null,
-        };
+        });
       }
     }
-    return {
+    return Object.freeze({
       state: 'hold',
-      executable: false,
-      providerMode: DEFAULT_PROVIDER_POLICY_MODE,
       snapshotDigest: MODEL_ACTIVATION_AUTHORITY_UNAVAILABLE_DIGEST,
       reasonCode: 'MODEL_ACTIVATION_AUTHORITY_UNAVAILABLE',
-    };
+    });
   } finally {
     store?.close();
   }
+}
+
+export function resolveProjectModelExecutionAuthority(
+  projectRoot: string,
+  provider: string,
+  modelId: string,
+  options: ModelActivationStoreOptions = {},
+): ProjectModelExecutionAuthority {
+  const snapshot = readProjectModelActivationSnapshot(projectRoot, options);
+  if (snapshot.state === 'ready') {
+    const policy = snapshot.policy;
+    return {
+      state: 'ready',
+      executable: policy.isExecutable(provider, modelId),
+      providerMode: policy.providerMode(provider),
+      snapshotDigest: snapshot.snapshotDigest,
+      reasonCode: null,
+    };
+  }
+  return {
+    state: 'hold',
+    executable: false,
+    providerMode: DEFAULT_PROVIDER_POLICY_MODE,
+    snapshotDigest: snapshot.snapshotDigest,
+    reasonCode: snapshot.reasonCode,
+  };
 }
 
 /** Stable composite key for the (provider, modelId) pair. */

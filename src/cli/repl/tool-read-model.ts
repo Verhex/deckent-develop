@@ -1,0 +1,246 @@
+// ═══ Structured CLI read projections — parser/model only ═══════════════════
+//
+// This module deliberately accepts only a complete, digest-verified JSON
+// document supplied by the same-session detail reader. It never knows a file
+// path, ContentWriter, child process, or rendered broker preview.
+
+export type ToolReadKind = 'doctor' | 'history' | 'models' | 'model-active-set' | 'agents' | 'skills';
+export type ToolReadDataState = 'loading' | 'valid' | 'empty' | 'schema-unknown' | 'partial' | 'unavailable' | 'raw';
+
+export interface ToolReadField {
+  readonly key: string;
+  readonly value: string;
+}
+
+export interface ToolReadRow {
+  readonly id: string;
+  readonly title: string;
+  /** Presentation section resolved by injected caller labels, never prose here. */
+  readonly titleKind?: 'authority' | 'summary' | 'capture' | 'execution';
+  readonly fields: readonly ToolReadField[];
+}
+
+export interface ToolReadProjection {
+  readonly kind: ToolReadKind;
+  readonly state: ToolReadDataState;
+  readonly count: number | null;
+  readonly rows: readonly ToolReadRow[];
+  /** Technical code only; caller maps its explanation through injected labels. */
+  readonly reasonCode: string | null;
+  readonly execution?: { readonly exitCode: number | null; readonly signal: string | null; readonly reason: string | null; readonly stderr: string | null; readonly stderrReadReason?: string };
+  readonly observation?: {
+    readonly observedAt: string;
+    readonly stdoutObservedBytes: number;
+    readonly stdoutStoredBytes: number;
+    readonly stdoutComplete: boolean;
+    readonly stdoutObservedSha256: string;
+    readonly stdoutStoredSha256: string | null;
+    readonly stderrObservedBytes: number;
+    readonly stderrStoredBytes: number;
+    readonly stderrComplete: boolean;
+    readonly stderrObservedSha256: string;
+    readonly stderrStoredSha256: string | null;
+  };
+}
+
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function scalar(value: unknown): string | null {
+  if (typeof value === 'string') return safeTerminalText(value);
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  return null;
+}
+
+/**
+ * Projection-only terminal sanitization. It never changes captured JSON bytes
+ * or their digest; it only makes control and directional code points visible in
+ * an Ink text sink.
+ */
+export function safeTerminalText(value: string): string {
+  return value.replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu, (char) =>
+    `\\u${char.codePointAt(0)!.toString(16).padStart(4, '0')}`,
+  );
+}
+
+function structured(value: unknown): string | null {
+  if (value === null) return 'null';
+  if (Array.isArray(value) || isRecord(value)) {
+    try { return safeTerminalText(JSON.stringify(value)); } catch { return null; }
+  }
+  return scalar(value);
+}
+
+function fieldValue(key: string, value: unknown): ToolReadField | null {
+  const text = structured(value);
+  return text === null ? null : { key: safeTerminalText(key), value: text };
+}
+
+/** Known-schema detail preserves every own field, including explicit null and
+ * future additive fields. Preferred order is presentation, not a lossy allowlist.
+ * The caller has already admitted a complete bounded JSON document. */
+function completeFields(source: UnknownRecord, preferred: readonly string[] = [], excluded: readonly string[] = []): ToolReadField[] {
+  const omitted = new Set(excluded);
+  const first = new Set(preferred);
+  const keys = [
+    ...preferred.filter((key) => Object.hasOwn(source, key) && !omitted.has(key)),
+    ...Object.keys(source).filter((key) => !first.has(key) && !omitted.has(key)).sort(),
+  ];
+  return keys.flatMap((key) => { const field = fieldValue(key, source[key]); return field ? [field] : []; });
+}
+
+function unknown(kind: ToolReadKind, reasonCode = 'READ_SCHEMA_UNKNOWN'): ToolReadProjection {
+  return { kind, state: 'schema-unknown', count: null, rows: [], reasonCode };
+}
+
+function rowsProjection(kind: ToolReadKind, rows: readonly ToolReadRow[]): ToolReadProjection {
+  return { kind, state: rows.length === 0 ? 'empty' : 'valid', count: rows.length, rows, reasonCode: null };
+}
+
+function parseArray(kind: ToolReadKind, value: unknown, map: (entry: UnknownRecord, index: number) => ToolReadRow | null): ToolReadProjection {
+  if (!Array.isArray(value)) return unknown(kind);
+  const rows: ToolReadRow[] = [];
+  for (let index = 0; index < value.length; index++) {
+    const entry = value[index];
+    if (!isRecord(entry)) return unknown(kind);
+    const row = map(entry, index);
+    if (row === null) return unknown(kind);
+    rows.push(row);
+  }
+  return rowsProjection(kind, rows);
+}
+
+function idOf(value: unknown, fallback: string): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : fallback;
+}
+
+function parseDoctor(value: unknown): ToolReadProjection {
+  if (!isRecord(value) || typeof value.ok !== 'boolean' || !Array.isArray(value.checks) || !Array.isArray(value.providers) || !Array.isArray(value.providerAuth) || !('honestSummary' in value)) return unknown('doctor');
+  const rows: ToolReadRow[] = [];
+  for (let index = 0; index < value.checks.length; index++) {
+    const check = value.checks[index];
+    if (!isRecord(check) || typeof check.name !== 'string' || typeof check.passed !== 'boolean' || typeof check.message !== 'string' || typeof check.required !== 'boolean') return unknown('doctor');
+    rows.push({
+      id: `doctor:${index}:${check.name}`,
+      title: safeTerminalText(check.name),
+      fields: completeFields(check, ['passed', 'required', 'message', 'name']),
+    });
+  }
+  for (let index = 0; index < value.providers.length; index++) {
+    const provider = value.providers[index];
+    if (!isRecord(provider) || typeof provider.name !== 'string') return unknown('doctor');
+    rows.push({ id: `doctor:provider:${index}:${provider.name}`, title: safeTerminalText(provider.name), fields: completeFields(provider, ['available', 'reason', 'version', 'name']) });
+  }
+  for (let index = 0; index < value.providerAuth.length; index++) {
+    const auth = value.providerAuth[index];
+    if (!isRecord(auth) || typeof auth.provider !== 'string') return unknown('doctor');
+    rows.push({ id: `doctor:auth:${index}:${auth.provider}`, title: safeTerminalText(auth.provider), fields: completeFields(auth, ['available', 'state', 'method', 'ready', 'evidence', 'provider']) });
+  }
+  const summary = fieldValue('honestSummary', value.honestSummary);
+  if (summary === null) return unknown('doctor');
+  rows.push({ id: 'doctor:summary', title: '', titleKind: 'summary', fields: completeFields(value, ['honestSummary', 'ok', 'providerSummary'], ['checks', 'providers', 'providerAuth']) });
+  return rowsProjection('doctor', rows);
+}
+
+function parseHistory(value: unknown): ToolReadProjection {
+  return parseArray('history', value, (entry, index) => {
+    const sprint = idOf(entry.sprint, '');
+    const counts = ['tasks', 'completed', 'noGo'];
+    const strings = ['techDebt', 'noGoRate', 'successRate', 'coverage', 'duration', 'agents', 'skills', 'tokens', 'calls', 'filesChanged'];
+    if (sprint === null || sprint.length === 0 || typeof entry.sprint !== 'string'
+      || counts.some((key) => !(entry[key] === '-' || entry[key] === null || (Number.isSafeInteger(entry[key]) && (entry[key] as number) >= 0)))
+      || strings.some((key) => typeof entry[key] !== 'string')) return null;
+    return { id: `history:${safeTerminalText(sprint)}:${index}`, title: safeTerminalText(sprint), fields: completeFields(entry, ['sprint', 'tasks', 'completed', 'noGo', 'techDebt', 'successRate', 'noGoRate', 'coverage', 'duration', 'filesChanged', 'tokens', 'calls', 'agents', 'skills']) };
+  });
+}
+
+function parseAgents(value: unknown): ToolReadProjection {
+  return parseArray('agents', value, (entry, index) => {
+    const id = idOf(entry.id, '');
+    const name = scalar(entry.name);
+    if (id === null || id.length === 0 || name === null || typeof entry.enabled !== 'boolean' || (entry.validity !== 'valid' && entry.validity !== 'invalid') || !isRecord(entry.routable) || typeof entry.routable.value !== 'boolean' || !Array.isArray(entry.routable.reasons) || !isRecord(entry.provenance) || !isRecord(entry.prompt) || typeof entry.uses !== 'number' || !Number.isFinite(entry.uses) || !(entry.successRate === null || (typeof entry.successRate === 'number' && Number.isFinite(entry.successRate))) || !Array.isArray(entry.diagnostics)) return null;
+    return { id: `agent:${safeTerminalText(id)}:${index}`, title: name, fields: completeFields(entry, ['id', 'name', 'enabled', 'validity', 'displayType', 'model', 'uses', 'successRate', 'successes', 'successRatio', 'successPercent', 'lastUsedInSprint', 'routable', 'provenance', 'prompt', 'diagnostics']) };
+  });
+}
+
+function parseSkills(value: unknown): ToolReadProjection {
+  return parseArray('skills', value, (entry, index) => {
+    const id = idOf(entry.id, '');
+    const name = scalar(entry.name);
+    const disposition = entry.disposition;
+    if (id === null || id.length === 0 || name === null || typeof entry.category !== 'string'
+      || typeof entry.enabled !== 'boolean' || typeof entry.layer !== 'string'
+      || !isRecord(disposition) || !['active', 'disabled', 'quarantined', 'retired'].includes(disposition.state as string)
+      || ['reasonCode', 'since', 'supersededBy'].some((key) => disposition[key] !== null && typeof disposition[key] !== 'string')
+      || typeof entry.masked !== 'boolean'
+      || !(entry.profileState === null || typeof entry.profileState === 'string')
+      || typeof entry.priority !== 'number' || !Number.isFinite(entry.priority)
+      || !Array.isArray(entry.triggers) || entry.triggers.some((trigger) => typeof trigger !== 'string')
+      || !(entry.stats === null || isRecord(entry.stats)) || !(entry.exposure === null || isRecord(entry.exposure))) return null;
+    return { id: `skill:${safeTerminalText(id)}:${index}`, title: name, fields: completeFields(entry, ['id', 'name', 'category', 'enabled', 'layer', 'disposition', 'masked', 'profileState', 'priority', 'triggers', 'activation', 'routing', 'stats', 'exposure']) };
+  });
+}
+
+function parseModels(value: unknown): ToolReadProjection {
+  if (!isRecord(value) || value.schemaVersion !== 1 || value.kind !== 'model-catalog-list' || typeof value.catalogDigest !== 'string' || typeof value.source !== 'string' || !isRecord(value.filter) || !Array.isArray(value.models) || !Array.isArray(value.warnings) || !Number.isSafeInteger(value.count) || (value.count as number) < 0) return unknown('models');
+  const parsed = parseArray('models', value.models, (entry, index) => {
+    const id = idOf(entry.id, '');
+    const provider = scalar(entry.provider);
+    if (id === null || id.length === 0 || provider === null || typeof entry.apiId !== 'string' || typeof entry.tier !== 'string' || typeof entry.status !== 'string' || typeof entry.contextWindow !== 'number' || !Number.isFinite(entry.contextWindow) || !(entry.maxOutputTokens === null || (typeof entry.maxOutputTokens === 'number' && Number.isFinite(entry.maxOutputTokens))) || !isRecord(entry.costPerMillion) || !isRecord(entry.capabilities) || typeof entry.preferredForTier !== 'boolean') return null;
+    return { id: `model:${safeTerminalText(provider)}:${safeTerminalText(id)}:${index}`, title: safeTerminalText(id), fields: completeFields(entry, ['id', 'provider', 'apiId', 'tier', 'status', 'contextWindow', 'maxOutputTokens', 'preferredForTier', 'costPerMillion', 'capabilities']) };
+  });
+  if (parsed.state === 'schema-unknown') return parsed;
+  const metadata = completeFields(value, ['source', 'fetchedAt', 'ageMs', 'offline', 'filter', 'count', 'catalogDigest', 'warnings'], ['models']);
+  return { ...parsed, count: value.count as number, rows: [{ id: 'models:summary', title: '', titleKind: 'summary', fields: metadata }, ...parsed.rows] };
+}
+
+function parseActiveModels(value: unknown): ToolReadProjection {
+  if (!isRecord(value) || value.schemaVersion !== 1 || value.kind !== 'model-active-set' || !isRecord(value.authority)) return unknown('model-active-set');
+  if (value.authority.state === 'hold') {
+    const reasonCode = typeof value.authority.reasonCode === 'string' ? value.authority.reasonCode : 'MODEL_ACTIVATION_AUTHORITY_UNAVAILABLE';
+    return { kind: 'model-active-set', state: 'unavailable', count: null, rows: [{ id: 'active:authority', title: '', titleKind: 'authority', fields: [
+      ...completeFields(value.authority, ['state', 'reasonCode', 'policySnapshotDigest']),
+      ...completeFields(value, [], ['authority']).map((field) => ({ ...field, key: `snapshot.${field.key}` })),
+    ] }], reasonCode: safeTerminalText(reasonCode) };
+  }
+  if (value.authority.state !== 'ready' || !Array.isArray(value.ownerPermittedModels) || !Array.isArray(value.unknownActiveModels) || !isRecord(value.catalog)) return unknown('model-active-set');
+  const permitted = parseArray('model-active-set', value.ownerPermittedModels, (entry, index) => {
+    const id = idOf(entry.id, '');
+    const provider = scalar(entry.provider);
+    if (id === null || id.length === 0 || provider === null) return null;
+    return { id: `permitted:${safeTerminalText(provider)}:${safeTerminalText(id)}:${index}`, title: safeTerminalText(id), fields: completeFields(entry, ['id', 'provider', 'apiId', 'tier', 'status', 'contextWindow', 'maxOutputTokens', 'costPerMillion', 'capabilities']) };
+  });
+  if (permitted.state === 'schema-unknown') return permitted;
+  const authority = value.authority;
+  const metadataKeys = ['policySnapshotDigest', 'defaultMode', 'explicitProviders', 'recordedActivations', 'providerPolicies'];
+  const metadata = completeFields(authority, metadataKeys);
+  const catalog = value.catalog;
+  const catalogKeys = ['source', 'fetchedAt', 'ageMs', 'catalogDigest', 'warnings'];
+  metadata.push(...completeFields(catalog, catalogKeys).map((field) => ({ ...field, key: `catalog.${field.key}` })));
+  metadata.push(...completeFields(value, [], ['authority', 'catalog', 'ownerPermittedModels', 'unknownActiveModels']).map((field) => ({ ...field, key: `snapshot.${field.key}` })));
+  const unknownRows: ToolReadRow[] = [];
+  for (let index = 0; index < value.unknownActiveModels.length; index++) {
+    const item = value.unknownActiveModels[index];
+    if (!isRecord(item) || typeof item.provider !== 'string' || typeof item.modelId !== 'string') return unknown('model-active-set');
+    unknownRows.push({ id: `unknown:${safeTerminalText(item.provider)}:${safeTerminalText(item.modelId)}:${index}`, title: safeTerminalText(item.modelId), fields: completeFields(item, ['provider', 'modelId', 'actor', 'updatedAt']) });
+  }
+  return { kind: 'model-active-set', state: permitted.state, count: permitted.count, rows: [{ id: 'active:metadata', title: '', titleKind: 'authority', fields: metadata }, ...permitted.rows, ...unknownRows], reasonCode: null };
+}
+
+/** Parse a complete verified JSON document. A parser failure never becomes empty. */
+export function parseToolReadJson(kind: ToolReadKind, text: string): ToolReadProjection {
+  let value: unknown;
+  try { value = JSON.parse(text); } catch { return unknown(kind, 'READ_JSON_INVALID'); }
+  switch (kind) {
+    case 'doctor': return parseDoctor(value);
+    case 'history': return parseHistory(value);
+    case 'agents': return parseAgents(value);
+    case 'skills': return parseSkills(value);
+    case 'models': return parseModels(value);
+    case 'model-active-set': return parseActiveModels(value);
+  }
+}
