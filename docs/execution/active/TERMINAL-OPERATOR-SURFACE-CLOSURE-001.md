@@ -11,6 +11,202 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### Approval bounded source landing — 2026-09-07T18:50Z
+
+Commit ff6b1d4099ce1929cf511a9c9c5c6f081064a635, parent
+672c51d4117063c0c40db21d8d64538d0ad21a38: exact18, +2146/-376.
+Root/Fable894 changed-set ve blob ownership doğruladı; indexempty, main59freeze
+değişmedi. run.tsx owned+26/-2, messages.ts owned+22/-6; inheritedrun+7 ve
+messages+73/-10 yalnız worktree'de korunur. Sourcecommit whole7099 DONE değildir.
+Preparedmanifest66b07adf21e3c26a18786b58127ef324067914e9f420d896c13a58f2fd7ccc14;
+clean runblob72f19dfac7d95585089b4405138233308d986aff0f08e14d7d166ca1fe086f7e,
+messagesblob9d4eaec08da76f7545467b08ebc46cb92ba21ce129692f89151905c96ba42799.
+Clean HEAD+exact18 tree `/tmp/deckent-7099-approval-commit-8JZ5KG` 18blob=commit:
+tsc64714exit0/i18nPASS/15file150/150PASS, testJSON
+`/tmp/deckent-7099-approval-73zxwUTv/proof/clean-selected-approval-v8-tests.json`
+sha e6f57810d2f1cbddcabbdcaf5f65eb15936c60b04c54593d7a747306a2d5301c.
+Main152 farkı inheritedlivefooter2tests; sessiz testeleme yok, named15file aynıdır.
+Helperv1failure korunur; v2 onecorrection seçilendelta sayımıylaPASS; ürün tekrar
+değişmedi. Sourcecommit sonrası bot/mainbuild pinleri korunur; MCPreconnect açık.
+Remote push yapılmadı (owner codex2koordine eder); remote CI ADVISORY, bu dilimde
+yeni remoteCI ölçümü yok. 7142–7146 admission dokümantasyonu ayrıcommit bekler.
+
+### Approval v8 main production-surface proof — 2026-09-07T18:40Z
+
+Bu kayıt aşağıdaki historical A2/conflict HOLD notlarını approval slice açısından
+supersede eder; native B ve outer7099 VERIFY açık kalır. Exact18 source fan-in:
+`/tmp/deckent-7099-approval-73zxwUTv/proof/main-fanin-v8-manifest.json`
+sha256 f184fb78a6e7c2595613b524a44f0f1361c55af8ee81c397636ff71211c31815.
+18 yol run.tsx/messages.ts dahil; inherited footer7/messages14hunk korunur,
+eventual commit yalnız ownedapproval değişiklikleri taşır. Freeze59 HEAD'e göre
+20 farkının kalan2 yolu inherited live-footer.ts/test'tir; bu pakete eklenmez.
+Root main59/59 pin = freeze-v8
+1f131fe531c9f6d940f21151f8baa47ee2aba76c65138462c7dbea0e2b8b05ad.
+
+Source correction exact2: channel/test. Cross event yerel child sonucu beklendikten
+sonra işlenir; yalnız exact accepted duplicate bastırılır. Yerel nonzero HOLD
+korunur, bağımsız doğrulanmış durable winner Card/App membership'i emekliye ayırır.
+Yeni cache/schema/authority yok. Candidate targeted152/152 sha c758910291d90520445e21a808db4326c80349e8fb6974abc31f4c240d1faa86;
+candidate12adverse WDbN3v ffa011cc79f93e4b170c3a9527985028fc0b72076dc667abcc827352493850d7
+ve basic zcCXJL a3ab75fb53cf44fdfe6c8c07de7d946ee335ab3f3108fe4dbb3a6f6270a3eadb PASS.
+Fable883/885 kaynak+actual scoped GO; eski failure kanıtları değişmeden korunur.
+
+Main targeted15file152/152PASS:
+`/tmp/deckent-7099-approval-73zxwUTv/proof/root-main-approval-v8-tests.json`
+sha2564a255c5309172b76242a3c91953e40bb28e9b50010c84047b4c255bbaef88f64.
+Main tsc96752PASS, i18n gatePASS, owned diffcheckPASS. Globaldiffcheck inherited
+memory export whitespaceFAIL; bu dilim memory.db/export'a dokunmadı.
+Canonical botstop2295163exit0/PIDESRCH; inspectActiveExecutions ALLOW/reasons[].
+Read-only wrapper ilkinde GO beklediği içinexit1; canonicalALLOW değişmedi.
+Build:all16255exit0; canonicalcleanALLOW19generatedentry temizlenip yeniden
+üretildi, native/core123assets/dashboardPASS. Retained728/tasks temizlenmedi.
+Botstart74627exit0 → PID2611078, recordedAt2026-09-07T18:37:11.831Z.
+Entrypoint digest35ba88de39a1b2a39c50bb8feb97ecfdd958fd9bd39a3dbb9dc87bab39c8ff31;
+bot-daemon module digest311be99b0aa51031d8ff8ffaeefda8aac512b1f8e948528c4e1e81574e7d9ba1.
+SourceTree1394file e9779cdebdd286579976b5b65c263c361f5302fb451bdf1c26ddcf58cc839205
+= dist/build-identity; buildidentity file fd4c7eb6fc2c4e6b3dfd3ebe36a5a285c20ec1f71d8a5be75d6565417e4e726f.
+Root+Fable890 bot/project/entry/module identity eşleşmesini doğruladı.
+
+Main actual compiled private Linux PTY:
+- `/tmp/deckent-7099-approval-adverse-pty-ELFUml/result.json`
+  sha25689c49d4a37a1918307279106b78a8d10bb7406adc1ab08c804ce17575a22ba9f:
+  12/12EN/TR cancel/expiry/foreign/SIGINT/SIGTERM/conflict PASS, session54567exit0.
+- `/tmp/deckent-7099-approval-card-pty-pohZAe/result.json`
+  sha256af5dac2c04315ed4d3058d644a2d3155884faf10c328d5a10d0f1a67b1ffb3be:
+  EN/TR wrongtoken/allow/deny/sameAppdoctor/resumePASS, session62277exit0.
+Source59/compiled11sabit, exactchildclose/no-survivor/unownedtmux0; providerturn0.
+Fable890 mainactual bağımsız ölçtü. Fixtureauth insanonayı/productionreceipt değildir;
+MCPreconnect/nativeB/diğerplatformlar/outer7099 açık. Şu kayıtta commit/push yok.
+
+Candidate kalıcı archive:
+`/home/alperen/deckent-recovery-20260904/terminal-7099-approval-v8-5JqLrk`;
+manifest5f2c4b8a6fcf35a2ce4e4abf2c95a3e6bc992ae61eaf7a5d3c6d2cdd781b1f1d,
+SUMS12beaa411748a3159abf0575c6b7725e11bf2df10fc3307de01993a1de4951ba;
+root+Fable888152checksumPASS/153file/43dir0600/0700/symlink0. Priorv7archive
+parent bağı korunur. Candidatearchive maindeploy kanıtı yerine geçmez; main raw
+kanıtları ayrı supplementary archive'a taşındı:
+`/home/alperen/deckent-recovery-20260904/terminal-7099-approval-main-v8-Hxa2eI`.
+Manifest606d95db2d8c81e9946bde7fc68b1e27ca202016eadca4f560360497425d5a58;
+SUMS97fab1ef971abbf1cab8e858342db950137dc34edbced8df4730ef592eae32b3;
+root93checksumPASS/94file/28dir0600/0700/symlink0. Main59source priorarchive
+ile birebir, yeniden kopyalanmadı; main11compiled/buildidentity ve rawcases dahil.
+Hiçbiri canonical settlement değildir. İlk staginghelper U3diff'te2messagehunk
+yerine4beklediği için preparefail-closed oldu; index/main değişmedi, partialproof
+korunur. Correction yalnız helper exact22+/6-approval delta sayımında, üründe değil.
+
+### A2 doğrulama / conflict bağımlı kapanışı açık — 2026-09-07T18:17Z
+
+Candidate source59-v7 freeze361470dd72e7a6cb156a4d824b528c6ded7fbae195522444f55c1b1035da5aa0;
+tsc73785PASS, candidate build15903exit0, CLI i18n gatePASS (her REPL string iddiası değil).
+Root15file149/149PASS e1b7d4c3298484f33e44376c05f824b5b58ff25633b8c3c29a42538b348b2c84.
+İlk148/149FAIL96e174fb saklandı: fixture kazananı child öncesinde gösteriyordu;
+doğru preflight HOLD sonrası spawn yoktu. Tek test correction kazananı child callback'e
+taşıdı ve spawn'ı assert etti; üretim değişmedi. Volta review correction legacyexit0
+korudu, SIGBREAK testi injected platform map kullandı. Owned hooks run, unowned
+sprint/tmux teardown skipped. A2 implementation/correction bütçesi kapalı.
+
+Gerçek private Linux fixture kanıtı; human approval/production receipt değildir:
+- Full12case4pNNJ4 sha1e87f086120ab0353769230c67320955c3d4b829361376dbec6f6d176be32246:
+  6PASS6FAIL;4cancel/SIGINT helper{reason} kusuru,2conflict gerçek ürünHOLD.
+- Helper-only corrected iVXacV sha12beed6ee36a757c61878be15a514d379599f1409bb705949ba8da30d24ecc83:
+  10/10EN/TR cancel/expiry/foreign/SIGINT/SIGTERM PASS. Conflict explicitdeferredCases.HOLD,
+  wholeApprovalClosure=false; eskiFAIL gizlenmedi veya unchangedconflict tekrarlanmadı.
+- Basic qL9Zca sha22c11b45bd8d64c29c19fbe83859af54f64318b2ca7cc6cea08efa5dc69077d8:
+  EN/TR wrongtoken/allow/deny/sameAppdoctor/exitPASS. Her child closed/absent,
+  source59/compiled11 unchanged, zero providerturn. Fable877/879 bağımsız ölçtü.
+
+Kalıcı arşiv /home/alperen/deckent-recovery-20260904/terminal-7099-approval-a2-bgoN5M:
+220file55dir0600/0700,symlink0,root+Fable879219/219 checksumPASS.
+Manifest a221e8c5f6071238e188f6f7a2b4ff6769ebc10756d02b880dd6d197e4f35e18;
+SUMS ebd40131b0297f56fe25bcc8caaee31103ce7c8ef5b0486a10b41573eeac469b.
+M26L8n parent kanıtı korunur; DB/auth/config dahil değil. SUPPORTIVE, receiptfalse.
+
+Conflict: ikinci gerçekCLI authorizeddeny kalıcı; ilkallow exit1+HOLD, kart stdin'i
+tutuyor. channel73–83 localpromise sonrası cross-decided'ı koşulsuz bastırıyor.
+Root/Fable bunu doğruladı; producer/eventstream olayın hiç üretilmemesi ile bastırma
+ayrımı için Sol readonlymapping sürüyor. Yeni exact dependent reconciliation scope'u
+yazılmadan source açılmaz. NonzeroHOLD sahteaccepted'a çevrilmez; existing
+verifyCrossDecision üzerinden kazanan truth'u uzlaştırılmalı. NativeB ve7099 açık.
+
+Owner live relay teyidi+858 verbatim provenance evidence/7099/owner-relay-admission-2026-09-07.md.
+MASTER7142–7146 OPENsiblings eklendi;31d23e48 canonical projectionPASS continuous;
+closure append-only7eventsPASS. Fable868 admission'ı ölçtü. Commit HEAD+exact5 ayrı
+canonical projection gerektirir; inherited3357/14GR commit dışı/workingtree'de korunur.
+Bu segment main source/build/restart/commit/push veya gerçek run yapılmadı.
+
+### Dependent cross-channel reconciliation — 2026-09-07T18:19Z
+
+Same7099 A closure dependency, new evidence4pNNJ4 conflict branch; not an A2
+budget reset or new MASTER outcome. A2 cancel/expiry/signal proof stays frozen.
+Source trace: run.tsx1519 ApprovalStoreWatch → wireApprovalCrossProcess pendingById
+cache/broker decided → relay(event-stream not excluded by local-terminal channel)
+→ stream cross-decided → Terminal inFlight wait/blanket suppression → no Card/App
+retirement. Static inference identifies dropped event; real conflict proof must
+confirm the end-to-end path, not treat source reasoning as runtime instrumentation.
+
+Exact writes TWO candidate files: src/cli/repl/approval-terminal-channel.ts and
+tests/cli/approval-terminal-channel.test.ts. All other source59-v7 pins protected.
+One implementation + at most one changed-evidence correction; unchanged retry
+forbidden. Local nonzero result remains HOLD; after awaiting local promise,
+suppress only an accepted exact matching decision. Other events must pass existing
+verifyCrossDecision, never raw event trust. Card/App existing exact membership
+retirement handles verified winner and prevents duplicate closure. No new cache,
+config, broker schema, auth protocol or naked accepted fallback without evidence.
+Root controls fan-in/proof/docs; Sol single two-file writer; no worker test/build.
+Verification: targeted inFlight HOLD/trusted conflict, tampered mismatch/untrusted,
+accepted-race dedup and late event membership; root full15file tests, compiled
+EN/TR twoCLI conflict with one truthful deny closure + sameAppdoctor + childclose;
+regression basic/adverse and independent Fable review. All fixtures private/no paid
+provider/real approval; main/runtime/tasks/memory/MASTER/other candidate paths excluded.
+Return to official dogfood still requires exact engine admission/settlement proof.
+
+### A2 adverse recovery admission — 2026-09-07T17:51Z
+
+BLOCKS_CURRENT_DONE, same7099; owner manual ADR-D-007 authority remains.
+New actual evidence `/tmp/deckent-7099-approval-adverse-pty-uRRnrS/result.json`
+sha256 fc2b913f4bc991690bf87f6b549784707d81fb2833e0774531eefdbff98600ff:
+EN/TR foreign-tenant2PASS; cancel/expiry4FAIL. Ctrl-C child exits1 and generic
+HOLD loses cancellation; expired card retains stdin and blocks doctor.
+All observed child processes closed/absent; source56/compiled10 unchanged.
+Global child signal handler can invoke unowned sprint/tmux teardown;
+private fixture tmux stub prevented host effects. No real approval/provider run.
+
+Exact candidate `/tmp/deckent-7099-approval-73zxwUTv/candidate`, base source56-v5
+cb90f76b. A2 one implementation + at most one changed-evidence correction;
+previous native-read repair budget stays closed. Two disjoint lanes:
+- Sol9: commands/approvals.ts, helpers/messages.ts (approval keys only),
+  repl/approval-terminal-command.ts, approval-card.tsx, app.tsx;
+  tests/cli/approvals-context-truth.test.ts, repl/approval-terminal-command.test.ts,
+  repl/approval-card-async.test.tsx, app-approval-wire.test.tsx.
+- Volta4: helpers/shutdown-hooks.ts, cli/entry.ts, tests/cli/shutdown-hooks.test.ts,
+  tests/cli/sigterm-cleanup.test.ts. Prefix for production paths is src/cli/.
+Join API withCommandLocalShutdown wraps decide action before its first await;
+entry snapshots command-local ownership, awaits owned hooks, never performs
+unowned sprint/tmux cleanup. Existing other-command behavior preserved.
+Cancellation has no auth/decision; durable conflicts never hidden. Expired
+actionability retires exactly; cancelled/untrusted remain retryable. Canonical
+system:expiry exception needs exact timeout receipt binding, not actor alone.
+Negative scope: main source, runtime/tasks/memory/auth, MASTER/receipts, native B.
+Root controls docs/channel; agents no build/test until joint source freeze.
+Proof: targeted tests, compiled EN/TR adverse + child-signal ownership with
+fresh durable decisions and same-session doctor; independent review then fan-in.
+Return-to-dogfood remains earliest safe official admission, not this fixture.
+
+Durable v5 archive `/home/alperen/deckent-recovery-20260904/terminal-7099-approval-candidate-M26L8n`:
+209 payload + manifest + SUMS,211files,0600/0700,no symlinks.
+Manifest223b53a8f6b084fb72f626440316f89700968d3053a3f4a1f48d6ed2e5586718;
+SUMS01cf3b8dc3a9e56b47a40c27c521cc5b27e142a1452f27de8d7f8d386efa9f13.
+Root+Fable861 independent210/210 checksumPASS; D0/D1/D2 included.
+SUPPORTIVE_EVIDENCE_NOT_SETTLEMENT, receipt false; later A2 not yet archived.
+
+Native B read-only correction: existing keyboard y/a/n lacks session intent,
+and governed a means batch, not always. Explicit once/session/always/deny intent
+selection must precede immutable governed request; intent grants no authority.
+Pending invocation args/turn mutation rejects, but a valid explicit tool-wide
+session/always grant intentionally covers that tool's subsequent resources.
+Do not confuse replay protection with revoking legitimate remembered grants.
+No native B implementation admitted by this A2 repair.
+
 ### L4-E/L3 bounded commits + A candidate native-read proof — 2026-09-07T17:28Z
 
 Prior verified main slices committed without changing worktree bytes:

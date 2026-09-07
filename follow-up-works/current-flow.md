@@ -4,71 +4,59 @@
 > Silinme tetiği: onaylı sıra tüketilip kalıcı kanıtlar MASTER/evidence'a işlendiğinde silinir.
 > Ayrıntı ve başarısızlık geçmişi: docs/execution/active/TERMINAL-OPERATOR-SURFACE-CLOSURE-001.md.
 
-## Güncel — 2026-09-07 20:29 TR
+## Güncel — 2026-09-07 21:50 TR
 
-7099 tek ACTIVE outcome; MASTER VERIFY. DOGFOOD ON / health DEGRADED;
-owner-onaylı elle ADR-D-007 devam eder. Goal aktif, bütün program korunur.
-Son source commit f01d2d28ad71562c06a8dd6fd16c1d2dcb48dba7.
-Fable çevrimiçi; ENTRY844 scoped GO,850 bağımsız postcommit doğrulama.
-Bunlar canonical XVerify receipt değildir; whole7099 closure açık.
+7099 tek ACTIVE outcome; MASTER VERIFY. DOGFOOD ON / health DEGRADED.
+Owner-onaylı elle ADR-D-007 devam; bütün program goal'de korunur.
+Sourcecommit ff6b1d409/ahead39: exact18,+2146/-376; root/Fable894doğruladı.
+Owned run26+/2-,messages22+/6-; inheritedrun7/messages73+/10- worktree'de.
+Clean committedtree15file150/150PASS e6f57810,tsc64714/i18nPASS.
+Bu dilimde push yok; docs2commit sırada.
+Main build:all16255PASS; canonicalbotstop2295163→start2611078;
+sourceTreee9779cde = build; botentry35ba88de/module311be99b eşleşiyor.
+MainactualELFUml89c49d4a12/12 + pohZAeaf5dac2c2/2PASS; Fable890doğruladı.
+Mainarchive terminal-7099-approval-main-v8-Hxa2eI:manifest606d95db/SUMS97fab1ef;
+93checksumPASS/94file/28dir0600/0700. Candidatearchive parent bağı korunur.
 
-## Mühürlenen main dilimler
+Approval A+A1+A2+cross-channel reconciliation main'e TAM18 dosya aktarıldı.
+Main59/59 source pin = candidate freeze-v8 1f131fe5. run/messages inherited
+değişiklikleri korundu; eventual commit yalnız owned delta taşımalı.
+Main15file152/152PASS (4a255c53), tsc96752PASS, i18n gatePASS,
+owned diffcheckPASS. Globaldiffcheck inherited memory export whitespaceFAIL;
+memory.db/export bu dilimde değiştirilmedi. Scoped-green repo-green değildir.
 
-- L4-E:2895e2891 exact18, gerçek request admission/usage/context/checkpoint truth.
-- L3:f01d2d28a exact28, okunabilir tool-result custody/cards/model authority/resize.
-- Root ve Fable: commit parent/path/blob doğrulandı; main43 byte unchanged.
-  run.tsx inherited+7 footer labels unstaged; diğer kullanıcı değişiklikleri korunur.
-- Önceki main367/367, tsc/i18n/build:all; actual EN/TR6surface12/12,
-  models6/6 kanıtı capsule'da. Scoped-green repo-green değildir.
-- Kalıcı arşivler /home/alperen/deckent-recovery-20260904 altında:
-  terminal-7099-l4e-pkGEev, terminal-7099-l3-candidate-c4V2d0,
-  terminal-7099-l3-main-ikLQYA. Root+Fable checksum/mod doğruladı.
+Candidate actual WDbN3v ffa011cc:12/12 EN/TR cancel/expiry/foreign/SIGINT/
+SIGTERM/conflict PASS. Basic zcCXJL a3ab75fb: wrongtoken/allow/deny/
+sameAppdoctor PASS. Conflict'te yerel HOLD korunur; bağımsız yetkili deny,
+yerel child sonucu beklendikten sonra kartı emekliye ayırır ve stdin açılır.
+Source59/compiled11 sabit; childclose/absence/unownedtmux0. Fixture auth insan
+onayı veya production receipt değildir; realproviderturn0. Native B açık.
 
-## Devam eden A/A1 — main'e aktarılmadı
+Kalıcı candidate v8 archive:
+ /home/alperen/deckent-recovery-20260904/terminal-7099-approval-v8-5JqLrk
+manifest5f2c4b8a;SUMS12beaa41;152checksumPASS/153file/43dir0600/0700/no symlinks.
+Önceki v7 bgoN5M, v5 M26L8n ve tüm failure kanıtları korunur.
+Fable883/885 kaynak+actual incelemesi mainfan-in için scoped GO; XVerify receipt değil.
 
-Candidate /tmp/deckent-7099-approval-73zxwUTv/candidate, kanıt ../proof.
-Governed approval Card → canonical CLI live-auth → durable validation →
-aynı oturum/focus. Native B grant/attribution bu dilimin bağımlı devamıdır.
-A tek başına L3/7099 değildir.
+## Sıradaki sınır
 
-Son exact2-file repair: nextTick → public stdin.pause → nextTick → spawn;
-Ink resume sahibidir. Child paylaşılan TTY'yi blocking yaptığı için mevcut
-Ink readable callback bitmeden spawn parent'ı read(fd23) içinde kilitliyordu.
-İlk pause-only patch FAIL; yeni publicobserver kanıtıyla son correction yapıldı.
-Kaynak4bcc3129/test0768bab4; freeze56-v5cb90f76b, build20323 exit0,
-13files132/132PASS5273f622. Implementation/correction bütçesi kapalı.
+1. Bounded18 sourcecommit tamam. İlk helperprepare U3messagehunk sayımı2≠4
+   fail-closed geçmişi korunur; v2 exactdelta ilePASS. Cleanverificationtree
+   /tmp/deckent-7099-approval-commit-8JZ5KG 18blob=commit; main59pin değişmedi.
+   Aktif MCP süreçleri için documented reconnect henüz doğrulanmadı.
+2. Main proof/arşiv/sourcecommit tamam; yalnızcapsule/currentflow docs landing.
+   MASTER7142–7146 OPEN admission commit'i ayrı HEAD+exact5 projection gerektirir;
+   inherited3357/14GR ve çalışma ağacındaki projection korunur.
+3. Native B once/session/always intent+auth+grant/effect wiring; A tekbaşına7099 değil.
+4. 7099 kalanL1–L6/multiworker/otomatiknextgoal/durable settlement.
+   İlk güvenli resmi admission sınırında dogfood'a dönüş.
+5. Sonra7103→7101→7104→7102(önceADR)→4034. 9002DONE;9001 gelecekte.
 
-Actual MOlnGT e913919c ve stdinobserver kaldırılmış ZApQgD929df47e:
-EN/TR wrong-token pending + allow/deny freshdurablevalid + sameApp/doctor +
-exactchildclose + normalexit/nosurvivors/providerturn0 PASS.
-Fixtureauth ≠ humanapproval/productionreceipt. Önceki FAIL'ler korunur.
-Adverse actual (cancel/expiry/conflict/foreign-tenant), native B once/session/
-always attribution, main fan-in/proof ve diğer platformlar hâlâ açık.
+## Korunan sınırlar
 
-## Sonraki exact adımlar
-
-1. A/A1 kaynak/kanıt + Fable D0/D1/D2 reproducer'larını kalıcı arşive bağla.
-   D2 scratchpad yolu/hash capsule'da; henüz kalıcı arşiv iddiası yok.
-2. A'nın eksik adverse actual matrisi; native B exact invocation/turn/grant
-   sözleşmesi. Mevcut approval altyapısı kullanılır, sahte local/user/receipt yok.
-3. Kabul edilen exact join'de A main fan-in, hedefli test/actual proof,
-   gerekli bağımsız review/XVerify; güvenli build/restart ile gerçek yüzeye taşı.
-4. 7099 kalan L1–L6 ve multiworker/otomatik next-goal/durable settlement kapanışı.
-   İlk güvenli resmi admission sınırında dogfood'a dön.
-5. Sonra7103→7101→7104→7102(önce ADR amendment)→4034.
-   C1→3358;C2+C4→3359;C3→3360;C5→6182;C6→546;C7→547;
-   C8→8030/8040;C9→3220/3332/3333;C10→3357/210/220 QUEUED.
-9002 DONE korunur;9001 graph/vector gelecekte, programa eklenmez.
-
-## Korunan HOLD ve sınırlar
-
-L6 debug candidate frozen/HOLD: fd pending-write/close kusuru; bütçe tüketildi,
-main'e alınmadı. Kalıcı terminal-7099-l6-debug-hold-kSb0FZ; tekrar FIX yok.
-Bot2295163 son Fable850 ölçümünde canlı, dist15:19Z/sourceTree755a54ea;
-bu segment main build/restart yapılmadı. MCP reconnect UNVERIFIED.
-Retained728/.tasks/memory.db ve inherited dirt korunur. Yeni sprint/dispatch yok.
-Push TOOL_POLICY_HOLD değişmedi, retry/bypass yok. Gitgc warning; prune yapılmadı.
-Windows/macOS/SSH gerçek host proof açık; full-suite baseline FAILED.
-Parent-unexpected-exit detached child custody RELATED; otomatik MASTER işi değil.
-Kanal stale-tail kusuruyla kaybolan içerik847/852 ile uzlaştırıldı;
-writer expected-ENTRY digest + EOF kontrolü kullanır. Root tek kanal yazarı.
+L4E2895e2891 ve L3f01d2d28a committed; kanıtları kalıcı arşivde.
+L6 debug candidate frozen/HOLD, bütçesi tüketildi; aynı failure'a körretry yok.
+Windows/macOS/SSH realhost proof açık; fullsuite baselineFAILED.
+7142–7146 ayrı OPEN queued işlerdir; ikinciACTIVEoutcome değildir.
+Push owner'ın codex2 koordinasyonunda; önceki TOOL_POLICY_HOLD'a bypass yok.
+Retained728/.tasks/memory.db ve inherited dirt korunur; yeni sprint/dispatch yok.
