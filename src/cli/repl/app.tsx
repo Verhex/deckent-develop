@@ -70,7 +70,8 @@ import {
   resolveQueueCommand, applyInterrupt, applySteer,
   type BusyControlsState, type QueueStatusDecision, type InterruptDecision, type SteerDecision,
 } from './busy-controls.js';
-import { ApprovalCard, createApprovalCardQueue, type ApprovalCardLabels, type ApprovalCardQueue } from './approval-card.js';
+import { ApprovalCard, NativePermissionIntentCard, createApprovalCardQueue, type ApprovalCardLabels, type ApprovalCardQueue, type NativePermissionIntentLabels } from './approval-card.js';
+import type { NativePermissionIntent, NativePermissionIntentController } from './native-permission-approval.js';
 import { clipTerminalCells, composeDualStream } from './dual-stream.js';
 import type { ApprovalTerminalChannel, ApprovalTerminalEvent } from './approval-terminal-channel.js';
 import { PlanPreviewCard, type PlanPreviewCardLabels } from './plan-preview-card.js';
@@ -740,6 +741,18 @@ export function resolveStdinOwner(confirmOpen: boolean, approvalPending: boolean
     // ApprovalCard ANDs this with its own `head !== null` internally — the
     // gate here only needs to defer to a higher-priority open confirm modal.
     approvalCardActive: !confirmOpen,
+  };
+}
+
+/** Native lifetime intent precedes durable publication and therefore owns stdin
+ * ahead of an unrelated durable approval card; never activate both hooks. */
+export function resolveApprovalCardOwners(
+  approvalCardActive: boolean,
+  nativePermissionPending: boolean,
+): { durable: boolean; native: boolean } {
+  return {
+    durable: approvalCardActive && !nativePermissionPending,
+    native: approvalCardActive && nativePermissionPending,
   };
 }
 
@@ -1476,6 +1489,9 @@ export interface ReplAppProps {
   /** Localized approval-card labels (run.tsx buildApprovalLabels, the
    * `approval_card.*` rows) — required; the mechanism owns no English set. */
   approvalLabels: ApprovalCardLabels;
+  /** Transient native lifetime intent; no broker request exists until selection. */
+  nativePermissionIntent?: { controller: NativePermissionIntentController; labels: NativePermissionIntentLabels };
+  registerNativeApprovalRetire?: (retire: (requestId: string) => void) => void;
   /**
    * TERM-FLOW-UNIFY Sprint-4 mount (426-002) — `terminal.run_flow_v2` seam
    * (run.tsx's `wireRunFlowMount`). Present only when the flag is on AND the
@@ -1664,7 +1680,7 @@ export async function routeNativeMcpInput(options: NativeMcpRouteOptions): Promi
 
 export function ReplApp(props: ReplAppProps): ReactElement {
   const palette = useInkPalette();
-  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, nativeMcpSlash, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, startupRecentSessions = false, sprintHistoricalContext, renderSprintContextReason, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false, dualStreamOverflow, toolRead } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, nativeMcpSlash, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, startupRecentSessions = false, sprintHistoricalContext, renderSprintContextReason, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, nativePermissionIntent, registerNativeApprovalRetire, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false, dualStreamOverflow, toolRead } = props;
   const resumeLedgerOptions: LedgerStoreOptions = { ...props.resumeLedgerOptions, cwd: props.cwd };
   const { exit, suspendTerminal } = useApp();
   // TERMINAL-TOOLS-004 — live width for the status row + queue preview (reflows on resize).
@@ -2102,10 +2118,17 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // actually reads from — is only ever created behind the flag, so a flag-off
   // render never subscribes to anything and stays byte-identical.
   const [approvalPending, setApprovalPending] = useState(false);
+  const [nativePermissionPending, setNativePermissionPending] = useState<NativePermissionIntent | null>(null);
+  useEffect(() => nativePermissionIntent?.controller.subscribe(setNativePermissionPending), [nativePermissionIntent?.controller]);
   const approvalTracker = useRef<ApprovalCardQueue | null>(null);
+  const approvalCardRetire = useRef<(requestId: string) => void>(() => undefined);
   if (approvalTracker.current === null) {
     approvalTracker.current = createApprovalCardQueue(() => setApprovalPending(approvalTracker.current!.head() !== null));
   }
+  useEffect(() => registerNativeApprovalRetire?.((requestId) => {
+    retireTerminalApproval(approvalTracker.current!, requestId);
+    approvalCardRetire.current(requestId);
+  }), [registerNativeApprovalRetire]);
   const approvalEvents = useRef<AsyncIterable<ApprovalTerminalEvent> | null>(null);
   if (approvalsEnabled && approvalChannel && approvalEvents.current === null) {
     approvalEvents.current = tapApprovalEvents(approvalChannel.events, approvalTracker.current);
@@ -3042,7 +3065,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
 
   // born-508: resolve which of {confirm modal, InputBar, ApprovalCard} owns
   // stdin this render — exactly one, ever (see resolveStdinOwner above).
-  const stdinOwner = resolveStdinOwner(confirm !== null, approvalPending);
+  const stdinOwner = resolveStdinOwner(confirm !== null, approvalPending || nativePermissionPending !== null);
+  const approvalCardOwners = resolveApprovalCardOwners(
+    stdinOwner.approvalCardActive,
+    nativePermissionPending !== null,
+  );
 
   // Confirm modal owns input only while it is open (single-key y / a / N). The
   // queue resolves the current head and advances to the next card (deny does not
@@ -3051,9 +3078,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // decide a card (case-insensitive y/a/n + Enter/Esc = deny default); stray
   // navigation/typed keys no longer mow the burst down one card per keystroke.
   useInput((input, key) => {
+    if (!stdinOwner.confirmActive) return;
     const answer = confirmKeyToAnswer(input, key, { oneTime: confirm?.oneTime === true });
     if (answer !== null) confirmQueue.current!.answer(answer);
-  }, { isActive: stdinOwner.confirmActive });
+  });
 
   // 358-006: Esc→interrupt while a turn is in flight (BUSY_KEY_ACTIONS contract,
   // busy-controls.ts). Double-Esc is idempotent by construction — the second
@@ -3103,9 +3131,14 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // While a modal/card owns stdin the InputBar is inactive, so Ctrl-C must
   // still reach the policy (otherwise it would be silently swallowed).
   const inputBarActiveNow = stdinOwner.inputBarActive && !runFlowPending && !inboxOpen && picker === null && !toolReadOpen;
+  const globalInterruptActive = resolveGlobalInterruptActive(
+    inputBarActiveNow,
+    resolvePickerCardActive(confirm !== null, approvalPending, runFlowPending, inboxOpen) && picker !== null,
+  );
   useInput((input, key) => {
+    if (!globalInterruptActive) return;
     if (key.ctrl && input === 'c') handleInterrupt('int', false);
-  }, { isActive: resolveGlobalInterruptActive(inputBarActiveNow, resolvePickerCardActive(confirm !== null, approvalPending, runFlowPending, inboxOpen) && picker !== null) });
+  });
 
   // Persistent phase anchor — the orientation signal ("am I working / done?").
   const phase: 'thinking' | 'generating' | 'idle' =
@@ -3186,8 +3219,17 @@ export function ReplApp(props: ReplAppProps): ReactElement {
             pushTurn('seg', message);
           }}
           labels={approvalLabels}
-          isActive={stdinOwner.approvalCardActive}
+          isActive={approvalCardOwners.durable}
           suspendTerminal={suspendTerminal}
+          registerLocalRetire={(retire) => { approvalCardRetire.current = retire; }}
+        />
+      )}
+      {nativePermissionIntent && (
+        <NativePermissionIntentCard
+          intent={nativePermissionPending}
+          controller={nativePermissionIntent.controller}
+          labels={nativePermissionIntent.labels}
+          isActive={approvalCardOwners.native}
         />
       )}
 

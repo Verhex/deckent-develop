@@ -51,6 +51,29 @@ async function* events(...requests: ApprovalRequest[]): AsyncGenerator<ApprovalT
 }
 
 describe('ApprovalCard authenticated async decision lifecycle', () => {
+  it('presentation retirement removes only the exact local card without a durable decision', async () => {
+    const first = request('native-local-retire');
+    const second = request('unrelated-durable');
+    let retire: (requestId: string) => void = () => undefined;
+    const onDecide = vi.fn();
+    const { lastFrame } = render(
+      <ApprovalCard
+        events={events(first, second)}
+        onDecide={onDecide}
+        labels={LABELS}
+        suspendTerminal={suspend}
+        registerLocalRetire={(callback) => { retire = callback; }}
+      />,
+    );
+    await tick();
+    expect(lastFrame()).toContain(first.summary);
+    retire(first.id);
+    await tick();
+    expect(lastFrame()).not.toContain(first.summary);
+    expect(lastFrame()).toContain(second.summary);
+    expect(onDecide).not.toHaveBeenCalled();
+  });
+
   it('locks repeated keys and emits no closure before durable acceptance', async () => {
     const req = request('async-1');
     let finish!: (result: ApprovalTerminalDecisionResult) => void;

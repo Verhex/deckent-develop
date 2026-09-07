@@ -124,7 +124,10 @@ function baseDeps(registry: ToolRegistry, over: Partial<LoopDeps>): LoopDeps {
     cwd: tmpdir(),
     model: 'm',
     getMode: () => 'suggest',
-    requestPermission: async () => ({ decision: 'once' }),
+    issuePermission: () => { throw new Error('unexpected permission prompt'); },
+    requestPermission: async () => ({ decision: 'hold', reasonCode: 'unexpected' }),
+    validatePermission: () => false,
+    claimPermissionEffect: () => false,
     maxIterations: 10,
     ...over,
   };

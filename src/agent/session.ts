@@ -7,15 +7,18 @@
 // mode, and a per-turn cancellation flag. Transport-neutral: the same stream
 // drives Ink / web-SSE / NDJSON.
 //
-// Timing note: the loop emits `permission-request` via `yield prompt` BEFORE it
-// calls `deps.requestPermission(prompt)`. The `for await` consumer therefore
-// runs `respondPermission` before `requestPermission` has set up its resolver.
-// We handle this with a pre-answer cache: `respondPermission` stores the answer
-// by id; `requestPermission` resolves immediately when a pre-answer exists.
+// Timing note: the session registers the immutable invocation BEFORE the loop
+// yields `permission-request`. An immediate view response therefore resolves an
+// issued record; unknown ids are never cached as future authority.
 
-import { createHash } from 'node:crypto';
-import type { AgentEvent, RequestMeasurementEvent } from './events.js';
-import { runAgentTurn, type LoopDeps, type PermissionResponse } from './loop.js';
+import { createHash, randomUUID } from 'node:crypto';
+import type { AgentEvent, PermissionRequestEvent, RequestMeasurementEvent } from './events.js';
+import {
+  runAgentTurn,
+  type LoopDeps,
+  type PermissionIssueInput,
+  type PermissionResponse,
+} from './loop.js';
 import type { PermissionPolicy } from './permission-policy.js';
 import type { RuleStore } from './permission-store.js';
 import type { ApprovalMode } from './permission-types.js';
@@ -34,6 +37,16 @@ import { openScratchStore, type CheckpointReadResult, type ScratchCheckpointPayl
 import { createNativeBudgetState, type NativeBudgetState } from './guards/recursion.js';
 import type { ContentWriter } from './tool-result-broker.js';
 import { projectSlug } from '../core/project-slug.js';
+import { ALL_APPROVAL_RISKS, ALL_APPROVAL_SCOPES } from '../core/approval-contract.js';
+import { maskArgs } from '../core/approval-masking.js';
+import {
+  bindNativePermissionIntent,
+  createNativePermissionInvocation,
+  digestNativePermissionArgs,
+  nativePermissionBindingsEqual,
+  parseNativePermissionBinding,
+  type NativePermissionBinding,
+} from './native-permission-binding.js';
 
 export type NativeBudgetTerminalCode = `native-budget.${string}`;
 
@@ -45,6 +58,34 @@ export interface SessionBudgetExhaustedEvent {
 }
 
 export type AgentSessionEvent = AgentEvent | SessionBudgetExhaustedEvent;
+
+export type PermissionResponseDisposition =
+  | { readonly ok: true }
+  | {
+      readonly ok: false;
+      readonly reasonCode:
+        | 'PERMISSION_SESSION_CLOSED'
+        | 'PERMISSION_STALE'
+        | 'PERMISSION_UNKNOWN'
+        | 'PERMISSION_MODIFIED'
+        | 'PERMISSION_DUPLICATE'
+        | 'PERMISSION_RESPONSE_INVALID';
+    };
+
+export type NativePermissionDecisionCallback = (
+  request: PermissionRequestEvent,
+  signal: AbortSignal,
+) => Promise<PermissionResponse>;
+
+export type NestedPermissionRequestInput = Omit<PermissionIssueInput, 'callId' | 'nested'>;
+
+export type NestedPermissionRequestResult =
+  | {
+      readonly kind: 'resolved';
+      readonly request: PermissionRequestEvent;
+      readonly response: Exclude<PermissionResponse, { decision: 'hold' }>;
+    }
+  | { readonly kind: 'hold'; readonly reasonCode: string };
 
 // ═══ Context epoch + @ref lineage (560-004, RCA §4-§6) ══════════════════════
 // Three carriers were previously ONE string: what the user actually typed, the
@@ -217,7 +258,25 @@ export interface AgentSession {
    *  context-epoch refresh, performed through the ordinary bounded-delta
    *  checkpoint path on the next `send()`. */
   renewBudgetEpoch(): { epoch: number };
-  respondPermission(id: string, response: PermissionResponse): void;
+  respondPermission(
+    request: PermissionRequestEvent,
+    response: PermissionResponse,
+  ): PermissionResponseDisposition;
+  /** Session-owned nested gate. The parent call id comes from the currently
+   *  executing top-level handler; callers cannot manufacture that identity. */
+  requestNestedPermission(
+    input: NestedPermissionRequestInput,
+    decidePermission: NativePermissionDecisionCallback,
+  ): Promise<NestedPermissionRequestResult>;
+  /** Final synchronous authority/lifecycle check immediately before an effect. */
+  claimPermissionEffect(
+    request: PermissionRequestEvent,
+    response: PermissionResponse,
+    rawArgs: Record<string, unknown>,
+  ): boolean;
+  /** Rehashes session-owned raw args and checks current generation/cancellation
+   *  before a consumer submits the immutable event to its authority adapter. */
+  validatePermissionRequest(request: PermissionRequestEvent): boolean;
   cancel(): void;
   setApprovalMode(mode: ApprovalMode): void;
   /** Live approval mode — the call_tool parity resolver (born-607) reads this so a
@@ -267,15 +326,29 @@ export interface ContextSnapshot {
 
 export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   const transcript = new Transcript();
-  /** Resolver waiting for a respondPermission call (set AFTER loop calls requestPermission). */
-  const pending = new Map<string, (r: PermissionResponse) => void>();
-  /** Pre-answers stored when respondPermission arrives before requestPermission is called. */
-  const preAnswers = new Map<string, PermissionResponse>();
   let mode: ApprovalMode = deps.policy.defaultMode;
-  let cancelled = false;
   /** TERMINAL-TOOLS-008 — abort seam of the turn in flight (fresh per send()). */
   let turnAbort: AbortController | undefined;
   let turnSequence = 0;
+  let closed = false;
+  const sessionId = deps.scratch?.sessionId ?? `native-session-${randomUUID()}`;
+  const sessionInstanceId = `native-instance-${randomUUID()}`;
+  interface IssuedPermission {
+    readonly request: PermissionRequestEvent;
+    readonly rawArgs: Record<string, unknown>;
+    state: 'issued' | 'answered' | 'consumed';
+    response?: PermissionResponse;
+    resolve?: (response: PermissionResponse) => void;
+    promise?: Promise<PermissionResponse>;
+  }
+  interface PermissionTurn {
+    readonly generation: number;
+    readonly controller: AbortController;
+    readonly issued: Map<string, IssuedPermission>;
+    retired: boolean;
+    activeParent?: { readonly token: symbol; readonly callId: string };
+  }
+  let activePermissionTurn: PermissionTurn | undefined;
   let budgetEpoch = 1;
   let exhausted: { code: NativeBudgetTerminalCode; at: number; epoch: number } | undefined;
   let lastRequestMeasurement: RequestMeasurementEvent | undefined;
@@ -301,6 +374,222 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   /** Reference identity accumulated across the session, keyed path\0digest. */
   const references = new Map<string, TurnReference>();
   let lastRawIntent = '';
+
+  const hold = (reasonCode: string): PermissionResponse => Object.freeze({ decision: 'hold', reasonCode });
+
+  function isRecord(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function hasPermissionRequestIdentity(value: unknown): value is PermissionRequestEvent {
+    if (!isRecord(value) || !isRecord(value['invocation'])) return false;
+    return typeof value['invocation']['invocationId'] === 'string'
+      && typeof value['invocation']['turnGeneration'] === 'number';
+  }
+
+  function hasPermissionResponseShape(value: unknown): value is PermissionResponse {
+    return isRecord(value) && typeof value['decision'] === 'string';
+  }
+
+  function deepFreeze<T>(value: T): T {
+    if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+      for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+      Object.freeze(value);
+    }
+    return value;
+  }
+
+  function eventsEqual(left: PermissionRequestEvent, right: PermissionRequestEvent): boolean {
+    try {
+      if (left.type !== right.type
+        || left.id !== right.id
+        || left.tool !== right.tool
+        || left.resource !== right.resource
+        || left.tier !== right.tier
+        || left.approval.scope !== right.approval.scope
+        || left.approval.risk !== right.approval.risk
+        || left.approval.scopeId !== right.approval.scopeId
+        || left.approval.resource !== right.approval.resource) return false;
+      return digestNativePermissionArgs(left.maskedArgs as Record<string, unknown>)
+          === digestNativePermissionArgs(right.maskedArgs as Record<string, unknown>)
+        && nativePermissionBindingsEqual(
+        bindNativePermissionIntent(left.invocation, 'once', left.resource),
+        bindNativePermissionIntent(right.invocation, 'once', right.resource),
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  function retireTurn(turn: PermissionTurn, reasonCode: string): void {
+    if (turn.retired) return;
+    turn.retired = true;
+    turn.controller.abort();
+    turn.activeParent = undefined;
+    for (const record of turn.issued.values()) {
+      if (record.state !== 'issued') continue;
+      record.state = 'answered';
+      record.response = hold(reasonCode);
+      record.resolve?.(record.response);
+      record.resolve = undefined;
+    }
+  }
+
+  function issuePermission(turn: PermissionTurn, input: PermissionIssueInput): PermissionRequestEvent {
+    if (closed || turn.retired || turn.controller.signal.aborted || activePermissionTurn !== turn) {
+      throw new Error('PERMISSION_STALE');
+    }
+    if (!ALL_APPROVAL_SCOPES.includes(input.approval.scope)
+      || !ALL_APPROVAL_RISKS.includes(input.approval.risk)
+      || input.approval.scopeId.trim().length === 0
+      || input.approval.scopeId !== input.approval.scopeId.trim()
+      || typeof input.approval.resource !== 'string'
+      || input.approval.resource !== input.resource) {
+      throw new Error('NATIVE_PERMISSION_CLASSIFICATION_UNAVAILABLE');
+    }
+    const invocation = createNativePermissionInvocation({
+      sessionId,
+      sessionInstanceId,
+      turnGeneration: turn.generation,
+      invocationId: `native-permission-${randomUUID()}`,
+      callId: input.callId,
+      tool: input.tool,
+      rawArgs: input.rawArgs,
+      tier: input.tier,
+      elevated: input.elevated,
+      nested: input.nested,
+    });
+    const request = Object.freeze({
+      type: 'permission-request' as const,
+      id: input.callId,
+      tool: input.tool,
+      resource: input.resource,
+      tier: input.tier,
+      approval: Object.freeze({ ...input.approval }),
+      maskedArgs: deepFreeze(maskArgs(input.rawArgs)),
+      invocation,
+    });
+    turn.issued.set(invocation.invocationId, { request, rawArgs: input.rawArgs, state: 'issued' });
+    return request;
+  }
+
+  function validatePermissionRequest(request: PermissionRequestEvent): boolean {
+    try {
+      if (!hasPermissionRequestIdentity(request)) return false;
+      const turn = activePermissionTurn;
+      if (!turn || closed || turn.retired || turn.controller.signal.aborted
+        || request.invocation.turnGeneration !== turn.generation) return false;
+      const record = turn.issued.get(request.invocation.invocationId);
+      if (!record || record.state === 'consumed' || !eventsEqual(record.request, request)) return false;
+      if (request.invocation.nested && turn.activeParent?.callId !== request.invocation.callId) return false;
+      return digestNativePermissionArgs(record.rawArgs) === request.invocation.invocationArgsDigest;
+    } catch {
+      return false;
+    }
+  }
+
+  function responseBinding(
+    record: IssuedPermission,
+    response: PermissionResponse,
+  ): NativePermissionBinding | undefined {
+    if (response.decision === 'hold') return undefined;
+    const parsed = parseNativePermissionBinding({ nativePermission: response.binding });
+    if (!parsed.ok) return undefined;
+    let expected: NativePermissionBinding;
+    try {
+      expected = bindNativePermissionIntent(
+        record.request.invocation,
+        parsed.value.requestedLifetime,
+        record.request.resource,
+      );
+    } catch {
+      return undefined;
+    }
+    if (!nativePermissionBindingsEqual(parsed.value, expected)) return undefined;
+    if (response.decision !== 'deny' && response.decision !== parsed.value.requestedLifetime) return undefined;
+    return parsed.value;
+  }
+
+  function acceptPermissionResponse(
+    turn: PermissionTurn | undefined,
+    request: PermissionRequestEvent,
+    response: PermissionResponse,
+  ): PermissionResponseDisposition {
+    if (closed) return { ok: false, reasonCode: 'PERMISSION_SESSION_CLOSED' };
+    if (!hasPermissionRequestIdentity(request)) return { ok: false, reasonCode: 'PERMISSION_UNKNOWN' };
+    if (!hasPermissionResponseShape(response)) return { ok: false, reasonCode: 'PERMISSION_RESPONSE_INVALID' };
+    if (!turn || activePermissionTurn !== turn || request.invocation.turnGeneration !== turn.generation
+      || turn.retired || turn.controller.signal.aborted) {
+      return { ok: false, reasonCode: 'PERMISSION_STALE' };
+    }
+    const record = turn.issued.get(request.invocation.invocationId);
+    if (!record) return { ok: false, reasonCode: 'PERMISSION_UNKNOWN' };
+    if (!eventsEqual(record.request, request)) return { ok: false, reasonCode: 'PERMISSION_MODIFIED' };
+    if (record.state !== 'issued') return { ok: false, reasonCode: 'PERMISSION_DUPLICATE' };
+    if (!validatePermissionRequest(request)) return { ok: false, reasonCode: 'PERMISSION_MODIFIED' };
+    let accepted: PermissionResponse;
+    if (response.decision === 'hold') {
+      if (typeof response.reasonCode !== 'string' || response.reasonCode.trim().length === 0) {
+        return { ok: false, reasonCode: 'PERMISSION_RESPONSE_INVALID' };
+      }
+      accepted = hold(response.reasonCode);
+    } else {
+      const binding = responseBinding(record, response);
+      if (!binding) return { ok: false, reasonCode: 'PERMISSION_RESPONSE_INVALID' };
+      accepted = Object.freeze({ decision: response.decision, binding });
+    }
+    record.state = 'answered';
+    record.response = accepted;
+    record.resolve?.(accepted);
+    record.resolve = undefined;
+    return { ok: true };
+  }
+
+  function awaitPermission(turn: PermissionTurn, request: PermissionRequestEvent): Promise<PermissionResponse> {
+    const record = turn.issued.get(request.invocation.invocationId);
+    if (!record || !eventsEqual(record.request, request)) return Promise.resolve(hold('PERMISSION_UNKNOWN'));
+    if (record.response) return Promise.resolve(record.response);
+    if (!record.promise) {
+      record.promise = new Promise<PermissionResponse>((resolve) => { record.resolve = resolve; });
+    }
+    return record.promise;
+  }
+
+  function validatePermission(
+    request: PermissionRequestEvent,
+    response: PermissionResponse,
+    rawArgs: Record<string, unknown>,
+  ): boolean {
+    if (!validatePermissionRequest(request) || !hasPermissionResponseShape(response)) return false;
+    const turn = activePermissionTurn;
+    if (!turn || closed || turn.retired || turn.controller.signal.aborted
+      || request.invocation.turnGeneration !== turn.generation
+      || response.decision === 'hold' || response.decision === 'deny') return false;
+    const record = turn.issued.get(request.invocation.invocationId);
+    if (!record || record.state !== 'answered' || record.response !== response
+      || !eventsEqual(record.request, request)) return false;
+    const binding = responseBinding(record, response);
+    if (!binding) return false;
+    if (binding.invocation.nested && turn.activeParent?.callId !== binding.invocation.callId) return false;
+    try {
+      if (digestNativePermissionArgs(rawArgs) !== binding.invocation.invocationArgsDigest) return false;
+    } catch {
+      return false;
+    }
+    return true;
+  }
+
+  function claimPermissionEffect(
+    request: PermissionRequestEvent,
+    response: PermissionResponse,
+    rawArgs: Record<string, unknown>,
+  ): boolean {
+    if (!validatePermission(request, response, rawArgs)) return false;
+    const record = activePermissionTurn?.issued.get(request.invocation.invocationId);
+    if (!record) return false;
+    record.state = 'consumed';
+    return true;
+  }
 
   function rememberReference(reference: TurnReference): void {
     const key = `${reference.path}\0${reference.digest}`;
@@ -510,7 +799,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     turnId: string,
     attributionGeneration: number,
   ): AsyncIterable<AgentSessionEvent> {
-    if (!scratch || !scratchDeps) return;
+    if (closed || !scratch || !scratchDeps) return;
     const usage: UsageTotals = { inputTokens: 0, outputTokens: 0 };
     let text: string | undefined;
     let failureCode: CheckpointFailureCode | undefined;
@@ -536,6 +825,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     if (providerFailureCode) {
       yield { type: 'notice', code: providerFailureCode, message: providerFailureCode };
     }
+    if (closed) return;
     if (text !== undefined) {
       try {
         const payload = parseCheckpointPayloadText(text);
@@ -594,7 +884,13 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     input: StructuredTurnInput,
     turnId: string,
     attributionGeneration: number,
+    turnLoopDeps: LoopDeps,
   ): AsyncIterable<AgentSessionEvent> {
+    if (closed || turnLoopDeps.isCancelled?.()) {
+      yield { type: 'error', code: 'native.session.closed', message: 'native.session.closed' };
+      yield { type: 'turn-end' };
+      return;
+    }
     lastRawIntent = input.rawIntent;
     for (const reference of input.references) rememberReference(reference);
     yield* maybeRefreshBeforeTurn(turnId, attributionGeneration);
@@ -606,7 +902,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       transcript.setNextUserMetadata({ turnId, origin: 'user' });
       const payload = attempt === 0 ? input.expandedPayload : retryInput;
       let retry = false;
-      for await (const event of runAgentTurn(loopDeps, transcript, payload)) {
+      for await (const event of runAgentTurn(turnLoopDeps, transcript, payload)) {
         if (event.type === 'request-measurement'
           && attributionGeneration === requestAttributionGeneration) {
           lastRequestMeasurement = event;
@@ -644,46 +940,56 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     }
   }
 
-  const nativeBudgetState: NativeBudgetState | undefined = deps.nativeBudget ? createNativeBudgetState() : undefined;
-  const loopDeps: LoopDeps = {
-    adapter: deps.adapter,
-    ...(deps.nativeBudget ? { nativeBudget: deps.nativeBudget } : {}),
-    ...(nativeBudgetState ? { nativeBudgetState } : {}),
-    registry: deps.registry,
-    policy: deps.policy,
-    ruleStore: deps.ruleStore,
-    cwd: deps.cwd,
-    model: deps.model,
-    lang: deps.lang,
-    ...(scratch ? { scratchDir: scratch.info.root } : {}),
-    maxIterations: deps.maxIterations,
-    costGuard: deps.costGuard,
-    ...(deps.getAdapter ? { getAdapter: deps.getAdapter } : {}),
-    ...(deps.getModel ? { getModel: deps.getModel } : {}),
-    ...(deps.getContextBudgetTokens ? { getContextBudgetTokens: deps.getContextBudgetTokens } : {}),
-    ...(deps.getProviderToolSchemas ? { getProviderToolSchemas: deps.getProviderToolSchemas } : {}),
-    getMode: () => mode,
-    isCancelled: () => cancelled,
-    // TERMINAL-TOOLS-008 — the per-turn AbortController's signal (see send()).
-    getTurnSignal: () => turnAbort?.signal,
-    requestPermission: (req) =>
-      new Promise<PermissionResponse>((resolve) => {
-        if (cancelled) { resolve({ decision: 'deny' }); return; }
-        // If respondPermission (or cancel) already ran before this call, consume it.
-        const pre = preAnswers.get(req.id);
-        if (pre !== undefined) { preAnswers.delete(req.id); resolve(pre); return; }
-        pending.set(req.id, resolve);
-      }),
-  };
+  let nativeBudgetState: NativeBudgetState | undefined = deps.nativeBudget ? createNativeBudgetState() : undefined;
+
+  function createTurnLoopDeps(turn: PermissionTurn): LoopDeps {
+    return {
+      adapter: deps.adapter,
+      ...(deps.nativeBudget ? { nativeBudget: deps.nativeBudget } : {}),
+      ...(nativeBudgetState ? { nativeBudgetState } : {}),
+      registry: deps.registry,
+      policy: deps.policy,
+      ruleStore: deps.ruleStore,
+      cwd: deps.cwd,
+      model: deps.model,
+      lang: deps.lang,
+      ...(scratch ? { scratchDir: scratch.info.root } : {}),
+      maxIterations: deps.maxIterations,
+      costGuard: deps.costGuard,
+      ...(deps.getAdapter ? { getAdapter: deps.getAdapter } : {}),
+      ...(deps.getModel ? { getModel: deps.getModel } : {}),
+      ...(deps.getContextBudgetTokens ? { getContextBudgetTokens: deps.getContextBudgetTokens } : {}),
+      ...(deps.getProviderToolSchemas ? { getProviderToolSchemas: deps.getProviderToolSchemas } : {}),
+      getMode: () => mode,
+      isCancelled: () => turn.retired || turn.controller.signal.aborted || activePermissionTurn !== turn,
+      getTurnSignal: () => turn.controller.signal,
+      issuePermission: (input) => issuePermission(turn, input),
+      requestPermission: (request) => awaitPermission(turn, request),
+      validatePermission,
+      claimPermissionEffect,
+      enterToolExecution(callId: string): () => void {
+        if (turn.retired || turn.controller.signal.aborted || activePermissionTurn !== turn) return () => {};
+        const token = Symbol(callId);
+        turn.activeParent = { token, callId };
+        return () => {
+          if (turn.activeParent?.token === token) turn.activeParent = undefined;
+        };
+      },
+    };
+  }
 
   return {
     send(userInput: TurnInput): AsyncIterable<AgentSessionEvent> {
-      cancelled = false;
+      if (closed) {
+        return (async function* closedTurn(): AsyncIterable<AgentSessionEvent> {
+          yield { type: 'error', code: 'native.session.closed', message: 'native.session.closed' };
+          yield { type: 'turn-end' };
+        })();
+      }
+      if (activePermissionTurn) retireTurn(activePermissionTurn, 'PERMISSION_TURN_REPLACED');
       // TERMINAL-TOOLS-008 — a fresh controller per turn: a late cancel() on a
       // finished turn can never poison the next one.
       turnAbort = new AbortController();
-      pending.clear();
-      preAnswers.clear();
       if (exhausted) {
         const event: SessionBudgetExhaustedEvent = {
           type: 'session-budget-exhausted',
@@ -696,14 +1002,27 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
           yield { type: 'turn-end' };
         })();
       }
-      const turnId = `turn-${++turnSequence}`;
+      const generation = ++turnSequence;
+      const turnId = `turn-${generation}`;
+      const turn: PermissionTurn = {
+        generation,
+        controller: turnAbort,
+        issued: new Map(),
+        retired: false,
+      };
+      activePermissionTurn = turn;
       const attributionGeneration = requestAttributionGeneration;
-      return runWithCheckpoints(normalizeTurnInput(userInput), turnId, attributionGeneration);
+      return runWithCheckpoints(
+        normalizeTurnInput(userInput),
+        turnId,
+        attributionGeneration,
+        createTurnLoopDeps(turn),
+      );
     },
     renewBudgetEpoch(): { epoch: number } {
       budgetEpoch++;
       exhausted = undefined;
-      if (deps.nativeBudget) loopDeps.nativeBudgetState = createNativeBudgetState();
+      if (deps.nativeBudget) nativeBudgetState = createNativeBudgetState();
       // Cumulative billing/cost/usage is NOT touched here — `deps.costGuard` and
       // every emitted usage total stay exactly as they were; only the WORKING
       // budget restarts. The context epoch is refreshed safely on the next send
@@ -711,26 +1030,45 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       contextRefreshPlanned = true;
       return { epoch: budgetEpoch };
     },
-    respondPermission(id: string, response: PermissionResponse): void {
-      const resolve = pending.get(id);
-      if (resolve) {
-        // requestPermission already called — resolve it directly.
-        pending.delete(id);
-        resolve(response);
-      } else {
-        // requestPermission not yet called — stash as pre-answer.
-        preAnswers.set(id, response);
-      }
+    respondPermission(
+      request: PermissionRequestEvent,
+      response: PermissionResponse,
+    ): PermissionResponseDisposition {
+      return acceptPermissionResponse(activePermissionTurn, request, response);
     },
+    async requestNestedPermission(
+      input: NestedPermissionRequestInput,
+      decidePermission: NativePermissionDecisionCallback,
+    ): Promise<NestedPermissionRequestResult> {
+      const turn = activePermissionTurn;
+      const parent = turn?.activeParent;
+      if (!turn || !parent || closed || turn.retired || turn.controller.signal.aborted) {
+        return { kind: 'hold', reasonCode: 'PERMISSION_PARENT_INACTIVE' };
+      }
+      let request: PermissionRequestEvent;
+      try {
+        request = issuePermission(turn, { ...input, callId: parent.callId, nested: true });
+      } catch {
+        return { kind: 'hold', reasonCode: 'PERMISSION_STALE' };
+      }
+      let proposed: PermissionResponse;
+      try {
+        proposed = await decidePermission(request, turn.controller.signal);
+      } catch {
+        proposed = hold('PERMISSION_DECISION_UNAVAILABLE');
+      }
+      const disposition = acceptPermissionResponse(turn, request, proposed);
+      if (!disposition.ok) return { kind: 'hold', reasonCode: disposition.reasonCode };
+      const accepted = turn.issued.get(request.invocation.invocationId)?.response;
+      if (!accepted || accepted.decision === 'hold') {
+        return { kind: 'hold', reasonCode: accepted?.reasonCode ?? 'PERMISSION_RESPONSE_INVALID' };
+      }
+      return { kind: 'resolved', request, response: accepted };
+    },
+    claimPermissionEffect,
+    validatePermissionRequest,
     cancel(): void {
-      cancelled = true;
-      // TERMINAL-TOOLS-008 — abort the in-flight provider request/stream NOW
-      // (fetch rejects with AbortError; the loop ends the turn without an
-      // error event). Before this the flag was only honored at the next event.
-      turnAbort?.abort();
-      // Deny everything already parked; ids not yet requested are covered by the
-      // `if (cancelled)` guard in requestPermission + the loop's isCancelled() checks.
-      for (const [id, resolve] of pending) { pending.delete(id); resolve({ decision: 'deny' }); }
+      if (activePermissionTurn) retireTurn(activePermissionTurn, 'PERMISSION_CANCELLED');
     },
     setApprovalMode(next: ApprovalMode): void {
       mode = next;
@@ -767,6 +1105,11 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       contextRefreshPlanned = true;
     },
     compactContext(): AsyncIterable<AgentSessionEvent> {
+      if (closed) {
+        return (async function* closedCompact(): AsyncIterable<AgentSessionEvent> {
+          yield { type: 'error', code: 'native.session.closed', message: 'native.session.closed' };
+        })();
+      }
       if (!scratch || !scratchDeps) {
         return (async function* unavailable(): AsyncIterable<AgentSessionEvent> {
           yield { type: 'notice', code: 'native.compact.unavailable', message: 'compaction unavailable — no scratch store on this session' };
@@ -779,6 +1122,8 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       return takeContextEpoch(`compact-${compactSequence}`, attributionGeneration);
     },
     close(options = {}): void {
+      closed = true;
+      if (activePermissionTurn) retireTurn(activePermissionTurn, 'PERMISSION_SESSION_CLOSED');
       const keep = options.keepForRecoveryMs ?? 0;
       // Fail-open, and only on a real teardown: a kept scratchpad's checkpoints
       // may still cite contentRefs, so the content store survives exactly as

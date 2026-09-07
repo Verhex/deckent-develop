@@ -15,8 +15,12 @@ import {
   type SessionBudgetExhaustedEvent,
   type StructuredTurnInput,
   type TurnReference,
+  type NativePermissionDecisionCallback,
 } from '../../agent/session.js';
 import type { RequestMeasurementEvent } from '../../agent/events.js';
+import type { PermissionRequestEvent } from '../../agent/events.js';
+import { permittedNativePermissionLifetimes } from '../../agent/native-permission-binding.js';
+import type { NativeToolApprovalClassification } from '../../agent/tools/types.js';
 import { loadPolicy } from '../../agent/permission-policy.js';
 import { createRuleStore } from '../../agent/permission-store.js';
 import { createCostGuard } from '../../agent/guards/cost.js';
@@ -24,6 +28,7 @@ import { writeAuditEvent } from '../../core/audit-writer.js';
 import type { ProviderAdapter, ProviderMessage, ProviderRequest } from '../../agent/provider-tooluse/types.js';
 import type { ContentWriter } from '../../agent/tool-result-broker.js';
 import type { ToolRegistry } from '../../agent/tools/registry.js';
+import { classifyNativeToolApproval } from '../../agent/native-tool-approval.js';
 import { createToolExposure } from '../../agent/tools/exposure.js';
 import { primaryResource, writeTargets, type PermissionResponse } from '../../agent/loop.js';
 import { decide, resolveTier } from '../../agent/permission.js';
@@ -196,6 +201,15 @@ export interface NativeEngineDeps {
   getContextBudgetTokens?: () => number | undefined;
   /** The existing confirm-queue trigger (run.tsx confirmTrigger). 'y'|'a'|'n'. */
   confirm: (summary: string, toolName: string) => Promise<'y' | 'a' | 'n'>;
+  /** Canonical broker-backed native decision seam. Missing means typed HOLD. */
+  decidePermission?: (
+    request: PermissionRequestEvent,
+    approval: NativeToolApprovalClassification,
+    lifetimes: ReturnType<typeof permittedNativePermissionLifetimes>,
+    maskedArgs: Readonly<Record<string, unknown>>,
+    signal: AbortSignal,
+    validateRequest: (request: PermissionRequestEvent) => boolean,
+  ) => Promise<PermissionResponse>;
   /** The existing tool/change-block sink (run.tsx toolSink). */
   toolSink: (info: ToolInfo) => void;
   maxIterations?: number;
@@ -421,6 +435,9 @@ export interface ParityExecContext {
   ruleStore: ParityRuleStoreLike;
   getMode: () => ApprovalMode;
   confirm: (summary: string, toolName: string) => Promise<'y' | 'a' | 'n'>;
+  requestNestedPermission?: ReturnType<typeof createAgentSession>['requestNestedPermission'];
+  claimPermissionEffect?: ReturnType<typeof createAgentSession>['claimPermissionEffect'];
+  decidePermission?: NativePermissionDecisionCallback;
   cwd: string;
   t: (key: string) => string;
   /**
@@ -477,6 +494,13 @@ const NATIVE_AGENT_SIGNAL_KEYS = new Set([
   'native.checkpoint.saved',
   'native.checkpoint.epoch-advanced',
   'native.checkpoint.degraded',
+  'native.permission.classification-unavailable',
+  'native.permission.binding-invalid',
+  'native.permission.hold',
+  'native.permission.terminal-unavailable',
+  'native.permission.no-longer-current',
+  'native.permission.grant-failed',
+  'native.session.closed',
   INPUT_CONTEXT_OVERFLOW_KEY,
   CONTINUATION_EXHAUSTED_KEY,
 ]);
@@ -608,22 +632,35 @@ export function createParityExecImpl(ctx: ParityExecContext) {
       decision = 'ask';
     }
     if (decision === 'ask') {
-      // born-633 item(3): this reuses the SAME confirm queue/UI as the
-      // top-level model-proposed tool-use path, whose 'a' answer means
-      // "always" (a PERSISTED grant — see toDecision below). The nested path
-      // never persists 'a' (a fresh ruleStore lookup runs on every nested
-      // call — see the "'a' degrade pin" test) — the label must say so, or
-      // 'a' here silently overpromises what it does.
-      const onceHint = localizeOrFallback(
-        ctx.t,
-        'native.nested_confirm_once',
-        '(this call only — "always" is not saved for nested calls)',
-      );
-      const answer = await ctx.confirm(
-        `${ctx.t('native.run_tool')}: ${name}${resource ? ` (${resource})` : ''} ${onceHint}`,
-        name,
-      );
-      if (answer === 'n') throw new Error(`${PARITY_USER_REJECTION_PREFIX} ${name}`);
+      if (ctx.requestNestedPermission && ctx.claimPermissionEffect && ctx.decidePermission) {
+        const approval = classifyNativeToolApproval(def.approval, callArgs, resource);
+        if ('reasonCode' in approval) throw new Error(`${PARITY_POLICY_DENIAL_PREFIX} ${name}`);
+        const nested = await ctx.requestNestedPermission({
+          tool: name,
+          rawArgs: callArgs,
+          resource,
+          tier,
+          elevated,
+          approval,
+        }, ctx.decidePermission);
+        if (nested.kind === 'hold') throw new Error(`${PARITY_USER_REJECTION_PREFIX} ${name}`);
+        if (nested.response.decision === 'deny'
+          || !ctx.claimPermissionEffect(nested.request, nested.response, callArgs)) {
+          throw new Error(`${PARITY_USER_REJECTION_PREFIX} ${name}`);
+        }
+      } else throw new Error(`${PARITY_POLICY_DENIAL_PREFIX} ${name}`);
+    }
+    const currentElevated = checkSelfModifying(ctx.cwd, writeTargets(callArgs)).elevated;
+    let currentTier = resolveTier(def, ctx.policy);
+    if (currentElevated) currentTier = 'always';
+    const currentDecision = decide(name, resource, currentTier, {
+      rules: ctx.ruleStore.activeRules(),
+      denies: ctx.ruleStore.activeDenies(),
+      policy: ctx.policy,
+      mode: ctx.getMode(),
+    });
+    if (currentDecision === 'deny' || currentTier !== tier || currentElevated !== elevated) {
+      throw new Error(`${PARITY_POLICY_DENIAL_PREFIX} ${name}`);
     }
     const handlerResult = await def.handler(callArgs);
     // born-633 item(4): the loop's own 'tool-result' event only ever sees the
@@ -638,13 +675,6 @@ export function createParityExecImpl(ctx: ParityExecContext) {
     });
     return handlerResult;
   };
-}
-
-/** Map a confirm-queue answer to a session permission decision. */
-function toDecision(answer: 'y' | 'a' | 'n'): PermissionResponse {
-  if (answer === 'n') return { decision: 'deny' };
-  if (answer === 'a') return { decision: 'always' }; // persisted, matches "hep izin ver"
-  return { decision: 'once' };
 }
 
 export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
@@ -736,6 +766,18 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
       ruleStore,
       getMode: () => session.getApprovalMode(),
       confirm: deps.confirm,
+      requestNestedPermission: session.requestNestedPermission,
+      claimPermissionEffect: session.claimPermissionEffect,
+      ...(deps.decidePermission ? {
+        decidePermission: (request, signal) => deps.decidePermission!(
+          request,
+          request.approval,
+          permittedNativePermissionLifetimes(request.invocation),
+          request.maskedArgs,
+          signal,
+          session.validatePermissionRequest,
+        ),
+      } : {}),
       cwd: deps.cwd,
       t,
       toolSink: deps.toolSink,
@@ -767,8 +809,10 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   /** TERMINAL-TOOLS-008 — turns currently inside runTurn (0 or 1 on the REPL
    *  path; the bg-turn wrapper below runs its drained turns sequentially). */
   let turnsInFlight = 0;
+  let permissionWaitAbort: AbortController | undefined;
 
   const runTurnInner: ReplEngine = async (input, cbs) => {
+    permissionWaitAbort = new AbortController();
     let inputTokens = 0;
     let outputTokens = 0;
     // 560-004: the three carriers are separated HERE, at the last seam before the
@@ -796,12 +840,24 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           cbs.output(ev.text);
           break;
         case 'permission-request': {
-          const answer = await deps.confirm(`${t('native.run_tool')}: ${ev.tool}${ev.resource ? ` (${ev.resource})` : ''}`, ev.tool);
-          session.respondPermission(ev.id, toDecision(answer));
+          const response = deps.decidePermission
+            ? await deps.decidePermission(
+                ev,
+                ev.approval,
+                permittedNativePermissionLifetimes(ev.invocation),
+                ev.maskedArgs,
+                permissionWaitAbort.signal,
+                session.validatePermissionRequest,
+              )
+            : ({ decision: 'hold', reasonCode: 'NATIVE_PERMISSION_AUTHORITY_UNAVAILABLE' } as const);
+          session.respondPermission(ev, response);
           break;
         }
         case 'tool-result':
           if (activeToolId === ev.id) clearActiveTool();
+          if (!ev.ok && ev.code) {
+            cbs.output(`\n${localizeNativeAgentSignal(t, ev.code, ev.code)}\n`);
+          }
           deps.toolSink({ verb: `${ev.tool} — ${t('native.tool_ran')}`, target: '', ...(ev.ok ? {} : { failed: true }) });
           break;
         case 'tool-executing':
@@ -972,6 +1028,8 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     try {
       await runTurnInner(input, cbs);
     } finally {
+      permissionWaitAbort?.abort();
+      permissionWaitAbort = undefined;
       turnsInFlight--;
     }
   };
@@ -1062,13 +1120,17 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   // TERMINAL-TOOLS-008 — see the ReplEngine.cancelTurn doc comment above.
   engine.cancelTurn = () => {
     if (turnsInFlight === 0) return false;
+    permissionWaitAbort?.abort();
     session.cancel();
     return true;
   };
   // born-493 (387-002) — see the ReplEngine.setApprovalMode doc comment above.
   engine.setApprovalMode = (mode) => session.setApprovalMode(mode);
   // NT-03 (553-002) — see the ReplEngine.close doc comment above.
-  engine.close = (options) => session.close(options);
+  engine.close = (options) => {
+    permissionWaitAbort?.abort();
+    session.close(options);
+  };
   // NATIVE-BUDGET-RENEWAL (557-002) — see the ReplEngine.renewBudgetEpoch doc
   // comment above; only run.tsx's explicit `/renew` slash ever calls this.
   engine.renewBudgetEpoch = () => session.renewBudgetEpoch();

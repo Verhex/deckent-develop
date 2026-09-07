@@ -6457,6 +6457,27 @@ const BASE_MESSAGES: MessageMap = {
   'approval_card.risk_medium': { en: 'MEDIUM', tr: 'ORTA' },
   'approval_card.risk_high': { en: 'HIGH', tr: 'YÜKSEK' },
   'approval_card.risk_critical': { en: 'CRITICAL', tr: 'KRİTİK' },
+  'native_permission.intent_title': { en: 'Permission lifetime · {tool}', tr: 'İzin süresi · {tool}' },
+  'native_permission.intent_actor': { en: 'Actor: {actor}', tr: 'Aktör: {actor}' },
+  'native_permission.intent_resource': { en: 'Resource: {resource}', tr: 'Kaynak: {resource}' },
+  'native_permission.intent_once': { en: 'Once', tr: 'Bir kez' },
+  'native_permission.intent_session': { en: 'Session', tr: 'Oturum' },
+  'native_permission.intent_always': { en: 'Always', tr: 'Her zaman' },
+  'native_permission.intent_once_consequence': { en: 'this exact invocation only', tr: 'yalnız bu tam çağrı' },
+  'native_permission.intent_session_consequence': { en: 'this tool for the living session, including other resources', tr: 'diğer kaynaklar dahil yaşayan oturumda bu araç' },
+  'native_permission.intent_always_consequence': { en: 'persist this tool grant, including later resources', tr: 'sonraki kaynaklar dahil bu araç iznini kalıcılaştır' },
+  'native_permission.intent_cancel': { en: '1/2/3 select · Esc/N cancel', tr: '1/2/3 seç · Esc/N iptal' },
+  'native_permission.request_summary': { en: 'Native tool permission: {tool}', tr: 'Yerel araç izni: {tool}' },
+  'native.permission.classification-unavailable': { en: 'Tool permission classification is unavailable.', tr: 'Araç izin sınıflandırması kullanılamıyor.' },
+  'native.permission.binding-invalid': { en: 'Tool permission binding is invalid.', tr: 'Araç izin bağı geçersiz.' },
+  'native.permission.hold': { en: 'Tool permission requires an authorized decision.', tr: 'Araç izni yetkili bir karar gerektiriyor.' },
+  'native.permission.terminal-unavailable': {
+    en: 'Terminal control could not be confirmed restored. This tool continuation is held; the recorded decision is preserved. Open a new terminal session to continue.',
+    tr: 'Terminal denetiminin geri yüklendiği doğrulanamadı. Bu araç devamı beklemeye alındı; kaydedilmiş karar korundu. Devam etmek için yeni bir terminal oturumu açın.',
+  },
+  'native.permission.no-longer-current': { en: 'This tool permission request is no longer current.', tr: 'Bu araç izin isteği artık güncel değil.' },
+  'native.permission.grant-failed': { en: 'The tool permission grant could not be applied.', tr: 'Araç izni uygulanamadı.' },
+  'native.session.closed': { en: 'The native session is closed.', tr: 'Yerel oturum kapalı.' },
 
   // ─── `deckent do "<goal>"` (Task 355-010 GOLDENFLOW-CMD — sole-authority
   // addition; cited by 355-010's own docImpact: "all do.ts user-facing

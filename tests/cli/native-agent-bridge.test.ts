@@ -1,11 +1,23 @@
 // tests/cli/native-agent-bridge.test.ts
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { tmpdir } from 'node:os';
 import { mkdtempSync, existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { createNativeEngine, resolveCostCeilingUsd } from '../../src/cli/repl/native-agent-bridge.js';
-import { buildNativeToolRegistry } from '../../src/cli/repl/native-tool-registry.js';
+import { createNativeEngine, createParityExecImpl, resolveCostCeilingUsd } from '../../src/cli/repl/native-agent-bridge.js';
+import { buildNativeToolRegistry, PARITY_POLICY_DENIAL_PREFIX } from '../../src/cli/repl/native-tool-registry.js';
 import type { ProviderAdapter, ProviderEvent } from '../../src/agent/provider-tooluse/types.js';
+import { bindNativePermissionIntent, createNativePermissionInvocation } from '../../src/agent/native-permission-binding.js';
+import { loadPolicy } from '../../src/agent/permission-policy.js';
+import { getMessage } from '../../src/cli/helpers/messages.js';
+
+const allowOnce = async (request: Parameters<NonNullable<Parameters<typeof createNativeEngine>[0]['decidePermission']>>[0]) => ({
+  decision: 'once' as const,
+  binding: bindNativePermissionIntent(request.invocation, 'once', request.resource),
+});
+const deny = async (request: Parameters<NonNullable<Parameters<typeof createNativeEngine>[0]['decidePermission']>>[0]) => ({
+  decision: 'deny' as const,
+  binding: bindNativePermissionIntent(request.invocation, 'once', request.resource),
+});
 
 function scripted(scripts: ProviderEvent[][]): ProviderAdapter {
   let turn = 0;
@@ -13,6 +25,106 @@ function scripted(scripts: ProviderEvent[][]): ProviderAdapter {
 }
 
 describe('createNativeEngine', () => {
+  it.each(['en', 'tr'] as const)('localizes terminal restoration HOLD guidance in %s without executing the tool', async (lang) => {
+    const dir = mkdtempSync(join(tmpdir(), `nb-terminal-hold-${lang}-`));
+    try {
+      const output: string[] = [];
+      const engine = createNativeEngine({
+        adapter: scripted([[
+          { type: 'tool-call', id: `terminal-hold-${lang}`, name: 'deckent_write_file', args: { path: 'held.txt', content: 'blocked' } },
+          { type: 'done' },
+        ], [{ type: 'done' }]]),
+        registry: buildNativeToolRegistry({ cwd: () => dir }),
+        cwd: dir,
+        model: 'm',
+        lang,
+        confirm: async () => 'y',
+        toolSink: () => {},
+        t: (key) => getMessage(key, lang),
+        decidePermission: async () => ({
+          decision: 'hold',
+          reasonCode: 'terminal-restoration-unconfirmed',
+        }),
+      });
+      await engine('write', { output: (text) => output.push(text), onTurnEnd: () => {} });
+      expect(output.join('')).toContain(getMessage('native.permission.terminal-unavailable', lang));
+      expect(existsSync(join(dir, 'held.txt'))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('close aborts a parked top-level permission decision and runs no handler', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'nb-close-permission-'));
+    try {
+      let observedSignal: AbortSignal | undefined;
+      const engine = createNativeEngine({
+        adapter: scripted([[
+          { type: 'tool-call', id: 'write-close', name: 'deckent_write_file', args: { path: 'never.txt', content: 'blocked' } },
+          { type: 'done' },
+        ]]),
+        registry: buildNativeToolRegistry({ cwd: () => dir }), cwd: dir, model: 'm', lang: 'en',
+        confirm: async () => 'y', toolSink: () => {},
+        decidePermission: async (_request, _approval, _lifetimes, _maskedArgs, signal) => {
+          observedSignal = signal;
+          await new Promise<void>((resolve) => signal.addEventListener('abort', () => resolve(), { once: true }));
+          return { decision: 'hold', reasonCode: 'closed' };
+        },
+      });
+      const turn = engine('write', { output: () => {}, onTurnEnd: () => {} });
+      await vi.waitFor(() => expect(observedSignal).toBeDefined());
+      engine.close?.({ policy: 'delete' });
+      await expect(turn).resolves.toBeUndefined();
+      expect(observedSignal?.aborted).toBe(true);
+      expect(existsSync(join(dir, 'never.txt'))).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+  it('nested permission never falls back to raw confirm and rechecks a changed deny before effect', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'nb-nested-policy-'));
+    try {
+      const registry = buildNativeToolRegistry({ cwd: () => dir });
+      const rawArgs = { path: 'nested.txt', content: 'blocked' };
+      const resource = 'nested.txt';
+      const invocation = createNativePermissionInvocation({
+        sessionId: 's', sessionInstanceId: 'i', turnGeneration: 1,
+        invocationId: 'nested-invocation', callId: 'nested-call', tool: 'deckent_write_file',
+        rawArgs, tier: 'confirm', elevated: false, nested: true,
+      });
+      const approval = { scope: 'file-write' as const, risk: 'high' as const, scopeId: 'deckent_write_file', resource };
+      const request = Object.freeze({
+        type: 'permission-request' as const, id: 'nested-call', tool: 'deckent_write_file', resource,
+        tier: 'confirm' as const, invocation, approval, maskedArgs: Object.freeze({ ...rawArgs }),
+      });
+      let denied = false;
+      const confirm = vi.fn(async () => 'y' as const);
+      const base = {
+        registry, policy: loadPolicy(dir), getMode: () => 'suggest' as const, confirm,
+        cwd: dir, t: (key: string) => key,
+      };
+      const missing = createParityExecImpl({
+        ...base, ruleStore: { activeRules: () => [], activeDenies: () => [] },
+      });
+      await expect(missing({ name: 'deckent_write_file', args: rawArgs })).rejects.toThrow(PARITY_POLICY_DENIAL_PREFIX);
+      expect(confirm).not.toHaveBeenCalled();
+      expect(existsSync(join(dir, resource))).toBe(false);
+
+      const changed = createParityExecImpl({
+        ...base,
+        ruleStore: {
+          activeRules: () => [],
+          activeDenies: () => denied ? [{ tool: 'deckent_write_file', pattern: '**' }] : [],
+        },
+        requestNestedPermission: (async () => {
+          denied = true;
+          return { kind: 'resolved', request, response: { decision: 'once', binding: bindNativePermissionIntent(invocation, 'once', resource) } };
+        }) as never,
+        claimPermissionEffect: (() => true) as never,
+        decidePermission: allowOnce as never,
+      });
+      await expect(changed({ name: 'deckent_write_file', args: rawArgs })).rejects.toThrow(PARITY_POLICY_DENIAL_PREFIX);
+      expect(existsSync(join(dir, resource))).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
   it('persists a compact checkpoint through the real engine-session-store chain at the canonical project path', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'nb-checkpoint-wire-'));
     try {
@@ -101,6 +213,7 @@ describe('createNativeEngine', () => {
       const engine = createNativeEngine({
         adapter, registry: buildNativeToolRegistry({ cwd: () => dir }), cwd: dir, model: 'm', lang: 'en',
         confirm: async (summary, tool) => { asks.push(tool); return 'y'; }, toolSink: () => {},
+        decidePermission: async (request) => { asks.push(request.tool); return allowOnce(request); },
       });
       await engine('write it', { output: () => {}, onTurnEnd: () => {} });
       expect(asks).toContain('deckent_write_file');           // permission-request → confirm-queue
@@ -122,6 +235,7 @@ describe('createNativeEngine', () => {
       const engine = createNativeEngine({
         adapter, registry: buildNativeToolRegistry({ cwd: () => dir }), cwd: dir, model: 'm', lang: 'en',
         confirm: async () => 'y', toolSink: () => {},
+        decidePermission: allowOnce,
         t: (key) => ({
           'tui.native_tool_executing': 'executing {tool} · {elapsed}',
           'tui.native_tool_executing_compact': 'executing · {elapsed} · {tool}',
@@ -159,6 +273,7 @@ describe('createNativeEngine', () => {
       const engine = createNativeEngine({
         adapter, registry: buildNativeToolRegistry({ cwd: () => dir }), cwd: dir, model: 'm', lang: 'en',
         confirm: async () => 'n', toolSink: (i) => sink.push(i),
+        decidePermission: deny,
       });
       await engine('write it', { output: () => {}, onTurnEnd: () => {} });
       expect(existsSync(join(dir, 'no.txt'))).toBe(false);
@@ -206,6 +321,7 @@ describe('createNativeEngine', () => {
       const engine = createNativeEngine({
         adapter, registry: buildNativeToolRegistry({ cwd: () => dir }), cwd: dir, model: 'm', lang: 'en',
         confirm: async (summary) => { summaries.push(summary); return 'y'; },
+        decidePermission: async (request) => { summaries.push(`RUN: ${request.tool}`); return allowOnce(request); },
         toolSink: () => {},
         t: (key) => (key === 'native.run_tool' ? 'RUN' : `LBL:${key}`),
       });

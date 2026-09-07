@@ -296,6 +296,12 @@ export function InputBar(props: InputBarProps): ReactElement {
   const setAtDismissedBoth = (n: number | null): void => { atDismissedRef.current = n; setAtDismissed(n); };
 
   useInput((input, key) => {
+    // Keep the listener mounted across stdin-owner transitions. Ink updates its
+    // `isActive` subscription in a passive effect, after a newly-visible card
+    // may already be painted. The latest callback guard makes that transition
+    // atomic from the product's perspective: a stale InputBar listener cannot
+    // consume the approval key during the effect gap.
+    if (!active) return;
     if (process.env['DECKENT_INK_DEBUG'] === '1') {
       try { appendFileSync(debugKeylogPath(), JSON.stringify({ input, key }) + '\n'); } catch { /* ignore */ }
     }
@@ -420,7 +426,7 @@ export function InputBar(props: InputBarProps): ReactElement {
         && activeAtQuery(res.state.buffer, res.state.cursor)?.start !== atDismissedRef.current) {
       setAtDismissedBoth(null);
     }
-  }, { isActive: active });
+  });
 
   const matches = search ? [] : slashMenuMatches(slashRegistry, state.buffer);
   const sel = matches.length > 0 ? ((menuSel % matches.length) + matches.length) % matches.length : 0;

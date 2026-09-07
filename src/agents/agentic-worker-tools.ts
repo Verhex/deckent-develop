@@ -1,3 +1,5 @@
+import { classifyApprovalCommand } from '../core/approval-command-classification.js';
+
 // ═══ agentic-worker-tools — native Ollama tool schemas (T-233-001) ═══
 //
 // Five JSON-schema tool definitions advertised to the local model on every
@@ -201,42 +203,6 @@ export interface RiskyClassification {
   reason: string;
 }
 
-interface RiskPattern {
-  re: RegExp;
-  risk: ApprovalRisk;
-  reason: string;
-}
-
-// Ordered most- to least-severe; the FIRST match wins within each class.
-const GIT_MUTATION_PATTERNS: readonly RiskPattern[] = [
-  { re: /\bgit\s+push\b[^|;&]*(--force\b|-f\b)/i, risk: 'critical', reason: 'git push --force' },
-  { re: /\bgit\s+reset\b[^|;&]*--hard\b/i, risk: 'critical', reason: 'git reset --hard' },
-  { re: /\bgit\s+clean\b[^|;&]*-[a-z]*f/i, risk: 'critical', reason: 'git clean -f' },
-  { re: /\bgit\s+branch\b[^|;&]*-D\b/i, risk: 'high', reason: 'git branch -D (force delete)' },
-  { re: /\bgit\s+push\b/i, risk: 'high', reason: 'git push' },
-  {
-    re: /\bgit\s+(commit|merge|rebase|reset|tag|cherry-pick|revert|rm|am|filter-branch)\b/i,
-    risk: 'high',
-    reason: 'git history/state mutation',
-  },
-  { re: /\bgit\s+checkout\b[^|;&]*--\s/i, risk: 'medium', reason: 'git checkout -- (discard working-tree changes)' },
-  { re: /\bgit\s+stash\b[^|;&]*(drop|clear)\b/i, risk: 'medium', reason: 'git stash drop/clear' },
-];
-
-const NETWORK_PATTERNS: readonly RiskPattern[] = [
-  { re: /\b(npm|yarn|pnpm)\s+publish\b/i, risk: 'high', reason: 'package publish' },
-  { re: /\b(curl|wget)\b/i, risk: 'medium', reason: 'HTTP client invocation' },
-  { re: /\b(ssh|scp|sftp|rsync)\b/i, risk: 'medium', reason: 'remote-host transfer' },
-  { re: /\b(npm|yarn|pnpm)\s+(install|i|ci|add|update|up)\b/i, risk: 'medium', reason: 'package registry install' },
-  { re: /\bpip3?\s+install\b/i, risk: 'medium', reason: 'package registry install' },
-  { re: /\b(apt(-get)?|brew)\s+install\b/i, risk: 'medium', reason: 'system package install' },
-  { re: /\bgit\s+(clone|pull|fetch)\b/i, risk: 'low', reason: 'git network fetch' },
-];
-
-function matchPattern(cmd: string, patterns: readonly RiskPattern[]): RiskPattern | undefined {
-  return patterns.find((p) => p.re.test(cmd));
-}
-
 /**
  * Classify a tool call against the 3 risky ApprovalScope classes. Returns
  * `null` for every tool except `run_bash` (read_file/write_file/edit_file/
@@ -250,13 +216,7 @@ export function classifyRiskyToolCall(name: string, args: Record<string, unknown
 
   const cmd = String(args['cmd'] ?? args['command'] ?? '');
 
-  const gitMatch = matchPattern(cmd, GIT_MUTATION_PATTERNS);
-  if (gitMatch) return { scope: 'git-mutation', risk: gitMatch.risk, reason: gitMatch.reason };
-
-  const networkMatch = matchPattern(cmd, NETWORK_PATTERNS);
-  if (networkMatch) return { scope: 'network', risk: networkMatch.risk, reason: networkMatch.reason };
-
-  return { scope: 'shell-exec', risk: 'medium', reason: 'shell command execution' };
+  return classifyApprovalCommand(cmd, 'agentic');
 }
 
 const SUMMARY_MAX_LENGTH = 200;

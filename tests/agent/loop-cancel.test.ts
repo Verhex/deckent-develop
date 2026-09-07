@@ -29,7 +29,10 @@ function baseDeps(over: Partial<LoopDeps>): LoopDeps {
     adapter: { name: 'noop', async *send() { yield { type: 'done' }; } },
     registry: reg, policy: SAFE_DEFAULT_POLICY, ruleStore: memRuleStore(),
     cwd: tmpdir(), model: 'm', getMode: () => 'suggest',
-    requestPermission: async () => ({ decision: 'once' }),
+    issuePermission: () => { throw new Error('unexpected permission prompt'); },
+    requestPermission: async () => ({ decision: 'hold', reasonCode: 'unexpected' }),
+    validatePermission: () => false,
+    claimPermissionEffect: () => false,
     ...over,
   };
 }

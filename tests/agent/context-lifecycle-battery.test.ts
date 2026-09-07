@@ -376,7 +376,10 @@ describe('560-006 · incident-shaped hermetic battery (11/11 regression proofs)'
     return {
       adapter, registry, policy: SAFE_DEFAULT_POLICY, ruleStore: memRuleStore(),
       cwd: '/tmp', model: 'incident-model', getMode: () => 'suggest',
-      requestPermission: async () => ({ decision: 'once' }),
+      issuePermission: () => { throw new Error('unexpected permission prompt'); },
+      requestPermission: async () => ({ decision: 'hold', reasonCode: 'unexpected' }),
+      validatePermission: () => false,
+      claimPermissionEffect: () => false,
     };
   }
 

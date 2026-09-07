@@ -141,8 +141,13 @@ export function createRuleStore(cwd: string): RuleStore {
         if (!session.some((s) => sameRule(s, rule))) session.push(rule);
         return;
       }
-      if (!persisted.some((s) => sameRule(s, rule))) persisted.push(rule);
-      persist(cwd, persisted);
+      if (persisted.some((s) => sameRule(s, rule))) {
+        persist(cwd, persisted);
+        return;
+      }
+      const nextPersisted = [...persisted, rule];
+      persist(cwd, nextPersisted);
+      persisted.push(rule);
     },
     revoke(rule) {
       for (let i = session.length - 1; i >= 0; i--) if (sameRule(session[i]!, rule)) session.splice(i, 1);

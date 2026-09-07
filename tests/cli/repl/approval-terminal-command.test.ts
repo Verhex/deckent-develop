@@ -120,31 +120,34 @@ function child(onSpawn?: () => void, close: { code: number | null; signal: NodeJ
 }
 
 function runtime(
-  req: ApprovalRequest,
-  currentDecision: () => ApprovalDecision | undefined,
-  validation: { ok: true } | { ok: false; reason: 'missing-authorization' } = { ok: true },
+  req: ApprovalRequest | readonly ApprovalRequest[],
+  currentDecision: (id?: string) => ApprovalDecision | undefined,
+  validation: { ok: true } | { ok: false; reason: string }
+    | (() => { ok: true } | { ok: false; reason: string }) = { ok: true },
   receipt: ApprovalTimeoutReceipt | null = null,
   lifecycle?: ApprovalAppliedLifecycleView,
 ): ApprovalAuthorityRuntimeOpenResult {
+  const requests = Array.isArray(req) ? req : [req];
+  const primary = requests[0]!;
   return {
     state: 'ready',
     authorityEvidenceRef: 'approval-authority:test',
     service: {
       broker: {
-        getRequest: (id: string) => id === req.id ? req : undefined,
-        getDecision: (id: string) => id === req.id ? currentDecision() : undefined,
-        getTimeoutReceipt: (id: string) => id === req.id ? receipt : null,
+        getRequest: (id: string) => requests.find((candidate) => candidate.id === id),
+        getDecision: (id: string) => requests.some((candidate) => candidate.id === id) ? currentDecision(id) : undefined,
+        getTimeoutReceipt: (id: string) => id === primary.id ? receipt : null,
       },
       store: {
         load: () => ({
           pending: [],
           approved: [],
           denied: [],
-          expired: [{ request: req, decision: currentDecision() ?? null, ...(lifecycle ? { lifecycle } : {}) }],
+          expired: [{ request: primary, decision: currentDecision(primary.id) ?? null, ...(lifecycle ? { lifecycle } : {}) }],
           quarantined: [],
         }),
       },
-      decisionAuthority: { validate: () => validation },
+      decisionAuthority: { validate: () => typeof validation === 'function' ? validation() : validation },
       close: vi.fn(),
     },
   } as unknown as ApprovalAuthorityRuntimeOpenResult;
@@ -234,6 +237,143 @@ describe('createApprovalTerminalCommand', () => {
       ['/package/dist/cli/entry.js', 'approvals', 'decide', req.id, '--allow'],
       { cwd: '/project', stdio: 'inherit', windowsHide: false },
     );
+  });
+
+  it('holds the matching local cross-decision until terminal restoration without delaying external decisions', async () => {
+    const req = request();
+    const sibling = request({ id: 'approval-sibling' });
+    const externalDecision = decision(sibling);
+    let durable: ApprovalDecision | undefined;
+    let finishChild!: () => void;
+    let releaseTerminal!: () => void;
+    const terminalHeld = new Promise<void>((resolve) => { releaseTerminal = resolve; });
+    const adapter = createApprovalTerminalCommand({
+      projectRoot: '/project', tenantId: 'tenant-a', isInteractiveTerminal: () => true,
+      now: () => new Date('2026-09-07T12:02:00.000Z'),
+      openRuntime: () => runtime([req, sibling], (id) => id === req.id ? durable : externalDecision),
+      pauseTerminalInput,
+      spawnProcess: () => {
+        const emitter = new EventEmitter() as ChildProcess;
+        Object.assign(emitter, { kill: vi.fn(() => true), pid: 42 });
+        finishChild = () => {
+          durable = decision(req);
+          emitter.emit('close', 0, null);
+        };
+        return emitter;
+      },
+    });
+    const deciding = adapter.decide(req, 'allow', async (callback) => {
+      await callback();
+      await terminalHeld;
+    });
+    await vi.waitFor(() => expect(finishChild).toBeTypeOf('function'));
+    await expect(adapter.decide(req, 'allow', suspend)).resolves.toMatchObject({
+      kind: 'hold', reasonCode: 'terminal-ceremony-already-active',
+    });
+    finishChild();
+    await vi.waitFor(() => expect(durable).toBeDefined());
+    let localSettled = false;
+    const localVerification = adapter.verifyCrossDecision(req, durable!).then((result) => {
+      localSettled = true;
+      return result;
+    });
+    await Promise.resolve();
+    expect(localSettled).toBe(false);
+
+    await expect(adapter.verifyCrossDecision(sibling, externalDecision)).resolves.toMatchObject({ kind: 'trusted' });
+
+    const aborted = new AbortController();
+    const abortedVerification = adapter.verifyCrossDecision(req, durable!, { signal: aborted.signal });
+    aborted.abort();
+    await expect(abortedVerification).resolves.toMatchObject({
+      kind: 'untrusted', reasonCode: 'terminal-ceremony-wait-cancelled',
+    });
+    const preAborted = new AbortController();
+    preAborted.abort();
+    await expect(adapter.verifyCrossDecision(req, durable!, { signal: preAborted.signal })).resolves.toMatchObject({
+      kind: 'untrusted', reasonCode: 'terminal-ceremony-wait-cancelled',
+    });
+
+    releaseTerminal();
+    await expect(deciding).resolves.toMatchObject({ kind: 'accepted' });
+    await expect(localVerification).resolves.toMatchObject({ kind: 'trusted' });
+  });
+
+  it('keeps later verification on HOLD when terminal restoration threw after a durable decision', async () => {
+    const req = request();
+    let durable: ApprovalDecision | undefined;
+    const adapter = createApprovalTerminalCommand({
+      projectRoot: '/project', tenantId: 'tenant-a', isInteractiveTerminal: () => true,
+      now: () => new Date('2026-09-07T12:02:00.000Z'),
+      openRuntime: () => runtime(req, () => durable), pauseTerminalInput,
+      spawnProcess: () => child(() => { durable = decision(req); }),
+    });
+    await expect(adapter.decide(req, 'allow', async (callback) => {
+      await callback();
+      throw new Error('restore failed');
+    })).resolves.toMatchObject({ kind: 'hold', reasonCode: 'terminal-suspension-failed:Error' });
+    await expect(adapter.verifyCrossDecision(req, durable!)).resolves.toMatchObject({
+      kind: 'untrusted', reasonCode: 'terminal-restoration-unconfirmed',
+    });
+  });
+
+  it('latches restoration HOLD when an expired child cannot be reaped', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-07T12:59:59.000Z'));
+    try {
+      const req = request();
+      const sibling = request({ id: 'approval-after-unreaped' });
+      const siblingDecision = decision(sibling);
+      const kill = vi.fn(() => true);
+      const adapter = createApprovalTerminalCommand({
+        projectRoot: '/project', tenantId: 'tenant-a', isInteractiveTerminal: () => true,
+        now: () => new Date(),
+        openRuntime: () => runtime([req, sibling], (id) => id === sibling.id ? siblingDecision : undefined),
+        pauseTerminalInput,
+        spawnProcess: () => Object.assign(new EventEmitter() as ChildProcess, { pid: 42, kill }),
+      });
+      const deciding = adapter.decide(req, 'allow', suspend);
+      await vi.advanceTimersByTimeAsync(3_100);
+      await expect(deciding).resolves.toMatchObject({ kind: 'hold', reasonCode: 'child-unreaped-after-expiry' });
+      expect(kill).toHaveBeenNthCalledWith(1);
+      expect(kill).toHaveBeenNthCalledWith(2, 'SIGKILL');
+      await expect(adapter.verifyCrossDecision(sibling, siblingDecision)).resolves.toMatchObject({
+        kind: 'untrusted', reasonCode: 'terminal-restoration-unconfirmed',
+      });
+      await expect(adapter.decide(sibling, 'allow', suspend)).resolves.toMatchObject({
+        kind: 'hold', reasonCode: 'terminal-restoration-unconfirmed',
+      });
+      expect(kill).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('revalidates expiry after a local ceremony wait instead of releasing a stale allow', async () => {
+    const req = request();
+    let durable: ApprovalDecision | undefined;
+    let current = new Date('2026-09-07T12:02:00.000Z');
+    let releaseTerminal!: () => void;
+    const terminalHeld = new Promise<void>((resolve) => { releaseTerminal = resolve; });
+    const adapter = createApprovalTerminalCommand({
+      projectRoot: '/project', tenantId: 'tenant-a', isInteractiveTerminal: () => true,
+      now: () => current,
+      openRuntime: () => runtime(req, () => durable, () => current.getTime() >= Date.parse(req.expiresAt)
+        ? { ok: false, reason: 'decision-after-expiry' }
+        : { ok: true }),
+      pauseTerminalInput,
+      spawnProcess: () => child(() => { durable = decision(req); }),
+    });
+    const deciding = adapter.decide(req, 'allow', async (callback) => {
+      await callback();
+      await terminalHeld;
+    });
+    await vi.waitFor(() => expect(durable).toBeDefined());
+    const verification = adapter.verifyCrossDecision(req, durable!);
+    current = new Date('2026-09-07T14:00:00.000Z');
+    releaseTerminal();
+    await deciding;
+    await expect(verification).resolves.toMatchObject({ kind: 'untrusted', reasonCode: 'decision-after-expiry' });
   });
 
   it('fails closed before spawn without an inherited interactive TTY', async () => {

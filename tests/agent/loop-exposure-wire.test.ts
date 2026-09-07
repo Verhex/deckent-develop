@@ -112,7 +112,10 @@ function baseDeps(over: Partial<LoopDeps> & { registry: ToolRegistry; adapter: P
     cwd,
     model: 'm',
     getMode: () => 'suggest',
-    requestPermission: async () => ({ decision: 'once' }),
+    issuePermission: () => { throw new Error('unexpected permission prompt'); },
+    requestPermission: async () => ({ decision: 'hold', reasonCode: 'unexpected' }),
+    validatePermission: () => false,
+    claimPermissionEffect: () => false,
     ...over,
   };
 }

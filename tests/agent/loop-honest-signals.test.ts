@@ -39,7 +39,10 @@ function baseDeps(over: Partial<LoopDeps>): LoopDeps {
     adapter: scriptedAdapter([[{ type: 'done' }]]).adapter,
     registry: new ToolRegistry(), policy: SAFE_DEFAULT_POLICY, ruleStore: memRuleStore(),
     cwd: tmpdir(), model: 'm', getMode: () => 'suggest',
-    requestPermission: async () => ({ decision: 'once' }),
+    issuePermission: () => { throw new Error('unexpected permission prompt'); },
+    requestPermission: async () => ({ decision: 'hold', reasonCode: 'unexpected' }),
+    validatePermission: () => false,
+    claimPermissionEffect: () => false,
     ...over,
   };
 }

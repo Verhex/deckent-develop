@@ -351,15 +351,41 @@ export class ApprovalBroker extends EventEmitter {
    * resolver that {@link ApprovalBroker.decide}, {@link ApprovalBroker.expire},
    * or {@link ApprovalBroker.checkForExternalDecisions} resumes.
    */
-  awaitDecision(id: string): Promise<ApprovalDecision> {
+  awaitDecision(id: string, opts: { signal?: AbortSignal } = {}): Promise<ApprovalDecision> {
+    const signal = opts.signal;
+    if (signal?.aborted) return Promise.reject(new DOMException('Approval wait aborted', 'AbortError'));
     this.checkForExternalDecisions();
     const settled = this.decisionsById.get(id);
     if (settled) return Promise.resolve(settled);
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      let done = false;
+      const finish = (decision: ApprovalDecision) => {
+        if (done) return;
+        done = true;
+        signal?.removeEventListener('abort', onAbort);
+        resolve(decision);
+      };
+      const onAbort = () => {
+        if (done) return;
+        done = true;
+        this.removeWaiter(id, finish);
+        signal?.removeEventListener('abort', onAbort);
+        reject(new DOMException('Approval wait aborted', 'AbortError'));
+      };
       const waiters = this.waitersById.get(id);
-      if (waiters) waiters.push(resolve);
-      else this.waitersById.set(id, [resolve]);
+      if (waiters) waiters.push(finish);
+      else this.waitersById.set(id, [finish]);
+      signal?.addEventListener('abort', onAbort, { once: true });
+      if (signal?.aborted) onAbort();
     });
+  }
+
+  private removeWaiter(id: string, waiter: (decision: ApprovalDecision) => void): void {
+    const waiters = this.waitersById.get(id);
+    if (!waiters) return;
+    const index = waiters.indexOf(waiter);
+    if (index >= 0) waiters.splice(index, 1);
+    if (waiters.length === 0) this.waitersById.delete(id);
   }
 
   /** Exact read-only lookup used by trusted decision ingress adapters. */

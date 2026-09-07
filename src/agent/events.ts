@@ -2,13 +2,26 @@
 // The agent core (M2 Part 2 loop) emits these; any view (Ink/web/IDE/headless)
 // consumes them. Transport-neutral: in-proc AsyncIterable, SSE/WS, or NDJSON.
 
-import type { ToolPermissionTier } from './tools/types.js';
+import type { NativeToolApprovalClassification, ToolPermissionTier } from './tools/types.js';
 import type { ApprovalMode } from './permission-types.js';
 import type { ProviderAdmissionDecision } from './provider-tooluse/types.js';
+import type { NativePermissionInvocation } from './native-permission-binding.js';
 
 export interface TextDeltaEvent { type: 'text-delta'; text: string; }
 export interface ToolProposedEvent { type: 'tool-proposed'; id: string; tool: string; args: Record<string, unknown>; }
-export interface PermissionRequestEvent { type: 'permission-request'; id: string; tool: string; resource: string; tier: ToolPermissionTier; }
+export interface PermissionRequestEvent {
+  readonly type: 'permission-request';
+  readonly id: string;
+  readonly tool: string;
+  readonly resource: string;
+  readonly tier: ToolPermissionTier;
+  /** Producer-owned, non-secret authorization classification for the broker. */
+  readonly approval: NativeToolApprovalClassification;
+  /** Deep-frozen safe display/request projection; raw args remain session-owned. */
+  readonly maskedArgs: Readonly<Record<string, unknown>>;
+  /** Immutable session-owned identity of this exact proposed invocation. */
+  readonly invocation: NativePermissionInvocation;
+}
 export interface PermissionAutoDecisionEvent {
   type: 'permission-auto-decision';
   tool: string;
@@ -22,7 +35,7 @@ export interface PermissionAutoDecisionEvent {
   floor: boolean;
 }
 export interface ToolExecutingEvent { type: 'tool-executing'; id: string; tool: string; }
-export interface ToolResultEvent { type: 'tool-result'; id: string; tool: string; ok: boolean; output: string; }
+export interface ToolResultEvent { type: 'tool-result'; id: string; tool: string; ok: boolean; output: string; code?: string; }
 export interface TurnEndEvent { type: 'turn-end'; }
 export interface UsageEvent { type: 'usage'; inputTokens: number; outputTokens: number; }
 export interface RequestMeasurementEvent {

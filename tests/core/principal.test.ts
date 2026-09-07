@@ -5,6 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   resolveLocalOsPrincipal,
+  resolveLocalOsActorId,
   principalToActor,
   assessActorAssurance,
   recordActorAssurance,
@@ -13,6 +14,12 @@ import {
 } from '../../src/core/principal.js';
 
 describe('resolveLocalOsPrincipal — real OS identity, never synthetic', () => {
+  it('projects the exact OS username or honestly returns unavailable', () => {
+    expect(resolveLocalOsActorId()).toBe(userInfo().username);
+    expect(resolveLocalOsActorId(() => ({ username: 'operator' }))).toBe('operator');
+    expect(resolveLocalOsActorId(() => ({ username: '' }))).toBeNull();
+    expect(resolveLocalOsActorId(() => { throw new Error('passwd unavailable'); })).toBeNull();
+  });
   it('resolves the actual os user + host with os-user assurance', () => {
     const p = resolveLocalOsPrincipal('cli');
     expect(p.id).toBe(`${userInfo().username}@${hostname()}`);

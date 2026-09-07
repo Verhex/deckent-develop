@@ -1,3 +1,5 @@
+import type { ApprovalRisk, ApprovalScope } from '../../core/approval-contract.js';
+
 // ═══ ToolDefinition — the native-agent tool extension point (SP-1 §8) ═══════
 // Any source (builtin, MCP, user, package, config) registers tools by
 // implementing this contract. The registry exposes them as provider-native
@@ -5,6 +7,18 @@
 
 export type ToolPermissionTier = 'silent' | 'confirm' | 'always';
 export type ToolSource = 'builtin' | 'mcp' | 'user' | 'package' | 'config';
+
+export interface NativeToolApprovalClassification {
+  readonly scope: ApprovalScope;
+  readonly risk: ApprovalRisk;
+  readonly scopeId: string;
+  readonly resource: string;
+}
+
+export type NativeToolApprovalClassifier = (
+  args: Record<string, unknown>,
+  resource: string,
+) => NativeToolApprovalClassification | null;
 
 export interface ToolResult {
   ok: boolean;
@@ -25,6 +39,8 @@ export interface ToolDefinition {
   tier: ToolPermissionTier;
   /** Where this tool came from (for telemetry + guard policy). */
   source: ToolSource;
+  /** Producer-owned approval metadata. null means the invocation is unsupported/HOLD. */
+  approval?: NativeToolApprovalClassifier;
   /** Executes the tool. Pure of the view; returns a structured result. */
   handler: (args: Record<string, unknown>) => Promise<ToolResult>;
 }
@@ -42,6 +58,7 @@ export function validateToolDefinition(def: unknown): string | null {
   if (typeof d.category !== 'string' || d.category.trim().length === 0) return 'category must be a non-empty string';
   if (typeof d.tier !== 'string' || !TIERS.has(d.tier)) return `tier must be one of ${[...TIERS].join('|')}`;
   if (typeof d.source !== 'string' || !SOURCES.has(d.source)) return `source must be one of ${[...SOURCES].join('|')}`;
+  if (d.approval !== undefined && typeof d.approval !== 'function') return 'approval must be a function';
   if (typeof d.handler !== 'function') return 'handler must be a function';
   return null;
 }

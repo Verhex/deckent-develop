@@ -30,7 +30,10 @@ function deps(adapter: ProviderAdapter, handler = vi.fn(async () => ({ ok: true,
   return {
     adapter, registry, policy: SAFE_DEFAULT_POLICY, ruleStore,
     cwd: '/tmp', model: 'incident-model', getMode: () => 'suggest',
-    requestPermission: async () => ({ decision: 'once' }),
+    issuePermission: () => { throw new Error('unexpected permission prompt'); },
+    requestPermission: async () => ({ decision: 'hold', reasonCode: 'unexpected' }),
+    validatePermission: () => false,
+    claimPermissionEffect: () => false,
   };
 }
 

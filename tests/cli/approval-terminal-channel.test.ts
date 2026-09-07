@@ -56,8 +56,12 @@ describe('ApprovalTerminalChannel authenticated boundary', () => {
     const channel = createApprovalTerminalChannel(relay, stream, {
       filter: (notification) => notification.request.tenantId === 'tenant-a',
     });
-    broker.submit(buildRequest('read-a'));
+    const foreign = broker.submit({ ...buildRequest('read-foreign'), tenantId: 'tenant-b' });
+    const own = broker.submit(buildRequest('read-a'));
     expect(await readOne(channel.events)).toMatchObject({ kind: 'pending', request: { id: 'read-a' } });
+    expect(broker.getRequest(foreign.id)).toEqual(foreign);
+    expect(broker.getDecision(foreign.id)).toBeNull();
+    expect(broker.getRequest(own.id)).toEqual(own);
     channel.dispose();
   });
 

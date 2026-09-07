@@ -34,9 +34,25 @@ import {
   estimateMessageTokens,
 } from './context-budget.js';
 import { matchRule } from './permission-types.js';
+import type {
+  NativePermissionBinding,
+  NativePermissionLifetime,
+} from './native-permission-binding.js';
+import { classifyNativeToolApproval } from './native-tool-approval.js';
+import type { NativeToolApprovalClassification } from './tools/types.js';
+import { ALL_APPROVAL_RISKS, ALL_APPROVAL_SCOPES } from '../core/approval-contract.js';
 
 const MAX_OUTPUT_CONTINUATIONS = 2;
 const CONTINUATION_INSTRUCTION = 'Continue the same answer exactly where it stopped. Do not repeat prior visible text.';
+
+function isValidApprovalClassification(value: NativeToolApprovalClassification): boolean {
+  return ALL_APPROVAL_SCOPES.includes(value.scope)
+    && ALL_APPROVAL_RISKS.includes(value.risk)
+    && typeof value.scopeId === 'string'
+    && value.scopeId.trim().length > 0
+    && value.scopeId === value.scopeId.trim()
+    && typeof value.resource === 'string';
+}
 
 function removeRepeatedPrefix(previous: string, next: string): string {
   const max = Math.min(previous.length, next.length);
@@ -46,7 +62,26 @@ function removeRepeatedPrefix(previous: string, next: string): string {
   return next;
 }
 
-export type PermissionResponse = { decision: 'once' | 'session' | 'always' | 'deny' };
+export type PermissionResponse =
+  | {
+      readonly decision: NativePermissionLifetime | 'deny';
+      readonly binding: NativePermissionBinding;
+    }
+  | {
+      readonly decision: 'hold';
+      readonly reasonCode: string;
+    };
+
+export interface PermissionIssueInput {
+  readonly callId: string;
+  readonly tool: string;
+  readonly rawArgs: Record<string, unknown>;
+  readonly resource: string;
+  readonly tier: import('./tools/types.js').ToolPermissionTier;
+  readonly elevated: boolean;
+  readonly nested: boolean;
+  readonly approval: NativeToolApprovalClassification;
+}
 
 export interface LoopDeps {
   adapter: ProviderAdapter;
@@ -93,8 +128,27 @@ export interface LoopDeps {
   getProviderToolSchemas?: () => NativeToolSchema[];
   /** current approval mode (read per-decision so setApprovalMode takes effect). */
   getMode: () => ApprovalMode;
+  /** Session-owned identity registration. The invocation is registered before
+   *  the returned event is yielded, so an immediate response is never unissued. */
+  issuePermission: (input: PermissionIssueInput) => PermissionRequestEvent;
   /** view→core suspension: resolve with the user's choice on an 'ask' decision. */
   requestPermission: (req: PermissionRequestEvent) => Promise<PermissionResponse>;
+  /** Non-consuming binding/lifecycle/argument check before a persistent grant. */
+  validatePermission: (
+    req: PermissionRequestEvent,
+    response: PermissionResponse,
+    rawArgs: Record<string, unknown>,
+  ) => boolean;
+  /** Revalidate and consume one exact issued invocation immediately before its
+   *  effect. False means HOLD; callers never infer authority from the callback. */
+  claimPermissionEffect: (
+    req: PermissionRequestEvent,
+    response: PermissionResponse,
+    rawArgs: Record<string, unknown>,
+  ) => boolean;
+  /** Marks the actual top-level invocation whose handler is executing. Nested
+   *  permission calls derive their parent call id from this session-owned seam. */
+  enterToolExecution?: (callId: string) => () => void;
   /** cooperative cancellation between iterations. */
   isCancelled?: () => boolean;
   /** TERMINAL-TOOLS-008 — the current turn's abort signal (session-owned
@@ -455,18 +509,40 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         transcript.appendToolResult(call.id, output);
         continue;
       }
-      const resource = primaryResource(call.args);
-      const elevated = checkSelfModifying(deps.cwd, writeTargets(call.args)).elevated;
-      let tier = resolveTier(def, deps.policy);
-      const isShellTool = call.name === 'bash' || call.name.endsWith('_bash');
-      const rawShellCommand = call.args['command'] ?? call.args['cmd'] ?? resource;
-      const shellCommand = typeof rawShellCommand === 'string' ? rawShellCommand : '';
-      const shellRisk = isShellTool ? classifyShellCommand(shellCommand) : undefined;
-      if (shellRisk?.risk === 'destructive') tier = 'always';
-      else if (shellRisk?.risk === 'safe-read') tier = 'silent';
-      if (elevated) tier = 'always';
-
-      const decision = decide(call.name, resource, tier, { rules: deps.ruleStore.activeRules(), denies: deps.ruleStore.activeDenies(), policy: deps.policy, mode: deps.getMode() });
+      const resolveCurrentPermission = () => {
+        const resource = primaryResource(call.args);
+        const elevated = checkSelfModifying(deps.cwd, writeTargets(call.args)).elevated;
+        let tier = resolveTier(def, deps.policy);
+        const isShellTool = call.name === 'bash' || call.name.endsWith('_bash');
+        const rawShellCommand = call.args['command'] ?? call.args['cmd'] ?? resource;
+        const shellCommand = typeof rawShellCommand === 'string' ? rawShellCommand : '';
+        const shellRisk = isShellTool ? classifyShellCommand(shellCommand) : undefined;
+        let approval: NativeToolApprovalClassification | { readonly reasonCode: 'NATIVE_PERMISSION_CLASSIFICATION_UNAVAILABLE' };
+        try {
+          approval = classifyNativeToolApproval(def.approval, call.args, resource);
+        } catch {
+          approval = { reasonCode: 'NATIVE_PERMISSION_CLASSIFICATION_UNAVAILABLE' };
+        }
+        if (shellRisk?.risk === 'destructive') tier = 'always';
+        else if (shellRisk?.risk === 'safe-read') tier = 'silent';
+        if (elevated) tier = 'always';
+        return {
+          resource,
+          elevated,
+          tier,
+          isShellTool,
+          shellRisk,
+          approval,
+          decision: decide(call.name, resource, tier, {
+            rules: deps.ruleStore.activeRules(),
+            denies: deps.ruleStore.activeDenies(),
+            policy: deps.policy,
+            mode: deps.getMode(),
+          }),
+        };
+      };
+      const initialPermission = resolveCurrentPermission();
+      const { resource, elevated, tier, isShellTool, shellRisk, decision } = initialPermission;
       // Every NON-ask outcome is an auditable auto-decision (548-T2 contract):
       // mode, tool, resource class, matched rule, tier, decision and floor
       // status — the trace-side record of what ran without a human prompt.
@@ -487,6 +563,7 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
           floor: tier === 'always',
         };
       }
+      let permission: { request: PermissionRequestEvent; response: PermissionResponse } | undefined;
       if (decision === 'deny') {
         const output = '[denied by policy]';
         yield { type: 'tool-result', id: call.id, tool: call.name, ok: false, output };
@@ -494,13 +571,70 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         continue;
       }
       if (decision === 'ask') {
-        const prompt: PermissionRequestEvent = { type: 'permission-request', id: call.id, tool: call.name, resource, tier };
+        if ('reasonCode' in initialPermission.approval
+          || !isValidApprovalClassification(initialPermission.approval)
+          || initialPermission.approval.resource !== resource) {
+          const code = 'native.permission.classification-unavailable';
+          const output = code;
+          yield { type: 'tool-result', id: call.id, tool: call.name, ok: false, output, code };
+          transcript.appendToolResult(call.id, output);
+          continue;
+        }
+        let prompt: PermissionRequestEvent;
+        try {
+          prompt = deps.issuePermission({
+            callId: call.id,
+            tool: call.name,
+            rawArgs: call.args,
+            resource,
+            tier,
+            elevated,
+            nested: false,
+            approval: initialPermission.approval,
+          });
+        } catch {
+          const code = 'native.permission.binding-invalid';
+          const output = code;
+          yield { type: 'tool-result', id: call.id, tool: call.name, ok: false, output, code };
+          transcript.appendToolResult(call.id, output);
+          continue;
+        }
         yield prompt;
         const resp = await deps.requestPermission(prompt);
-        if (resp.decision === 'deny') {
-          const output = '[rejected by user]';
-          yield { type: 'tool-result', id: call.id, tool: call.name, ok: false, output };
+        if (resp.decision === 'deny' || resp.decision === 'hold') {
+          const cancelled = deps.isCancelled?.() === true;
+          const code = !cancelled && resp.decision === 'hold'
+            ? resp.reasonCode === 'terminal-restoration-unconfirmed'
+              ? 'native.permission.terminal-unavailable'
+              : 'native.permission.hold'
+            : undefined;
+          const output = cancelled
+            ? '[cancelled]'
+            : resp.decision === 'deny' ? '[rejected by user]' : code!;
+          yield { type: 'tool-result', id: call.id, tool: call.name, ok: false, output, ...(code ? { code } : {}) };
           transcript.appendToolResult(call.id, output);
+          if (deps.isCancelled?.()) { cancelledAt = callIndex + 1; break; }
+          continue;
+        }
+        const beforeGrant = resolveCurrentPermission();
+        const currentBeforeGrant = !deps.isCancelled?.()
+          && call.name === prompt.tool
+          && beforeGrant.resource === prompt.resource
+          && beforeGrant.tier === prompt.tier
+          && beforeGrant.elevated === prompt.invocation.elevated
+          && !('reasonCode' in beforeGrant.approval)
+          && beforeGrant.approval.scope === prompt.approval.scope
+          && beforeGrant.approval.risk === prompt.approval.risk
+          && beforeGrant.approval.scopeId === prompt.approval.scopeId
+          && beforeGrant.approval.resource === prompt.approval.resource
+          && beforeGrant.decision !== 'deny'
+          && deps.validatePermission(prompt, resp, call.args);
+        if (!currentBeforeGrant) {
+          const code = deps.isCancelled?.() ? undefined : 'native.permission.no-longer-current';
+          const output = code ?? '[cancelled]';
+          yield { type: 'tool-result', id: call.id, tool: call.name, ok: false, output, ...(code ? { code } : {}) };
+          transcript.appendToolResult(call.id, output);
+          if (deps.isCancelled?.()) { cancelledAt = callIndex + 1; break; }
           continue;
         }
         // A self-modifying-elevated call never persists a grant — each deckent-source
@@ -508,14 +642,48 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         // later source writes by this tool and defeat the guard (review follow-up #2).
         if (resp.decision !== 'once' && !elevated) {
           const lifetime = resp.decision as Exclude<GrantLifetime, 'once'>;
-          deps.ruleStore.grant({ tool: call.name, pattern: grantPatternFor(call.name, resource, lifetime) }, lifetime);
+          try {
+            deps.ruleStore.grant({ tool: call.name, pattern: grantPatternFor(call.name, resource, lifetime) }, lifetime);
+          } catch {
+            const code = 'native.permission.grant-failed';
+            const output = code;
+            yield { type: 'tool-result', id: call.id, tool: call.name, ok: false, output, code };
+            transcript.appendToolResult(call.id, output);
+            continue;
+          }
         }
+        permission = { request: prompt, response: resp };
       }
 
       yield { type: 'tool-executing', id: call.id, tool: call.name };
+      const beforeEffect = resolveCurrentPermission();
+      const livePolicyAllows = !deps.isCancelled?.()
+        && call.name === def.name
+        && beforeEffect.decision !== 'deny'
+        && (permission === undefined
+          || (beforeEffect.resource === permission.request.resource
+            && beforeEffect.tier === permission.request.tier
+            && beforeEffect.elevated === permission.request.invocation.elevated
+            && !('reasonCode' in beforeEffect.approval)
+            && beforeEffect.approval.scope === permission.request.approval.scope
+            && beforeEffect.approval.risk === permission.request.approval.risk
+            && beforeEffect.approval.scopeId === permission.request.approval.scopeId
+            && beforeEffect.approval.resource === permission.request.approval.resource));
+      const permissionClaimed = livePolicyAllows && (permission === undefined
+        || deps.claimPermissionEffect(permission.request, permission.response, call.args));
+      if (!livePolicyAllows || !permissionClaimed) {
+        const code = deps.isCancelled?.() ? undefined : 'native.permission.no-longer-current';
+        const output = code ?? '[cancelled]';
+        yield { type: 'tool-result', id: call.id, tool: call.name, ok: false, output, ...(code ? { code } : {}) };
+        transcript.appendToolResult(call.id, output);
+        if (deps.isCancelled?.()) { cancelledAt = callIndex + 1; break; }
+        continue;
+      }
+      const leaveToolExecution = deps.enterToolExecution?.(call.id);
       let result: ToolResult;
       try { result = await def.handler(call.args); }
       catch (e) { result = { ok: false, output: e instanceof Error ? e.message : String(e) }; }
+      finally { leaveToolExecution?.(); }
       yield { type: 'tool-result', id: call.id, tool: call.name, ok: result.ok, output: result.output };
       transcript.appendToolResult(call.id, result.output);
     }

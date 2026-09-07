@@ -47,6 +47,18 @@ export interface VerifiedPrincipal {
   readonly role?: string;
 }
 
+/** Exact local OS actor name shared by local principal and live terminal auth. */
+export function resolveLocalOsActorId(
+  resolveUserInfo: () => { username?: string } = userInfo,
+): string | null {
+  try {
+    const username = resolveUserInfo().username;
+    return typeof username === 'string' && username.length > 0 ? username : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Resolve the REAL local operating-system identity for host-invoked surfaces
  * (CLI, MCP stdio, REPL). This replaces the synthetic literals those ingresses
@@ -54,12 +66,7 @@ export interface VerifiedPrincipal {
  * invocation genuinely IS this OS user — recording it is truth, not theater.
  */
 export function resolveLocalOsPrincipal(provenance: RequestOrigin): VerifiedPrincipal {
-  let username = '';
-  try {
-    username = userInfo().username;
-  } catch {
-    // Some containers have no passwd entry for the uid; fall through.
-  }
+  const username = resolveLocalOsActorId();
   if (!username) {
     // Honest degradation: identity is still local+traceable via host, but the
     // assurance drops to unverified so the advisory seam surfaces it.

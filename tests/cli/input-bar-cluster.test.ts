@@ -77,7 +77,9 @@ describe('inkToKey — Home/End detection', () => {
 
   it('does not misfire on unrelated keys (arrows, return, backspace still take priority)', () => {
     expect(inkToKey('', inkKey({ leftArrow: true }))).toEqual({ name: 'left' });
-    expect(inkToKey('', inkKey({ return: true }))).toEqual({ name: 'return' });
+    expect(inkToKey('', inkKey({ return: true }))).toEqual({ name: 'return', shift: false, meta: false });
+    expect(inkToKey('', inkKey({ return: true, shift: true }))).toEqual({ name: 'return', shift: true, meta: false });
+    expect(inkToKey('', inkKey({ return: true, meta: true }))).toEqual({ name: 'return', shift: false, meta: true });
     expect(inkToKey('x', inkKey())).toEqual({ name: 'x', sequence: 'x' });
   });
 });

@@ -67,6 +67,7 @@ import {
 } from '../agent/permission-store.js';
 import { WorkerApprovalGate, type GateVerdict } from '../core/approval-worker-gate.js';
 import type { ApprovalScope, ApprovalRisk, Requester } from '../core/approval-contract.js';
+import { classifyApprovalCommand } from '../core/approval-command-classification.js';
 
 // ─── Token usage: orchestrator/adapter-owned (Worker Output Contract §1.1) ─
 //
@@ -1140,38 +1141,6 @@ export interface RiskyClassification {
   reason: string;
 }
 
-interface RiskPattern {
-  re: RegExp;
-  risk: ApprovalRisk;
-  reason: string;
-}
-
-// Ordered most- to least-severe; the FIRST match wins within each class.
-const GIT_MUTATION_PATTERNS: readonly RiskPattern[] = [
-  { re: /\bgit\s+push\b[^|;&]*(--force\b|-f\b)/i, risk: 'critical', reason: 'git push --force' },
-  { re: /\bgit\s+reset\b[^|;&]*--hard\b/i, risk: 'critical', reason: 'git reset --hard' },
-  { re: /\bgit\s+clean\b[^|;&]*-[a-z]*f/i, risk: 'critical', reason: 'git clean -f' },
-  { re: /\bgit\s+branch\b[^|;&]*-D\b/i, risk: 'high', reason: 'git branch -D (force delete)' },
-  { re: /\bgit\s+push\b/i, risk: 'high', reason: 'git push' },
-  {
-    re: /\bgit\s+(commit|merge|rebase|reset|tag|cherry-pick|revert|rm|am|filter-branch)\b/i,
-    risk: 'high',
-    reason: 'git history/state mutation',
-  },
-];
-
-const NETWORK_PATTERNS: readonly RiskPattern[] = [
-  { re: /\b(npm|yarn|pnpm)\s+publish\b/i, risk: 'high', reason: 'package publish' },
-  { re: /\b(curl|wget)\b/i, risk: 'medium', reason: 'HTTP client invocation' },
-  { re: /\b(ssh|scp|sftp|rsync)\b/i, risk: 'medium', reason: 'remote-host transfer' },
-  { re: /\b(npm|yarn|pnpm)\s+(install|i|ci|add|update|up)\b/i, risk: 'medium', reason: 'package registry install' },
-  { re: /\bgit\s+(clone|pull|fetch)\b/i, risk: 'low', reason: 'git network fetch' },
-];
-
-function matchPattern(cmd: string, patterns: readonly RiskPattern[]): RiskPattern | undefined {
-  return patterns.find((p) => p.re.test(cmd));
-}
-
 /**
  * Classify a shell command a worker is about to run into one of the 3 risky
  * `ApprovalScope` classes. Always returns a classification for a non-empty
@@ -1180,13 +1149,7 @@ function matchPattern(cmd: string, patterns: readonly RiskPattern[]): RiskPatter
  * sub-pattern upgrades scope/risk (git-mutation > network priority).
  */
 export function classifyRiskyWorkerCommand(cmd: string): RiskyClassification {
-  const gitMatch = matchPattern(cmd, GIT_MUTATION_PATTERNS);
-  if (gitMatch) return { scope: 'git-mutation', risk: gitMatch.risk, reason: gitMatch.reason };
-
-  const networkMatch = matchPattern(cmd, NETWORK_PATTERNS);
-  if (networkMatch) return { scope: 'network', risk: networkMatch.risk, reason: networkMatch.reason };
-
-  return { scope: 'shell-exec', risk: 'medium', reason: 'shell command execution' };
+  return classifyApprovalCommand(cmd, 'worker');
 }
 
 /**

@@ -37,6 +37,41 @@ describe('createRuleStore', () => {
     const doc = JSON.parse(readFileSync(settingsPath(d), 'utf-8'));
     expect(doc.permissions.rules).toContainEqual({ tool: 'bash', pattern: 'npm test*' });
   });
+  it('does not activate a new "always" grant when persistence fails', () => {
+    const d = sandbox();
+    writeFileSync(settingsPath(d), JSON.stringify({
+      permissions: {
+        rules: [{ tool: 'read_file', pattern: 'docs/**' }],
+        deny: [{ tool: 'bash', pattern: 'rm -rf*' }],
+      },
+    }));
+    const s = createRuleStore(d);
+    s.grant({ tool: 'write_file', pattern: 'src/session/**' }, 'session');
+
+    rmSync(join(d, '.deckent'), { recursive: true });
+    writeFileSync(join(d, '.deckent'), 'not-a-directory');
+    const requested = { tool: 'bash', pattern: 'npm test*' };
+
+    expect(() => s.grant(requested, 'always')).toThrow();
+    expect(s.activeRules()).toEqual([
+      { tool: 'read_file', pattern: 'docs/**' },
+      { tool: 'write_file', pattern: 'src/session/**' },
+    ]);
+    expect(s.activeDenies()).toEqual([{ tool: 'bash', pattern: 'rm -rf*' }]);
+
+    rmSync(join(d, '.deckent'));
+    mkdirSync(join(d, '.deckent'));
+    s.grant(requested, 'always');
+    expect(s.activeRules()).toEqual([
+      { tool: 'read_file', pattern: 'docs/**' },
+      requested,
+      { tool: 'write_file', pattern: 'src/session/**' },
+    ]);
+    expect(JSON.parse(readFileSync(settingsPath(d), 'utf-8')).permissions.rules).toEqual([
+      { tool: 'read_file', pattern: 'docs/**' },
+      requested,
+    ]);
+  });
   it('migrates legacy permissions.allow[toolName] → rule tool(**) on load', () => {
     const d = sandbox();
     writeFileSync(settingsPath(d), JSON.stringify({ permissions: { allow: ['deckent_write_file'] } }));

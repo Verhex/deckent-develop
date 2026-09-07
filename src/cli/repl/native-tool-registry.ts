@@ -14,6 +14,8 @@ import { z, type ZodTypeAny } from 'zod';
 import { ToolRegistry } from '../../agent/tools/registry.js';
 import type { ContentWriter } from '../../agent/tool-result-broker.js';
 import type { ToolDefinition, ToolPermissionTier, ToolResult } from '../../agent/tools/types.js';
+import { nativeBuiltinApprovalClassifier } from '../../agent/native-tool-approval.js';
+import type { NativeToolApprovalClassifier } from '../../agent/tools/types.js';
 import type { ToolExposure, ToolExposureKind } from '../../agent/tools/exposure.js';
 import { createToolExecDispatcher } from '../commands/chat-tool-exec.js';
 import { createCliToolDispatcher } from '../commands/chat-tool-bridge.js';
@@ -398,6 +400,7 @@ function defineFromDispatcher(
   dispatcher: McpToolDispatcher,
   exposure?: ToolExposureKind,
 ): ToolDefinition {
+  const approval = nativeBuiltinApprovalClassifier(name);
   return {
     name,
     description,
@@ -405,9 +408,38 @@ function defineFromDispatcher(
     category: 'coding',
     tier,
     source: 'builtin',
+    ...(approval ? { approval } : {}),
     ...(exposure ? { exposure } : {}),
     handler: async (args) => toolResultFrom(await dispatcher.dispatch(name, args)),
   };
+}
+
+const CLI_LIFECYCLE_HIGH = new Set(['deckent_start', 'deckent_run', 'deckent_process', 'deckent_autonomous']);
+const CLI_LIFECYCLE_CRITICAL = new Set(['deckent_kill', 'deckent_cleanup', 'deckent_recover']);
+const CLI_FILE_WRITES = new Set(['deckent_plan', 'deckent_review', 'deckent_sync', 'deckent_set_directives', 'deckent_docs', 'deckent_checkpoint', 'deckent_config']);
+
+/** Producer declaration for the exact dispatch branches this registry exposes. */
+function nativeCliApprovalClassifier(tool: string): NativeToolApprovalClassifier | undefined {
+  if (CLI_LIFECYCLE_HIGH.has(tool) || CLI_LIFECYCLE_CRITICAL.has(tool) || tool === 'deckent_audit') {
+    return (args, resource) => {
+      const permission = classifyTool(tool, args);
+      return permission === 'read' ? null : ({
+      scope: 'lifecycle',
+      risk: CLI_LIFECYCLE_CRITICAL.has(tool) ? 'critical' : permission === 'always' ? 'high' : 'medium',
+      scopeId: tool,
+      resource,
+      });
+    };
+  }
+  if (CLI_FILE_WRITES.has(tool)) {
+    return (args, resource) => {
+      const permission = classifyTool(tool, args);
+      return permission === 'read' ? null : ({
+        scope: 'file-write', risk: permission === 'always' ? 'high' : 'medium', scopeId: tool, resource,
+      });
+    };
+  }
+  return undefined;
 }
 
 /**
@@ -810,7 +842,9 @@ export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRe
     const description = opts.runFlow?.enabled && RUN_FLOW_ESCAPE_HATCH_NAMES.has(spec.name)
       ? `${spec.description} ${RUN_FLOW_ESCAPE_HATCH_NOTE}`
       : spec.description;
-    registry.register(defineFromDispatcher(spec.name, description, spec.schema ?? genericSchema, tier, cli));
+    const def = defineFromDispatcher(spec.name, description, spec.schema ?? genericSchema, tier, cli);
+    const approval = nativeCliApprovalClassifier(spec.name);
+    registry.register(approval ? { ...def, approval } : def);
   }
 
   // Skill-dispatch tool (F11) — worker parity: lets the native REPL agent invoke a

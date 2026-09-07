@@ -8,6 +8,7 @@ import { render } from 'ink';
 import { createTerminalResizeMediator, TerminalViewportProvider } from './terminal-resize-mediator.js';
 import { ReplApp, ReplErrorBoundary, type ConfirmTrigger, type ToolSink, type ToolInfo, type ReplLabels } from './app.js';
 import type { ApprovalCardLabels } from './approval-card.js';
+import type { NativePermissionIntentLabels } from './approval-card.js';
 import {
   resolveNativeProvider,
   resolveNativeSelection,
@@ -210,8 +211,11 @@ import { ApprovalBroker } from '../../core/approval-broker.js';
 import { ApprovalRelay } from '../../core/approval-relay.js';
 import { ApprovalEventStream } from '../../core/approval-eventstream.js';
 import { createApprovalTerminalChannel, type ApprovalTerminalChannel } from './approval-terminal-channel.js';
-import { createApprovalTerminalCommand } from './approval-terminal-command.js';
+import { createApprovalTerminalCommand, type ApprovalTerminalDecisionAdapter } from './approval-terminal-command.js';
 import { createApprovalStoreWatch, type ApprovalStoreWatchHandle } from '../../core/approval-store-watch.js';
+import { createNativePermissionIntentController } from './native-permission-approval.js';
+import { createNativePermissionApprovalService } from './native-permission-approval.js';
+import { resolveLocalOsActorId } from '../../core/principal.js';
 import type { ApprovalRequest } from '../../core/approval-contract.js';
 import { randomUUID } from 'node:crypto';
 import { MemoryStore } from '../../core/memory-store.js';
@@ -592,6 +596,21 @@ export function buildApprovalLabels(t: (key: string) => string): ApprovalCardLab
       terminalDeferred: t('tui.approval_card.terminal.deferred'),
       terminalEscalated: t('tui.approval_card.terminal.escalated'),
     },
+  };
+}
+
+export function buildNativePermissionIntentLabels(t: (key: string) => string): NativePermissionIntentLabels {
+  return {
+    title: t('native_permission.intent_title'),
+    actor: t('native_permission.intent_actor'),
+    resource: t('native_permission.intent_resource'),
+    once: t('native_permission.intent_once'),
+    session: t('native_permission.intent_session'),
+    always: t('native_permission.intent_always'),
+    onceConsequence: t('native_permission.intent_once_consequence'),
+    sessionConsequence: t('native_permission.intent_session_consequence'),
+    alwaysConsequence: t('native_permission.intent_always_consequence'),
+    cancel: t('native_permission.intent_cancel'),
   };
 }
 
@@ -1082,9 +1101,11 @@ export function wireApprovalCrossProcess(
       broker.emit('pending', request);
     },
     onDecided: (id, decision) => {
-      const request = pendingById.get(id);
       pendingById.delete(id);
-      broker.emit('decided', decision, request);
+      // The broker reads, authenticates and settles the durable decision itself.
+      // Watch payload bytes never become decision authority.
+      void decision;
+      broker.checkForExternalDecisions();
     },
   });
 }
@@ -1478,38 +1499,47 @@ export async function runInkRepl(
     try { stateFeed = createRunStateFeed({ projectRoot: process.cwd() }); } catch { stateFeed = undefined; }
   }
   const approvalsEnabled = surf.approvals === true;
+  const approvalLifecycle = projectCfg.approval?.lifecycle;
+  const approvalLifecycleEnabled = approvalLifecycle?.enabled === true;
+  const nativePermissionIntent = createNativePermissionIntentController();
+  let retireNativeApproval: ((requestId: string) => void) | undefined;
   let approvalChannel: ApprovalTerminalChannel | undefined;
   let approvalWatch: ApprovalStoreWatchHandle | undefined;
   // Hoisted (not block-local) so the TERM-RPC local-transport wire further
   // below (terminal.rpc_debug) can read approval.list off the SAME broker
   // instance instead of constructing a second one.
   let broker: ApprovalBroker | undefined;
+  let approvalDecisionAdapter: ApprovalTerminalDecisionAdapter | undefined;
   // born-549 (SIGTERM-TEARDOWN) — hoisted out of the native-agent MCP setup
   // block below so the exit-path teardown can dispose it (kills any MCP
   // stdio server child); previously local to that block, so nothing outside
   // it could ever reach the broker to disconnect.
   let mcpClientBroker: import('../../mcp-client/broker.js').McpClientBroker | undefined;
-  if (approvalsEnabled) {
+  if (approvalsEnabled || approvalLifecycleEnabled) {
     try {
-      broker = new ApprovalBroker(process.cwd());
+      broker = new ApprovalBroker(process.cwd(), {
+        ...(approvalLifecycle ? { lifecycle: approvalLifecycle } : {}),
+      });
       const relay = new ApprovalRelay(broker);
       const stream = new ApprovalEventStream(relay);
       const approvalAuthority = projectCfg.approval?.authority;
-      const decisionAdapter = approvalAuthority?.enabled === true && approvalAuthority.tenant_id
+      approvalDecisionAdapter = approvalAuthority?.enabled === true && approvalAuthority.tenant_id
         ? createApprovalTerminalCommand({
             projectRoot: process.cwd(),
             tenantId: approvalAuthority.tenant_id,
           })
         : undefined;
-      approvalChannel = createApprovalTerminalChannel(relay, stream, {
-        ...(decisionAdapter ? { decisionAdapter } : {}),
-        filter: (notification) => approvalAuthority?.enabled === true
-          && notification.request.tenantId === approvalAuthority.tenant_id,
-      });
+      if (approvalsEnabled) {
+        approvalChannel = createApprovalTerminalChannel(relay, stream, {
+          ...(approvalDecisionAdapter ? { decisionAdapter: approvalDecisionAdapter } : {}),
+          filter: (notification) => approvalAuthority?.enabled === true
+            && notification.request.tenantId === approvalAuthority.tenant_id,
+        });
+      }
       // Cross-process feed (APR-XPROC-WIRE, born-462 dilim-2) — same storeDir
       // the broker above defaults to (it has no public getter, so replicated
       // via the same DECKENT_DIR constant it's built from).
-      approvalWatch = wireApprovalCrossProcess(approvalsEnabled, broker, join(process.cwd(), DECKENT_DIR, 'approvals'));
+      approvalWatch = wireApprovalCrossProcess(true, broker, join(process.cwd(), DECKENT_DIR, 'approvals'));
 
       // DECKENT_APPROVAL_DEMO=1 — seed ONE in-process demo pending so the card
       // path is testable end-to-end without a live worker. Submitted straight
@@ -1538,6 +1568,25 @@ export async function runInkRepl(
       }
     } catch { approvalChannel = undefined; approvalWatch = undefined; broker = undefined; }
   }
+  const nativePermissionActor = resolveLocalOsActorId();
+  const nativePermissionTenant = projectCfg.approval?.authority?.tenant_id;
+  const nativePermissionDecision = approvalsEnabled
+    && approvalLifecycleEnabled
+    && broker
+    && approvalDecisionAdapter
+    && nativePermissionActor
+    && nativePermissionTenant
+    ? createNativePermissionApprovalService({
+        broker,
+        decisionAdapter: approvalDecisionAdapter,
+        intentController: nativePermissionIntent,
+        lifecycle: approvalLifecycle,
+        actorId: nativePermissionActor,
+        tenantId: nativePermissionTenant,
+        summary: (tool) => t('native_permission.request_summary').replace('{tool}', tool),
+        retireLocalRequest: (requestId) => retireNativeApproval?.(requestId),
+      })
+    : undefined;
 
   // born-642 (408-001) BG-TURNS-PRODUCER — `repl_surface.bg_turns` gate. Off
   // by default (reserved-field precedent, config-types.ts): the producer side
@@ -1990,6 +2039,10 @@ export async function runInkRepl(
         ),
         lang: lang as 'en' | 'tr',
         confirm: (summary, toolName) => (confirmTrigger ? confirmTrigger(summary, toolName) : Promise.resolve('n')),
+        decidePermission: nativePermissionDecision
+          ? (request, approval, lifetimes, maskedArgs, signal, validateRequest) =>
+              nativePermissionDecision(request, approval, lifetimes, maskedArgs, signal, validateRequest)
+          : async () => ({ decision: 'hold', reasonCode: 'NATIVE_PERMISSION_AUTHORITY_UNAVAILABLE' }),
         toolSink: (info) => { if (toolSink) toolSink(info); },
         t: (key: string) => getMessage(key, lang),
         ...(costCeilingUsd !== undefined ? { costCeilingUsd } : {}),
@@ -2154,6 +2207,11 @@ export async function runInkRepl(
       liveFooterLabels={buildLiveFooterLabels(t)}
       approvalsEnabled={approvalsEnabled}
       {...(approvalChannel ? { approvalChannel } : {})}
+      nativePermissionIntent={{
+        controller: nativePermissionIntent,
+        labels: buildNativePermissionIntentLabels(t),
+      }}
+      registerNativeApprovalRetire={(retire) => { retireNativeApproval = retire; }}
       {...(bgTurnsEnabled ? { registerBgEventSink: (enqueue: (event: ChatTurnBgEvent) => void) => { bgEventSink = enqueue; } } : {})}
       runFlowCardLabels={buildPlanPreviewCardLabels(lang)}
       runFlowMountLabels={buildRunFlowMountLabels(t)}

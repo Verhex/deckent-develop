@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runAgentTurn, type LoopDeps } from '../../src/agent/loop.js';
+import { runAgentTurn, type LoopDeps, type PermissionResponse } from '../../src/agent/loop.js';
 import { clearDetectionCache } from '../../src/orchestra/self-modifying-detector.js';
 import { Transcript } from '../../src/agent/transcript.js';
 import { ToolRegistry } from '../../src/agent/tools/registry.js';
@@ -12,6 +12,13 @@ import { createCostGuard } from '../../src/agent/guards/cost.js';
 import type { AgentEvent } from '../../src/agent/events.js';
 import type { ProviderAdapter, ProviderEvent, ProviderRequest } from '../../src/agent/provider-tooluse/types.js';
 import type { RuleStore } from '../../src/agent/permission-store.js';
+import {
+  bindNativePermissionIntent,
+  createNativePermissionInvocation,
+  digestNativePermissionArgs,
+  nativePermissionBindingsEqual,
+} from '../../src/agent/native-permission-binding.js';
+import type { PermissionRequestEvent } from '../../src/agent/events.js';
 
 // A scripted adapter: yields a canned ProviderEvent[] per call, in order.
 function scriptedAdapter(scripts: ProviderEvent[][]): { adapter: ProviderAdapter; requests: ProviderRequest[] } {
@@ -40,11 +47,38 @@ function baseDeps(over: Partial<LoopDeps>): LoopDeps {
     name: 'echo', description: 'echo', inputSchema: { type: 'object' }, category: 'coding',
     tier: 'silent', source: 'builtin', handler: async (a) => ({ ok: true, output: `echoed:${a['v'] ?? ''}` }),
   });
+  let invocation = 0;
+  const issuePermission: LoopDeps['issuePermission'] = (input) => {
+    const nativeInvocation = createNativePermissionInvocation({
+      sessionId: 'loop-test-session', sessionInstanceId: 'loop-test-process', turnGeneration: 1,
+      invocationId: `invocation-${++invocation}`, callId: input.callId, tool: input.tool,
+      rawArgs: input.rawArgs, tier: input.tier, elevated: input.elevated, nested: input.nested,
+    });
+    return Object.freeze({
+      type: 'permission-request', id: input.callId, tool: input.tool,
+      resource: input.resource, tier: input.tier, approval: Object.freeze({ ...input.approval }),
+      maskedArgs: Object.freeze({ ...input.rawArgs }),
+      invocation: nativeInvocation,
+    });
+  };
+  const valid = (request: PermissionRequestEvent, response: PermissionResponse, rawArgs: Record<string, unknown>): boolean => {
+    if (response.decision === 'hold' || response.decision === 'deny') return false;
+    return digestNativePermissionArgs(rawArgs) === request.invocation.invocationArgsDigest
+      && nativePermissionBindingsEqual(
+        response.binding,
+        bindNativePermissionIntent(request.invocation, response.decision, request.resource),
+      );
+  };
   return {
     adapter: scriptedAdapter([[{ type: 'done' }]]).adapter,
     registry: reg, policy: SAFE_DEFAULT_POLICY, ruleStore: memRuleStore(),
     cwd: tmpdir(), model: 'm', getMode: () => 'suggest',
-    requestPermission: async () => ({ decision: 'once' }),
+    issuePermission,
+    requestPermission: async (request) => ({
+      decision: 'once', binding: bindNativePermissionIntent(request.invocation, 'once', request.resource),
+    }),
+    validatePermission: valid,
+    claimPermissionEffect: valid,
     ...over,
   };
 }
@@ -78,10 +112,22 @@ describe('runAgentTurn', () => {
 
   it('asks for permission on a confirm-tier tool and aborts the call on deny', async () => {
     const reg = new ToolRegistry();
-    reg.register({ name: 'writer', description: 'w', inputSchema: { type: 'object' }, category: 'coding', tier: 'confirm', source: 'builtin', handler: async () => ({ ok: true, output: 'wrote' }) });
+    reg.register({
+      name: 'writer', description: 'w', inputSchema: { type: 'object' }, category: 'coding', tier: 'confirm', source: 'builtin',
+      approval: (args) => typeof args['path'] === 'string'
+        ? { scope: 'file-write', risk: 'high', scopeId: 'writer', resource: args['path'] }
+        : null,
+      handler: async () => ({ ok: true, output: 'wrote' }),
+    });
     const { adapter } = scriptedAdapter([[{ type: 'tool-call', id: 'w1', name: 'writer', args: { path: 'a.txt' } }, { type: 'done' }], [{ type: 'done' }]]);
-    const evs = await drain(runAgentTurn(baseDeps({ adapter, registry: reg, requestPermission: async () => ({ decision: 'deny' }) }), new Transcript(), 'go'));
-    expect(evs).toContainEqual({ type: 'permission-request', id: 'w1', tool: 'writer', resource: 'a.txt', tier: 'confirm' });
+    const evs = await drain(runAgentTurn(baseDeps({
+      adapter,
+      registry: reg,
+      requestPermission: async (request) => ({
+        decision: 'deny', binding: bindNativePermissionIntent(request.invocation, 'once', request.resource),
+      }),
+    }), new Transcript(), 'go'));
+    expect(evs).toContainEqual(expect.objectContaining({ type: 'permission-request', id: 'w1', tool: 'writer', resource: 'a.txt', tier: 'confirm' }));
     expect(evs).toContainEqual({ type: 'tool-result', id: 'w1', tool: 'writer', ok: false, output: '[rejected by user]' });
     expect(evs.some((e) => e.type === 'tool-executing')).toBe(false);
   });
@@ -111,11 +157,22 @@ describe('runAgentTurn', () => {
       const grants: { tool: string; pattern: string }[] = [];
       const ruleStore: RuleStore = { grant: (r) => grants.push(r), revoke: () => {}, activeRules: () => [...grants], activeDenies: () => [] };
       const reg = new ToolRegistry();
-      reg.register({ name: 'srcwriter', description: 'w', inputSchema: { type: 'object' }, category: 'coding', tier: 'silent', source: 'builtin', handler: async () => ({ ok: true, output: 'wrote' }) });
+      reg.register({
+        name: 'srcwriter', description: 'w', inputSchema: { type: 'object' }, category: 'coding', tier: 'silent', source: 'builtin',
+        approval: (args) => typeof args['path'] === 'string'
+          ? { scope: 'file-write', risk: 'high', scopeId: 'srcwriter', resource: args['path'] }
+          : null,
+        handler: async () => ({ ok: true, output: 'wrote' }),
+      });
       const { adapter } = scriptedAdapter([[{ type: 'tool-call', id: 's1', name: 'srcwriter', args: { path: 'src/core/x.ts' } }, { type: 'done' }], [{ type: 'done' }]]);
-      const evs = await drain(runAgentTurn(baseDeps({ adapter, registry: reg, ruleStore, cwd: root, requestPermission: async () => ({ decision: 'always' }) }), new Transcript(), 'go'));
+      const evs = await drain(runAgentTurn(baseDeps({
+        adapter, registry: reg, ruleStore, cwd: root,
+        requestPermission: async (request) => ({
+          decision: 'once', binding: bindNativePermissionIntent(request.invocation, 'once', request.resource),
+        }),
+      }), new Transcript(), 'go'));
       // a silent-tier tool is elevated to a permission prompt because it writes deckent source...
-      expect(evs).toContainEqual({ type: 'permission-request', id: 's1', tool: 'srcwriter', resource: 'src/core/x.ts', tier: 'always' });
+      expect(evs).toContainEqual(expect.objectContaining({ type: 'permission-request', id: 's1', tool: 'srcwriter', resource: 'src/core/x.ts', tier: 'always' }));
       // ...and the "always" grant is NOT persisted (each self-modifying write re-confirms).
       expect(grants).toEqual([]);
       expect(evs).toContainEqual({ type: 'tool-result', id: 's1', tool: 'srcwriter', ok: true, output: 'wrote' });

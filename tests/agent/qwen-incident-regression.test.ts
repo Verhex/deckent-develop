@@ -184,7 +184,10 @@ function deps(registry: ToolRegistry, adapter: ProviderAdapter): LoopDeps {
     cwd: tmpdir(),
     model: 'm',
     getMode: () => 'suggest',
-    requestPermission: async () => ({ decision: 'once' }),
+    issuePermission: () => { throw new Error('unexpected permission prompt'); },
+    requestPermission: async () => ({ decision: 'hold', reasonCode: 'unexpected' }),
+    validatePermission: () => false,
+    claimPermissionEffect: () => false,
     nativeBudget: TEST_BUDGET,
     getContextBudgetTokens: () => INCIDENT_EFFECTIVE_CONTEXT_TOKENS,
   };

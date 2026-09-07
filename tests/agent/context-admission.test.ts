@@ -72,7 +72,10 @@ function baseDeps(over: Partial<LoopDeps>): LoopDeps {
     adapter: scriptedAdapter([[{ type: 'done' }]]).adapter,
     registry: reg, policy: SAFE_DEFAULT_POLICY, ruleStore: memRuleStore(),
     cwd: tmpdir(), model: 'm', getMode: () => 'suggest',
-    requestPermission: async () => ({ decision: 'once' }),
+    issuePermission: () => { throw new Error('unexpected permission prompt'); },
+    requestPermission: async () => ({ decision: 'hold', reasonCode: 'unexpected' }),
+    validatePermission: () => false,
+    claimPermissionEffect: () => false,
     ...over,
   };
 }
@@ -238,6 +241,7 @@ function localLlm(
   const resolved = resolveNativeSelection(
     { provider: 'local-llm', model: null },
     {
+      projectRoot: tmpdir(),
       env: {},
       config: { native_model: 'qwen3-coder', local_llm: { endpoint: 'http://127.0.0.1:18080' }, ...config },
       fetchFn,

@@ -7,6 +7,8 @@ import { SAFE_DEFAULT_POLICY } from '../../src/agent/permission-policy.js';
 import type { AgentEvent } from '../../src/agent/events.js';
 import type { ProviderAdapter, ProviderEvent, ProviderRequest } from '../../src/agent/provider-tooluse/types.js';
 import type { RuleStore } from '../../src/agent/permission-store.js';
+import { bindNativePermissionIntent } from '../../src/agent/native-permission-binding.js';
+import type { PermissionResponse } from '../../src/agent/loop.js';
 
 function scripted(scripts: ProviderEvent[][]): { adapter: ProviderAdapter; requests: ProviderRequest[] } {
   const requests: ProviderRequest[] = []; let turn = 0;
@@ -15,11 +17,53 @@ function scripted(scripts: ProviderEvent[][]): { adapter: ProviderAdapter; reque
 function memRuleStore(): RuleStore { const r: { tool: string; pattern: string }[] = []; return { grant: (x) => r.push(x), revoke: () => {}, activeRules: () => [...r], activeDenies: () => [] }; }
 function deps(over: Partial<AgentSessionDeps>): AgentSessionDeps {
   const reg = new ToolRegistry();
-  reg.register({ name: 'writer', description: 'w', inputSchema: { type: 'object' }, category: 'coding', tier: 'confirm', source: 'builtin', handler: async () => ({ ok: true, output: 'wrote' }) });
+  reg.register({
+    name: 'writer', description: 'w', inputSchema: { type: 'object' }, category: 'coding', tier: 'confirm', source: 'builtin',
+    approval: (args) => typeof args['path'] === 'string'
+      ? { scope: 'file-write', risk: 'high', scopeId: 'writer', resource: args['path'] }
+      : null,
+    handler: async () => ({ ok: true, output: 'wrote' }),
+  });
   return { adapter: scripted([[{ type: 'done' }]]).adapter, registry: reg, policy: SAFE_DEFAULT_POLICY, ruleStore: memRuleStore(), cwd: tmpdir(), model: 'm', ...over };
+}
+function responseFor(
+  request: Extract<AgentEvent, { type: 'permission-request' }>,
+  decision: 'once' | 'session' | 'always' | 'deny',
+): PermissionResponse {
+  const lifetime = decision === 'deny' ? 'once' : decision;
+  return { decision, binding: bindNativePermissionIntent(request.invocation, lifetime, request.resource) };
 }
 
 describe('createAgentSession', () => {
+  it('fails a send after close before provider or auto-allowed tool execution', async () => {
+    let providerCalls = 0;
+    let toolCalls = 0;
+    const reg = new ToolRegistry();
+    reg.register({
+      name: 'silent-tool', description: 's', inputSchema: { type: 'object' }, category: 'coding',
+      tier: 'silent', source: 'builtin',
+      handler: async () => { toolCalls++; return { ok: true, output: 'ran' }; },
+    });
+    const adapter: ProviderAdapter = {
+      name: 'must-not-run',
+      async *send() {
+        providerCalls++;
+        yield { type: 'tool-call', id: 'silent', name: 'silent-tool', args: {} };
+        yield { type: 'done' };
+      },
+    };
+    const session = createAgentSession(deps({ adapter, registry: reg }));
+    session.close();
+    const events: AgentEvent[] = [];
+    for await (const event of session.send('after-close')) events.push(event);
+    expect(events).toEqual([
+      { type: 'error', code: 'native.session.closed', message: 'native.session.closed' },
+      { type: 'turn-end' },
+    ]);
+    expect(providerCalls).toBe(0);
+    expect(toolCalls).toBe(0);
+  });
+
   it('persists the transcript across turns (turn 2 request includes turn 1)', async () => {
     const { adapter, requests } = scripted([[{ type: 'text-delta', text: 'a' }, { type: 'done' }], [{ type: 'text-delta', text: 'b' }, { type: 'done' }]]);
     const s = createAgentSession(deps({ adapter }));
@@ -33,7 +77,7 @@ describe('createAgentSession', () => {
     const { adapter } = scripted([[{ type: 'tool-call', id: 'w1', name: 'writer', args: { path: 'a' } }, { type: 'done' }], [{ type: 'done' }]]);
     const s = createAgentSession(deps({ adapter }));
     const events: AgentEvent[] = [];
-    const iter = (async () => { for await (const e of s.send('go')) { events.push(e); if (e.type === 'permission-request') s.respondPermission(e.id, { decision: 'session' }); } })();
+    const iter = (async () => { for await (const e of s.send('go')) { events.push(e); if (e.type === 'permission-request') s.respondPermission(e, responseFor(e, 'session')); } })();
     await iter;
     expect(events).toContainEqual({ type: 'tool-result', id: 'w1', tool: 'writer', ok: true, output: 'wrote' });
   });
@@ -48,12 +92,12 @@ describe('createAgentSession', () => {
     expect(events).toContainEqual({ type: 'tool-result', id: 'w1', tool: 'writer', ok: true, output: 'wrote' });
   });
 
-  it('cancel() resolves a pending permission as deny and ends the turn', async () => {
+  it('cancel() retires a pending permission and ends the turn as cancelled', async () => {
     const { adapter } = scripted([[{ type: 'tool-call', id: 'w1', name: 'writer', args: { path: 'a' } }, { type: 'done' }]]);
     const s = createAgentSession(deps({ adapter }));
     const events: AgentEvent[] = [];
     for await (const e of s.send('go')) { events.push(e); if (e.type === 'permission-request') s.cancel(); }
-    expect(events).toContainEqual({ type: 'tool-result', id: 'w1', tool: 'writer', ok: false, output: '[rejected by user]' });
+    expect(events).toContainEqual({ type: 'tool-result', id: 'w1', tool: 'writer', ok: false, output: '[cancelled]' });
     expect(events[events.length - 1]).toEqual({ type: 'turn-end' });
   });
 
@@ -61,7 +105,13 @@ describe('createAgentSession', () => {
     // one turn proposes a confirm tool (w1) AND a silent tool (e1); cancelling on
     // w1's prompt must prevent e1 from executing, not just subsequent ask-tier tools.
     const reg = new ToolRegistry();
-    reg.register({ name: 'writer', description: 'w', inputSchema: { type: 'object' }, category: 'coding', tier: 'confirm', source: 'builtin', handler: async () => ({ ok: true, output: 'wrote' }) });
+    reg.register({
+      name: 'writer', description: 'w', inputSchema: { type: 'object' }, category: 'coding', tier: 'confirm', source: 'builtin',
+      approval: (args) => typeof args['path'] === 'string'
+        ? { scope: 'file-write', risk: 'high', scopeId: 'writer', resource: args['path'] }
+        : null,
+      handler: async () => ({ ok: true, output: 'wrote' }),
+    });
     reg.register({ name: 'echo', description: 'e', inputSchema: { type: 'object' }, category: 'coding', tier: 'silent', source: 'builtin', handler: async () => ({ ok: true, output: 'echoed' }) });
     const { adapter } = scripted([[{ type: 'tool-call', id: 'w1', name: 'writer', args: { path: 'a' } }, { type: 'tool-call', id: 'e1', name: 'echo', args: {} }, { type: 'done' }]]);
     const s = createAgentSession(deps({ adapter, registry: reg }));
@@ -84,7 +134,8 @@ describe('createAgentSession', () => {
     await new Promise((res) => setImmediate(res));
     const pr = events.find((e) => e.type === 'permission-request');
     expect(pr).toBeDefined();
-    s.respondPermission((pr as Extract<AgentEvent, { type: 'permission-request' }>).id, { decision: 'session' });
+    const request = pr as Extract<AgentEvent, { type: 'permission-request' }>;
+    s.respondPermission(request, responseFor(request, 'session'));
     await drainP;
     expect(events).toContainEqual({ type: 'tool-result', id: 'w1', tool: 'writer', ok: true, output: 'wrote' });
   });

@@ -56,6 +56,7 @@ export interface ApprovalTerminalDecisionAdapter {
   verifyCrossDecision(
     request: ApprovalRequest,
     decision: ApprovalDecision,
+    options?: { readonly signal?: AbortSignal },
   ): Promise<ApprovalTerminalCrossDecisionResult>;
 }
 
@@ -258,6 +259,46 @@ export function createApprovalTerminalCommand(
     ?? (() => pauseTerminalInputForHandoff(process.stdin));
   const entryPath = options.entryPath ?? defaultEntryPath();
   const execPath = options.execPath ?? process.execPath;
+  const localCeremonies = new Map<string, {
+    readonly requestDigest: string;
+    readonly completion: Promise<boolean>;
+    complete(restored: boolean): void;
+  }>();
+  // A failed terminal restoration invalidates this adapter instance's ability
+  // to claim the terminal is safe again. Recreation is the explicit reset.
+  let terminalRestorationUncertain = false;
+
+  const beginLocalCeremony = (request: ApprovalRequest) => {
+    if (localCeremonies.has(request.id)) return undefined;
+    let complete!: (restored: boolean) => void;
+    const ceremony = {
+      requestDigest: approvalRequestDigest(request),
+      completion: new Promise<boolean>((resolve) => { complete = resolve; }),
+      complete: (restored: boolean) => complete(restored),
+    };
+    localCeremonies.set(request.id, ceremony);
+    return ceremony;
+  };
+
+  const waitForLocalCeremony = async (
+    request: ApprovalRequest,
+    signal?: AbortSignal,
+  ): Promise<'ready' | 'failed' | 'aborted'> => {
+    if (signal?.aborted) return 'aborted';
+    if (terminalRestorationUncertain) return 'failed';
+    const ceremony = localCeremonies.get(request.id);
+    if (!ceremony) return 'ready';
+    if (ceremony.requestDigest !== approvalRequestDigest(request)) return 'failed';
+    if (!signal) return (await ceremony.completion) ? 'ready' : 'failed';
+    return new Promise((resolve) => {
+      const abort = () => resolve('aborted');
+      signal.addEventListener('abort', abort, { once: true });
+      void ceremony.completion.then((restored) => {
+        signal.removeEventListener('abort', abort);
+        resolve(restored ? 'ready' : 'failed');
+      });
+    });
+  };
 
   const snapshot = (
     expected: ApprovalRequest,
@@ -396,6 +437,9 @@ export function createApprovalTerminalCommand(
         return { kind: 'untrusted', reasonCode: 'cli-request-id-unsafe' };
       }
       if (request.tenantId !== options.tenantId) return { kind: 'untrusted', reasonCode: 'tenant-mismatch' };
+      if (terminalRestorationUncertain) {
+        return { kind: 'hold', reasonCode: 'terminal-restoration-unconfirmed' };
+      }
       const before = snapshot(request);
       if (before.kind !== 'ok') {
         return {
@@ -414,8 +458,11 @@ export function createApprovalTerminalCommand(
       if (now().getTime() >= Date.parse(before.snapshot.request.expiresAt)) {
         return { kind: 'expired', reasonCode: 'request-expired' };
       }
+      const ceremony = beginLocalCeremony(request);
+      if (!ceremony) return { kind: 'hold', reasonCode: 'terminal-ceremony-already-active' };
 
       let child: ChildOutcome | undefined;
+      let terminalRestored = false;
       try {
         await suspendTerminal(async () => {
           await pauseTerminalInput();
@@ -426,6 +473,7 @@ export function createApprovalTerminalCommand(
           );
           child = await waitForChild(processHandle, before.snapshot.request.expiresAt, now);
         });
+        terminalRestored = true;
       } catch (error) {
         const after = snapshot(request);
         const durable = after.kind === 'ok' ? after.snapshot.decision : after.decision;
@@ -434,6 +482,11 @@ export function createApprovalTerminalCommand(
           reasonCode: `terminal-suspension-failed:${error instanceof Error ? error.name : 'unknown'}`,
           ...(durable ? { observedDecision: observed(durable) } : {}),
         };
+      } finally {
+        const restorationVerified = terminalRestored && child?.kind !== 'unreaped';
+        if (!restorationVerified) terminalRestorationUncertain = true;
+        ceremony.complete(restorationVerified);
+        localCeremonies.delete(request.id);
       }
       if (!child) {
         const after = snapshot(request);
@@ -447,7 +500,20 @@ export function createApprovalTerminalCommand(
       return inspectAfterChild(request, action, child);
     },
 
-    async verifyCrossDecision(request, decision) {
+    async verifyCrossDecision(request, decision, verifyOptions) {
+      const ceremony = await waitForLocalCeremony(request, verifyOptions?.signal);
+      if (verifyOptions?.signal?.aborted) {
+        return { kind: 'untrusted', reasonCode: 'terminal-ceremony-wait-cancelled', decision };
+      }
+      if (ceremony !== 'ready') {
+        return {
+          kind: 'untrusted',
+          reasonCode: ceremony === 'aborted'
+            ? 'terminal-ceremony-wait-cancelled'
+            : 'terminal-restoration-unconfirmed',
+          decision,
+        };
+      }
       const verified = snapshot(request, decision);
       if (verified.kind === 'expired' && verified.decision) {
         return { kind: 'expired', decision: verified.decision };

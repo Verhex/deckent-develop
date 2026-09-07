@@ -29,6 +29,49 @@ import type {
 import type {
   ApprovalTerminalEvent,
 } from './approval-terminal-channel.js';
+import type { NativePermissionIntent, NativePermissionIntentController } from './native-permission-approval.js';
+
+export interface NativePermissionIntentLabels {
+  readonly title: string;
+  readonly actor: string;
+  readonly resource: string;
+  readonly once: string;
+  readonly session: string;
+  readonly always: string;
+  readonly onceConsequence: string;
+  readonly sessionConsequence: string;
+  readonly alwaysConsequence: string;
+  readonly cancel: string;
+}
+
+export function NativePermissionIntentCard(props: {
+  intent: NativePermissionIntent | null;
+  controller: NativePermissionIntentController;
+  labels: NativePermissionIntentLabels;
+  isActive: boolean;
+}): ReactElement | null {
+  const { intent, controller, labels, isActive } = props;
+  useInput((input, key) => {
+    if (!intent || !isActive) return;
+    if (key.escape || input === 'n') { controller.cancel(); return; }
+    if (input === '1' && intent.lifetimes.includes('once')) controller.choose('once');
+    else if (input === '2' && intent.lifetimes.includes('session')) controller.choose('session');
+    else if (input === '3' && intent.lifetimes.includes('always')) controller.choose('always');
+  });
+  if (!intent) return null;
+  const rows = [
+    intent.lifetimes.includes('once') ? `1  ${labels.once} — ${labels.onceConsequence}` : null,
+    intent.lifetimes.includes('session') ? `2  ${labels.session} — ${labels.sessionConsequence}` : null,
+    intent.lifetimes.includes('always') ? `3  ${labels.always} — ${labels.alwaysConsequence}` : null,
+  ].filter((row): row is string => row !== null);
+  return <Box borderStyle="round" flexDirection="column" paddingX={1}>
+    <Text bold>{labels.title.replace('{tool}', intent.tool)}</Text>
+    <Text>{labels.actor.replace('{actor}', intent.actorId)}</Text>
+    <Text>{labels.resource.replace('{resource}', intent.resource)}</Text>
+    {rows.map((row) => <Text key={row}>{row}</Text>)}
+    <Text dimColor>{labels.cancel}</Text>
+  </Box>;
+}
 
 // ─── Pure queue controller (framework-free — unit-testable without Ink) ─────
 
@@ -405,6 +448,8 @@ export interface ApprovalCardProps {
   now?: () => number;
   /** Public Ink terminal-lending callback, injected by the owning App. */
   suspendTerminal?: ApprovalTerminalSuspender;
+  /** Registers presentation-only retirement for an exact locally displayed request. */
+  registerLocalRetire?: (retire: (requestId: string) => void) => void;
 }
 
 // ─── ApprovalCard ───────────────────────────────────────────────────────────
@@ -419,6 +464,7 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
     isActive: mutexActive = true,
     now = Date.now,
     suspendTerminal,
+    registerLocalRetire,
   } = props;
   const [head, setHead] = useState<ApprovalCardHead | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -444,6 +490,10 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
   if (!queueRef.current) {
     queueRef.current = createApprovalCardQueue(() => setHead(queueRef.current!.head()));
   }
+  useEffect(() => {
+    registerLocalRetire?.((requestId) => queueRef.current!.resolve(requestId));
+    return () => registerLocalRetire?.(() => undefined);
+  }, [registerLocalRetire]);
 
   useEffect(() => {
     let cancelled = false;
@@ -550,7 +600,7 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
 
   useInput((input, key) => {
     const current = queueRef.current!.head();
-    if (!current) return;
+    if (!current || !mutexActive || inFlightRef.current !== null) return;
     // Escape is presentation-only here: collapse details, but keep the live
     // request pending for explicit approval authority or expiry.
     if (key.escape) { if (expanded) setExpanded(false); return; }
@@ -572,7 +622,7 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
       default:
         return;
     }
-  }, { isActive: head !== null && mutexActive && inFlightRef.current === null });
+  });
 
   const palette = useInkPalette();
   if (!head) return null;

@@ -172,6 +172,83 @@ describe('ApprovalBroker — atomic write', () => {
 // ─── decide + awaitDecision ───────────────────────────────────────────────────
 
 describe('ApprovalBroker.decide / awaitDecision', () => {
+  it('aborts only the exact waiter and cleans its listener without creating a decision', async () => {
+    const req = broker.submit(buildRequest('apr-abort-one'));
+    const controller = new AbortController();
+    const add = vi.spyOn(controller.signal, 'addEventListener');
+    const remove = vi.spyOn(controller.signal, 'removeEventListener');
+    const cancelled = broker.awaitDecision(req.id, { signal: controller.signal });
+    const sibling = broker.awaitDecision(req.id);
+
+    controller.abort();
+    await expect(cancelled).rejects.toMatchObject({ name: 'AbortError' });
+    expect(add).toHaveBeenCalledWith('abort', expect.any(Function), { once: true });
+    expect(remove).toHaveBeenCalledWith('abort', expect.any(Function));
+    expect(broker.getDecision(req.id)).toBeNull();
+
+    const brokerB = new ApprovalBroker(projectRoot, { storeDir, clock: () => FIXED_NOW });
+    const decision = brokerB.decide(req.id, {
+      decision: 'allow', decidedBy: 'operator', channel: 'cli', decidedAt: FIXED_NOW.toISOString(),
+    });
+    broker.checkForExternalDecisions();
+    await expect(sibling).resolves.toEqual(decision);
+    await expect(cancelled).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('does not park a pre-aborted waiter and keeps an already-settled result canonical', async () => {
+    const pending = broker.submit(buildRequest('apr-pre-aborted'));
+    const preAborted = new AbortController();
+    preAborted.abort();
+    await expect(broker.awaitDecision(pending.id, { signal: preAborted.signal }))
+      .rejects.toMatchObject({ name: 'AbortError' });
+
+    const decided = broker.submit(buildRequest('apr-decided-before-abort'));
+    const decision = broker.decide(decided.id, {
+      decision: 'deny', decidedBy: 'operator', channel: 'cli', decidedAt: FIXED_NOW.toISOString(),
+    });
+    const laterAbort = new AbortController();
+    const waiting = broker.awaitDecision(decided.id, { signal: laterAbort.signal });
+    laterAbort.abort();
+    await expect(waiting).resolves.toEqual(decision);
+  });
+
+  it('binds listener cleanup to the signal captured at wait ingress', async () => {
+    const req = broker.submit(buildRequest('apr-captured-signal'));
+    const original = new AbortController();
+    const replacement = new AbortController();
+    const originalRemove = vi.spyOn(original.signal, 'removeEventListener');
+    const replacementRemove = vi.spyOn(replacement.signal, 'removeEventListener');
+    const opts: { signal?: AbortSignal } = { signal: original.signal };
+    const cancelled = broker.awaitDecision(req.id, opts);
+    opts.signal = replacement.signal;
+
+    original.abort();
+    await expect(cancelled).rejects.toMatchObject({ name: 'AbortError' });
+    expect(originalRemove).toHaveBeenCalledWith('abort', expect.any(Function));
+    expect(replacementRemove).not.toHaveBeenCalled();
+
+    const sibling = broker.awaitDecision(req.id);
+    const decision = broker.decide(req.id, {
+      decision: 'deny', decidedBy: 'operator', channel: 'cli', decidedAt: FIXED_NOW.toISOString(),
+    });
+    await expect(sibling).resolves.toEqual(decision);
+  });
+
+  it('removes the captured abort listener when a pending wait durably settles', async () => {
+    const req = broker.submit(buildRequest('apr-settle-listener'));
+    const controller = new AbortController();
+    const remove = vi.spyOn(controller.signal, 'removeEventListener');
+    const waiting = broker.awaitDecision(req.id, { signal: controller.signal });
+    const decision = broker.decide(req.id, {
+      decision: 'allow', decidedBy: 'operator', channel: 'cli', decidedAt: FIXED_NOW.toISOString(),
+    });
+
+    await expect(waiting).resolves.toEqual(decision);
+    expect(remove).toHaveBeenCalledWith('abort', expect.any(Function));
+    controller.abort();
+    await expect(waiting).resolves.toEqual(decision);
+  });
+
   it('exposes exact read-only request and durable-winner lookups', () => {
     const req = broker.submit(buildRequest('apr-read-only'));
     expect(broker.getRequest(req.id)).toEqual(req);

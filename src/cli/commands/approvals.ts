@@ -33,6 +33,7 @@ import type { ApprovalRequest } from '../../core/approval-contract.js';
 import { openApprovalAuthorityRuntime } from '../../core/approval-authority-runtime.js';
 import type { LocalTerminalReauthenticationProvider } from '../../core/approval-terminal-authenticator.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { resolveLocalOsActorId } from '../../core/principal.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { withCommandLocalShutdown } from '../helpers/shutdown-hooks.js';
@@ -177,9 +178,11 @@ function createInteractiveTerminalReauthProvider(input: {
         rl.close();
       }
       if (answer !== input.confirmToken) return null;
+      const actorId = resolveLocalOsActorId();
+      if (actorId === null) return null;
       const now = (input.now ?? (() => new Date()))();
       return {
-        actorId: userInfo().username,
+        actorId,
         tenantId: context.request.tenantId,
         authorityRef: LOCAL_TERMINAL_AUTHORITY_REF,
         authenticatedAt: now.toISOString(),
@@ -450,11 +453,14 @@ export function registerApprovalsCommand(program: Command): void {
         // through to a (possibly stale) broker mirror. This check deliberately
         // follows short-code resolution but precedes every lifecycle, mirror,
         // or live-decision mutation.
-        const foreignTenantTarget = federatedInbox.find(item =>
+        const foreignFederatedTarget = federatedInbox.find(item =>
           item.id === requestId
           && item.tenantId !== undefined
           && item.tenantId !== authority.tenant_id);
-        if (foreignTenantTarget) {
+        const brokerTarget = opened.service.broker.getRequest(requestId);
+        const foreignBrokerTarget = brokerTarget
+          && brokerTarget.tenantId !== authority.tenant_id;
+        if (foreignFederatedTarget || foreignBrokerTarget) {
           printError(new Error(getMessage('approvals.decision_refused', language, {
             id: requestId,
             kind: 'lineage-mismatch',
