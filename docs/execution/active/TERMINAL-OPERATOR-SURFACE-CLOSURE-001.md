@@ -11,6 +11,75 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### L1/L5 ve L6 bounded landing — 2026-09-07T01:20Z
+
+| Grup | Main commit | Exact scope / selected verification |
+|---|---|---|
+| E | ef1a7607b0d3f10ff25402b958e4c846a273cbfc | 12 dosya; HTTP AbortController/UNKNOWN/pending containment + durable checkpoint/JSON fence/typed-private errors; 81/81 tests + tsc + build:all PASS |
+| F | a4fb4784730a4c4a218641ffce4c8d8b2a14beb8 | 6 dosya; picker Ctrl+C ownership/global fallback + approval Esc details collapse; combined E+F 141/141 + tsc + build:all PASS |
+| G | c19141e5116139cb6f90c0f116b9d4d362686897 | 2 dosya; non-TTY --version/-V tek satır, TTY splash korunur; 17/17 + tsc + build:all PASS |
+
+Her stage/commit öncesi branch-vv ve selected blob eşitliği12/6/2 PASS.
+Inherited source/3357 değişiklikleri bu gruplara alınmadı. Fable bağımsız
+committed blob/proof incelemesi PASS; kanal review canonical XVerify receipt değildir.
+Selected candidate Git base d10456e99 üzerine E12 → E+F18 → E+F+G20 dosya uygulandı;
+candidate HEAD adı assembled içerik yerine geçmez. İlk missing-dependency FAIL
+denemeleri arşivde korunur; fixture bağımlılığı düzeltildikten sonraki PASS
+geçmiş denemeleri yeniden sınıflandırmaz. Gerçek stdout/exit logları saklandı.
+
+| Kanıt | Main result SHA256 | Selected result SHA256 |
+|---|---|---|
+| L1 compiled loopback HTTP | a008150f950cf16701027a64bbf2d3c772ccc4465c395fc8bd0864e9a18a7563 | dd93bf6e46b265b26a5d44566f7c551aec433024a695c6696f29e82db0405045 |
+| L5 compiled registered caller | db8bcc8a6e8b08ae1f14643ceca637b47037fcb41957ff16b72c0eb8f0c44346 | 86d9f7fc9f4bad1668f01e34d89f30ed79efaf554ed5bf23da91c88844896465 |
+| L6 keyboard actual CLI/PTY | 1733f3a10642d41b4feba3104c1dcf173e300c703f8074fd237bad134cfcbe6a | 0f38a7f9cf14043e2f0a68792e9ad5ef1fe866a56f7f4eafd221b0b48c000668 |
+| L6 version actual CLI matrix | 3e93f866417f71f82bca59af9b31e8efad0eb6858a330a13f9740bb34f5e5e72 | 82ba768c6b719f84d7040a5bcb5b7fc9962fa463bb06c6f5f876d7eb33b6bcff |
+
+L1: gerçek HTTP hang → timeout/abort → pending clear → healthy refresh;
+CLI/PTY/provider-turn kanıtı değildir. L5: withContextSlashes → engine → session →
+store; gerçek scratch close/reaper deletion, durable restart, tam dış Markdown
+JSON fence, typed private failure ve tamper ayrımı. Diagnostic provider;
+billing receipt değildir. L6 keyboard: EN/TR picker Ctrl+C yalnız picker'ı
+kapatır, sonraki idle Ctrl+C normal policy'yi kurar. Approval Esc yalnız
+mounted-component proof kapsamındadır, request dismissal/PTY kanıtı değildir.
+Version: 6 non-TTY flag/color case + gerçek TTY, tek satır88B/JSON125B,
+exit0/stderr0; metadata subprocess olabilir, provider turn değildir.
+
+| Selected scope | Patch SHA256 | Evidence manifest SHA256 |
+|---|---|---|
+| E12 | c32946ebd74ad1c33a051804323c46f8433a4b4286ce51b68f48a5fb0aaf40b3 | e8c2b99a1686a2ee3f3c74731d1057b0fa3df9b3030765451a76fe5f4f7f2f4a |
+| F-only6 | fb19006c948e1b66b255c3380c586dd9921871aa73d9cd1d951fbca9ff924cd2 | 3ba70f6d339569c8ab797ca210375c3e6d777e0245cccb6cae2cf313c57405b0 |
+| G-only2 | 78f218affc2c5a89fadc70cb99d9f18915ec05c2fc941d8f9606d2ddcac7d715 | 6c58f0690032e4dba7352e9afd253584da019a7a2978bb557ef68043d87c424d |
+
+Kalıcı arşiv kökü /home/alperen/deckent-recovery-20260904.
+Asıllar silinmedi; DB/config/credential kopyalanmadı. Her arşiv harness,
+main/selected result ve selected-verification log/patch/manifest içerir.
+
+| Arşiv dizini | Payload check | SHA256SUMS SHA256 |
+|---|---|---|
+| terminal-7099-l1-l5-mugpXg | 22/22 PASS | 7b1ea9d2b84109c83f2dca46f1805b6e3bd38124631102ff288a1e91171915d1 |
+| terminal-7099-l6-keyboard-LOaeWw | 18/18 PASS | 207f528d0296dd7b3019a2034b81efb9b81406bf5e8ecf17bf41a913d3e2478c |
+| terminal-7099-l6-version-0me3eb | 30/30 PASS | 98530d5f074677d2d22f7773dadcf2438bbb438d2590fa664b827b41b0e597ca |
+
+Son main runtime: canonical stop721261 → active-execution ALLOW → build:all
+PASS (01:05:50Z) → bot736773, Fable01:07Z canlı PID doğrulaması. Dist bu commit
+içerikleri + inherited dirty source'tan üretildi; pristine HEAD build değildir.
+Sırf commit için restart yok. MCP reconnect bağımsız kanıtlanmadı.
+Retained728/task/lock/DB temizlenmedi; bu dilimde yeni sprint/worker dispatch yok.
+Push TOOL_POLICY_HOLD: owner yetkisi mevcut; önceki deneme process başlamadan
+approval-policy/never çelişkisiyle reddedildi. Bypass/unchanged retry yok.
+Son source HEAD ahead7/behind0, REMOTE_CI_NOT_TRIGGERED; repo-green iddiası yok.
+
+7099 VERIFY korunur. Açık: L1 readiness/identity + semantik chat_provider migrasyonu;
+L2 active-provider cancellation; L3 renderer/MCP/approval; L4 reactive state/resume;
+L5 explicit compact accounting; L6 recursive i18n/verdict/ASCII/reduced-motion/
+resize/debug-redaction ve platform proof. Gerçek consumption silinmez; başarılı
+checkpoint attribution customer billing değildir. Version TTY output_splash
+tercihi/exit-flush riski inherited RELATED_BUT_NONBLOCKING; bu patch kapsamı değildir.
+L6 scanner+fixture dependency-bound foundation uygulanıyor; eski ~54 sayısı
+yeniden ölçüm değildir. Allowlist/baseline büyütülmez, failing gate tek başına
+main'e alınmaz; renderer hit'leri ayrı writer scope'larında aynı L6 DAG'ına bağlıdır.
+
+
 ### Bounded kod landing — 2026-09-07T00:22Z
 
 Kalıcı v4 patch/manifest ve selected-C PTY arşivi:
