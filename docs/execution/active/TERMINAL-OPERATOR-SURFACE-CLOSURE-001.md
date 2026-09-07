@@ -11,6 +11,63 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### L4-C exact literal resume — bounded source landed, 2026-09-07
+
+Source `1bfed4296600d38d85dc63aa3beb582003b9c3cd`: exact7 committed blobs,
++529/-79; root and Fable765/769 independently verified source/commit equality.
+`/resume sprint-ID` outside the recent-five discovery window now reaches the
+existing canonical historical-context reader after exact chat absence. No jobs
+full scan or synthesized sprint identity is introduced; numeric picker order stays.
+
+The new strict ledger reader distinguishes absent, found and failed. Only actual
+ENOENT permits legacy-history lookup; malformed/invalid-UTF8/foreign-session/read
+errors and existing-empty ledgers never turn into archive fallback. Existing
+tolerant read/list compatibility is retained. A present canonical memory DB with
+no usable adapter means unavailable, not absent. Malformed runtime history returns
+typed failed. Native and legacy chat context wins over a same-ID sprint archive;
+identity changes only after successful hydration/resume. Tool-call linkage survives
+legacy restoration. Existing default-OFF config, tenant/root authority, whole-note
+integrity, one-shot context and clear/switch invalidation remain in force.
+
+Compatibility consequence: previously produced gap/duplicate ledger turn indexes
+now refuse strict resume rather than restoring partial context; this package does
+not repair, rewrite or delete those records. Listing behavior remains tolerant.
+
+Selected and main: **6 suites /137 tests PASS**, i18n/typecheck/build PASS.
+Actual native compiled CLI: selected and main **8/8 cases PASS**, each with
+18 compiled plus7 source pins and28/28 observed child closures. EN/TR default-OFF,
+old literal with no job row, one-shot next message, chat precedence, empty/corrupt/
+real-EACCES refusal, missing archive and tamper rejection were exercised. Source
+freeze SHA `709507247950f8d8fc8ac92e998d5019a58fe4a7388e05010ecb4ea5bcf5eab8`;
+selected result `85e005f686032ce8899289f6df1476384301ef3a6c4693b8768b163d5df986fc`,
+main result `1cdf143e92294ea330626e8c5679058f1b2c3831cb8fcc678014eb53c0799670`.
+This is Linux CLI with diagnostic native responses, NOT external provider delivery,
+usage, billing, settlement, supported-platform completeness or whole7099 closure.
+
+Legacy candidate command-only V1 failed on a native-only success-text selector.
+V2 completed all8 behavior/identity/clean-exit checks but its aggregate remains
+FAIL: its child allowlist omitted legacy init's private codex/cursor auth probes.
+Separate raw-hash-bound adjudication verifies52/52 private child lifecycles; it does
+not rewrite the original result. Main legacy CLI remains UNRUN/OPEN; historical
+context delivery to a subsequent real legacy provider turn remains unproved.
+Worker targeted V1/V2 failures, root initial136/137 missing-import failure and
+root's incorrectly empty first freeze are retained. That first root run is NOT
+source-binding evidence; corrected bound-v2 verification uses all7 pinned paths.
+
+Bot1693409 canonical stop -> ALLOW -> main build:all -> bot1764892 start/status/
+liveness PASS. Build identity595cf951, sourceTree027dad3b; loaded entrypoint and
+bot module digests match. MCP reconnect remains unverified; no fresh sprint or
+retained-state cleanup. Fable review is not a canonical XVerify receipt.
+
+Private archive: `/home/alperen/deckent-recovery-20260904/terminal-7099-l4c-ptyOrV`.
+210 checksum checks /211 files, directories700/files600; only explicit evidence
+files, no DB/config/credential/fixture-tree copy. Manifest SHA
+`eddbefa386fc95efeab7726bca74a92859b466a996baa2edacbc9c9941d681a5`;
+SUMS `cb7776c63432c81c56f4a2d335320ea3f6e4c9a55d1e5b1e01baf77bb1be4b05`.
+7099 remains VERIFY/DEGRADED; MASTER and retained runtime were not modified.
+Next: remaining L4 live state/error/next-action and declared legacy proof boundary,
+then remaining L1/L3/L5/L6 contracts; no new outcome is admitted by these findings.
+
 ### 7099-CADENCE-FIX-1 — catalog/MCP repair landed, 2026-09-07
 
 Source `64562e63d0cd7a9ab35a258fa75ebc1aa141c240`: exact4 files, +153/-14;
