@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):fc50cf2af4983aaff142f5a0a85fb90f36ca9732d5ce502c1901eac1ba6a156c`
+**Source digest:** `sha256(normalized-lf-utf8):4a2092257995ba1e24232f24ed3dd9b75165614018a72fca9d9b49144341a68d`
 
-**Rows:** 584 total · 495 active · 89 terminal
+**Rows:** 589 total · 500 active · 89 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 373 |
+| OPEN | 378 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
@@ -453,6 +453,11 @@
 | 7121 | `SKILLMD-V3-RECONCILIATION-001` | OPEN | P0 | ECOSYSTEM | `SKILL-CATALOG-AUTHORITY-001`, `SKILL-ROUTING-ELIGIBILITY-001`, `SKILL-SUPPLY-CHAIN-INGRESS-001` | — | SKILLMD-INGEST-001'in immutable V2 activation kabulünü production V3 SkillProfile ve fail-closed package ingress contractıyla lossless uzlaştır |
 | 7130 | `AGENT-RUNTIME-ADAPTER-001` | OPEN | P2 | PROVIDER | `COMPOSITE-WORKER-001` | — | Harici agent-runtime adapter ailesi değerlendirmesi: generic ACP worker adapter + Hermes/OpenClaw/Codex-remote/ADK sınıfı runtime'ların governed composite worker olarak admission'ı |
 | 7141 | `ERROR-REGISTRY-THROW-CONVERSION-001` | OPEN | P1 | KERNEL | — | — | Maraton-birikimi 131 ham `throw new Error(...)` sitesinin typed error-registry kontratına taşınması (owner admission 2026-08-25; sprint-670-006 dürüst-NO_GO bulgusu) |
+| 7142 | `PERMISSION-MODEL-DURABILITY-COMPAT-001` | OPEN | P1 | DURABILITY | — | — | Node permission-model ile durable fsync/CAS işlemlerinin uyumluluk sözleşmesi |
+| 7143 | `TERMINAL-SHRINK-RESIZE-RENDER-TRUTH-001` | OPEN | P1 | TERMINAL | — | — | Terminal daraltma ve yeniden büyütmede Ink eski satır artefaktlarının giderilmesi |
+| 7144 | `CLI-DETACHED-CAPTURE-PROCESS-CUSTODY-001` | OPEN | P1 | KERNEL | — | — | Detached CLI capture için parent çıkışında child ve process-tree sahipliği |
+| 7145 | `TERMINAL-SECURITY-WARNING-CONTAINMENT-001` | OPEN | P1 | SECURITY | — | — | Runtime SecurityWarning'in Terminal sunum ve tanılama kanalları arasında güvenli ayrımı |
+| 7146 | `TEST-BASELINE-REPAIR-001` | OPEN | P1 | TRUTH | — | — | Mevcut full-suite kırmızı baseline'ın kök neden sınıflarıyla onarılması |
 | 8000 | `EVERY-ENV-001` | OPEN | P0 | XPLAT | `SSOT-003`, `TEST-PLATFORM-001` | — | Every-environment architecture and release parent |
 | 8010 | `ENV-ADAPTER-001` | OPEN | P0 | XPLAT | `KERNEL-001`, `AUTHORITY-001` | — | PlatformAdapter contracts for process, paths, locks, IPC, credentials, terminal and services |
 | 8020 | `INSTALL-SCOPE-001` | OPEN | P0 | ONBOARDING | `ENV-ADAPTER-001`, `MEMORY-AUTHORITY-001` | — | Global install plus project-scoped state and learning |

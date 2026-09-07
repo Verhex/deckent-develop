@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "fc50cf2af4983aaff142f5a0a85fb90f36ca9732d5ce502c1901eac1ba6a156c"
+    "value": "4a2092257995ba1e24232f24ed3dd9b75165614018a72fca9d9b49144341a68d"
   },
   "summary": {
-    "total": 584,
-    "active": 495,
+    "total": 589,
+    "active": 500,
     "terminal": 89,
     "receipts": 218,
     "byState": {
-      "OPEN": 373,
+      "OPEN": 378,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 365,
-      "P1": 169,
+      "P1": 174,
       "P2": 50
     },
     "byProgram": {
@@ -36,12 +36,12 @@
       "DATA": 3,
       "DESKTOP": 7,
       "DOCS": 6,
-      "DURABILITY": 2,
+      "DURABILITY": 3,
       "ECOSYSTEM": 11,
       "ENTERPRISE": 4,
       "EVAL": 5,
       "EVOLUTION": 4,
-      "KERNEL": 132,
+      "KERNEL": 133,
       "LEARNING": 11,
       "OBS": 9,
       "ONBOARDING": 1,
@@ -55,11 +55,11 @@
       "RESILIENCE": 1,
       "ROUTING": 8,
       "SCALE": 1,
-      "SECURITY": 10,
+      "SECURITY": 11,
       "SURFACE": 1,
-      "TERMINAL": 25,
+      "TERMINAL": 26,
       "TOOL": 1,
-      "TRUTH": 107,
+      "TRUTH": 108,
       "XPLAT": 7
     }
   },
@@ -5650,6 +5650,61 @@
       "updated": "2026-08-26",
       "definitionDigest": "72a12fb1047dea839dc72cd935cbc4a6032ad1dd7300dbe0e4db271a8b41e22c",
       "progressDigest": "cffeda2908d349aba134450b0567900b408603af8bcb57e6b54e2d32cd0900bc",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7142,
+      "id": "PERMISSION-MODEL-DURABILITY-COMPAT-001",
+      "program": "DURABILITY",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-09-07",
+      "definitionDigest": "888e8f8009ba0b03f2d221ec2cd31f003c14d417469577bc446a7ae390ef0042",
+      "progressDigest": "1c96c12f9136b1fd44eee978f85c163cd5fdbacf79229996119bca8757d2ac7e",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7143,
+      "id": "TERMINAL-SHRINK-RESIZE-RENDER-TRUTH-001",
+      "program": "TERMINAL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-09-07",
+      "definitionDigest": "75464776ba760a35e8daa548566dcb7dbe276867042ecb996e315a1b616d978d",
+      "progressDigest": "1c8de120b4b51f08b01cd1b2acc20f86daa8011d12a7a4a867ec4f8da6dfbe94",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7144,
+      "id": "CLI-DETACHED-CAPTURE-PROCESS-CUSTODY-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-09-07",
+      "definitionDigest": "bbec9e1ede7d957f5d1f6cd8553851bf775af698712ab7e92d85347e7169daf1",
+      "progressDigest": "80013710fb5434762109801b99deb8738b3aa361b4aac69cd8d0a784774d328e",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7145,
+      "id": "TERMINAL-SECURITY-WARNING-CONTAINMENT-001",
+      "program": "SECURITY",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-09-07",
+      "definitionDigest": "77c623dd6dc0969ac76b3232ed1a8d400eb34c8dc18f41e2d34767ddf073d989",
+      "progressDigest": "03a0fb24dbed0336998eb02abe3066fe12ba47f3ddf11af937ebeb3b2c14393f",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7146,
+      "id": "TEST-BASELINE-REPAIR-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-09-07",
+      "definitionDigest": "71135c6ab6ec625b28cb7b27b5d7f230b60cc099ca90bd5f7ae7a0992dd099b1",
+      "progressDigest": "63d530858aebb02923f1c50db376c4692e2e0012f995a345954235ab6da23608",
       "terminalClosureDigest": null
     },
     {
@@ -24730,7 +24785,12 @@
         "SKILLMD-V3-RECONCILIATION-001",
         "AGENT-RUNTIME-ADAPTER-001",
         "RUN-POLICY-DELIVERY-001",
-        "ERROR-REGISTRY-THROW-CONVERSION-001"
+        "ERROR-REGISTRY-THROW-CONVERSION-001",
+        "PERMISSION-MODEL-DURABILITY-COMPAT-001",
+        "TERMINAL-SHRINK-RESIZE-RENDER-TRUTH-001",
+        "CLI-DETACHED-CAPTURE-PROCESS-CUSTODY-001",
+        "TERMINAL-SECURITY-WARNING-CONTAINMENT-001",
+        "TEST-BASELINE-REPAIR-001"
       ],
       "gates": [
         "G2",
@@ -24791,7 +24851,12 @@
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
         "AGENT-RUNTIME-ADAPTER-001",
-        "ERROR-REGISTRY-THROW-CONVERSION-001"
+        "ERROR-REGISTRY-THROW-CONVERSION-001",
+        "PERMISSION-MODEL-DURABILITY-COMPAT-001",
+        "TERMINAL-SHRINK-RESIZE-RENDER-TRUTH-001",
+        "CLI-DETACHED-CAPTURE-PROCESS-CUSTODY-001",
+        "TERMINAL-SECURITY-WARNING-CONTAINMENT-001",
+        "TEST-BASELINE-REPAIR-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Provenance, install, permissions, sandbox, update, revoke and quarantine are one trust plane",
@@ -26568,6 +26633,166 @@
       "acceptance": "`npm run lint:errors` 0 yeni-occurrence ile yeşil; error-handling-unification + error-registry-lint testleri baseline-mutabakatıyla geçer; dönüşüm assertion/ratchet zayıflatmadan, dosya-kümeli onarım-dalgası olarak koşulur (gen-repair-directives + lint:directives hattı); typed hata-sınıfları mevcut DeckentError/registry desenini izler",
       "evidence": "2026-08-25 dalga-kapanisi: sprint-672 (9 task, 8 tek-FIX-turda RESOLVED; 672-005 SCOPED_PROOF_HOLD verification-authority gap ile unresolved — kod-defekti degil, site elle cevrildi). 131/131 site typed DeckentError (ad-hoc aile; mesaj-baytlari korunur, baseline dokunulmadi). Kanit: `npm run lint:errors` -> `0 new violation(s), 319 known baseline occurrence(s)` exit-0; guard-suite 204/204; tsc-0; alan spot-suite 29/29; Tier-1 gercek-binary smoke stderr typed-kod (`(INVALID_PATH)`); 28 dosya +417/-131. Full-suite %100 kosusu landing-commit mesajinda. Kalan-VERIFY: owner satir-kabulu + farkli-provider xverify muhru (adjudicator-arizasi acikken typed-HOLD); 2026-08-26 devam-dalgaları (687-001 + sprint-688 2/2 COMPLETE 0-FIX; landing b22429eeb): en-yoğun 12 dosyada 242 site typed'a (26+110+106 → hepsi 0), baseline 318→77 occurrence / 286→72 entry yalnız-azalma budamasıyla; mesaj/akış bit-korundu, 10 suite + lint:errors + tsc-0 + 20-gate yeşil; 687-001'in tek-NO_GO'su direktif-tasarım artefaktıydı (imkânsız-yeşil Test-kombinasyonu — ders: baseline-tutarlılık testi worker-Test'ine konmaz, budama landing-host'ta); kalan 77 occurrence son-dalga adayı; 2026-08-26 son-dalga (689): +8 dosya/32-site (claude+codex karışık) — kümülatif 318→45 occurrence (286→43 entry); kalan 45 uzun-kuyruk (33 dosyada 1-3'erli) ayrı mini-dalga adayı",
       "updated": "2026-08-26"
+    },
+    {
+      "order": 7142,
+      "id": "PERMISSION-MODEL-DURABILITY-COMPAT-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "DURABILITY",
+      "outcome": "Node permission-model ile durable fsync/CAS işlemlerinin uyumluluk sözleşmesi",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Gerçek producer-consumer yollarında permission etkin write/fsync/readback ve crash-durability kanıtı; destekli platform/runtime kombinasyonları ölçülür, desteklenmeyen kombinasyon typed fail/HOLD olur; permission kaldırmak veya durability gate'ini atlamak çözüm sayılmaz; tenant/path authority ve mevcut CAS güvenliği korunur",
+      "evidence": "Owner-admitted 2026-09-07: Fable ENTRY858 seçimi + root doğrudan relay teyidi; provenance docs/execution/evidence/7099/owner-relay-admission-2026-09-07.md (source sha256:9395665b8da51696ec832c0ef04eb5891c8caf259b7a6567289b6c72e8d05c44). 7099 capsule L4-C/CLI auth deneyi permission altında fsync reddini gösterdi; çözüm/live/platform closure kanıtlanmadı. Ayrı kuyruk, 7099 yerine ACTIVE değildir",
+      "updated": "2026-09-07"
+    },
+    {
+      "order": 7143,
+      "id": "TERMINAL-SHRINK-RESIZE-RENDER-TRUTH-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TERMINAL",
+      "outcome": "Terminal daraltma ve yeniden büyütmede Ink eski satır artefaktlarının giderilmesi",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Gerçek terminal emulatoründe grow/shrink geçişleri eski satır bırakmaz; viewport, focus, çok satırlı araç/onay kartları ve klavye sahipliği korunur; EN/TR, ASCII, NO_COLOR ve desteklenen platform matrisi doğrulanır; yalnız steady-frame veya escape-sequence varlığı geçiş kanıtı sayılmaz",
+      "evidence": "Owner-admitted 2026-09-07: ENTRY858 + root teyidi; provenance docs/execution/evidence/7099/owner-relay-admission-2026-09-07.md. 7099 capsule resize geçiş kanıtı eksikliği; mevcut renderer testleri bu özel problemi kapatmaz. Ayrı kuyruk, aktif 7099 kapsamını genişletmez",
+      "updated": "2026-09-07"
+    },
+    {
+      "order": 7144,
+      "id": "CLI-DETACHED-CAPTURE-PROCESS-CUSTODY-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "KERNEL",
+      "outcome": "Detached CLI capture için parent çıkışında child ve process-tree sahipliği",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Parent beklenmedik çıkış, timeout ve cancellation yollarında exact invocation-bound child/process-tree custody ve bounded reap; başka oturumun süreçlerine dokunulmaz; gerçek exit/partial-output truth korunur, orphan veya sessiz success oluşmaz; platform adapterları ve gerçek process senaryoları kanıtlanır",
+      "evidence": "Owner-admitted 2026-09-07: ENTRY858 + root teyidi; provenance docs/execution/evidence/7099/owner-relay-admission-2026-09-07.md; Fable captureCliTool m2/ENTRY843 gözlemi, 7099 capsule parent-unexpected-exit finding. Mevcut cli-tool-capture/chat-tool-bridge akışları kapanış kanıtı değildir; ayrı kuyruk",
+      "updated": "2026-09-07"
+    },
+    {
+      "order": 7145,
+      "id": "TERMINAL-SECURITY-WARNING-CONTAINMENT-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "SECURITY",
+      "outcome": "Runtime SecurityWarning'in Terminal sunum ve tanılama kanalları arasında güvenli ayrımı",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Ham warning TUI kartlarını/transkripti bozmaz; güvenlik uyarısı susturulmaz, redacted typed diagnostic/audit kanalında görünür ve ilişkilendirilir; TTY/pipe, EN/TR, startup/child süreç ve secret-redaction testleriyle gerçek binary kanıtı; global warning disablement çözüm değildir",
+      "evidence": "Owner-admitted 2026-09-07: ENTRY858 + root teyidi; provenance docs/execution/evidence/7099/owner-relay-admission-2026-09-07.md; 7099 L4-C/L4-D transcript bulguları. Güvenli containment henüz kanıtlanmadı; ayrı kuyruk",
+      "updated": "2026-09-07"
+    },
+    {
+      "order": 7146,
+      "id": "TEST-BASELINE-REPAIR-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TRUTH",
+      "outcome": "Mevcut full-suite kırmızı baseline'ın kök neden sınıflarıyla onarılması",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Fresh full-suite envanteri exact source/runtime/test kimliğiyle sabitlenir; permission/EPERM, stale fixture, sıraya bağlı test ve gerçek regression ayrılır; her sınıf assertion/ratchet zayıflatılmadan onarılır ve birleşik koşuda doğrulanır; yeni kırmızı gizlenmez, scoped-green repo-green diye sunulmaz; mevcut 5-landing full-suite kadansı korunur",
+      "evidence": "Owner-admitted 2026-09-07: ENTRY858 soru3 + root teyidi; provenance docs/execution/evidence/7099/owner-relay-admission-2026-09-07.md. Historical full-suite FAILED ayrı kanıttır; bu kayıt testlerin geçtiğini veya bugünkü sayılarını kanıtlamaz. Ayrı outcome, 7099 landing'lerini geriye dönük yeniden sınıflandırmaz",
+      "updated": "2026-09-07"
     },
     {
       "order": 8000,
@@ -29509,6 +29734,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "09410d43250e951865bff3fd0267c63183de2a6250f4822831348adbaea251fb"
+    "value": "9c9f19a6b7d60d972c1182f5e1439fa492fbc3663d579f49374b6f0292c99e9c"
   }
 }
