@@ -14,7 +14,7 @@
 // by id; `requestPermission` resolves immediately when a pre-answer exists.
 
 import { createHash } from 'node:crypto';
-import type { AgentEvent } from './events.js';
+import type { AgentEvent, RequestMeasurementEvent } from './events.js';
 import { runAgentTurn, type LoopDeps, type PermissionResponse } from './loop.js';
 import type { PermissionPolicy } from './permission-policy.js';
 import type { RuleStore } from './permission-store.js';
@@ -28,6 +28,7 @@ import type {
   ProviderMessage,
   ProviderRequest,
 } from './provider-tooluse/types.js';
+import { providerContextErrorCode } from './provider-tooluse/context-errors.js';
 import { decideProviderAdmission, estimateTokens, measureProviderRequest } from './context-budget.js';
 import { openScratchStore, type CheckpointReadResult, type ScratchCheckpointPayload, type ScratchStore } from './scratch-checkpoint.js';
 import { createNativeBudgetState, type NativeBudgetState } from './guards/recursion.js';
@@ -233,6 +234,9 @@ export interface AgentSession {
    * measurement exists — the caller renders "unknown", never an estimate.
    */
   contextSnapshot(): Promise<ContextSnapshot>;
+  /** Clear only the last-request display attribution after a successful
+   * transcript identity switch. Provider usage, cost and budget stay intact. */
+  clearLastRequestMeasurement(): void;
   /** Plan a context-epoch refresh for the NEXT send() — the `/renew` side
    *  effect without the working-budget renewal. */
   planContextRefresh(): void;
@@ -251,6 +255,8 @@ export interface AgentSession {
 export interface ContextSnapshot {
   window: number | undefined;
   measuredInputTokens: number | undefined;
+  lastRequestMeasurement?: RequestMeasurementEvent;
+  providerReportedUsage?: { inputTokens: number; outputTokens: number; reports: number };
   epoch: number;
   messages: number;
   preambleMessages: number;
@@ -272,6 +278,9 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   let turnSequence = 0;
   let budgetEpoch = 1;
   let exhausted: { code: NativeBudgetTerminalCode; at: number; epoch: number } | undefined;
+  let lastRequestMeasurement: RequestMeasurementEvent | undefined;
+  let requestAttributionGeneration = 0;
+  const providerReportedUsage = { inputTokens: 0, outputTokens: 0, reports: 0 };
   const scratchDeps = deps.scratch;
   const scratch: ScratchStore | undefined = scratchDeps
     ? openScratchStore(
@@ -357,11 +366,12 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
    *  other turn — so the same measurement/admission wrapper (native-transport's
    *  withMeasuredAdmission) gates it — and its usage is returned to the caller
    *  so it lands in the SAME usage/cost chain, never off-books. */
-  async function callCheckpointProvider(
+  async function* callCheckpointProvider(
     previousSummary: string | undefined,
     delta: string,
     usage: UsageTotals,
-  ): Promise<string> {
+    attributionGeneration: number,
+  ): AsyncGenerator<RequestMeasurementEvent, string, void> {
     if (!scratchDeps) throw new Error('checkpoint requested without a scratch session');
     const adapter = deps.getAdapter?.() ?? deps.adapter;
     const messages: ProviderMessage[] = [];
@@ -378,10 +388,24 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     };
     let text = '';
     for await (const response of adapter.send(request)) {
-      if (response.type === 'text-delta') text += response.text;
+      if (response.type === 'request-measurement') {
+        const event = Object.freeze({
+          type: 'request-measurement' as const,
+          decision: response.decision,
+          purpose: 'checkpoint' as const,
+        });
+        if (attributionGeneration === requestAttributionGeneration) {
+          lastRequestMeasurement = event;
+        }
+        yield event;
+      }
+      else if (response.type === 'text-delta') text += response.text;
       else if (response.type === 'usage') {
         usage.inputTokens += response.inputTokens;
         usage.outputTokens += response.outputTokens;
+        providerReportedUsage.inputTokens += response.inputTokens;
+        providerReportedUsage.outputTokens += response.outputTokens;
+        providerReportedUsage.reports++;
       }
     }
     return text;
@@ -393,7 +417,10 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
    * summaries recursively chunked+merged — depth-bounded, so an oversized
    * transcript ends in a typed failure rather than an endless continuation.
    */
-  async function summarizeBoundedDelta(usage: UsageTotals): Promise<string> {
+  async function* summarizeBoundedDelta(
+    usage: UsageTotals,
+    attributionGeneration: number,
+  ): AsyncGenerator<RequestMeasurementEvent, string, void> {
     const all = transcript.toProviderMessages();
     const delta = all.slice(Math.min(epochPreambleLength, all.length));
     const budget = checkpointDeltaBudget();
@@ -403,14 +430,16 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     for (let depth = 0; chunks.length > 1; depth++) {
       if (depth >= CHECKPOINT_MERGE_MAX_DEPTH) throw new Error('checkpoint-merge-depth-exceeded');
       const partials: string[] = [];
-      for (const chunk of chunks) partials.push(await callCheckpointProvider(previousSummary, chunk, usage));
+      for (const chunk of chunks) {
+        partials.push(yield* callCheckpointProvider(previousSummary, chunk, usage, attributionGeneration));
+      }
       chunks = packLines(
         partials.map((partial) => boundTextForCheckpoint(partial, Math.max(128, budget * 2))),
         budget,
       );
       if (chunks.length === 0) throw new Error('checkpoint-merge-produced-nothing');
     }
-    return callCheckpointProvider(previousSummary, chunks[0]!, usage);
+    return yield* callCheckpointProvider(previousSummary, chunks[0]!, usage, attributionGeneration);
   }
 
   /** Measure what the CURRENT transcript (plus any pending extra messages) would
@@ -477,19 +506,35 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
    *  the transcript onto raw intent + reference lineage + the checkpoint. Usage
    *  is emitted (and accrued) even when the summarization itself fails — the
    *  provider call happened, so it is billed and reported either way. */
-  async function* takeContextEpoch(turnId: string): AsyncIterable<AgentSessionEvent> {
+  async function* takeContextEpoch(
+    turnId: string,
+    attributionGeneration: number,
+  ): AsyncIterable<AgentSessionEvent> {
     if (!scratch || !scratchDeps) return;
     const usage: UsageTotals = { inputTokens: 0, outputTokens: 0 };
     let text: string | undefined;
     let failureCode: CheckpointFailureCode | undefined;
+    let providerFailureCode: string | undefined;
     try {
-      text = await summarizeBoundedDelta(usage);
-    } catch {
-      failureCode = 'CHECKPOINT_PROVIDER_FAILED';
+      try {
+        text = yield* summarizeBoundedDelta(usage, attributionGeneration);
+      } catch (error) {
+        providerFailureCode = providerContextErrorCode(error);
+        failureCode = 'CHECKPOINT_PROVIDER_FAILED';
+      }
+    } finally {
+      // A consumer may close the outer session iterator between checkpoint
+      // chunks. Provider-reported usage observed before that boundary remains
+      // billable even though no later aggregate event can be yielded.
+      if ((usage.inputTokens > 0 || usage.outputTokens > 0) && deps.costGuard) {
+        accrue(deps.costGuard, usage);
+      }
     }
     if (usage.inputTokens > 0 || usage.outputTokens > 0) {
-      if (deps.costGuard) accrue(deps.costGuard, usage);
       yield { type: 'usage', inputTokens: usage.inputTokens, outputTokens: usage.outputTokens };
+    }
+    if (providerFailureCode) {
+      yield { type: 'notice', code: providerFailureCode, message: providerFailureCode };
     }
     if (text !== undefined) {
       try {
@@ -527,25 +572,32 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
 
   /** PROACTIVE trigger: turn the epoch over BEFORE the request jams. Measured,
    *  not guessed — an unknown context authority simply never triggers it. */
-  async function* maybeRefreshBeforeTurn(turnId: string): AsyncIterable<AgentSessionEvent> {
+  async function* maybeRefreshBeforeTurn(
+    turnId: string,
+    attributionGeneration: number,
+  ): AsyncIterable<AgentSessionEvent> {
     const planned = contextRefreshPlanned;
     contextRefreshPlanned = false;
     if (!scratch || !scratchDeps) return;
     if (planned) {
-      yield* takeContextEpoch(turnId);
+      yield* takeContextEpoch(turnId, attributionGeneration);
       return;
     }
     const measured = await measureContext();
     if (!measured) return;
     if (measured.inputTokens >= Math.floor(measured.window * CONTEXT_HIGH_WATER_RATIO)) {
-      yield* takeContextEpoch(turnId);
+      yield* takeContextEpoch(turnId, attributionGeneration);
     }
   }
 
-  async function* runWithCheckpoints(input: StructuredTurnInput, turnId: string): AsyncIterable<AgentSessionEvent> {
+  async function* runWithCheckpoints(
+    input: StructuredTurnInput,
+    turnId: string,
+    attributionGeneration: number,
+  ): AsyncIterable<AgentSessionEvent> {
     lastRawIntent = input.rawIntent;
     for (const reference of input.references) rememberReference(reference);
-    yield* maybeRefreshBeforeTurn(turnId);
+    yield* maybeRefreshBeforeTurn(turnId, attributionGeneration);
     // The recovery turn drops the expansion and rides intent + lineage instead —
     // re-sending the payload that just overflowed would be a doomed second call.
     const retryInput = epochObjective();
@@ -555,6 +607,15 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       const payload = attempt === 0 ? input.expandedPayload : retryInput;
       let retry = false;
       for await (const event of runAgentTurn(loopDeps, transcript, payload)) {
+        if (event.type === 'request-measurement'
+          && attributionGeneration === requestAttributionGeneration) {
+          lastRequestMeasurement = event;
+        }
+        if (event.type === 'usage') {
+          providerReportedUsage.inputTokens += event.inputTokens;
+          providerReportedUsage.outputTokens += event.outputTokens;
+          providerReportedUsage.reports++;
+        }
         if (event.type === 'error' && isNativeBudgetTerminalCode(event.code)) {
           exhausted = { code: event.code, at: Date.now(), epoch: budgetEpoch };
         }
@@ -572,7 +633,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
         }
         yield event;
         if (event.type !== 'budget-checkpoint-request') continue;
-        yield* takeContextEpoch(turnId);
+        yield* takeContextEpoch(turnId, attributionGeneration);
       }
       if (!retry) return;
       yield {
@@ -636,7 +697,8 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
         })();
       }
       const turnId = `turn-${++turnSequence}`;
-      return runWithCheckpoints(normalizeTurnInput(userInput), turnId);
+      const attributionGeneration = requestAttributionGeneration;
+      return runWithCheckpoints(normalizeTurnInput(userInput), turnId, attributionGeneration);
     },
     renewBudgetEpoch(): { epoch: number } {
       budgetEpoch++;
@@ -681,11 +743,14 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     },
     latestCheckpoint(): CheckpointReadResult { return checkpointDegradation ?? scratch?.readLatestCheckpoint() ?? { status: 'empty' }; },
     async contextSnapshot(): Promise<ContextSnapshot> {
-      const window = deps.getContextBudgetTokens?.();
-      const measured = await measureContext();
+      const decision = lastRequestMeasurement?.decision;
       return {
-        window: window !== undefined && window > 0 ? window : undefined,
-        measuredInputTokens: measured?.inputTokens,
+        window: decision?.measurement.identity.contextWindowTokens,
+        measuredInputTokens: decision?.measurement.inputTokens,
+        ...(lastRequestMeasurement
+          ? { lastRequestMeasurement: Object.freeze({ ...lastRequestMeasurement }) }
+          : {}),
+        ...(providerReportedUsage.reports > 0 ? { providerReportedUsage: { ...providerReportedUsage } } : {}),
         epoch: contextEpoch,
         messages: transcript.toProviderMessages().length,
         preambleMessages: epochPreambleLength,
@@ -693,6 +758,10 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
         refreshPlanned: contextRefreshPlanned,
         highWaterRatio: CONTEXT_HIGH_WATER_RATIO,
       };
+    },
+    clearLastRequestMeasurement(): void {
+      requestAttributionGeneration++;
+      lastRequestMeasurement = undefined;
     },
     planContextRefresh(): void {
       contextRefreshPlanned = true;
@@ -704,9 +773,10 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
         })();
       }
       compactSequence++;
+      const attributionGeneration = requestAttributionGeneration;
       // A fresh abort seam for the explicit compaction (cancel() aborts it).
       turnAbort = new AbortController();
-      return takeContextEpoch(`compact-${compactSequence}`);
+      return takeContextEpoch(`compact-${compactSequence}`, attributionGeneration);
     },
     close(options = {}): void {
       const keep = options.keepForRecoveryMs ?? 0;

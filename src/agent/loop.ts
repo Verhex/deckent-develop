@@ -7,6 +7,7 @@
 // limit/abort fires. View-neutral: permission suspension is an injected callback.
 
 import type { AgentEvent, PermissionRequestEvent } from './events.js';
+import { providerContextErrorCode } from './provider-tooluse/context-errors.js';
 import { composeSystemPrompt } from './identity.js';
 import { decide, resolveTier } from './permission.js';
 import type { PermissionPolicy } from './permission-policy.js';
@@ -293,7 +294,10 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         // running the in-flight turn to completion (breaking a for-await triggers
         // the adapter's iterator.return(), giving it a chance to abort cleanly).
         if (deps.isCancelled?.()) break;
-        if (ev.type === 'text-delta') {
+        if (ev.type === 'request-measurement') {
+          yield Object.freeze({ type: 'request-measurement', decision: ev.decision, purpose: 'turn' });
+        }
+        else if (ev.type === 'text-delta') {
           segmentText += ev.text;
           // Preserve ordinary streaming order. Continuation segments alone are
           // buffered until their overlap with already-visible text is known.
@@ -377,7 +381,12 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         yield { type: 'turn-end' };
         return;
       }
-      yield { type: 'error', message: e instanceof Error ? e.message : String(e) };
+      const contextCode = providerContextErrorCode(e);
+      yield {
+        type: 'error',
+        message: e instanceof Error ? e.message : String(e),
+        ...(contextCode ? { code: contextCode } : {}),
+      };
       yield { type: 'turn-end' };
       return;
     }

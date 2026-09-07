@@ -28,6 +28,16 @@ const tFor = (lang: string) => (key: string): string => getMessage(key, lang);
 const snapshot: ContextSnapshot = {
   window: 200_000, measuredInputTokens: 50_000, epoch: 2, messages: 14, preambleMessages: 3,
   checkpoint: 'ok', refreshPlanned: false, highWaterRatio: 0.75,
+  lastRequestMeasurement: {
+    type: 'request-measurement', purpose: 'turn', decision: {
+      admitted: true, availableTokens: 150_000,
+      measurement: {
+        inputTokens: 50_000, quality: 'exact', provenance: 'provider-counter', requestDigest: 'safe-digest',
+        identity: { provider: 'openai', model: 'model-a', contextWindowTokens: 200_000, contextProvenance: 'model-registry' },
+      },
+    },
+  },
+  providerReportedUsage: { inputTokens: 50_000, outputTokens: 500, reports: 1 },
 };
 function fakeEngine(extra: Partial<ReplEngine> = {}): ReplEngine & { sends: string[] } {
   const sends: string[] = [];
@@ -60,19 +70,27 @@ describe('resolveContextSlash — read-only snapshot lines', () => {
     expect(await resolveContextSlash('/context', fakeEngine(), labels)).toBe(labels.unavailable);
   });
 
-  it('renders window, occupancy percentage, epoch, messages and checkpoint from the snapshot', async () => {
+  it('renders the cached last actual request, not a synthetic current-occupancy percentage', async () => {
     const engine = fakeEngine({ contextSnapshot: async () => snapshot });
     const text = await resolveContextSlash('  /CONTEXT ', engine, labels);
     expect(text).toContain('50000');
     expect(text).toContain('200000');
-    expect(text).toContain('25%');
+    expect(text).toContain('last actual request');
+    expect(text).toContain('openai');
+    expect(text).toContain('model-a');
+    expect(text).toContain('provider reports');
+    expect(text).toContain('25% of that request window');
+    expect(text).not.toContain('in use:');
     expect(text).toContain('2'); // epoch
     expect(text).toContain('14');
     expect(engine.sends).toEqual([]); // zero provider turns
   });
 
-  it('says "unknown" (catalog) when there is no context authority instead of guessing', async () => {
-    const engine = fakeEngine({ contextSnapshot: async () => ({ ...snapshot, window: undefined, measuredInputTokens: undefined }) });
+  it('says "unknown" (catalog) when no actual request exists instead of guessing', async () => {
+    const engine = fakeEngine({ contextSnapshot: async () => ({
+      ...snapshot, window: undefined, measuredInputTokens: undefined,
+      lastRequestMeasurement: undefined, providerReportedUsage: undefined,
+    }) });
     const text = await resolveContextSlash('/context', engine, labels);
     expect(text).toContain(labels.unknown);
     expect(text).not.toMatch(/\(\d+%\)/); // no occupancy percentage is invented
@@ -91,23 +109,42 @@ describe('resolveCompactSlash — explicit compaction outcome lines', () => {
     const noStore = fakeEngine({ compactContext: async () => ({ outcome: 'unavailable', epoch: 1 }) });
     expect(await resolveCompactSlash('/compact', noStore, labels)).toBe(labels.compactUnavailable);
   });
+
+  it.each(['en', 'tr'] as const)('keeps the raw typed compact cause and its localized safe action in %s', async (lang) => {
+    const labels = buildContextSlashLabels(tFor(lang));
+    const overflow = fakeEngine({ compactContext: async () => ({ outcome: 'degraded', epoch: 2, reasonCode: 'INPUT_CONTEXT_OVERFLOW' }) });
+    const authority = fakeEngine({ compactContext: async () => ({ outcome: 'degraded', epoch: 2, reasonCode: 'INPUT_CONTEXT_AUTHORITY_UNAVAILABLE' }) });
+    expect(await resolveCompactSlash('/compact', overflow, labels)).toBe(labels.errorOverflow);
+    expect(await resolveCompactSlash('/compact', authority, labels)).toBe(labels.errorAuthorityUnavailable);
+    expect(labels.errorOverflow).toContain('INPUT_CONTEXT_OVERFLOW');
+    expect(labels.errorAuthorityUnavailable).toContain('INPUT_CONTEXT_AUTHORITY_UNAVAILABLE');
+  });
 });
 
 describe('withContextSlashes — local answers, everything else passes through, members forwarded', () => {
-  it('answers /context and /compact without a provider turn and forwards cancelTurn', async () => {
+  it.each([[5, 2], [0, 0]] as const)('answers /context and /compact with aggregate usage %i/%i and forwards the live measurement callback', async (inputTokens, outputTokens) => {
+    const measurements: unknown[] = [];
     const inner = fakeEngine({
       contextSnapshot: async () => snapshot,
-      compactContext: async () => ({ outcome: 'compacted', epoch: 3 }),
+      compactContext: async (callbacks: Parameters<NonNullable<ReplEngine['compactContext']>>[0]) => {
+        callbacks?.onRequestMeasurement?.(snapshot.lastRequestMeasurement!);
+        return { outcome: 'compacted', epoch: 3, usage: { inputTokens, outputTokens } };
+      },
       cancelTurn: () => true,
     });
     const engine = withContextSlashes(inner, buildContextSlashLabels(tFor('en')));
-    const out: string[] = []; let ends = 0;
-    const cbs = { output: (t: string) => out.push(t), onTurnEnd: () => { ends++; } };
+    const out: string[] = []; const ended: Array<{ inputTokens: number; outputTokens: number }> = [];
+    const cbs = {
+      output: (t: string) => out.push(t),
+      onTurnEnd: (stats: { inputTokens: number; outputTokens: number }) => { ended.push(stats); },
+      onRequestMeasurement: (event: unknown) => measurements.push(event),
+    };
     await engine('/context', cbs);
     await engine('/compact', cbs);
     expect(inner.sends).toEqual([]);
-    expect(ends).toBe(2);
-    expect(out.join('\n')).toContain('25%');
+    expect(ended).toEqual([{ inputTokens: 0, outputTokens: 0 }, { inputTokens, outputTokens }]);
+    expect(measurements).toEqual([snapshot.lastRequestMeasurement]);
+    expect(out.join('\n')).toContain('last actual request');
     expect(out.join('\n')).toContain('3');
     await engine('hello', cbs);
     expect(inner.sends).toEqual(['hello']);

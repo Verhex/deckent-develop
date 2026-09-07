@@ -4,6 +4,7 @@
 
 import type { ToolPermissionTier } from './tools/types.js';
 import type { ApprovalMode } from './permission-types.js';
+import type { ProviderAdmissionDecision } from './provider-tooluse/types.js';
 
 export interface TextDeltaEvent { type: 'text-delta'; text: string; }
 export interface ToolProposedEvent { type: 'tool-proposed'; id: string; tool: string; args: Record<string, unknown>; }
@@ -24,6 +25,11 @@ export interface ToolExecutingEvent { type: 'tool-executing'; id: string; tool: 
 export interface ToolResultEvent { type: 'tool-result'; id: string; tool: string; ok: boolean; output: string; }
 export interface TurnEndEvent { type: 'turn-end'; }
 export interface UsageEvent { type: 'usage'; inputTokens: number; outputTokens: number; }
+export interface RequestMeasurementEvent {
+  readonly type: 'request-measurement';
+  readonly decision: ProviderAdmissionDecision;
+  readonly purpose: 'turn' | 'checkpoint';
+}
 export type GenerationRecoveryClassification =
   | 'OUTPUT_LIMIT'
   | 'EMPTY_VISIBLE_AFTER_REASONING'
@@ -65,6 +71,7 @@ export type AgentEvent =
   | ToolResultEvent
   | TurnEndEvent
   | UsageEvent
+  | RequestMeasurementEvent
   | GenerationRecoveryEvent
   | BudgetCheckpointRequestEvent
   | ErrorEvent

@@ -30,6 +30,12 @@ import { expandAtRefs } from './at-ref.js';
 import { resolveSlash, type SlashRegistry } from '../commands/chat-slash-registry.js';
 import type { ChatMode } from '../commands/chat-mode.js';
 import type { NativeToolActivityEvent, ReplEngine } from './native-agent-bridge.js';
+import type { RequestMeasurementEvent } from '../../agent/events.js';
+import {
+  formatNativeRequestMetricDetail,
+  formatNativeRequestMetricSummary,
+  type NativeRequestMetricLabels,
+} from './native-request-metrics.js';
 import type { ProviderMessage } from '../../agent/provider-tooluse/types.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { listLedgerSessions, readLedgerSessionForResume, type LedgerStoreOptions } from './session-ledger.js';
@@ -993,6 +999,8 @@ export interface ReplLabels {
   activeChatContext: string; // "local active chat context: {id}"
   /** Compact caller-owned status-row label for the same local identity. */
   activeChatSession: string;
+  /** Caller-owned labels for the privacy-safe, last actual native request. */
+  requestMetric: NativeRequestMetricLabels;
   busyQueueStatus: string; // "queue: {count} background · {state}"
   busyStateBusy: string;   // "busy"
   busyStateIdle: string;   // "idle"
@@ -1188,6 +1196,10 @@ export async function runNativeTurnLoop(
     onTurnStats: (stats: { elapsedMs: number; tokens?: number }) => void;
     onTurnError: (message: string) => void;
     onToolActivity?: (event: NativeToolActivityEvent, turnId: number) => void;
+    /** Captured once before each engine call; callers can invalidate a prior
+     * chat attribution without suppressing measurements from the next turn. */
+    measurementAttribution?: () => number;
+    onRequestMeasurement?: (event: RequestMeasurementEvent, turnId: number, attribution: number | undefined) => void;
     /**
      * REPL-575 K3 — chat persistence for the native engine. Called once per
      * completed turn with the user's input line and the assistant text that was
@@ -1202,6 +1214,7 @@ export async function runNativeTurnLoop(
   let turnId = 0;
   for await (const line of lines) {
     const currentTurnId = ++turnId;
+    const measurementAttribution = cbs.measurementAttribution?.();
     const startMs = now();
     // Accumulate the streamed assistant text so the completed turn can be
     // persisted (what the user saw == what /resume replays). A turn that only
@@ -1219,6 +1232,11 @@ export async function runNativeTurnLoop(
         ...(cbs.onToolActivity ? {
           onToolActivity: (event) => {
             if (turnOpen) cbs.onToolActivity?.(event, currentTurnId);
+          },
+        } : {}),
+        ...(cbs.onRequestMeasurement ? {
+          onRequestMeasurement: (event) => {
+            if (turnOpen) cbs.onRequestMeasurement?.(event, currentTurnId, measurementAttribution);
           },
         } : {}),
       });
@@ -1621,6 +1639,15 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   } | null>(null);
   const [nativeToolNow, setNativeToolNow] = useState(0);
   const nativeToolGenerationRef = useRef(0);
+  const nativeRequestAttributionRef = useRef(0);
+  const [nativeRequestMeasurement, setNativeRequestMeasurement] = useState<{
+    event: RequestMeasurementEvent;
+    generation: number;
+  } | null>(null);
+  const clearNativeRequestMeasurementAfterResume = (): void => {
+    nativeRequestAttributionRef.current += 1;
+    setNativeRequestMeasurement(null);
+  };
   const [queued, setQueued] = useState<string[]>([]);
   const [confirm, setConfirm] = useState<ConfirmHead | null>(null);
 
@@ -1761,6 +1788,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       setActiveSessionId(id);
       activeSessionIdRef.current = id;
       setSessionTok(attempt.result.outputTokens);
+      // A hydrated chat has no new outbound request yet. Do not present the
+      // previous chat's measurement as its current/last request.
+      clearNativeRequestMeasurementAfterResume();
       pushTurn('seg', line);
       return true;
     }
@@ -1947,13 +1977,34 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     pendingSprintContextRef.current = result;
     pushTurn('seg', requireInjectedLabel('resumeSprintLoaded', labels.resumeSprintLoaded).replace('{id}', sprintId));
   };
-  const localChatContext = (): string | undefined => {
+  const localChatContext = (includeRequest = true): string | undefined => {
     const id = activeSessionIdRef.current;
     const chat = id ? labels.activeChatContext.replace('{id}', formatSessionIdForTerminal(id)) : undefined;
     const tool = nativeToolActivity && replSurfaceEnabled
       ? nativeToolActivity.statusLabel.replace('{tool}', formatSessionIdForTerminal(nativeToolActivity.tool))
       : undefined;
-    return [chat, tool].filter((line): line is string => line !== undefined).join('\n') || undefined;
+    const request = includeRequest && nativeRequestMeasurement && replSurfaceEnabled
+      ? formatNativeRequestMetricSummary(nativeRequestMeasurement.event, labels.requestMetric)
+      : undefined;
+    return [chat, tool, request].filter((line): line is string => line !== undefined).join('\n') || undefined;
+  };
+  /** Native `/status` may read the session's already-cached snapshot. The
+   * query performs no counting or provider call, and includes reports only
+   * when the provider actually emitted them. */
+  const nativeStatusDetail = async (): Promise<string | undefined> => {
+    // Flag-off preserves the pre-L4-E local `/status` path: no snapshot query
+    // and no request-measurement detail enters this surface.
+    if (!replSurfaceEnabled) return localChatContext(false);
+    const local = localChatContext(false);
+    const snapshot = nativeEngine?.contextSnapshot ? await nativeEngine.contextSnapshot() : undefined;
+    const request = snapshot
+      ? formatNativeRequestMetricDetail({
+        event: snapshot.lastRequestMeasurement,
+        providerReportedUsage: snapshot.providerReportedUsage,
+        labels: labels.requestMetric,
+      }).join('\n')
+      : undefined;
+    return [local, request].filter((line): line is string => line !== undefined).join('\n') || undefined;
   };
   const busyCtl = useRef<BusyControlsState>(initialBusyControlsState());
 
@@ -2300,6 +2351,16 @@ export function ReplApp(props: ReplAppProps): ReactElement {
             ? null
             : current);
         },
+        measurementAttribution: () => nativeRequestAttributionRef.current,
+        onRequestMeasurement: (event, _turnId, attribution) => {
+          if (!nativeLoopActive || attribution !== nativeRequestAttributionRef.current) return;
+          // The bridge stamps provider/model inside the immutable event. Keep
+          // that actual identity rather than relabeling it with a later picker
+          // selection; a resume clears this state before its next request.
+          setNativeRequestMeasurement((current) => current !== null && current.generation > generation
+            ? current
+            : { event, generation });
+        },
         // 387-003: a per-turn exception no longer unwinds the whole loop —
         // flush any in-flight partial/segment first (finalizeReply, same as a
         // normal turn-end) so ordering stays correct, then surface the error
@@ -2584,6 +2645,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
             setActiveSessionId(literalId);
             activeSessionIdRef.current = literalId;
             setSessionTok(attempt.result.outputTokens);
+            clearNativeRequestMeasurementAfterResume();
             pushTurn('seg', requireInjectedLabel('resumeSwitched', labels.resumeSwitched).replace('{id}', literalId));
           }
           return;
@@ -2702,7 +2764,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           const gate = gateAction(termModeRef.current, { tool: bridged.tool, args: bridged.args, declaredRisk: entry?.risk });
           if (gate.kind === 'deny') { pushTurn('seg', denyLine(gate, trimmed)); return; }
           const dispatchResult = await dispatcher.dispatch(bridged.tool, bridged.args);
-          const localDetail = bridged.tool === 'deckent_status' ? localChatContext() : undefined;
+          const localDetail = bridged.tool === 'deckent_status' ? await nativeStatusDetail() : undefined;
           pushTurn('seg', localDetail ? `${dispatchResult}\n${localDetail}` : dispatchResult);
         }
         return;
@@ -2830,6 +2892,20 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       return clipTerminalCells(displayWidth(rich) <= budget ? rich : compact, budget, dualStreamOverflow);
     })()
     : null;
+  const nativeRequestMetricText = nativeRequestMeasurement && replSurfaceEnabled
+    ? (() => {
+      const phaseText = phase === 'thinking' ? labels.thinking : labels.generating;
+      const anchorPrefix = phase === 'idle'
+        ? `${inputBarActiveNow ? `✓ ${labels.ready}` : labels.inputPaused} · `
+        : `● deckent · ${phaseText} · `;
+      const interruptSuffix = interruptHint ? `  · ${interruptHint.text}` : '';
+      return clipTerminalCells(
+        formatNativeRequestMetricSummary(nativeRequestMeasurement.event, labels.requestMetric),
+        Math.max(1, columns - displayWidth(anchorPrefix) - displayWidth(interruptSuffix)),
+        dualStreamOverflow,
+      );
+    })()
+    : null;
 
   return (
     <Box flexDirection="column">
@@ -2955,8 +3031,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         {nativeToolActivityText
           ? <><Spinner /><Text bold> deckent </Text><Text {...palette.muted}>{`· ${nativeToolActivityText}`}</Text></>
           : phase === 'idle'
-          ? <Text {...palette.muted}>{inputBarActiveNow ? `✓ ${labels.ready}` : labels.inputPaused}</Text>
-          : <><Spinner /><Text bold> deckent </Text><Text {...palette.muted}>{`· ${phase === 'thinking' ? labels.thinking : labels.generating}`}</Text></>}
+          ? <Text {...palette.muted}>{inputBarActiveNow ? `✓ ${labels.ready}` : labels.inputPaused}{nativeRequestMetricText ? ` · ${nativeRequestMetricText}` : ''}</Text>
+          : <><Spinner /><Text bold> deckent </Text><Text {...palette.muted}>{`· ${phase === 'thinking' ? labels.thinking : labels.generating}${nativeRequestMetricText ? ` · ${nativeRequestMetricText}` : ''}`}</Text></>}
         {/* TERMINAL-TOOLS-006: transient Ctrl-C hint (names the next key). */}
         {interruptHint ? <Text {...palette.info}>{`  · ${interruptHint.text}`}</Text> : null}
       </Box>

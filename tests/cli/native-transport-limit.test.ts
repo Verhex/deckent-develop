@@ -10,11 +10,20 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { resolveContextBudgetTokens } from '../../src/cli/repl/native-transport.js';
+import {
+  ContextAuthorityUnavailableError as ProviderNeutralContextAuthorityUnavailableError,
+} from '../../src/agent/provider-tooluse/context-errors.js';
+import {
+  ContextAuthorityUnavailableError as CompatibilityContextAuthorityUnavailableError,
+} from '../../src/cli/repl/native-transport.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const sourcePath = join(__dirname, '../../src/cli/repl/native-transport.ts');
 
 describe('resolveContextBudgetTokens — Ollama default doc↔code consistency', () => {
+  it('keeps the provider-neutral typed error available through the legacy CLI export', () => {
+    expect(CompatibilityContextAuthorityUnavailableError).toBe(ProviderNeutralContextAuthorityUnavailableError);
+  });
   it('refuses an Ollama selection with no context authority (typed, no 24k literal — 7086/560-001)', () => {
     expect(() => resolveContextBudgetTokens('ollama', {})).toThrowError(/INPUT_CONTEXT_AUTHORITY_UNAVAILABLE/);
     // With any real authority (config or advertised) it resolves normally.

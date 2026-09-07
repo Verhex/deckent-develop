@@ -34,6 +34,10 @@ import { setConfigValues } from '../commands/config.js';
 import { loadDeckSecrets } from '../../core/deck-file.js';
 import { buildNativeToolRegistry, resolveToolSurfaceOptions, resolveRunFlowEnabled } from './native-tool-registry.js';
 import { createNativeEngine, resolveCostCeilingUsd, type NativeEngineDeps, type ReplEngine, type ContextSnapshot } from './native-agent-bridge.js';
+import {
+  formatNativeRequestMetricDetail,
+  type NativeRequestMetricLabels,
+} from './native-request-metrics.js';
 import type { ShortcutsPanel } from './input-bar.js';
 export type { ShortcutsPanel } from './input-bar.js';
 
@@ -334,6 +338,7 @@ export function buildReplLabels(t: (key: string) => string): ReplLabels {
     resumeSprintSuperseded: t('tui.resume_sprint_context_superseded'),
     activeChatContext: t('tui.active_chat_context'),
     activeChatSession: t('tui.active_chat_session'),
+    requestMetric: buildContextSlashLabels(t),
     // busy-controls: /queue /interrupt /steer (renderBusyDecision, app.tsx).
     busyQueueStatus: t('tui.busy_queue_status'),
     busyStateBusy: t('tui.busy_state_busy'),
@@ -655,11 +660,9 @@ export function withRenewSlash(engine: ReplEngine, labels: RenewSlashLabels): Re
 // (`native-context.slash.*`, `native-context.compact.*`); an engine without
 // the seam (legacy loop) gets the honest "not available" line.
 
-export interface ContextSlashLabels {
+export interface ContextSlashLabels extends NativeRequestMetricLabels {
   header: string;         // "Context"
   window: string;         // "window: {window} tokens"
-  measured: string;       // "in use: {used} tokens ({percent}%)"
-  measuredUnknown: string; // "in use: {unknown} (no measurement authority)"
   epoch: string;          // "epoch: {epoch}"
   messages: string;       // "messages: {messages} · checkpoint preamble: {preamble}"
   checkpoint: string;     // "checkpoint: {status}"
@@ -670,14 +673,14 @@ export interface ContextSlashLabels {
   compacted: string;      // "context compacted — epoch {epoch}, checkpoint saved"
   compactDegraded: string; // "compaction degraded — …; epoch {epoch} kept"
   compactUnavailable: string; // "/compact is not available — no scratch store on this engine"
+  errorOverflow: string;
+  errorAuthorityUnavailable: string;
 }
 
 export function buildContextSlashLabels(t: (key: string) => string): ContextSlashLabels {
   return {
     header: t('native-context.slash.header'),
     window: t('native-context.slash.window'),
-    measured: t('native-context.slash.measured'),
-    measuredUnknown: t('native-context.slash.measured_unknown'),
     epoch: t('native-context.slash.epoch'),
     messages: t('native-context.slash.messages'),
     checkpoint: t('native-context.slash.checkpoint'),
@@ -688,6 +691,22 @@ export function buildContextSlashLabels(t: (key: string) => string): ContextSlas
     compacted: t('native-context.compact.compacted'),
     compactDegraded: t('native-context.compact.degraded'),
     compactUnavailable: t('native-context.compact.unavailable'),
+    lastRequest: t('native-context.request.last'),
+    purposeTurn: t('native-context.request.purpose_turn'),
+    purposeCheckpoint: t('native-context.request.purpose_checkpoint'),
+    admitted: t('native-context.request.admitted'),
+    denied: t('native-context.request.denied'),
+    providerModel: t('native-context.request.provider_model'),
+    measurement: t('native-context.request.measurement'),
+    qualityExact: t('native-context.request.quality_exact'),
+    qualityUpperBound: t('native-context.request.quality_upper_bound'),
+    capacity: t('native-context.request.capacity'),
+    provenance: t('native-context.request.provenance'),
+    digest: t('native-context.request.digest'),
+    reportedUsage: t('native-context.request.reported_usage'),
+    requestUnavailable: t('native-context.request.unavailable'),
+    errorOverflow: t('native-context.error_overflow').replace('{code}', 'INPUT_CONTEXT_OVERFLOW'),
+    errorAuthorityUnavailable: t('native-context.error_authority_unavailable').replace('{code}', 'INPUT_CONTEXT_AUTHORITY_UNAVAILABLE'),
   };
 }
 
@@ -695,12 +714,13 @@ export function buildContextSlashLabels(t: (key: string) => string): ContextSlas
 export function formatContextSnapshot(snapshot: ContextSnapshot, labels: ContextSlashLabels): string {
   const lines = [labels.header];
   lines.push(`  ${labels.window.replace('{window}', snapshot.window === undefined ? labels.unknown : String(snapshot.window))}`);
-  if (snapshot.window !== undefined && snapshot.measuredInputTokens !== undefined) {
-    const percent = Math.round((snapshot.measuredInputTokens / snapshot.window) * 100);
-    lines.push(`  ${labels.measured.replace('{used}', String(snapshot.measuredInputTokens)).replace('{percent}', String(percent))}`);
-  } else {
-    lines.push(`  ${labels.measuredUnknown.replace('{unknown}', labels.unknown)}`);
-  }
+  // `lastRequestMeasurement` is cached at the admission boundary. Never use
+  // the compatibility fields as a synthetic "current transcript" count.
+  lines.push(...formatNativeRequestMetricDetail({
+    event: snapshot.lastRequestMeasurement,
+    providerReportedUsage: snapshot.providerReportedUsage,
+    labels,
+  }).map((line) => `  ${line}`));
   lines.push(`  ${labels.epoch.replace('{epoch}', String(snapshot.epoch))}`);
   lines.push(`  ${labels.messages.replace('{messages}', String(snapshot.messages)).replace('{preamble}', String(snapshot.preambleMessages))}`);
   lines.push(`  ${labels.checkpoint.replace('{status}', snapshot.checkpoint)}`);
@@ -724,11 +744,18 @@ export async function resolveCompactSlash(
   trimmed: string,
   engine: Pick<ReplEngine, 'compactContext'> | undefined,
   labels: ContextSlashLabels,
+  callbacks?: {
+    onRequestMeasurement?: (event: import('../../agent/events.js').RequestMeasurementEvent) => void;
+    onOutcome?: (outcome: import('./native-agent-bridge.js').CompactOutcome) => void;
+  },
 ): Promise<string | undefined> {
   if (trimmed.trim().toLowerCase() !== '/compact') return undefined;
   const compact = engine?.compactContext;
   if (!compact) return labels.compactUnavailable;
-  const result = await compact();
+  const result = await compact(callbacks);
+  callbacks?.onOutcome?.(result);
+  if (result.reasonCode === 'INPUT_CONTEXT_OVERFLOW') return labels.errorOverflow;
+  if (result.reasonCode === 'INPUT_CONTEXT_AUTHORITY_UNAVAILABLE') return labels.errorAuthorityUnavailable;
   if (result.outcome === 'compacted') return labels.compacted.replace('{epoch}', String(result.epoch));
   if (result.outcome === 'degraded') return labels.compactDegraded.replace('{epoch}', String(result.epoch));
   return labels.compactUnavailable;
@@ -738,13 +765,19 @@ export async function resolveCompactSlash(
  *  other input passes through; every engine member is forwarded. */
 export function withContextSlashes(engine: ReplEngine, labels: ContextSlashLabels): ReplEngine {
   const wrapped: ReplEngine = async (input, cbs) => {
-    const line = (await resolveContextSlash(input, engine, labels)) ?? (await resolveCompactSlash(input, engine, labels));
+    let compactUsage: { inputTokens: number; outputTokens: number } | undefined;
+    const line = (await resolveContextSlash(input, engine, labels)) ?? (await resolveCompactSlash(input, engine, labels, {
+      ...(cbs.onRequestMeasurement ? { onRequestMeasurement: cbs.onRequestMeasurement } : {}),
+      onOutcome: (outcome) => { compactUsage = outcome.usage; },
+    }));
     if (line === undefined) {
       await engine(input, cbs);
       return;
     }
     cbs.output(line);
-    cbs.onTurnEnd({ inputTokens: 0, outputTokens: 0 });
+    // `compactContext` aggregates its provider reports once. The local slash
+    // must surface that same aggregate, not the historical zero/zero fiction.
+    cbs.onTurnEnd(compactUsage ?? { inputTokens: 0, outputTokens: 0 });
   };
   for (const key of Object.keys(engine) as (keyof ReplEngine)[]) {
     (wrapped as unknown as Record<string, unknown>)[key] = engine[key];

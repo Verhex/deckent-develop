@@ -47,6 +47,49 @@ describe('createNativeEngine', () => {
     expect(stats).toEqual({ inputTokens: 3, outputTokens: 1 });
   });
 
+  it('relays the exact request-admission event without claiming transport success', async () => {
+    const decision = {
+      admitted: true as const,
+      availableTokens: 800,
+      measurement: {
+        inputTokens: 200, quality: 'exact' as const, provenance: 'provider-counter', requestDigest: 'digest',
+        identity: { provider: 'mock', model: 'm', contextWindowTokens: 1000, contextProvenance: 'model-registry' as const },
+      },
+    };
+    const engine = createNativeEngine({
+      adapter: scripted([[{ type: 'request-measurement', decision }, { type: 'done' }]]),
+      registry: buildNativeToolRegistry({ cwd: () => tmpdir() }), cwd: tmpdir(), model: 'm', lang: 'en',
+      confirm: async () => 'y', toolSink: () => {},
+    });
+    const measurements: unknown[] = [];
+    await engine('measure', {
+      output: () => {}, onTurnEnd: () => {}, onRequestMeasurement: (event) => measurements.push(event),
+    });
+    expect(measurements).toEqual([{ type: 'request-measurement', purpose: 'turn', decision }]);
+  });
+
+  it('clears only the cached last-request display attribution after successful hydration', async () => {
+    const decision = {
+      admitted: true as const,
+      availableTokens: 800,
+      measurement: {
+        inputTokens: 200, quality: 'exact' as const, provenance: 'provider-counter', requestDigest: 'digest',
+        identity: { provider: 'mock', model: 'm', contextWindowTokens: 1000, contextProvenance: 'model-registry' as const },
+      },
+    };
+    const engine = createNativeEngine({
+      adapter: scripted([[{ type: 'request-measurement', decision }, { type: 'usage', inputTokens: 0, outputTokens: 0 }, { type: 'done' }]]),
+      registry: buildNativeToolRegistry({ cwd: () => tmpdir() }), cwd: tmpdir(), model: 'm', lang: 'en',
+      confirm: async () => 'y', toolSink: () => {},
+    });
+    await engine('measure', { output: () => {}, onTurnEnd: () => {} });
+    expect((await engine.contextSnapshot!()).lastRequestMeasurement).toBeDefined();
+    engine.hydrateTranscript?.([{ role: 'user', content: 'resumed' }], { nextTurnIndex: 4 });
+    const after = await engine.contextSnapshot!();
+    expect(after.lastRequestMeasurement).toBeUndefined();
+    expect(after.providerReportedUsage).toEqual({ inputTokens: 0, outputTokens: 0, reports: 1 });
+  });
+
   it('asks the confirm-queue on a side-effecting tool, then executes it on "y" (real write)', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'nb-'));
     try {

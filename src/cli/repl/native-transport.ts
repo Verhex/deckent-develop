@@ -36,6 +36,12 @@ import {
   measureProviderRequest,
   type EffectiveContextResult,
 } from '../../agent/context-budget.js';
+import {
+  ContextAuthorityUnavailableError,
+  InputContextOverflowError,
+} from '../../agent/provider-tooluse/context-errors.js';
+
+export { ContextAuthorityUnavailableError, InputContextOverflowError } from '../../agent/provider-tooluse/context-errors.js';
 
 export interface NativeEndpointHealth {
   endpoint: string;
@@ -57,22 +63,6 @@ export interface ResolvedProvider {
   modelIdentity?: () => Promise<NativeModelIdentityVerdict>;
   contextStatus?: () => Promise<EffectiveContextResult | null>;
   configuredContextSize?: number;
-}
-
-export class InputContextOverflowError extends Error {
-  readonly code = 'INPUT_CONTEXT_OVERFLOW' as const;
-  constructor(readonly decision: Extract<ReturnType<typeof decideProviderAdmission>, { admitted: false }>) {
-    super(`INPUT_CONTEXT_OVERFLOW: measured=${decision.measurement.inputTokens} available=${decision.availableTokens}`);
-    this.name = 'InputContextOverflowError';
-  }
-}
-
-export class ContextAuthorityUnavailableError extends Error {
-  readonly code = 'INPUT_CONTEXT_AUTHORITY_UNAVAILABLE' as const;
-  constructor(provider: string, model: string) {
-    super(`INPUT_CONTEXT_AUTHORITY_UNAVAILABLE: provider=${provider} model=${model}`);
-    this.name = 'ContextAuthorityUnavailableError';
-  }
 }
 
 function registryContextTokens(model: string): number | null {
@@ -146,7 +136,15 @@ export function withMeasuredAdmission(input: {
         input.outputReserveTokens ?? req.outputCeilingTokens ?? 0,
         input.contextSafetyReserveTokens ?? 0,
       );
-      if (!decision.admitted) throw new InputContextOverflowError(decision);
+      const snapshot = Object.freeze({
+        ...decision,
+        measurement: Object.freeze({
+          ...decision.measurement,
+          identity: Object.freeze({ ...decision.measurement.identity }),
+        }),
+      });
+      yield Object.freeze({ type: 'request-measurement' as const, decision: snapshot });
+      if (!snapshot.admitted) throw new InputContextOverflowError(snapshot);
       yield* input.adapter.send(req);
     },
   };

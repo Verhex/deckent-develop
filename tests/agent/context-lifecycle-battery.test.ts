@@ -63,6 +63,9 @@ import type {
   ProviderRequest,
   ProviderRequestMeasurementCapability,
 } from '../../src/agent/provider-tooluse/types.js';
+import {
+  ContextAuthorityUnavailableError,
+} from '../../src/agent/provider-tooluse/context-errors.js';
 
 // ── shared, module-scoped fixtures (reused by multiple items below) ─────────
 
@@ -116,11 +119,154 @@ describe('560-006 · incident-shaped hermetic battery (11/11 regression proofs)'
         adapter: underlying, identity: providerIdentity, capability, outputReserveTokens: 4_096,
       });
 
-      await expect(drainAll(guarded.send(request))).rejects.toMatchObject({
+      const iterator = guarded.send(request)[Symbol.asyncIterator]();
+      expect(await iterator.next()).toMatchObject({
+        done: false,
+        value: { type: 'request-measurement', decision: { admitted: false } },
+      });
+      await expect(iterator.next()).rejects.toMatchObject({
         name: 'InputContextOverflowError', code: 'INPUT_CONTEXT_OVERFLOW',
       } satisfies Partial<InputContextOverflowError>);
       expect(capability.measure).toHaveBeenCalledOnce();
       expect(sent).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      {
+        name: 'authority unavailable',
+        code: 'INPUT_CONTEXT_AUTHORITY_UNAVAILABLE',
+        adapter: () => {
+          const attempts = vi.fn();
+          return {
+            attempts,
+            adapter: {
+              name: 'authority-fixture',
+              async *send() {
+                attempts();
+                throw new ContextAuthorityUnavailableError('fixture', 'missing-model');
+              },
+            } satisfies ProviderAdapter,
+          };
+        },
+      },
+      {
+        name: 'untyped provider failure',
+        code: undefined,
+        adapter: () => {
+          const attempts = vi.fn();
+          return {
+            attempts,
+            adapter: {
+              name: 'generic-fixture',
+              async *send() { attempts(); throw new Error('generic-provider-failure'); },
+            } satisfies ProviderAdapter,
+          };
+        },
+      },
+    ])('preserves $name without retry or code fabrication', async ({ code, adapter: makeAdapter }) => {
+      const { adapter, attempts } = makeAdapter();
+      const events = await drainAll(runAgentTurn(loopDeps(adapter), new Transcript(), 'incident'));
+      expect(events.at(-2)).toMatchObject({
+        type: 'error',
+        ...(code === undefined ? { message: 'generic-provider-failure' } : { code }),
+      });
+      if (code === undefined) expect(events.at(-2)).not.toHaveProperty('code');
+      expect(events.at(-1)).toEqual({ type: 'turn-end' });
+      expect(events.some((event) => event.type === 'error'
+        && event.code === 'native-context.admission-denied')).toBe(false);
+      expect(attempts).toHaveBeenCalledOnce();
+    });
+
+    it('preserves wrapper overflow raw code, emits its decision first, and never dispatches or retries', async () => {
+      const sent = vi.fn();
+      const measured = vi.fn(async () => ({ inputTokens: 101, provenance: 'overflow-fixture' }));
+      const adapter = withMeasuredAdmission({
+        adapter: {
+          name: 'underlying',
+          async *send() { sent(); yield { type: 'done' }; },
+        },
+        identity: { ...providerIdentity, contextWindowTokens: 100 },
+        capability: { measure: measured },
+      });
+      const events = await drainAll(runAgentTurn(loopDeps(adapter), new Transcript(), 'incident'));
+      expect(events).toEqual([
+        expect.objectContaining({
+          type: 'request-measurement', purpose: 'turn',
+          decision: expect.objectContaining({ admitted: false }),
+        }),
+        expect.objectContaining({ type: 'error', code: 'INPUT_CONTEXT_OVERFLOW' }),
+        { type: 'turn-end' },
+      ]);
+      expect(events.some((event) => event.type === 'error'
+        && event.code === 'native-context.admission-denied')).toBe(false);
+      expect(measured).toHaveBeenCalledOnce();
+      expect(sent).not.toHaveBeenCalled();
+    });
+
+    it('does not restore stale request attribution when measurement resolves after an identity clear', async () => {
+      const cwd = freshCwd();
+      let releaseMeasurement!: () => void;
+      const measurementStarted = new Promise<void>((resolve) => {
+        releaseMeasurement = resolve;
+      });
+      let finishMeasurement!: () => void;
+      const measurementReleased = new Promise<void>((resolve) => {
+        finishMeasurement = resolve;
+      });
+      const adapter = withMeasuredAdmission({
+        adapter: {
+          name: 'deferred-underlying',
+          async *send() {
+            yield { type: 'usage', inputTokens: 3, outputTokens: 2 };
+            yield { type: 'text-delta', text: 'ok' };
+            yield { type: 'done' };
+          },
+        },
+        identity: providerIdentity,
+        capability: {
+          async measure() {
+            releaseMeasurement();
+            await measurementReleased;
+            return { inputTokens: 23, provenance: 'deferred-exact' };
+          },
+        },
+      });
+      const session = createAgentSession({
+        adapter, registry: new ToolRegistry(), policy: SAFE_DEFAULT_POLICY,
+        ruleStore: memRuleStore(), cwd, model: providerIdentity.model,
+        getContextBudgetTokens: () => providerIdentity.contextWindowTokens,
+        scratch: {
+          tenantId: 'tenant', projectId: 'project', sessionId: 'planning-race',
+          checkpointInstruction: CHECKPOINT_INSTRUCTION,
+        },
+      });
+      try {
+        // With scratch enabled, the first suspended measurement is the
+        // proactive internal planning read, before the actual request exists.
+        const pending = drainAll(session.send('before-resume'));
+        await measurementStarted;
+        session.clearLastRequestMeasurement();
+        finishMeasurement();
+        const events = await pending;
+        expect(events).toContainEqual(expect.objectContaining({
+          type: 'request-measurement', purpose: 'turn',
+        }));
+        expect(await session.contextSnapshot()).toMatchObject({
+          measuredInputTokens: undefined,
+          providerReportedUsage: { inputTokens: 3, outputTokens: 2, reports: 1 },
+        });
+        expect((await session.contextSnapshot()).lastRequestMeasurement).toBeUndefined();
+
+        // A genuinely new operation captures the new generation and may store
+        // its own actual request attribution normally.
+        await drainAll(session.send('after-resume'));
+        expect(await session.contextSnapshot()).toMatchObject({
+          lastRequestMeasurement: { type: 'request-measurement', purpose: 'turn' },
+        });
+      } finally {
+        session.close();
+        rmSync(cwd, { recursive: true, force: true });
+      }
     });
   });
 
@@ -435,6 +581,180 @@ describe('560-006 · incident-shaped hermetic battery (11/11 regression proofs)'
       expect(events.filter((event) => event.type === 'usage').length).toBeGreaterThan(1);
       session.close();
       rmSync(cwd, { recursive: true, force: true });
+    });
+
+    it('relays checkpoint measurement live while partial-failure usage remains one aggregate', async () => {
+      const cwd = freshCwd();
+      const measured = vi.fn(async () => ({ inputTokens: 17, provenance: 'checkpoint-exact' }));
+      const underlying: ProviderAdapter = {
+        name: 'checkpoint-provider',
+        async *send(request) {
+          expect(request.system).toBe(CHECKPOINT_INSTRUCTION);
+          yield { type: 'usage', inputTokens: 7, outputTokens: 5 };
+          throw new Error('fixture-stream-failed');
+        },
+      };
+      const adapter = withMeasuredAdmission({
+        adapter: underlying,
+        identity: { ...providerIdentity, contextWindowTokens: 10_000 },
+        capability: { measure: measured },
+      });
+      const costGuard: CostGuardState = { spentTokens: 0, usdPerMillionTokens: 1 };
+      const session = createAgentSession(sessionDeps({
+        adapter, cwd, contextTokens: () => 10_000, costGuard, sessionId: 'checkpoint-measurement',
+      }));
+      try {
+        const events = await drainAll(session.compactContext());
+        expect(events.map((event) => event.type)).toEqual([
+          'request-measurement', 'usage', 'notice',
+        ]);
+        expect(events[0]).toMatchObject({
+          type: 'request-measurement', purpose: 'checkpoint',
+          decision: { admitted: true, measurement: { inputTokens: 17 } },
+        });
+        expect(events.filter((event) => event.type === 'usage')).toEqual([
+          { type: 'usage', inputTokens: 7, outputTokens: 5 },
+        ]);
+        expect(costGuard.spentTokens).toBe(12);
+        expect(session.latestCheckpoint()).toMatchObject({
+          status: 'degraded', reasonCode: 'CHECKPOINT_PROVIDER_FAILED',
+        });
+        const callsBeforeQueries = measured.mock.calls.length;
+        const snapshot = await session.contextSnapshot();
+        expect(snapshot).toMatchObject({
+          lastRequestMeasurement: { purpose: 'checkpoint' },
+          providerReportedUsage: { inputTokens: 7, outputTokens: 5, reports: 1 },
+        });
+        expect(Object.isFrozen(snapshot.lastRequestMeasurement)).toBe(true);
+        expect(Object.isFrozen(snapshot.lastRequestMeasurement?.decision)).toBe(true);
+        expect(Object.isFrozen(snapshot.lastRequestMeasurement?.decision.measurement)).toBe(true);
+        expect(Object.isFrozen(snapshot.lastRequestMeasurement?.decision.measurement.identity)).toBe(true);
+        await session.contextSnapshot();
+        expect(measured).toHaveBeenCalledTimes(callsBeforeQueries);
+        session.clearLastRequestMeasurement();
+        expect(await session.contextSnapshot()).toMatchObject({
+          measuredInputTokens: undefined,
+          providerReportedUsage: { inputTokens: 7, outputTokens: 5, reports: 1 },
+        });
+        expect((await session.contextSnapshot()).lastRequestMeasurement).toBeUndefined();
+        expect(costGuard.spentTokens).toBe(12);
+      } finally {
+        session.close();
+        rmSync(cwd, { recursive: true, force: true });
+      }
+    });
+
+    it('keeps a typed checkpoint denial causal but non-terminal and closes an abandoned relay', async () => {
+      const cwd = freshCwd();
+      const measured = vi.fn(async () => ({ inputTokens: 101, provenance: 'checkpoint-denied' }));
+      const sent = vi.fn();
+      const underlying: ProviderAdapter = {
+        name: 'checkpoint-provider',
+        async *send() { sent(); yield { type: 'done' }; },
+      };
+      const guarded = withMeasuredAdmission({
+        adapter: underlying,
+        identity: { ...providerIdentity, contextWindowTokens: 100 },
+        capability: { measure: measured },
+      });
+      let relayClosed = false;
+      const adapter: ProviderAdapter = {
+        name: guarded.name,
+        requestMeasurement: guarded.requestMeasurement,
+        async *send(request) {
+          try { yield* guarded.send(request); }
+          finally { relayClosed = true; }
+        },
+      };
+      const session = createAgentSession(sessionDeps({
+        adapter, cwd, contextTokens: () => 100, sessionId: 'checkpoint-denial',
+      }));
+      try {
+        const denied = await drainAll(session.compactContext());
+        expect(denied).toEqual([
+          expect.objectContaining({
+            type: 'request-measurement', purpose: 'checkpoint',
+            decision: expect.objectContaining({ admitted: false }),
+          }),
+          expect.objectContaining({ type: 'notice', code: 'INPUT_CONTEXT_OVERFLOW' }),
+          expect.objectContaining({ type: 'notice', code: 'native.checkpoint.degraded' }),
+        ]);
+        expect(denied.some((event) => event.type === 'error')).toBe(false);
+        expect(sent).not.toHaveBeenCalled();
+
+        relayClosed = false;
+        const abandoned = session.compactContext()[Symbol.asyncIterator]();
+        expect(await abandoned.next()).toMatchObject({
+          done: false,
+          value: { type: 'request-measurement', purpose: 'checkpoint' },
+        });
+        await abandoned.return?.();
+        expect(relayClosed).toBe(true);
+        expect(await abandoned.next()).toEqual({ done: true, value: undefined });
+        // The identical second request is served by the canonical measurement
+        // cache; abandonment must not clear it or trigger a duplicate count.
+        expect(measured).toHaveBeenCalledOnce();
+        expect(sent).not.toHaveBeenCalled();
+      } finally {
+        session.close();
+        rmSync(cwd, { recursive: true, force: true });
+      }
+    });
+
+    it('accrues observed usage once when a multi-chunk checkpoint relay is closed early', async () => {
+      const cwd = freshCwd();
+      const costGuard: CostGuardState = { spentTokens: 0, usdPerMillionTokens: 1 };
+      let checkpointStarts = 0;
+      let checkpointFinalizers = 0;
+      const underlying: ProviderAdapter = {
+        name: 'checkpoint-provider',
+        async *send(request) {
+          if (request.system !== CHECKPOINT_INSTRUCTION) {
+            yield { type: 'text-delta', text: 'ok' };
+            yield { type: 'done' };
+            return;
+          }
+          checkpointStarts++;
+          try {
+            yield { type: 'usage', inputTokens: 7, outputTokens: 5 };
+            yield { type: 'text-delta', text: checkpointJson('partial') };
+            yield { type: 'done' };
+          } finally {
+            checkpointFinalizers++;
+          }
+        },
+      };
+      const adapter = withMeasuredAdmission({
+        adapter: underlying,
+        identity: { ...providerIdentity, contextWindowTokens: 100_000 },
+        capability: { measure: async () => ({ inputTokens: 17, provenance: 'checkpoint-exact' }) },
+      });
+      const session = createAgentSession(sessionDeps({
+        adapter, cwd, contextTokens: () => 100_000, costGuard, sessionId: 'checkpoint-early-close',
+      }));
+      try {
+        for (let turn = 0; turn < 20; turn++) {
+          await drainAll(session.send(`${turn}:${'x'.repeat(4_000)}`));
+        }
+        const iterator = session.compactContext()[Symbol.asyncIterator]();
+        expect(await iterator.next()).toMatchObject({
+          value: { type: 'request-measurement', purpose: 'checkpoint' },
+        });
+        // Advancing to the next measurement proves the first checkpoint request
+        // completed and its usage was observed, without reaching aggregate emit.
+        expect(await iterator.next()).toMatchObject({
+          value: { type: 'request-measurement', purpose: 'checkpoint' },
+        });
+        expect(checkpointStarts).toBe(1);
+        expect(checkpointFinalizers).toBe(1);
+        await iterator.return?.();
+        expect(costGuard.spentTokens).toBe(12);
+        expect(checkpointStarts).toBe(1);
+        expect(checkpointFinalizers).toBe(1);
+      } finally {
+        session.close();
+        rmSync(cwd, { recursive: true, force: true });
+      }
     });
   });
 

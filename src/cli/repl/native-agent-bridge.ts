@@ -16,6 +16,7 @@ import {
   type StructuredTurnInput,
   type TurnReference,
 } from '../../agent/session.js';
+import type { RequestMeasurementEvent } from '../../agent/events.js';
 import { loadPolicy } from '../../agent/permission-policy.js';
 import { createRuleStore } from '../../agent/permission-store.js';
 import { createCostGuard } from '../../agent/guards/cost.js';
@@ -64,6 +65,10 @@ export type { ContextSnapshot } from '../../agent/session.js';
 export interface CompactOutcome {
   outcome: 'compacted' | 'degraded' | 'unavailable';
   epoch: number;
+  /** One aggregate from the existing checkpoint generator. It is rendered
+   * through the normal turn-end footer exactly once; cost accrual remains in
+   * the session layer. */
+  usage?: { inputTokens: number; outputTokens: number };
   /** Stable operational classification; never provider response text. */
   reasonCode?: string;
 }
@@ -75,6 +80,9 @@ export interface ReplEngine {
       output: (text: string) => void;
       onTurnEnd: (stats: { inputTokens: number; outputTokens: number }) => void;
       onToolActivity?: (event: NativeToolActivityEvent) => void;
+      /** Privacy-safe admission fact for an actual provider request. An
+       * admitted measurement never means the request completed or was sent. */
+      onRequestMeasurement?: (event: RequestMeasurementEvent) => void;
     },
   ): Promise<void>;
   /**
@@ -123,7 +131,9 @@ export interface ReplEngine {
   contextSnapshot?: () => Promise<ContextSnapshot>;
   /** TERMINAL-TOOLS-010 — `/compact`: take a context epoch now; the outcome
    *  names what really happened (checkpoint saved / degraded / no store). */
-  compactContext?: () => Promise<CompactOutcome>;
+  compactContext?: (callbacks?: {
+    onRequestMeasurement?: (event: RequestMeasurementEvent) => void;
+  }) => Promise<CompactOutcome>;
   /** 7087 (562-001 hand-completion) — the SAME context-budget authority the
    *  loop's admission uses (run.tsx getContextBudgetTokens), exposed so the
    *  @ref expansion in app.tsx can size its inline-vs-descriptor decision
@@ -740,8 +750,11 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
 
   // Localize a loop signal by its stable code ('native.<code>' message key);
   // an unmapped/unlocalized code falls back to the loop's English default.
-  const localizeSignal = (code: string | undefined, fallback: string): string =>
-    localizeNativeAgentSignal(t, code, fallback);
+  const localizeSignal = (code: string | undefined, fallback: string): string => {
+    if (code === 'INPUT_CONTEXT_OVERFLOW') return t('native-context.error_overflow').replace('{code}', code);
+    if (code === 'INPUT_CONTEXT_AUTHORITY_UNAVAILABLE') return t('native-context.error_authority_unavailable').replace('{code}', code);
+    return localizeNativeAgentSignal(t, code, fallback);
+  };
 
   // NATIVE-BUDGET-RENEWAL (557-002) — one gate per engine (per session), so the
   // dedup survives across turns exactly as long as the exhaustion itself does.
@@ -834,6 +847,12 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           outputTokens += ev.outputTokens;
           // accrual + ceiling check happen in the loop (via the threaded costGuard);
           // a crossed hard ceiling arrives here as an 'error' event, printed below.
+          break;
+        case 'request-measurement':
+          // The event is produced by the admission wrapper for the exact
+          // outbound request. Relay its frozen, body-free decision; do not
+          // turn `admitted` into a claim that transport or completion happened.
+          cbs.onRequestMeasurement?.(ev);
           break;
         case 'error': {
           clearActiveTool();
@@ -978,20 +997,39 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
       };
   // TERMINAL-TOOLS-010 — `/context` and `/compact` seams (run.tsx withContextSlashes).
   engine.contextSnapshot = () => session.contextSnapshot();
-  engine.compactContext = async () => {
+  engine.compactContext = async (callbacks) => {
     let outcome: CompactOutcome['outcome'] = 'unavailable';
     let reasonCode: string | undefined;
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let usageReported = false;
     // Counts as in flight so Esc / Ctrl-C (cancelTurn) can abort the
     // checkpoint provider call the same way they abort a turn.
     turnsInFlight++;
     try {
       for await (const ev of session.compactContext()) {
+        if (ev.type === 'request-measurement') {
+          callbacks?.onRequestMeasurement?.(ev);
+          continue;
+        }
+        if (ev.type === 'usage') {
+          usageReported = true;
+          inputTokens += ev.inputTokens;
+          outputTokens += ev.outputTokens;
+          continue;
+        }
+        if (ev.type === 'notice'
+          && (ev.code === 'INPUT_CONTEXT_OVERFLOW' || ev.code === 'INPUT_CONTEXT_AUTHORITY_UNAVAILABLE')) {
+          outcome = 'degraded';
+          reasonCode = ev.code;
+          continue;
+        }
         if (ev.type !== 'notice') continue;
         if (ev.code === 'native.checkpoint.saved') outcome = 'compacted';
         else if (ev.code === 'native.checkpoint.degraded') {
           outcome = 'degraded';
           const checkpoint = session.latestCheckpoint();
-          reasonCode = checkpoint.status === 'degraded'
+          reasonCode ??= checkpoint.status === 'degraded'
             ? checkpoint.reasonCode
             : undefined;
         }
@@ -1014,7 +1052,12 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
       turnsInFlight--;
     }
     const snapshot = await session.contextSnapshot();
-    return { outcome, epoch: snapshot.epoch, ...(reasonCode === undefined ? {} : { reasonCode }) };
+    return {
+      outcome,
+      epoch: snapshot.epoch,
+      ...(usageReported ? { usage: { inputTokens, outputTokens } } : {}),
+      ...(reasonCode === undefined ? {} : { reasonCode }),
+    };
   };
   // TERMINAL-TOOLS-008 — see the ReplEngine.cancelTurn doc comment above.
   engine.cancelTurn = () => {
@@ -1042,6 +1085,10 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
       && Number.isInteger(options.nextTurnIndex) && options.nextTurnIndex >= 0) {
       turnIndex = options.nextTurnIndex;
     }
+    // Hydration committed its complete prefix/index update. A prior chat's
+    // cached admission fact cannot be displayed as this chat's last request;
+    // provider reports/cost/budget remain in the session authority.
+    session.clearLastRequestMeasurement();
   };
   return engine;
 }

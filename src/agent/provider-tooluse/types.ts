@@ -97,7 +97,14 @@ export interface ProviderDone { type: 'done'; stopReason?: ProviderStopReason; }
  *  empty visible content as EMPTY_VISIBLE_AFTER_REASONING and drive bounded
  *  continuation, without ever being able to display the reasoning itself. */
 export interface ProviderReasoningActivity { type: 'reasoning-activity'; chars: number; }
-export type ProviderEvent = ProviderTextDelta | ProviderToolCall | ProviderUsage | ProviderDone | ProviderReasoningActivity;
+/** Privacy-safe snapshot of the admission decision for the exact request about
+ * to be sent. The request body and tool schemas never cross this boundary. */
+export interface ProviderRequestMeasurementEvent {
+  type: 'request-measurement';
+  decision: ProviderAdmissionDecision;
+}
+export type ProviderEvent = ProviderTextDelta | ProviderToolCall | ProviderUsage | ProviderDone
+  | ProviderReasoningActivity | ProviderRequestMeasurementEvent;
 
 /** Every LLM backend (Anthropic/OpenAI-compat/Ollama) implements this. */
 export interface ProviderAdapter {

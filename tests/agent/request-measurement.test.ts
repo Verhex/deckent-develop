@@ -55,11 +55,50 @@ describe('provider-neutral request measurement authority', () => {
     };
     const guarded = withMeasuredAdmission({ adapter: underlying, identity, capability, outputReserveTokens: 4_096 });
 
-    await expect(drain(guarded.send(request))).rejects.toMatchObject({
+    const iterator = guarded.send(request)[Symbol.asyncIterator]();
+    const first = await iterator.next();
+    expect(first.value).toMatchObject({
+      type: 'request-measurement',
+      decision: { admitted: false, measurement: { inputTokens: 222_682, quality: 'exact' } },
+    });
+    expect(Object.isFrozen(first.value)).toBe(true);
+    const frozenDecision = (first.value as {
+      decision: { measurement: { identity: object } };
+    }).decision;
+    expect(Object.isFrozen(frozenDecision)).toBe(true);
+    expect(Object.isFrozen(frozenDecision.measurement)).toBe(true);
+    expect(Object.isFrozen(frozenDecision.measurement.identity)).toBe(true);
+    await expect(iterator.next()).rejects.toMatchObject({
       name: 'InputContextOverflowError', code: 'INPUT_CONTEXT_OVERFLOW',
     } satisfies Partial<InputContextOverflowError>);
     expect(capability.measure).toHaveBeenCalledOnce();
     expect(sent).not.toHaveBeenCalled();
+  });
+
+  it('emits one immutable admitted decision before dispatch without recounting', async () => {
+    const request: ProviderRequest = {
+      system: 'full system', model: identity.model,
+      messages: [{ role: 'user', content: 'hello' }], tools: [],
+    };
+    const capability: ProviderRequestMeasurementCapability = {
+      measure: vi.fn(async () => ({ inputTokens: 42, provenance: 'exact-fixture' })),
+    };
+    const sent = vi.fn();
+    const underlying: ProviderAdapter = {
+      name: 'underlying',
+      async *send() { sent(); yield { type: 'done' }; },
+    };
+    const iterator = withMeasuredAdmission({ adapter: underlying, identity, capability }).send(request)[Symbol.asyncIterator]();
+    const measurement = await iterator.next();
+    expect(measurement.value).toMatchObject({
+      type: 'request-measurement',
+      decision: { admitted: true, availableTokens: identity.contextWindowTokens },
+    });
+    expect(sent).not.toHaveBeenCalled();
+    const done = await iterator.next();
+    expect(done.value).toEqual({ type: 'done' });
+    expect(sent).toHaveBeenCalledOnce();
+    expect(capability.measure).toHaveBeenCalledOnce();
   });
 
   it('labels a missing exact capability only as a proven conservative upper bound', async () => {

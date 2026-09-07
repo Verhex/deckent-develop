@@ -124,7 +124,9 @@ describe('ReplApp mounted keyboard ownership', () => {
 
   it('native /status preserves run output and appends the full local chat context', async () => {
     const dispatch = vi.fn(async () => 'run truth: unavailable');
-    const { stdin, lastFrame, unmount } = mountApp({ sessionId: 'chat-memory-123', dispatcher: { dispatch } });
+    const contextSnapshot = vi.fn(async () => { throw new Error('flag-off must not query metrics'); });
+    const engine = Object.assign(async () => {}, { close: vi.fn(), contextSnapshot }) as unknown as ReplEngine;
+    const { stdin, lastFrame, unmount } = mountApp({ sessionId: 'chat-memory-123', dispatcher: { dispatch }, engine });
     await tick();
     stdin.write('/status');
     stdin.write(ENTER);
@@ -132,12 +134,24 @@ describe('ReplApp mounted keyboard ownership', () => {
     expect(dispatch).toHaveBeenCalledWith('deckent_status', { root: '.' });
     expect(lastFrame() ?? '').toContain('run truth: unavailable');
     expect(lastFrame() ?? '').toContain('local active chat context: chat-memory-123');
+    expect(contextSnapshot).not.toHaveBeenCalled();
     unmount();
   });
 
   it('commits a typed native resume only after hydration succeeds', async () => {
     const hydrateTranscript = vi.fn();
-    const engine = Object.assign(async (_input: string, cbs: { output: (text: string) => void; onTurnEnd: (stats: { inputTokens: number; outputTokens: number }) => void }) => {
+    const engine = Object.assign(async (input: string, cbs: Parameters<ReplEngine>[1]) => {
+      if (input === 'seed' || input === 'next turn') {
+        cbs.onRequestMeasurement?.({
+          type: 'request-measurement', purpose: 'turn', decision: {
+            admitted: true, availableTokens: input === 'seed' ? 1 : 2,
+            measurement: {
+              inputTokens: input === 'seed' ? 999 : 777, quality: 'exact', provenance: 'fixture', requestDigest: input,
+              identity: { provider: 'old-provider', model: 'old-model', contextWindowTokens: 10, contextProvenance: 'model-registry' },
+            },
+          },
+        });
+      }
       cbs.output('fresh answer'); cbs.onTurnEnd({ inputTokens: 1, outputTokens: 2 });
     }, { close: vi.fn(), hydrateTranscript }) as unknown as ReplEngine;
     const appendChatTurn = vi.fn();
@@ -148,14 +162,53 @@ describe('ReplApp mounted keyboard ownership', () => {
     };
     const { stdin, lastFrame, unmount } = mountApp({ sessionId: 'chat-old', memory, engine, replSurfaceEnabled: true });
     try {
+      await tick(); stdin.write('seed'); stdin.write(ENTER); await tick(100);
+      expect(lastFrame() ?? '').toContain('last actual request');
       await tick(); stdin.write('/resume chat-target'); stdin.write(ENTER); await tick(100);
       expect(hydrateTranscript).toHaveBeenCalled();
       expect(lastFrame() ?? '').toContain('resumed: chat-target');
       expect(lastFrame() ?? '').toContain('chat: chat-target');
+      expect(lastFrame() ?? '').not.toContain('999 tokens');
       stdin.write('next turn'); stdin.write(ENTER); await tick(100);
+      expect(lastFrame() ?? '').toContain('777 tokens');
       expect(appendChatTurn).toHaveBeenCalledWith('chat-target', 'user', 'next turn');
       expect(appendChatTurn).toHaveBeenCalledWith('chat-target', 'assistant', 'fresh answer');
     } finally { unmount(); }
+  });
+
+  it('suppresses a delayed pre-resume measurement callback while allowing the resumed chat to commit', async () => {
+    let release: (() => void) | undefined;
+    let oldCallbacks: Parameters<ReplEngine>[1] | undefined;
+    const hydrateTranscript = vi.fn();
+    const engine = Object.assign(async (input: string, cbs: Parameters<ReplEngine>[1]) => {
+      if (input !== 'old turn') { cbs.onTurnEnd({ inputTokens: 0, outputTokens: 0 }); return; }
+      oldCallbacks = cbs;
+      await new Promise<void>((resolve) => { release = resolve; });
+      cbs.onTurnEnd({ inputTokens: 0, outputTokens: 0 });
+    }, { close: vi.fn(), hydrateTranscript }) as unknown as ReplEngine;
+    const memory = {
+      listChatSessions: () => [{ sessionId: 'chat-target', lastAt: '2026-09-07T00:00:00.000Z', preview: 'target' }],
+      getChatHistory: () => [{ role: 'user', content: 'prior context' }],
+    };
+    const { stdin, lastFrame, unmount } = mountApp({ sessionId: 'chat-old', memory, engine, replSurfaceEnabled: true });
+    try {
+      await tick(); stdin.write('old turn'); stdin.write(ENTER); await tick(100);
+      expect(oldCallbacks).toBeDefined();
+      stdin.write('/resume chat-target'); stdin.write(ENTER); await tick(100);
+      oldCallbacks?.onRequestMeasurement?.({
+        type: 'request-measurement', purpose: 'turn', decision: {
+          admitted: true, availableTokens: 9,
+          measurement: {
+            inputTokens: 999, quality: 'exact', provenance: 'fixture', requestDigest: 'old',
+            identity: { provider: 'old-provider', model: 'old-model', contextWindowTokens: 10, contextProvenance: 'model-registry' },
+          },
+        },
+      });
+      release?.(); await tick(100);
+      expect(hydrateTranscript).toHaveBeenCalled();
+      expect(lastFrame() ?? '').toContain('chat: chat-target');
+      expect(lastFrame() ?? '').not.toContain('999 tokens');
+    } finally { release?.(); unmount(); }
   });
 
   it.each([
