@@ -104,6 +104,38 @@ describe('CLI index — buildProgram()', () => {
     expect(opts).toContain('--version');
   });
 
+  it('writes exactly one plain version line for non-TTY --version without a splash', () => {
+    const original = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
+    Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const exit = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => { throw new Error(`exit:${code}`); }) as never);
+    try {
+      expect(() => buildProgram().emit('option:version')).toThrow('exit:0');
+      expect(log).toHaveBeenCalledTimes(1);
+      expect(log).toHaveBeenCalledWith(DECKENT_VERSION);
+    } finally {
+      log.mockRestore(); exit.mockRestore();
+      if (original) Object.defineProperty(process.stdout, 'isTTY', original);
+      else Reflect.deleteProperty(process.stdout, 'isTTY');
+    }
+  });
+
+  it('keeps the splash and version line for TTY --version', () => {
+    const original = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const exit = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => { throw new Error(`exit:${code}`); }) as never);
+    try {
+      expect(() => buildProgram().emit('option:version')).toThrow('exit:0');
+      expect(log).toHaveBeenCalledTimes(2);
+      expect(String(log.mock.calls[1]?.[0])).toContain(DECKENT_VERSION);
+    } finally {
+      log.mockRestore(); exit.mockRestore();
+      if (original) Object.defineProperty(process.stdout, 'isTTY', original);
+      else Reflect.deleteProperty(process.stdout, 'isTTY');
+    }
+  });
+
   it('registers all 28 command functions', () => {
     buildProgram();
 

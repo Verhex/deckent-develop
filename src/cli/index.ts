@@ -233,8 +233,14 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
     .option('-V, --version', helpLabels.versionOptionDescription)
     .option('--version-json', helpLabels.versionJsonOptionDescription)
     .on('option:version', () => {
-      console.log(showSplash(DECKENT_VERSION));
-      console.log(`\n  ${buildVersionString(DECKENT_VERSION)}`);
+      // A pipe is a machine-facing contract: retain the interactive splash,
+      // but emit exactly one plain version line when stdout is not a TTY.
+      if (process.stdout.isTTY === true) {
+        console.log(showSplash(DECKENT_VERSION));
+        console.log(`\n  ${buildVersionString(DECKENT_VERSION)}`);
+      } else {
+        console.log(buildVersionString(DECKENT_VERSION));
+      }
       process.exit(0);
     })
     .on('option:version-json', () => {
