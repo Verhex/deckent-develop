@@ -4,7 +4,7 @@
 > Silinme tetiği: onaylı sıra tüketilip kalıcı kanıtlar MASTER/evidence'a işlendiğinde silinir.
 > Ayrıntılı geçmiş Git'te: d10456e99 ve 934dc194f:follow-up-works/current-flow.md.
 
-## Aktif durum — 2026-09-07T03:22Z
+## Aktif durum — 2026-09-07T04:06Z
 
 7099 tek ACTIVE outcome, MASTER VERIFY; bütün ürün/Terminal kapanışı yok.
 DOGFOOD ON, health DEGRADED; owner onaylı bounded ADR-D-007 kaynak yürütmesi.
@@ -21,6 +21,7 @@ Retained728, .tasks, memory.db ve inherited değişiklikler korunur.
 | M/N | 366637d18 / 9560fc60e | Live-footer resize + docs |
 | O/P | cc7102991 / b90854cb2 | Native boot intent + proof docs |
 | Q | 59c2c8a04 | Active native cancellation HTTP regression proof |
+| R | 492809cd5 | Native `/mcp` ingress + truthful connection state |
 
 Exact patch/manifest/failure/limit ayrıntıları tek kalıcı capsule'da:
 docs/execution/active/TERMINAL-OPERATOR-SURFACE-CLOSURE-001.md.
@@ -28,11 +29,11 @@ Fable bağımsız review canonical XVerify receipt değildir. Layer9 inherited a
 
 ## Runtime / remote
 
-Stop892444 → execution ALLOW → build:all03:02–03:03Z PASS → bot976804 statusPASS.
+Stop976804 → execution ALLOW → build:all03:57–03:58Z PASS → bot1075914 statusPASS.
 Dist main dirty-tree; selected binary ayrıca doğrulandı. MCP reconnect kanıtlanmadı.
 Yeni sprint/worker dispatch yok; retained state temizlenmedi.
 Push TOOL_POLICY_HOLD: owner yetkisine rağmen araç process başlamadan reddetmişti;
-bypass/unchanged retry yok. HEAD59c2c8a04 ahead17/behind0; remote CI tetiklenmedi.
+bypass/unchanged retry yok. HEAD492809cd5 ahead19/behind0; remote CI tetiklenmedi.
 
 ## Şimdi / sonraki sıra
 
@@ -47,12 +48,17 @@ bypass/unchanged retry yok. HEAD59c2c8a04 ahead17/behind0; remote CI tetiklenmed
    EN/TR loopbackHTTP abort/no late render/fresh next turn PASS,11causalpins.
    Production source/build değişmedi. Kalıcı8payload+helper+manifest arşiv:
    /home/alperen/deckent-recovery-20260904/terminal-7099-l2-cancel-fjAx7X.
-   L3 worker /tmp/deckent-7099-l3-mcp-4sTuJX: missing native /mcp ingress;
-   one existing bridge+posture+confirm. Configured connection failure ile empty/
-   absent ayrımı ve eski TR hardcode aynı paket içinde düzeltiliyor.
-   Main fan-in yok; yeni MASTER outcome/permission authority yok.
-3. Kalan L1 identity/readiness+migration; L3 tool/MCP/approval; L4 reactive state/
-   resume; L5 accounting; L6 verdict/reduced-motion/rows/redaction/platform.
+   L3 native `/mcp` ingress landed492809cd5: tek canlı bridge, native-only
+   interception, explicit confirm ve posture gate; stale tool current refresh
+   dışında çağrılamaz. Selected88/main136/Fable88 test + tsc/i18n/build PASS.
+   Candidate/main compiled loopback SDK PASS; üç eski harness FAIL korunur.
+   Kalıcı55dosya arşiv:
+   /home/alperen/deckent-recovery-20260904/terminal-7099-l3-mcp-g5bxvA.
+   Provider usage/receipt/platform/tüm-L3 veya7099 kapanışı değildir.
+3. L4 exact bounded active-session visibility yazarı yetkili ve aktif; full
+   closure değildir. Kalan L1 identity/readiness+migration; L3 tool-renderer/
+   approval; L4 diğer reactive state/resume; L5 accounting; L6 verdict/
+   reduced-motion/rows/redaction/platform.
    Capsule DAG'ı; yeni outcome veya C kuyruğu başlamadı.
 4. Sonra7103 →7101 →7104 →7102 (önce ADR amendment) →4034.
 5. C1→3358; C2+C4→3359; C3→3360; C5→6182; C6→546; C7→547;

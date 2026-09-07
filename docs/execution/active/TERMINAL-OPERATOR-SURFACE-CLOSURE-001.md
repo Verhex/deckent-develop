@@ -11,6 +11,45 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### Native `/mcp` ingress landing — 2026-09-07
+
+Main `492809cd583ec5e29ddac4e01d595304c752b9c6`, exact10 committed blob
+equality PASS. Native Ink yalnız `/mcp` ailesini session'ın tek canlı
+`ReplMcpBridge` instance'ına bağlar; legacy loop çift-dispatch yapmaz. `call`
+öncesi posture gate ve bridge'in mevcut read-only/confirm/audit sınıflandırması
+korunur; explicit confirm enjekte edilir. Current refresh'te bağlı olmayan
+cached server/tool çağrılamaz; stale catalogue canlı gösterilmez.
+
+No-config, project-only disabled, all-failed, partial, connected-no-tools ve
+unknown-operation durumları EN/TR ve secret-free ayrılır. Selected 88 test;
+main 136 test, tsc, i18n ve build PASS. Fable main 88-test battery PASS.
+Candidate ve main compiled loopback MCP SDK kanıtları EN/TR read/list,
+key=value write-deny ve unknown dallarını provider turnsüz yürüttü. JSON args,
+no-bridge, disabled ve stale-refresh dalları source testlerinde doğrulandı;
+compiled harness onları yürüttü iddiası yoktur.
+
+| Evidence | SHA256 |
+|---|---|
+| Selected patch | b5a121bf82f07cbcd908b0640c12cc5161859aab189bbe1b1dc4eae15ca09c36 |
+| Root source freeze | e7d9a529db60e444fa5df610be2bcb4f7d2cd12a5c8540d399fc83e997b6d2e4 |
+| Candidate compiled PASS | 2116267f45d232aba566877d59332171998bce2ad2a403ac994d66761651c10f |
+| Main compiled PASS | 8deaa128cbbc8876658c7229b56f31d7257b57a4641beb25609e27a9938001bb |
+| Final harness | f6c71ec4c8e051c40c7d0157eef32af778a563249c2bd4d77c890e3f95756a44 |
+| Candidate build | 6746a126d569416ba6f82dc59e71e96e3e59203e68f20211d1c0b5617db3548e |
+| Fable main 88 raw | 2eb2128bafe17a0b3c6fdc6c71c0a489eff769ec33fa6aae1915c79c0e304798 |
+| Archive manifest | 423b49ec2f6e60f0fddcecd58c102cd536be347260aa4bc506b57cd04a184451 |
+| Archive SHA256SUMS | 7a09cb50788dd0bb9363b1fd9f5934bc2d67b8baa851383e0dbbf6645ccf4c8f |
+
+Kalıcı arşiv `/home/alperen/deckent-recovery-20260904/terminal-7099-l3-mcp-g5bxvA`:
+52 payload + helper + manifest = 54 checks; `SHA256SUMS` ile 55 dosya. Üç
+harness denemesi lexical grant, homedir ve confirm-selector varsayımlarıyla FAIL
+olarak tutuldu; ilk PASS diye yazılmadı. Linux diagnostic loopback provider
+usage/billing, receipt, platform, tüm L3 veya 7099 kapanışı değildir. Main dist
+dirty source ve inherited 83+7 içerir; commit dışıdır. User-scope MCP homedir
+relocatability RELATED_BUT_NONBLOCKING; yeni MASTER satırı açılmaz. L4 exact
+bounded active-session visibility yazarı yetkilidir ve aktiftir; bu bir full
+closure değildir. Kalan L1/L3 renderer/approval, L5/L6/platform OPEN; 7099 VERIFY.
+
 ### Active-turn cancellation proof — 2026-09-07T03:22Z
 
 Test59c2c8a04: exact1blob PASS; main4suite17tests PASS. Production source unchanged.
