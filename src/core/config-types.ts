@@ -92,6 +92,11 @@ export interface TerminalConfig {
    * config value when both are present.
    */
   native_agent?: boolean;
+  /** Startup-only REPL preferences. Explicit `/resume` discovery is independent. */
+  startup?: {
+    /** One-time recent-session teaser. Explicit opt-in. */
+    recent_sessions?: boolean;
+  };
   /**
    * TERM-FLOW-UNIFY Sprint-1 dilim (422-001,
    * docs/analysis/term-flow-unify-design-2026-07-11.md): gates the

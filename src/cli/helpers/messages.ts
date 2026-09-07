@@ -5641,6 +5641,14 @@ const BASE_MESSAGES: MessageMap = {
   'history.trend_header': { en: '--- Trend (last {n} runs) ---', tr: '--- Trend (son {n} run) ---' },
   'config.set': { en: 'Set {key} = {value}', tr: '{key} = {value} olarak ayarlandı' },
   'config.invalid': { en: 'Invalid config: {errors}', tr: 'Geçersiz yapılandırma: {errors}' },
+  'config.terminal_startup_invalid_object': {
+    en: '{field} must be an object.',
+    tr: '{field} bir nesne olmalıdır.',
+  },
+  'config.terminal_startup_recent_sessions_invalid_boolean': {
+    en: '{field} must be a boolean.',
+    tr: '{field} bir boolean olmalıdır.',
+  },
   'config.provider_alias_conflict': {
     en: 'Conflicting provider settings in the {layer} config: {flatKey}={flatValue} differs from {groupedKey}={groupedValue}. Remove one definition or make both values equal.',
     tr: '{layer} yapılandırmasında çakışan provider ayarları var: {flatKey}={flatValue}, {groupedKey}={groupedValue} değerinden farklı. Tanımlardan birini kaldırın veya iki değeri eşitleyin.',

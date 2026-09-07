@@ -299,6 +299,9 @@ export const DEFAULT_TERMINAL_CONFIG: TerminalConfig = {
   idleTimeoutMs: 1_800_000,
   scrollbackBytes: 262_144,
   allowShellKind: true,
+  startup: {
+    recent_sessions: false,
+  },
 };
 
 // ─── Default Prompt Config (Sprint 182 PQ-5 / F7) ───────────────────
@@ -1618,6 +1621,18 @@ export function validateConfig(config: DeckentConfig): string[] {
       errors.push(
         `Invalid value '${String(links)}' for field 'terminal.links'. Valid: ${validLinks.join(', ')}.`,
       );
+    }
+  }
+  if (config.terminal?.startup !== undefined) {
+    const startup = config.terminal.startup;
+    if (typeof startup !== 'object' || startup === null || Array.isArray(startup)) {
+      errors.push(getMessage('config.terminal_startup_invalid_object', config.language ?? DEFAULT_LANGUAGE, {
+        field: 'terminal.startup',
+      }));
+    } else if (startup.recent_sessions !== undefined && typeof startup.recent_sessions !== 'boolean') {
+      errors.push(getMessage('config.terminal_startup_recent_sessions_invalid_boolean', config.language ?? DEFAULT_LANGUAGE, {
+        field: 'terminal.startup.recent_sessions',
+      }));
     }
   }
   if (config.prompt?.adr_render !== undefined) {
@@ -3186,6 +3201,14 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
     type: "'auto' | 'on' | 'off'",
     default: 'auto',
     options: ['auto', 'on', 'off'],
+    category: 'Terminal',
+  },
+  'terminal.startup.recent_sessions': {
+    description: 'Show a one-time recent-session teaser when the interactive REPL starts. This does not change explicit /resume discovery.',
+    descriptionTr: 'Etkileşimli REPL başlangıcında tek seferlik son oturumlar ipucu gösterir. Açık /resume keşfini değiştirmez.',
+    type: 'boolean',
+    default: DEFAULT_TERMINAL_CONFIG.startup?.recent_sessions,
+    options: ['true', 'false'],
     category: 'Terminal',
   },
   mode: {

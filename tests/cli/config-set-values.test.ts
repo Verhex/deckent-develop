@@ -51,6 +51,18 @@ describe('setConfigValues', () => {
     expect(written.mode).toBe('balanced');
   });
 
+  it('rejects malformed terminal.startup.recent_sessions without writing the patch', () => {
+    const root = project({ language: 'en', terminal: { startup: { recent_sessions: false } } });
+    const before = readFileSync(join(root, PROJECT_CONFIG_PATH), 'utf-8');
+    const out = setConfigValues(root, { 'terminal.startup.recent_sessions': 'yes' });
+    expect(out).toEqual({
+      ok: false,
+      code: 'validation',
+      error: 'terminal.startup.recent_sessions must be a boolean.',
+    });
+    expect(readFileSync(join(root, PROJECT_CONFIG_PATH), 'utf-8')).toBe(before);
+  });
+
   it('a missing config file is created from the patch alone', () => {
     const root = mkdtempSync(join(tmpdir(), 'picker-config-empty-'));
     roots.push(root);

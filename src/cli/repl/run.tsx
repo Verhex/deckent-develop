@@ -1209,7 +1209,7 @@ export async function runInkRepl(
   let projectCfg: {
     language?: string;
     repl_surface?: { enabled?: boolean; approvals?: boolean; bg_turns?: boolean };
-    terminal?: { rpc_debug?: boolean; native_agent?: boolean; run_flow_v2?: boolean };
+    terminal?: { rpc_debug?: boolean; native_agent?: boolean; run_flow_v2?: boolean; startup?: { recent_sessions?: boolean } };
     native_provider?: string;
     native_model?: string;
     native_context_tokens?: number;
@@ -1940,6 +1940,7 @@ export async function runInkRepl(
       shortcutsPanel={buildShortcutsPanel(t)}
       {...(nativeEngine ? { nativeEngine } : {})}
       replSurfaceEnabled={replSurfaceEnabled}
+      startupRecentSessions={projectCfg.terminal?.startup?.recent_sessions === true}
       {...(stateFeed ? { stateFeed } : {})}
       liveFooterLabels={buildLiveFooterLabels(t)}
       approvalsEnabled={approvalsEnabled}

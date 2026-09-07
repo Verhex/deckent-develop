@@ -1,7 +1,7 @@
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'ink-testing-library';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ReplApp, type ConfirmTrigger, type ReplEngine } from '../../../src/cli/repl/app.js';
@@ -30,9 +30,9 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-function mountApp(options: { sessionId?: string; dispatcher?: { dispatch: (name: string, args: Record<string, unknown>) => Promise<string> } } = {}) {
-  const cwd = mkdtempSync(join(tmpdir(), 'deckent-l6-keyboard-'));
-  roots.push(cwd);
+function mountApp(options: { cwd?: string; sessionId?: string; replSurfaceEnabled?: boolean; startupRecentSessions?: boolean; dispatcher?: { dispatch: (name: string, args: Record<string, unknown>) => Promise<string> } } = {}) {
+  const cwd = options.cwd ?? mkdtempSync(join(tmpdir(), 'deckent-l6-keyboard-'));
+  if (!options.cwd) roots.push(cwd);
   let confirmTrigger: ConfirmTrigger | undefined;
   const engine = Object.assign(async () => {}, {
     close: vi.fn(),
@@ -63,6 +63,8 @@ function mountApp(options: { sessionId?: string; dispatcher?: { dispatch: (name:
       shortcutsPanel={buildShortcutsPanel(t)}
       nativeEngine={engine}
       {...(options.sessionId ? { sessionId: options.sessionId } : {})}
+      {...(options.replSurfaceEnabled ? { replSurfaceEnabled: true } : {})}
+      {...(options.startupRecentSessions ? { startupRecentSessions: true } : {})}
     />,
   );
   return { ...mounted, getConfirmTrigger: () => confirmTrigger };
@@ -76,6 +78,37 @@ async function openPicker(stdin: { write(value: string): void }, lastFrame: () =
 }
 
 describe('ReplApp mounted keyboard ownership', () => {
+  it('keeps startup recent-session discovery off by default but lets explicit /resume load it', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'deckent-l4-startup-'));
+    roots.push(cwd);
+    const jobs = join(cwd, '.deckent', 'runtime', 'jobs');
+    mkdirSync(jobs, { recursive: true });
+    writeFileSync(join(jobs, 'prior.json'), JSON.stringify({ jobId: 'job-1', status: 'completed', startedAt: '2026-09-07T00:00:00.000Z', summary: 'prior session' }));
+    const { stdin, lastFrame, unmount } = mountApp({ cwd, replSurfaceEnabled: true });
+    try {
+      await tick();
+      expect(lastFrame() ?? '').not.toContain('prior session');
+      stdin.write('/resume');
+      stdin.write(ENTER);
+      await tick(100);
+      expect(lastFrame() ?? '').toContain('prior session');
+    } finally {
+      unmount();
+    }
+  });
+
+  it('shows the startup teaser once when explicitly enabled', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'deckent-l4-startup-on-'));
+    roots.push(cwd);
+    const jobs = join(cwd, '.deckent', 'runtime', 'jobs');
+    mkdirSync(jobs, { recursive: true });
+    writeFileSync(join(jobs, 'prior.json'), JSON.stringify({ jobId: 'job-2', status: 'completed', startedAt: '2026-09-07T00:00:00.000Z', summary: 'startup session' }));
+    const { lastFrame, unmount } = mountApp({ cwd, replSurfaceEnabled: true, startupRecentSessions: true });
+    await tick(100);
+    expect(lastFrame() ?? '').toContain('startup session');
+    unmount();
+  });
+
   it('native /status preserves run output and appends the full local chat context', async () => {
     const dispatch = vi.fn(async () => 'run truth: unavailable');
     const { stdin, lastFrame, unmount } = mountApp({ sessionId: 'chat-memory-123', dispatcher: { dispatch } });

@@ -1253,6 +1253,8 @@ export interface ReplAppProps {
   memory?: ChatMemoryAdapter;
   /** Active chat session id (new turns append here; /resume switches it). */
   sessionId?: string;
+  /** Explicit opt-in for the one-shot startup teaser; `/resume` stays lazy. */
+  startupRecentSessions?: boolean;
   /** UI language for loop-emitted strings (/resume picker). */
   lang?: string;
   /** When set (native flag on), drives the turn INSTEAD of runChatNativeLoop. */
@@ -1475,7 +1477,7 @@ export async function routeNativeMcpInput(options: NativeMcpRouteOptions): Promi
 
 export function ReplApp(props: ReplAppProps): ReactElement {
   const palette = useInkPalette();
-  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, nativeMcpSlash, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false, dualStreamOverflow } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, nativeMcpSlash, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, startupRecentSessions = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false, dualStreamOverflow } = props;
   const { exit } = useApp();
   // TERMINAL-TOOLS-004 — live width for the status row + queue preview (reflows on resize).
   const columns = useTerminalColumns();
@@ -1590,9 +1592,17 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     pushTurn('seg', requireInjectedLabel('termSwitched', labels.termSwitched)
       .replace('{mode}', resolveModeLabel(result.state.mode, labels)));
   };
+  /** Explicit `/resume` discovery loads lazily and caches only its project root. */
+  const loadRecentSessions = (): SessionRecord[] => {
+    const cached = recentSessions.current;
+    if (cached?.cwd === props.cwd) return cached.records;
+    const records = listRecentSessions(props.cwd, RESUME_RECENT_LIMIT);
+    recentSessions.current = { cwd: props.cwd, records };
+    return records;
+  };
   /** The merged session list the typed /resume resolves against (disk jobs + ledger + memory). */
   const mergedResumeRecords = () => mergeResumeSessionRecords(
-    recentSessions.current ?? [],
+    loadRecentSessions(),
     chatSessionsToRecords(listLedgerSessions(RESUME_RECENT_LIMIT, { cwd: props.cwd })),
     chatSessionsToRecords(memory?.listChatSessions?.(RESUME_RECENT_LIMIT) ?? []),
   );
@@ -1708,7 +1718,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // the bottom bar when it differs from the launch session. busyCtl: the
   // /queue-/interrupt-/steer state machine (ref only — no render reads it
   // directly; decision lines re-render via pushTurn).
-  const recentSessions = useRef<SessionRecord[] | null>(null);
+  const recentSessions = useRef<{ cwd: string; records: SessionRecord[] } | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>(sessionId);
   // Mirror activeSessionId into a ref: the native turn-loop lives in a useEffect
   // whose deps intentionally exclude activeSessionId (re-running it would restart
@@ -1895,16 +1905,17 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     });
   }, [registerRunFlowResultSink]);
 
-  // APP-SURFACE-WIRE (358-006): startup resume-teaser. One disk read per mount
+  // L4-A: startup resume-teaser is an explicit preference. `/resume` keeps its
+  // own lazy shared loader above, so default-off never scans merely to mount.
   // (listRecentSessions is degrade-safe: missing/unreadable jobs dir → []).
   // Renders NOTHING when the source is empty — the teaser only ever appears
   // when there are sessions to resume, and it flows into <Static> as a one-off
   // turn so it scrolls away naturally (render order untouched).
   useEffect(() => {
-    if (!replSurfaceEnabled || recentSessions.current !== null) return;
-    recentSessions.current = listRecentSessions(props.cwd, RESUME_RECENT_LIMIT);
+    if (!replSurfaceEnabled || !startupRecentSessions || recentSessions.current !== null) return;
+    const disk = loadRecentSessions();
     const merged = mergeResumeSessionRecords(
-      recentSessions.current,
+      disk,
       chatSessionsToRecords(listLedgerSessions(RESUME_RECENT_LIMIT, { cwd: props.cwd })),
       chatSessionsToRecords(memory?.listChatSessions?.(RESUME_RECENT_LIMIT) ?? []),
     );
@@ -1912,7 +1923,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (lines.length > 0) pushTurn('bg', lines.join('\n'));
     // labels/props.cwd are mount-stable (run.tsx passes literals); the ref
     // guard makes this one-shot even if the deps ever re-fired.
-  }, [replSurfaceEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [replSurfaceEnabled, startupRecentSessions]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (started.current) return;
