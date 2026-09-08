@@ -3602,6 +3602,40 @@ dependent multiworker/automatic next-goal settlement or whole7099 closure. Repor
 stderr shell-note integration is RELATED_BUT_NONBLOCKING, not added to this slice.
 MCP freshness stays unproven. No sprint/recovery/retained728/DB mutation or push.
 
+#### L3 fresh MCP stdio observation — 2026-09-08T06:15Z
+
+Existing compiled main server, no product source change or rebuild. Main four
+MCP suites43/43 PASS59f4e420e5850198da5dbbc791a2ea5f28cc34658f6ffe27b309e0f3f94d238d.
+Root-reviewed helperV2 eda664eb2e2875daff05a1be0eb5ea9bbe73e7d6c101923d0133e79a6cc48ca2;
+V1 preparation3f8fb3303f54 remains UNRUN. V2 fixes SDK package pin acceptance,
+aggregate output budget and failure-path response parsing before first execution.
+Freeze84b9418b2cc2360114d416a0e514f6f911d865c68918cbab1cf9e0eb5dc6a81b:
+70source/71compiled/6package-SDK inputs unchanged, current disk build binding adopts.
+Actual11282356f76631ad4baf81cd1404d79c926e3a0a6424a6d542da7d900de85990:
+direct Node entry and private POSIX executable symlink2/2 PASS in empty ordinary
+user-project cwd with private HOME/XDG. Both initialize, protocol2025-11-25 from
+installed SDK constant, server version0.100.0,51tool/8resource discovery matching
+help catalog, read-only help initialized=false/sprintActive=false. Each stdout
+86567bytes protocol-only, stderr0; exact request correlation, childPID18/30
+close exit0/dead at06:14:27.157Z/06:14:27.671Z. No resource reads or mutation tool.
+Container deckent-proof-mcp-k0jiom exit0/noOOM, pinned735dd688da64 image,
+nonroot/networknone/RO package/private writes,2GB2CPU/pids128. Existing host
+MCP sessions and bot3536055 untouched; no provider generation or run/DB mutation.
+Archive /home/alperen/deckent-recovery-20260904/terminal-7099-mcp-stdio-sq3n5q:
+165payload/166checksums readback PASS, manifestb9ad95c8557a8b84c317e511a74c88f42867f0989ef47150ccad038d3285c619,
+SUMSf4e88c6fff930ce8c176aa07f34c6f3084ed3e22f6297f655533127e748b3e95.
+Fresh private-process behavior is LOCAL_VERIFIED, not loaded-byte attestation
+of retained Codex sessions, native outgoing `/mcp` re-proof, platform evidence,
+canonical XVerify/settlement or whole7099 closure. No new identity schema added.
+Fable1000 independent scoped LOCAL_VERIFIED at2026-09-08T06:32:15.600Z,
+body2cbd1c6cc1bb9ff940617bfbd02d9c87d0c4975040721a3b33bc043d83bd50a5.
+Root rechecked original166checksums before retaining the review in
+/home/alperen/deckent-recovery-20260904/terminal-7099-mcp-seal-v8zn2V:
+3payload/4checksums, manifest47b1968177fc3e1b36489fdddbb6b873c96ec9aa8568aac7297b4b091e6185c7,
+SUMSa365f4f35989a3191f61cf4b97cc6ad4e726cc33ed4984456cae3cf81f2f9715.
+Review is supportive independent measurement, not canonical XVerify. No new audit
+requested for these bytes; source/build/runtime unchanged by this evidence seal.
+
 ### L4/L5 supportive evidence seal — 2026-09-08T03:26Z
 
 Fable980 independent scoped GO, UTC03:24:49.914Z, bodySHA
