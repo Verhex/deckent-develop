@@ -122,6 +122,40 @@ describe('resolveCompactSlash — explicit compaction outcome lines', () => {
 });
 
 describe('withContextSlashes — local answers, everything else passes through, members forwarded', () => {
+  it.each(['en', 'tr'] as const)('reports failed-compaction usage once without a normal engine turn in %s', async (lang) => {
+    const compactContext = vi.fn(async (callbacks: Parameters<NonNullable<ReplEngine['compactContext']>>[0]) => {
+      callbacks?.onRequestMeasurement?.(snapshot.lastRequestMeasurement!);
+      return {
+        outcome: 'degraded' as const,
+        epoch: 2,
+        reasonCode: 'CHECKPOINT_RESPONSE_INVALID_JSON',
+        usage: { inputTokens: 13, outputTokens: 5 },
+      };
+    });
+    const inner = fakeEngine({ compactContext });
+    const labels = buildContextSlashLabels(tFor(lang));
+    const engine = withContextSlashes(inner, labels);
+    const output: string[] = [];
+    const ended: Array<{ inputTokens: number; outputTokens: number }> = [];
+    const measurements: unknown[] = [];
+
+    await engine('/compact', {
+      output: (text) => output.push(text),
+      onTurnEnd: (stats) => ended.push(stats),
+      onRequestMeasurement: (event) => measurements.push(event),
+    });
+
+    expect(compactContext).toHaveBeenCalledOnce();
+    expect(inner.sends).toEqual([]);
+    expect(ended).toEqual([{ inputTokens: 13, outputTokens: 5 }]);
+    expect(measurements).toEqual([snapshot.lastRequestMeasurement]);
+    expect(output).toEqual([labels.compactDegraded.replace('{epoch}', '2')]);
+    // Generic checkpoint failures intentionally expose the degraded state but
+    // not the raw internal reason on this surface. The durable checkpoint/audit
+    // projection retains CHECKPOINT_RESPONSE_INVALID_JSON.
+    expect(output.join('\n')).not.toContain('CHECKPOINT_RESPONSE_INVALID_JSON');
+  });
+
   it.each([[5, 2], [0, 0]] as const)('answers /context and /compact with aggregate usage %i/%i and forwards the live measurement callback', async (inputTokens, outputTokens) => {
     const measurements: unknown[] = [];
     const inner = fakeEngine({

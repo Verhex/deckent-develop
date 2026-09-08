@@ -3207,6 +3207,148 @@ Git otomatik bakımında unreachable-loose-object/gc.log uyarısı verdi; prune 
 gc.log silme yapılmadı (ilgili olmayan bakım bulgusu). Formal XVerify/settlement/
 Windows-native/macOS/SSH/whole-L3/7099 closure iddiası yok. MASTER VERIFY korunur.
 
+### L4/L5 supportive evidence seal — 2026-09-08T03:26Z
+
+Fable980 independent scoped GO, UTC03:24:49.914Z, bodySHA
+b2c5205e379afb23789308f0dbbf7be4898d86fc59a0cca540a5f5846c616c55.
+Raw review preserved /tmp/deckent-7099-l5-accounting-UREUGU/fable-review-980.txt.
+Reviewer checked L4 39pins/L5 55pins against current main, exact checkpoint,
+usage/epoch/terminal truth, archive70/83checksums and permissions, test-only34line
+EN/TR diff; scoped52/55/28 reports. Review is not a canonical XVerify receipt.
+Accepted next step bounded test+docs seal only; L6 WIP, inherited main changes,
+MASTER/generated/closure disposition excluded. No fresh audit before landing;
+post-landing invariant check only. Formal customer billing, platform,
+multiworker/next-goal settlement and whole7099 remain unproven/VERIFY.
+
+### L5 actual CLI checkpoint accounting — 2026-09-08T03:07Z
+
+Owner-approved same7099 bounded manual continuation; no production source change,
+build, restart, main sprint/state mutation or new outcome. Helper V2 root reviewed:
+`/tmp/deckent-7099-l5-accounting-UREUGU/actual-cli-compact-pty-v2.mjs`, SHA
+2e5eda24fd2de9e793223b0f78c61c2827ed12dd55d5df2062cb9912f2e85f53.
+V1 remains UNRUN; V2 uses explicit OS isolation/plain Node, not Node permission
+proof. Freeze37af3a87f0e314f1ff94cfb887c3494c1c9117b1fa2b52c072905c8ab65b4b24
+binds27source/28compiled; prior L4 pins independently rechecked before execution.
+
+Actual main result `/tmp/deckent-7099-l5-cli-main-br6srj/deckent-7099-l5-cli-nI3Ycc/result.json`
+SHA8b63dd83af32772ef3dc57f00667d46f7da25c113caadc8d76673a0c82ea9981:
+EN/TR both PASS. Actual entry→Ink→withContextSlashes→native engine/session→
+production Ollama/OpenAI HTTP adapter→private synthetic SSE fixture.
+Valid explicit compact reports11/7 and advances epoch1→2; next malformed compact
+reports13/5, keeps epoch2 and byte-identical checkpoint, emits durable
+CHECKPOINT_RESPONSE_INVALID_JSON. `/context` shows cumulative24input/12output,
+reports2 and degraded. No explicit-slash conversation turn-ledger created;
+root supplemental read distinguishes ENOENT from other filesystem errors.
+All55pins unchanged. CLI exits0/signal0, observed auth-only children close1
+with exact matching parent/child identity; no paid provider invocation.
+
+Container deckent-proof-l5-cli-br6srj started03:05:23.610Z, finished03:05:26.288Z,
+exit0/noOOM; exact image735dd688da64d22ebd9dd374b3e7e5a874635668fd2a6ec20ca1f99264294086.
+Nonroot1000:1000/networknone/readonly/capdrop/no-new-privileges/init/pids128/2GB/2CPU.
+Only private proof parent writable; source/dist/modules/package/helper read-only.
+No main .brain/.deckent/.git/auth mounts. Finite outer150s/case30s/output256KiB.
+
+Durable archive `/home/alperen/deckent-recovery-20260904/terminal-7099-l5-cli-KcD11h`:
+82payload/83checksums PASS; manifest
+79c70cc945e65c87705f40184df8b5b16a651c12ad95af8a3ca8e7556f8a78e3,
+SUMS186f8c27dc7649fcb01a87e8d3f955ef2c5531ba38b531eb1fcb2b04ef71b770.
+Explicit allowlist includes helper/contract/freeze, source/compiled snapshots,
+transcripts, child observations, fixture checkpoint/audit, tests and container.
+Private config/raw DB excluded. Prior archives/results unchanged.
+
+Limitations: synthetic transport, not paid-provider invoice, customer billing,
+canonical XVerify receipt, other-platform or whole7099 proof. Native /api/tags
+fixture404 was not a readiness claim. DECKENT_ASCII=1 still emits Unicode glyphs;
+this directly supports the already-open L6 global ASCII obligation, not a new
+MASTER item or a reason to rewrite the L5 PASS result. Formal accounting/customer
+charge eligibility remains unproven. Fable979 requests one combined L4/L5 scoped
+review; test-only34line delta and docs sealing remain pending. MASTER VERIFY.
+
+### L4/L5 evidence continuation — 2026-09-08T02:40Z
+
+Main HEADbb1399486, L3 reviewed-precommit source20/20 unchanged; no build,
+restart, production dispatch, commit or push in this slice. MASTER validator:
+590rows/501active/232receipts/13blocker classes, projections in sync; Closure
+gate7events PASS. These are timestamped observations, not new ledger mutations.
+
+L4 source chain already connects literal resume to verified archive and the next
+legacy provider input. Current main context/resume3suites28/28 PASS and persistent
+provider4suites55/55 PASS; reports in /tmp/deckent-7099-l4-root-check-Ye8riH,
+SHAfe8baa54005a and76512f92e096. Initial command included nonexistent
+chat-session.test.ts filter, which matched no file; the four correct provider
+files were explicitly run afterward. Actual legacy CLI delivery remains UNRUN.
+Wegener's malformed private helper was caught before execution and removed;
+no repository/runtime effects. Lovelace owns the replacement private helper.
+
+L5 root adds only34lines in tests/cli/repl/context-slashes.test.tsx: EN/TR failed
+compaction with nonzero usage is reported once without a normal engine turn.
+Together with context-lifecycle battery:2suites52/52 PASS, report l5-tests.json
+SHA83b052ac244d7cb06067dcfa885f54517d18b90c35f30dfee7acf821b26f9e45;
+main tsc --noEmit30665 exit0. No production source change was needed.
+
+Actual compiled registered-caller proof PASS, EN/TR11/11 each:
+withContextSlashes -> createNativeEngine -> AgentSession -> canonical checkpoint
+and audit writer. Valid seed11/7 then malformed checkpoint13/5 retains prior
+bytes and epoch2; one failed stats aggregate, cumulative24/12 reports2, durable
+native.checkpoint.degraded + CHECKPOINT_RESPONSE_INVALID_JSON, recordTurn0.
+UI displays localized generic degraded, NOT the raw internal reason. The adapter
+is diagnostic in-process; this is not CLI/PTY, paid provider, billing or receipt
+proof. Customer-charge eligibility remains unsupported by canonical evidence.
+
+Result /tmp/deckent-7099-l5-main-M8Ebte/result.json
+SHA2e55d5c93f958f4b8e5cd0b60a0ab48a43f9adcba2a7b85cfb1b67d39ef0ca35.
+Helper9e5620a2117a; source7+compiled9 pins unchanged. Exact container
+deckent-proof-l5-accounting-m8ebte exit0/noOOM, nonroot/networknone/read-only
+main inputs, private writable fixture,2GB/2CPU/60s. No main state mounted.
+Archive /home/alperen/deckent-recovery-20260904/terminal-7099-l5-accounting-3FxMDC:
+31payload/32checksums PASS; manifestb3cb1ebefa52, SUMSc3611b788617.
+Explicit source snapshots/result/checkpoints/audit/test evidence only; no raw
+memory DB/config/credentials copied. Root regression remains uncommitted;
+independent review and actual CLI proof remain OPEN. 7099 stays VERIFY.
+
+### L4 legacy provider delivery — actual main CLI / 2026-09-08T02:55Z
+
+EN/TR16/16 each PASS on actual compiled entry -> Ink App -> legacy loop ->
+createPersistentClaudeSession -> actual defaultPersistentSpawn -> private
+stream-json executable. One warm child per case (PID93/204 in the container),
+two exact user envelopes, distinct synthetic replies/usage, production SIGTERM
+teardown and clean CLI exit0. The first user input contains the complete62-byte
+note with exact sprint/artifact/manifest/artifact digest and data-only wrapper;
+second input is byte-equal to the raw second message. Active chat identity and
+private persisted conversation agree; archive bytes unchanged, target absent
+from jobs and older than the six newer discovery entries.
+
+Result /tmp/deckent-7099-l4-delivery-main-2nzs5C/deckent-7099-l4-legacy-delivery-ERo0py/result.json
+SHA136e342ff502dfb22150d1b2e1baee5addeec2ccb0dcc05bdc894a9ac5b4a1a7.
+19source+20compiled before/after and external compiled freeze agree. Helper
+root v2 SHA189cc7e9f7ed0f2cbcc9d9aa7c018a17d5aaf3eb7bd398bc3578d7343615a11f;
+freeze d769c06845de710731fcbcd7e96ba9a117eee413a97570e2e23a7aae6568108e.
+Original prepared v1 UNRUN. Root caught double-escaped newline assertion,
+missing explicit private HOME and inspector's stale Node-permission envelope
+before execution; v2 aligns all phases with the declared OS isolation contract.
+The earlier malformed preparation was also UNRUN; no product retry occurred.
+
+Container deckent-proof-l4-delivery-2nzs5c terminal exit0/noOOM; networknone,
+read-only main src/dist/deps/package, private /tmp, nonroot,2GB/2CPU/pids128,
+150s outer deadline. Node --permission/fsync7142 is NOT fixed or claimed.
+The diagnostic provider shim is not a paid provider, real usage invoice or
+settlement receipt. Linux PTY only; no full platform or whole7099 closure.
+The inherited inspector thirdIsClean=false is an unused third-message field;
+no third input or /clear behavior was claimed by this two-message proof.
+
+Durable archive /home/alperen/deckent-recovery-20260904/terminal-7099-l4-legacy-delivery-7FSSsw:
+69payload/70checksums PASS,0700/0600. Manifest8024b49cc3d6835465d2300c418e6363c7f8fe80695554f57c6cbe9a50c0932f,
+SUMS96cc2b03a86b5b9837e106a8150ca7fd9ada40ad7e5b9092d09f14c8e3feef50.
+Source/bundle snapshots, helper versions, fixture note/manifest, exact process/
+protocol/transcript observations and targeted test reports; no raw memoryDB or
+credential/config-tree copy. Independent scoped review/docs seal still pending.
+
+L3 post-landing: Fable977 (7127811a87b6) independently verified source20path and
+seal8920219fc invariant PASS. Direct git push origin main then rejected before
+process start by tool policy (approval required / Never); remote4432b172f,
+main8920219fc ahead7. No bypass/retry or owner re-approval loop. L4 proof did
+not change production source, dist or main runtime. MASTER remains VERIFY.
+
 ## Yürütme
 
 - Giriş: native terminal `/do` (3331 sonrası) → Goal/Flow/Run; provider/model/worker sayısı
