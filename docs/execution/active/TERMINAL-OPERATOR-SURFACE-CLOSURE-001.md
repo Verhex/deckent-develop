@@ -3086,6 +3086,35 @@ Deckent'in kendi Goal/Flow/Run zincirini `/do` ile yürütür ve kanıtı bu pak
 Sıra: L6 (kapılar) ve L1 (kimlik) önce, çünkü L3/L4 onların sözleşmesine dayanır; L2 ve L5
 paralel; L3 ve L4 son. Tek writer per hot file: `app.tsx` L3 ve L4 arasında sıralı kilit.
 
+### L2 actual CLI cancellation — 2026-09-08T00:58Z
+
+Root main `1f1df1a4e` üzerinde mevcut compiled CLI, private Linux Docker PTY ve
+loopback OpenAI-compatible SSE ile EN/Escape + TR/Ctrl-C geçti. Her case:
+ordinary user request → visible partial → cancel key → response close → rejected
+late text/usage → distinct second user request + fixture-reported 7 output tokens
+→ clean exit0/signal0, CLI reaped ve server closed. İki gerçek HTTP turn/case;
+45 tool schema ve 4096 output ceiling korunmuş; 8 source + 9 compiled pin sabit.
+Provider sunucusu/tokenizer diagnostic fixture'dır; paid-provider, gerçek model
+kapasitesi, billing, settlement, diğer platformlar veya bütün L2/7099 closure değildir.
+
+İlk v3 FAIL kayıpsız tutuldu: 8192 fixture penceresine system+tools+4096 output+
+2048 safety sığmadığından loop token-pressure checkpoint istedi. İlk HTTP çağrı
+checkpoint'ti; cancellation'a ulaşılmadı, cleanup socket close başarı SAYILMADI.
+v4 yalnız fixture props/models/config kapasitesini65536 yaptı ve ordinary-turn /
+cancel-before-close kontrollerini ekledi; production gate veya kaynak değişmedi.
+PASS result SHA `0feb18e914817dba64ac3f62d23906c60a1085e7a955db3a0287d93e85fb9d69`;
+FAIL result SHA `0c5e4fb59e45165b63a2f0a231945c28c04fc84e38623623af8e8eff71096ba4`.
+
+Kalıcı arşiv: `/home/alperen/deckent-recovery-20260904/terminal-7099-active-cancel-8UYyvY`.
+41 payload + manifest/SHA256SUMS;42 checksum PASS; files0600/dirs0700.
+Manifest SHA `1c507ef1a463fa28a20f94a322ca13003978bda70394dc03253036cf866b3183`;
+SUMS SHA `b4818a0c44b79ee7e355e8d44341f1559f94bdf9cfeb0fb15a84b380f4ca1f9e`.
+İki container durmuş: v3 exit1/v4 exit0; networknone/read-only/nonroot/pids64/2GB.
+Root LOCAL_VERIFIED; ENTRY969 ile Fable'a scoped review isteği gönderildi, yanıt henüz yok;
+formal XVerify receipt veya authenticated MASTER settlement üretilmedi. 7099 VERIFY.
+Sonraki L3: sync/audit typed capture/card + action picker; write eylemleri existing
+classifyTool/askConfirm yolunda kalır, read-only capture'a izinsiz taşınmaz.
+
 ## Yürütme
 
 - Giriş: native terminal `/do` (3331 sonrası) → Goal/Flow/Run; provider/model/worker sayısı
