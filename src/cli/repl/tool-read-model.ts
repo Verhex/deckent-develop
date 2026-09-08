@@ -4,6 +4,15 @@
 // document supplied by the same-session detail reader. It never knows a file
 // path, ContentWriter, child process, or rendered broker preview.
 
+import {
+  buildSyncAggregate,
+  isSyncAggregateSummary,
+  type SyncAggregateSummary,
+  type SyncCommandOutput,
+} from '../helpers/sync-aggregate.js';
+import { isAgentSyncConflictKind } from '../../core/agent-sync-conflict.js';
+import { isSyncChangeDetectionMode, isSyncChangeDetectionIssueCode } from '../helpers/sync-change-detection.js';
+
 export type ToolReadKind =
   | 'doctor'
   | 'history'
@@ -280,7 +289,36 @@ const SYNC_REPORT_KEYS = [
   'workspaceSync',
   'gitChanges',
   'warnings',
+  'summary',
 ] as const;
+
+/**
+ * `SyncResult.detection.issue` (`src/cli/commands/sync.ts`): either `null`
+ * (the mode was established cleanly) or a typed `{ code, detail }` record
+ * naming which git step failed.
+ */
+function validSyncChangeDetectionIssue(value: unknown): boolean {
+  return value === null
+    || (isRecord(value)
+      && isSyncChangeDetectionIssueCode(value.code)
+      && typeof value.detail === 'string');
+}
+
+/**
+ * `SyncResult.detection` (`src/cli/commands/sync.ts`): how the file lists on
+ * this same `gitChanges` record were established. Required by every current
+ * producer, so a present-but-malformed `detection` is rejected outright — see
+ * `validSyncResult` for the separate, deliberate exception that keeps
+ * accepting a LEGACY `gitChanges` that omits `detection` entirely.
+ */
+function validSyncChangeDetection(value: unknown): boolean {
+  return isRecord(value)
+    && isSyncChangeDetectionMode(value.mode)
+    && validSyncChangeDetectionIssue(value.issue)
+    // A failure code only ever accompanies 'unavailable' (the producer never
+    // pairs a clean mode with an issue) — reject the incoherent combination.
+    && (value.issue === null || value.mode === 'unavailable');
+}
 
 function validSyncResult(value: unknown): boolean {
   return isRecord(value)
@@ -289,11 +327,109 @@ function validSyncResult(value: unknown): boolean {
     && isStringArray(value.modified)
     && isStringArray(value.added)
     && isStringArray(value.deleted)
-    && isStringArray(value.renamed);
+    && isStringArray(value.renamed)
+    // `detection` is required in the current `SyncResult` producer type, but
+    // a pre-7104 producer never emitted it — accept that legacy shape (the
+    // aggregate then fails closed to `detection: 'unavailable'`, see
+    // `buildSyncAggregate`). What is never accepted is a PRESENT `detection`
+    // that is malformed: a git failure must never look like "no changes".
+    && (value.detection === undefined || validSyncChangeDetection(value.detection));
 }
 
-function validSyncReport(value: unknown): boolean {
-  return value === undefined || isRecord(value);
+/**
+ * `AgentPromptSyncConflict` / `AgentManifestSyncConflict`
+ * (`src/core/agent-prompt-sync.ts`, `src/core/agent-manifest-sync.ts`): a
+ * single typed keptLocal notice. `kind` is required by the current producer
+ * type but a pre-7104 producer never emitted it — accepted as the same
+ * deliberate legacy exception `validSyncResult` makes for `detection` above
+ * (`buildSyncAggregate` then treats a missing `kind` as the more severe
+ * `'local-edit'`, never as a silently-dropped field). Any OTHER `kind` value
+ * is rejected outright — this is a closed two-value enum, not a free string.
+ */
+function validAgentSyncConflict(value: unknown): boolean {
+  return isRecord(value)
+    && typeof value.agentId === 'string'
+    && typeof value.shadowPath === 'string'
+    && typeof value.builtinPath === 'string'
+    && typeof value.reason === 'string'
+    && (value.kind === undefined || isAgentSyncConflictKind(value.kind));
+}
+
+/**
+ * `AgentPromptSyncReport` / `AgentManifestSyncReport` (`agentPromptSync` /
+ * `agentManifestSync`). `isStringArray` requires `Array.isArray`, so an
+ * array-like object (e.g. `{ created: { length: 0 } }`) is rejected here —
+ * `buildSyncAggregate` only ever reads `.length`, so that forgery would
+ * otherwise pass the canonical-`summary` equality gate undetected.
+ */
+function validAgentSyncReport(value: unknown): boolean {
+  return value === undefined
+    || (isRecord(value)
+      && isStringArray(value.created)
+      && isStringArray(value.updated)
+      && isStringArray(value.keptLocal)
+      && Array.isArray(value.conflicts)
+      && value.conflicts.every((entry) => validAgentSyncConflict(entry)));
+}
+
+/**
+ * `AgentCapabilitiesSyncReport` (`agentCapabilitiesSync`,
+ * `src/cli/commands/sync.ts`). `protected` is optional because a legacy
+ * producer that predates that field omits it entirely; when present it must
+ * be a real string array like every other count-bearing field here.
+ */
+function validCapabilitiesReport(value: unknown): boolean {
+  return value === undefined
+    || (isRecord(value)
+      && isStringArray(value.migrated)
+      && isStringArray(value.alreadyV3)
+      && (value.protected === undefined || isStringArray(value.protected))
+      && Array.isArray(value.issues)
+      && value.issues.every((entry) => isRecord(entry)
+        && typeof entry.agentId === 'string'
+        && typeof entry.code === 'string'
+        && typeof entry.message === 'string'));
+}
+
+/**
+ * `BuiltinSkillSyncReport` (`skillManifestSync`, `src/core/skill-pool.ts`).
+ * `issues` entries are `BuiltinSkillSyncIssue { skillId, reason }` — both
+ * required strings; extra fields on an issue record are tolerated.
+ */
+function validSkillReport(value: unknown): boolean {
+  return value === undefined
+    || (isRecord(value)
+      && isStringArray(value.created)
+      && isStringArray(value.updated)
+      && isStringArray(value.unchanged)
+      && isStringArray(value.keptLocal)
+      && Array.isArray(value.issues)
+      && value.issues.every((entry) => isRecord(entry)
+        && typeof entry.skillId === 'string'
+        && typeof entry.reason === 'string'));
+}
+
+/**
+ * Deterministic JSON serialization used only to compare a claimed `summary`
+ * against the aggregate `buildSyncAggregate` derives from the same raw
+ * report. Recursively sorts object keys so producer-controlled key order in
+ * the parsed `summary` (or the field-declaration order `buildSyncAggregate`
+ * happens to use) never causes a spurious mismatch; array element order is
+ * preserved because it is semantically meaningful (e.g. `conflicts`,
+ * `missingBaseline.agentIds`). Applying this to BOTH sides — never a raw
+ * `JSON.stringify` on one side only — is what makes the comparison
+ * order-independent instead of merely shifting the ordering assumption.
+ */
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => stableStringify(entry)).join(',')}]`;
+  }
+  if (value !== null && typeof value === 'object') {
+    const record = value as UnknownRecord;
+    const keys = Object.keys(record).sort();
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
 }
 
 function parseSync(value: unknown): ToolReadProjection {
@@ -306,19 +442,66 @@ function parseSync(value: unknown): ToolReadProjection {
       || typeof entry.label !== 'string'
       || typeof entry.file !== 'string'
       || typeof entry.reason !== 'string'))) return unknown('sync');
-  for (const key of ['agentPromptSync', 'agentManifestSync', 'agentCapabilitiesSync', 'skillManifestSync'] as const) {
-    if (!validSyncReport(value[key])) return unknown('sync');
-  }
+  if (!validAgentSyncReport(value.agentPromptSync)) return unknown('sync');
+  if (!validAgentSyncReport(value.agentManifestSync)) return unknown('sync');
+  if (!validCapabilitiesReport(value.agentCapabilitiesSync)) return unknown('sync');
+  if (!validSkillReport(value.skillManifestSync)) return unknown('sync');
   if (value.workspaceSync !== undefined && (!isRecord(value.workspaceSync)
     || !isStringArray(value.workspaceSync.changed)
     || !isStringArray(value.workspaceSync.unchanged))) return unknown('sync');
   if (value.gitChanges !== undefined && value.gitChanges !== null && !validSyncResult(value.gitChanges)) return unknown('sync');
   if (value.warnings !== undefined && !isStringArray(value.warnings)) return unknown('sync');
+
+  // A shape-valid `summary` is not enough: it must also be the exact
+  // aggregate `buildSyncAggregate` derives from the rest of this same raw
+  // report, or a stale/forged/hand-edited summary would render silently
+  // alongside raw counts it disagrees with. Fail closed (never partially
+  // render) on any shape violation, derivation error, or numeric/field
+  // mismatch.
+  let verifiedSummary: SyncAggregateSummary | undefined;
+  if (value.summary !== undefined) {
+    if (!isSyncAggregateSummary(value.summary)) return unknown('sync', 'READ_SCHEMA_UNKNOWN');
+    const { summary: _summary, ...rawWithoutSummary } = value;
+    let derivedSummary: SyncAggregateSummary;
+    try {
+      derivedSummary = buildSyncAggregate(rawWithoutSummary as unknown as SyncCommandOutput);
+    } catch {
+      return unknown('sync', 'READ_SCHEMA_UNKNOWN');
+    }
+    if (stableStringify(derivedSummary) !== stableStringify(value.summary)) return unknown('sync', 'READ_SCHEMA_UNKNOWN');
+    verifiedSummary = value.summary;
+  }
+
+  const rows: ToolReadRow[] = [];
+  let count: number | null = null;
+  if (verifiedSummary !== undefined) {
+    const summary = verifiedSummary;
+    const fields: ToolReadField[] = [
+      { key: 'adapters', value: summary.adapters.errors > 0 ? `${summary.adapters.synced}/${summary.adapters.errors}` : `${summary.adapters.synced}` },
+      { key: 'skills', value: `${summary.skills.created + summary.skills.updated}/${summary.skills.unchanged}` },
+      { key: 'commits', value: summary.git === null ? '-' : `${summary.git.commits}` },
+      { key: 'conflicts', value: `${summary.conflicts.length}` },
+      { key: 'missingBaseline', value: `${summary.missingBaseline.count}` },
+    ];
+    // A truthful `'root-fallback'`/`'unavailable'` detection mode must stay
+    // visible on the card — the common `'range'` case adds nothing so the
+    // row stays unchanged for it (7104: a git failure must never look like
+    // "no changes").
+    if (summary.git !== null && summary.git.detection !== 'range') {
+      fields.push({ key: 'detection', value: summary.git.detection });
+      if (summary.git.issueCode !== null) fields.push({ key: 'detectionIssue', value: summary.git.issueCode });
+    }
+    if (summary.missingBaseline.count > 0) fields.push({ key: 'missingBaselineAgents', value: summary.missingBaseline.agentIds.join(',') });
+    if (summary.conflicts.length > 0) fields.push({ key: 'conflictAgents', value: summary.conflicts.map((entry) => `${entry.scope}:${entry.agentId}`).join(',') });
+    rows.push({ id: 'sync:aggregate', title: '', titleKind: 'summary', fields });
+    count = summary.conflicts.length;
+  }
+  rows.push({ id: 'sync:summary', title: '', titleKind: 'summary', fields: completeFields(value, SYNC_REPORT_KEYS, ['summary']) });
   return {
     kind: 'sync',
     state: 'valid',
-    count: null,
-    rows: [{ id: 'sync:summary', title: '', titleKind: 'summary', fields: completeFields(value, SYNC_REPORT_KEYS) }],
+    count,
+    rows,
     reasonCode: null,
   };
 }

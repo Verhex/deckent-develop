@@ -3123,6 +3123,130 @@ const BASE_MESSAGES: MessageMap = {
     en: '{prefix}Workspace artifact updated: {path}',
     tr: '{prefix}Workspace artifactı güncellendi: {path}',
   },
+  'sync.adapter_synced': {
+    en: '{prefix}{label} synced → @DECKENT.md ensured',
+    tr: '{prefix}{label} senkronlandı → @DECKENT.md sağlandı',
+  },
+  'sync.adapter_skipped': {
+    en: 'Warning: {label} skipped ({file}) — {reason}',
+    tr: 'Uyarı: {label} atlandı ({file}) — {reason}',
+  },
+  'sync.complete': {
+    en: 'Sync complete. Existing file contents preserved.',
+    tr: 'Senkronizasyon tamamlandı. Mevcut dosya içerikleri korundu.',
+  },
+  'sync.agent_prompt_created': {
+    en: '{prefix}Agent prompt created: .deckent/agents/{id}/PROMPT.md',
+    tr: '{prefix}Agent prompt oluşturuldu: .deckent/agents/{id}/PROMPT.md',
+  },
+  'sync.agent_prompt_updated': {
+    en: '{prefix}Agent prompt updated: .deckent/agents/{id}/PROMPT.md',
+    tr: '{prefix}Agent prompt güncellendi: .deckent/agents/{id}/PROMPT.md',
+  },
+  'sync.agent_manifest_created': {
+    en: '{prefix}Agent manifest created: .deckent/agents/{id}/agent.json',
+    tr: '{prefix}Agent manifesti oluşturuldu: .deckent/agents/{id}/agent.json',
+  },
+  'sync.agent_manifest_updated': {
+    en: '{prefix}Agent manifest updated: .deckent/agents/{id}/agent.json',
+    tr: '{prefix}Agent manifesti güncellendi: .deckent/agents/{id}/agent.json',
+  },
+  'sync.scope_prompt': {
+    en: 'agent prompt',
+    tr: 'agent prompt',
+  },
+  'sync.scope_manifest': {
+    en: 'agent manifest',
+    tr: 'agent manifesti',
+  },
+  'sync.conflict_local_edit': {
+    en: 'Conflict: {scope} "{id}" kept as your local edit — it differs from both the last-synced baseline and the current builtin ({path})',
+    tr: 'Çakışma: {scope} "{id}" yerel düzenlemeniz olarak korundu — hem son senkron baseline\'ından hem de güncel builtin\'den farklı ({path})',
+  },
+  'sync.missing_baseline_summary': {
+    en: '{count} shadow file(s) have no recorded sync baseline and were kept as-is (not a conflict): {ids}',
+    tr: '{count} shadow dosyasının kayıtlı senkron baseline\'ı yok; olduğu gibi korundu (çakışma değil): {ids}',
+  },
+  'sync.capabilities_migrated': {
+    en: '{prefix}Agent capabilities migrated: .deckent/agents/{id}/agent.json (provisional v3)',
+    tr: '{prefix}Agent yetenekleri taşındı: .deckent/agents/{id}/agent.json (geçici v3)',
+  },
+  'sync.capabilities_issue': {
+    en: 'Warning: agent "{id}" capabilities migration issue ({code}) — {message}',
+    tr: 'Uyarı: agent "{id}" yetenek taşıma sorunu ({code}) — {message}',
+  },
+  'sync.capabilities_summary': {
+    en: 'Agent capabilities: {migrated} migrated, {alreadyV3} already v3',
+    tr: 'Agent yetenekleri: {migrated} taşındı, {alreadyV3} zaten v3',
+  },
+  'sync.not_git_repo': {
+    en: 'Warning: Not a git repository — skipping change detection.',
+    tr: 'Uyarı: Git deposu değil — değişiklik tespiti atlanıyor.',
+  },
+  'sync.no_previous_sprint': {
+    en: 'Warning: No previous sprint found in .brain/sprints/ — run `deckent start` to begin your first sprint.',
+    tr: 'Uyarı: .brain/sprints/ içinde önceki sprint yok — ilk sprint için `deckent start` çalıştırın.',
+  },
+  'sync.no_changes': {
+    en: 'No changes since last sprint',
+    tr: 'Son sprintten bu yana değişiklik yok',
+  },
+  'sync.dry_run_memory': {
+    en: '[dry-run] Would record to memory.db:',
+    tr: '[kuru-çalıştırma] memory.db\'ye kaydedilecekti:',
+  },
+  'sync.aggregate_summary': {
+    en: 'Sync summary: {adapters} adapter(s) · {skills} skill(s) · {commits} commit(s) · {conflicts} conflict(s) · {missing} without baseline',
+    tr: 'Senkron özeti: {adapters} adapter · {skills} skill · {commits} commit · {conflicts} çakışma · {missing} baseline\'sız',
+  },
+  'sync.format_synced': {
+    en: 'Synced: {commits} commit(s) since {sprint}',
+    tr: 'Senkronlandı: {sprint} sonrası {commits} commit',
+  },
+  'sync.format_sprint_label': {
+    en: 'Sprint #{n}',
+    tr: 'Sprint #{n}',
+  },
+  'sync.format_last_sprint': {
+    en: 'last sprint',
+    tr: 'son sprint',
+  },
+  'sync.format_modified': {
+    en: '  Modified: {files}',
+    tr: '  Değiştirilen: {files}',
+  },
+  'sync.format_new': {
+    en: '  New: {files}',
+    tr: '  Yeni: {files}',
+  },
+  'sync.format_deleted': {
+    en: '  Deleted: {files}',
+    tr: '  Silinen: {files}',
+  },
+  'sync.format_renamed': {
+    en: '  Renamed: {files}',
+    tr: '  Yeniden adlandırılan: {files}',
+  },
+  'sync.format_recorded': {
+    en: '  → Recorded to memory.db for next sprint context',
+    tr: '  → Sonraki sprint bağlamı için memory.db\'ye kaydedildi',
+  },
+  'sync.format_more': {
+    en: ', and {remaining} more...',
+    tr: ' ve {remaining} tane daha...',
+  },
+  'sync.capabilities_protected': {
+    en: 'Agent capabilities: {count} manifest(s) kept as-is (locally owned shadow): {ids}',
+    tr: 'Agent yetenekleri: {count} manifest olduğu gibi korundu (yerel sahipli shadow): {ids}',
+  },
+  'sync.git_change_detection_unavailable': {
+    en: 'Warning: git change detection unavailable ({code}) — file lists are empty, not verified: {detail}',
+    tr: 'Uyarı: git değişiklik tespiti kullanılamıyor ({code}) — dosya listeleri boş, doğrulanmadı: {detail}',
+  },
+  'sync.git_change_detection_root_fallback': {
+    en: 'Note: history is shorter than the sprint window — changes compared against the repository root',
+    tr: 'Not: geçmiş sprint penceresinden kısa — değişiklikler depo köküne göre karşılaştırıldı',
+  },
   'sync.workspace_summary': {
     en: 'Workspace artifacts: {changed} changed, {unchanged} unchanged',
     tr: 'Workspace artifactları: {changed} değişti, {unchanged} değişmedi',

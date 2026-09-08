@@ -253,6 +253,7 @@ describe('syncBuiltinAgentPrompts', () => {
         shadowPath: SHADOW_PROMPT_PATH,
       });
       expect(report.conflicts[0]!.reason).toContain('locally edited');
+      expect(report.conflicts[0]!.kind).toBe('local-edit');
       // Never overwrite the shadow in the conflict branch.
       expect(fs.writeFileSync).not.toHaveBeenCalledWith(SHADOW_PROMPT_PATH, expect.anything(), expect.anything());
     });
@@ -283,6 +284,7 @@ describe('syncBuiltinAgentPrompts', () => {
       expect(report.keptLocal).toEqual([AGENT_ID]);
       expect(report.conflicts).toHaveLength(1);
       expect(report.conflicts[0]!.reason).toContain('no prior sync baseline recorded');
+      expect(report.conflicts[0]!.kind).toBe('missing-baseline');
       expect(fs.writeFileSync).not.toHaveBeenCalledWith(SHADOW_PROMPT_PATH, expect.anything(), expect.anything());
     });
   });

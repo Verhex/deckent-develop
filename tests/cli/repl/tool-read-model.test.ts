@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseToolReadJson } from '../../../src/cli/repl/tool-read-model.js';
+import { buildSyncAggregate, type SyncCommandOutput } from '../../../src/cli/helpers/sync-aggregate.js';
 
 describe('structured tool read model', () => {
   it('keeps doctor diagnostic rows when the execution outcome is later nonzero', () => {
@@ -167,12 +168,12 @@ describe('structured tool read model', () => {
     const report = {
       adaptersSynced: ['Claude'],
       adapterErrors: [{ label: 'Gemini', file: 'GEMINI.md', reason: 'kept-local' }],
-      agentPromptSync: { created: [], updated: ['worker'], conflicts: [] },
-      agentManifestSync: { created: [], updated: [], conflicts: [] },
-      agentCapabilitiesSync: { migrated: [], alreadyV3: ['worker'], issues: [] },
+      agentPromptSync: { created: [], updated: ['worker'], keptLocal: [], conflicts: [] },
+      agentManifestSync: { created: [], updated: [], keptLocal: [], conflicts: [] },
+      agentCapabilitiesSync: { migrated: [], alreadyV3: ['worker'], issues: [], protected: [] },
       skillManifestSync: { created: [], updated: [], keptLocal: [], unchanged: ['audit'], issues: [] },
       workspaceSync: { changed: [], unchanged: ['AGENTS.md'] },
-      gitChanges: { commits: 0, sprintId: null, modified: [], added: [], deleted: [], renamed: [] },
+      gitChanges: { commits: 0, sprintId: null, modified: [], added: [], deleted: [], renamed: [], detection: { mode: 'range', issue: null } },
       warnings: [],
       future: { retained: true },
     };
@@ -182,6 +183,495 @@ describe('structured tool read model', () => {
     expect(parsed.rows[0]?.fields).toContainEqual({ key: 'future', value: '{"retained":true}' });
     expect(parseToolReadJson('sync', '{}').state).toBe('schema-unknown');
     expect(parseToolReadJson('sync', JSON.stringify({ gitChanges: { commits: -1 } })).state).toBe('schema-unknown');
+  });
+
+  it('prepends an aggregate summary row ahead of the raw sync report and derives the conflict count from it', () => {
+    // The summary must be the exact aggregate `buildSyncAggregate` derives
+    // from this same raw report (see the "rejects a summary that disagrees
+    // with the raw report" tests below) — so this fixture is built from a
+    // real raw report via `buildSyncAggregate`, not hand-typed numbers.
+    const rawReport: SyncCommandOutput = {
+      adaptersSynced: ['Claude', 'Gemini'],
+      adapterErrors: [{ label: 'Cursor', file: 'AGENTS.md', reason: 'kept-local' }],
+      agentPromptSync: {
+        created: [],
+        updated: ['worker'],
+        keptLocal: [],
+        conflicts: [
+          { agentId: 'a', shadowPath: 'p1', builtinPath: 'b1', reason: 'r1', kind: 'missing-baseline' },
+          { agentId: 'worker', shadowPath: 'p2', builtinPath: 'b2', reason: 'r2', kind: 'local-edit' },
+        ],
+      },
+      agentManifestSync: {
+        created: [],
+        updated: [],
+        keptLocal: [],
+        conflicts: [
+          { agentId: 'b', shadowPath: 'p3', builtinPath: 'b3', reason: 'r3', kind: 'missing-baseline' },
+        ],
+      },
+      skillManifestSync: { created: ['s1'], updated: [], keptLocal: [], unchanged: ['s2', 's3', 's4'], issues: [] },
+      // A normal `HEAD~N..HEAD` comparison — the common case, so the
+      // `sync:aggregate` row below carries no `detection` field for it
+      // (see the dedicated "git change detection (7104)" describe block).
+      gitChanges: { commits: 4, sprintId: null, modified: [], added: [], deleted: [], renamed: [], detection: { mode: 'range', issue: null } },
+      warnings: [],
+    };
+    const summary = buildSyncAggregate(rawReport);
+    const report = { ...rawReport, summary };
+    const parsed = parseToolReadJson('sync', JSON.stringify(report));
+    expect(parsed.state).toBe('valid');
+    expect(parsed.count).toBe(1);
+    expect(parsed.rows[0]?.id).toBe('sync:aggregate');
+    expect(parsed.rows[0]?.fields).toEqual([
+      { key: 'adapters', value: '2/1' },
+      { key: 'skills', value: '1/3' },
+      { key: 'commits', value: '4' },
+      { key: 'conflicts', value: '1' },
+      { key: 'missingBaseline', value: '2' },
+      { key: 'missingBaselineAgents', value: 'a,b' },
+      { key: 'conflictAgents', value: 'agent-prompt:worker' },
+    ]);
+    expect(parsed.rows[1]?.id).toBe('sync:summary');
+    expect(parsed.rows[1]?.fields.map((field) => field.key)).not.toContain('summary');
+  });
+
+  it('renders a dash for commits and omits the empty conditional fields when the aggregate summary has no git repository', () => {
+    const summary = {
+      schemaVersion: 1,
+      adapters: { synced: 0, errors: 0 },
+      agentPrompts: { created: 0, updated: 0, keptLocal: 0 },
+      agentManifests: { created: 0, updated: 0, keptLocal: 0 },
+      capabilities: { migrated: 0, issues: 0 },
+      skills: { created: 0, updated: 0, keptLocal: 0, unchanged: 0, issues: 0 },
+      workspace: { changed: 0, unchanged: 0 },
+      git: null,
+      missingBaseline: { count: 0, agentIds: [] },
+      conflicts: [],
+      warnings: 0,
+    };
+    const parsed = parseToolReadJson('sync', JSON.stringify({ warnings: [], summary }));
+    expect(parsed.count).toBe(0);
+    expect(parsed.rows[0]?.fields).toContainEqual({ key: 'adapters', value: '0' });
+    expect(parsed.rows[0]?.fields).toContainEqual({ key: 'commits', value: '-' });
+    expect(parsed.rows[0]?.fields.map((field) => field.key)).not.toContain('missingBaselineAgents');
+    expect(parsed.rows[0]?.fields.map((field) => field.key)).not.toContain('conflictAgents');
+  });
+
+  describe('git change detection (7104: a git failure must never look like "no changes")', () => {
+    it('root-fallback: the `sync:aggregate` row surfaces a `detection` field carrying the mode', () => {
+      const raw: SyncCommandOutput = {
+        gitChanges: {
+          commits: 500,
+          sprintId: '7104',
+          modified: ['deep-history.ts'],
+          added: [],
+          deleted: [],
+          renamed: [],
+          detection: { mode: 'root-fallback', issue: null },
+        },
+      };
+      const summary = buildSyncAggregate(raw);
+      const parsed = parseToolReadJson('sync', JSON.stringify({ ...raw, summary }));
+      expect(parsed.state).toBe('valid');
+      expect(parsed.rows[0]?.id).toBe('sync:aggregate');
+      expect(parsed.rows[0]?.fields).toContainEqual({ key: 'commits', value: '500' });
+      expect(parsed.rows[0]?.fields).toContainEqual({ key: 'detection', value: 'root-fallback' });
+    });
+
+    it("unavailable (with an issue): the row's `commits` count still shows the raw number, plus a `detection` field", () => {
+      const raw: SyncCommandOutput = {
+        gitChanges: {
+          commits: 5,
+          sprintId: '7104',
+          modified: [],
+          added: [],
+          deleted: [],
+          renamed: [],
+          detection: { mode: 'unavailable', issue: { code: 'GIT_DIFF_FAILED', detail: 'fatal: bad revision' } },
+        },
+      };
+      const summary = buildSyncAggregate(raw);
+      const parsed = parseToolReadJson('sync', JSON.stringify({ ...raw, summary }));
+      expect(parsed.state).toBe('valid');
+      expect(parsed.rows[0]?.fields).toContainEqual({ key: 'commits', value: '5' });
+      expect(parsed.rows[0]?.fields).toContainEqual({ key: 'detection', value: 'unavailable' });
+    });
+
+    it('malformed detection: an out-of-range mode, and a non-null issue with an unknown code, both fail closed to schema-unknown', () => {
+      expect(parseToolReadJson('sync', JSON.stringify({
+        gitChanges: { commits: 1, sprintId: null, modified: [], added: [], deleted: [], renamed: [], detection: { mode: 'stale', issue: null } },
+      })).state).toBe('schema-unknown');
+      expect(parseToolReadJson('sync', JSON.stringify({
+        gitChanges: {
+          commits: 1,
+          sprintId: null,
+          modified: [],
+          added: [],
+          deleted: [],
+          renamed: [],
+          detection: { mode: 'unavailable', issue: { code: 'GIT_FETCH_FAILED', detail: 'x' } },
+        },
+      })).state).toBe('schema-unknown');
+      expect(parseToolReadJson('sync', JSON.stringify({
+        gitChanges: { commits: 1, sprintId: null, modified: [], added: [], deleted: [], renamed: [], detection: { mode: 'range', issue: 'not-an-object-or-null' } },
+      })).state).toBe('schema-unknown');
+    });
+
+    it('legacy gitChanges without `detection`: still valid, and the derived aggregate fails closed to `detection: \'unavailable\'` on the row', () => {
+      // A pre-7104 producer never emitted `detection` at all; the current
+      // `SyncResult` type declares it required, so the whole literal is cast
+      // through `unknown` to model that legacy runtime shape without
+      // fighting the type.
+      const raw = {
+        gitChanges: { commits: 2, sprintId: '7104', modified: ['a.ts'], added: [], deleted: [], renamed: [] },
+      } as unknown as SyncCommandOutput;
+      const summary = buildSyncAggregate(raw);
+      const parsed = parseToolReadJson('sync', JSON.stringify({ ...raw, summary }));
+      expect(parsed.state).toBe('valid');
+      expect(parsed.rows[0]?.fields).toContainEqual({ key: 'commits', value: '2' });
+      expect(parsed.rows[0]?.fields).toContainEqual({ key: 'detection', value: 'unavailable' });
+      // 7104 extension: a legacy raw report carries no `detection.issue` at
+      // all (it predates `detection` entirely), so the derived `issueCode`
+      // must fail closed to `null` — never a guessed code — and the row
+      // must carry no `detectionIssue` field for it.
+      expect(summary.git?.issueCode).toBeNull();
+      expect(parsed.rows[0]?.fields.map((field) => field.key)).not.toContain('detectionIssue');
+    });
+
+    it("range: the common case adds no `detection` field to the row", () => {
+      const raw: SyncCommandOutput = {
+        gitChanges: { commits: 4, sprintId: '7104', modified: ['x.ts'], added: [], deleted: [], renamed: [], detection: { mode: 'range', issue: null } },
+      };
+      const summary = buildSyncAggregate(raw);
+      const parsed = parseToolReadJson('sync', JSON.stringify({ ...raw, summary }));
+      expect(parsed.state).toBe('valid');
+      expect(parsed.rows[0]?.fields).toContainEqual({ key: 'commits', value: '4' });
+      expect(parsed.rows[0]?.fields.map((field) => field.key)).not.toContain('detection');
+    });
+
+    it.each(['GIT_LOG_FAILED', 'GIT_LS_TREE_FAILED'] as const)(
+      'unavailable + %s: the raw detection issue code round-trips through a matching summary as `valid`',
+      (code) => {
+        const raw: SyncCommandOutput = {
+          gitChanges: {
+            commits: 3,
+            sprintId: '7104',
+            modified: [],
+            added: [],
+            deleted: [],
+            renamed: [],
+            detection: { mode: 'unavailable', issue: { code, detail: 'x' } },
+          },
+        };
+        const summary = buildSyncAggregate(raw);
+        const parsed = parseToolReadJson('sync', JSON.stringify({ ...raw, summary }));
+        expect(parsed.state).toBe('valid');
+      },
+    );
+
+    it('an unknown raw issue code (`GIT_FOO`) fails closed to schema-unknown', () => {
+      const parsed = parseToolReadJson('sync', JSON.stringify({
+        gitChanges: {
+          commits: 1, sprintId: null, modified: [], added: [], deleted: [], renamed: [],
+          detection: { mode: 'unavailable', issue: { code: 'GIT_FOO', detail: 'x' } },
+        },
+      }));
+      expect(parsed.state).toBe('schema-unknown');
+    });
+
+    it('incoherent raw: mode `range` paired with a non-null, otherwise well-formed issue object fails closed to schema-unknown', () => {
+      const parsed = parseToolReadJson('sync', JSON.stringify({
+        gitChanges: {
+          commits: 1, sprintId: null, modified: [], added: [], deleted: [], renamed: [],
+          detection: { mode: 'range', issue: { code: 'GIT_LOG_FAILED', detail: 'x' } },
+        },
+      }));
+      expect(parsed.state).toBe('schema-unknown');
+    });
+
+    it('the `sync:aggregate` row places `detectionIssue` immediately after `detection` for `unavailable`, omits `detectionIssue` (but keeps `detection`) for `root-fallback`, and carries neither for `range`', () => {
+      const unavailableRaw: SyncCommandOutput = {
+        gitChanges: {
+          commits: 1, sprintId: '7104', modified: [], added: [], deleted: [], renamed: [],
+          detection: { mode: 'unavailable', issue: { code: 'GIT_LOG_FAILED', detail: 'fatal: bad object HEAD' } },
+        },
+      };
+      const unavailableParsed = parseToolReadJson('sync', JSON.stringify({ ...unavailableRaw, summary: buildSyncAggregate(unavailableRaw) }));
+      const unavailableFields = unavailableParsed.rows[0]?.fields ?? [];
+      const detectionIndex = unavailableFields.findIndex((field) => field.key === 'detection');
+      expect(detectionIndex).toBeGreaterThanOrEqual(0);
+      expect(unavailableFields[detectionIndex]).toEqual({ key: 'detection', value: 'unavailable' });
+      expect(unavailableFields[detectionIndex + 1]).toEqual({ key: 'detectionIssue', value: 'GIT_LOG_FAILED' });
+
+      const rootFallbackRaw: SyncCommandOutput = {
+        gitChanges: {
+          commits: 500, sprintId: '7104', modified: ['deep-history.ts'], added: [], deleted: [], renamed: [],
+          detection: { mode: 'root-fallback', issue: null },
+        },
+      };
+      const rootFallbackParsed = parseToolReadJson('sync', JSON.stringify({ ...rootFallbackRaw, summary: buildSyncAggregate(rootFallbackRaw) }));
+      const rootFallbackKeys = rootFallbackParsed.rows[0]?.fields.map((field) => field.key) ?? [];
+      expect(rootFallbackKeys).toContain('detection');
+      expect(rootFallbackKeys).not.toContain('detectionIssue');
+
+      const rangeRaw: SyncCommandOutput = {
+        gitChanges: { commits: 4, sprintId: '7104', modified: ['x.ts'], added: [], deleted: [], renamed: [], detection: { mode: 'range', issue: null } },
+      };
+      const rangeParsed = parseToolReadJson('sync', JSON.stringify({ ...rangeRaw, summary: buildSyncAggregate(rangeRaw) }));
+      const rangeKeys = rangeParsed.rows[0]?.fields.map((field) => field.key) ?? [];
+      expect(rangeKeys).not.toContain('detection');
+      expect(rangeKeys).not.toContain('detectionIssue');
+    });
+
+    it("a `commits: 0` raw with GIT_LOG_FAILED renders as `valid` with `commits: '0'` AND `detectionIssue: 'GIT_LOG_FAILED'` on the row — the REPL must show why a zero is untrusted", () => {
+      const raw: SyncCommandOutput = {
+        gitChanges: {
+          commits: 0, sprintId: '7104', modified: [], added: [], deleted: [], renamed: [],
+          detection: { mode: 'unavailable', issue: { code: 'GIT_LOG_FAILED', detail: 'fatal: bad object HEAD' } },
+        },
+      };
+      const summary = buildSyncAggregate(raw);
+      const parsed = parseToolReadJson('sync', JSON.stringify({ ...raw, summary }));
+      expect(parsed.state).toBe('valid');
+      expect(parsed.rows[0]?.fields).toContainEqual({ key: 'commits', value: '0' });
+      expect(parsed.rows[0]?.fields).toContainEqual({ key: 'detectionIssue', value: 'GIT_LOG_FAILED' });
+    });
+  });
+
+  it('fails closed to schema-unknown rather than partially rendering a malformed aggregate summary', () => {
+    expect(parseToolReadJson('sync', JSON.stringify({ warnings: [], summary: { schemaVersion: 2 } })).state).toBe('schema-unknown');
+    expect(parseToolReadJson('sync', JSON.stringify({
+      warnings: [],
+      summary: {
+        schemaVersion: 1,
+        adapters: { synced: 0, errors: 0 },
+        agentPrompts: { created: 0, updated: 0, keptLocal: 0 },
+        agentManifests: { created: 0, updated: 0, keptLocal: 0 },
+        capabilities: { migrated: 0, issues: 0 },
+        skills: { created: 0, updated: 0, keptLocal: 0, unchanged: 0, issues: 0 },
+        workspace: { changed: 0, unchanged: 0 },
+        git: null,
+        missingBaseline: { count: -1, agentIds: [] },
+        conflicts: [],
+        warnings: 0,
+      },
+    })).state).toBe('schema-unknown');
+  });
+
+  it('accepts a summary that is exactly buildSyncAggregate applied to the same raw report (real producer shape)', () => {
+    const raw: SyncCommandOutput = {
+      adaptersSynced: ['Claude'],
+      adapterErrors: [],
+      agentPromptSync: { created: ['worker'], updated: [], keptLocal: [], conflicts: [] },
+      agentManifestSync: { created: [], updated: ['worker'], keptLocal: [], conflicts: [] },
+      agentCapabilitiesSync: { migrated: ['worker'], alreadyV3: [], issues: [], protected: [] },
+      skillManifestSync: { created: [], updated: [], keptLocal: [], unchanged: ['audit'], issues: [] },
+      workspaceSync: { changed: ['IDENTITY.md'], unchanged: [] },
+      gitChanges: { commits: 1, sprintId: '7104', modified: ['x.ts'], added: [], deleted: [], renamed: [], detection: { mode: 'range', issue: null } },
+      warnings: ['w1'],
+    };
+    const summary = buildSyncAggregate(raw);
+    const parsed = parseToolReadJson('sync', JSON.stringify({ ...raw, summary }));
+
+    expect(parsed.state).toBe('valid');
+    expect(parsed.count).toBe(0);
+    expect(parsed.rows[0]?.id).toBe('sync:aggregate');
+    expect(parsed.rows.find((row) => row.id === 'sync:summary')).toBeDefined();
+  });
+
+  describe('rejects a summary that disagrees with the raw report it was derived from (raw is the truth, not the claimed summary)', () => {
+    const baseRaw: SyncCommandOutput = {
+      adaptersSynced: ['Claude'],
+      adapterErrors: [],
+      agentPromptSync: {
+        created: ['worker'],
+        updated: [],
+        keptLocal: [],
+        conflicts: [{ agentId: 'legacy', shadowPath: 'p', builtinPath: 'b', reason: 'r', kind: 'local-edit' }],
+      },
+      agentManifestSync: {
+        created: [],
+        updated: ['worker'],
+        keptLocal: [],
+        conflicts: [{ agentId: 'unverified', shadowPath: 'p2', builtinPath: 'b2', reason: 'r2', kind: 'missing-baseline' }],
+      },
+      agentCapabilitiesSync: { migrated: [], alreadyV3: [], issues: [], protected: [] },
+      skillManifestSync: { created: [], updated: [], keptLocal: [], unchanged: ['audit'], issues: [] },
+      workspaceSync: { changed: [], unchanged: ['AGENTS.md'] },
+      gitChanges: { commits: 3, sprintId: '7104', modified: ['a.ts'], added: [], deleted: [], renamed: [], detection: { mode: 'range', issue: null } },
+      warnings: ['w1'],
+    };
+    const baseSummary = buildSyncAggregate(baseRaw);
+
+    it('sanity: the unmodified raw/summary pair is internally consistent and renders valid', () => {
+      expect(parseToolReadJson('sync', JSON.stringify({ ...baseRaw, summary: baseSummary })).state).toBe('valid');
+    });
+
+    it('adapters: raw reports zero synced adapters while the forged summary claims 999', () => {
+      const parsed = parseToolReadJson('sync', JSON.stringify({
+        ...baseRaw,
+        adaptersSynced: [],
+        summary: { ...baseSummary, adapters: { ...baseSummary.adapters, synced: 999 } },
+      }));
+      expect(parsed.state).toBe('schema-unknown');
+    });
+
+    it('agentPrompts: a forged created count disagrees with the raw report', () => {
+      const parsed = parseToolReadJson('sync', JSON.stringify({
+        ...baseRaw,
+        summary: { ...baseSummary, agentPrompts: { ...baseSummary.agentPrompts, created: baseSummary.agentPrompts.created + 41 } },
+      }));
+      expect(parsed.state).toBe('schema-unknown');
+    });
+
+    it('skills: a forged unchanged count disagrees with the raw report', () => {
+      const parsed = parseToolReadJson('sync', JSON.stringify({
+        ...baseRaw,
+        summary: { ...baseSummary, skills: { ...baseSummary.skills, unchanged: baseSummary.skills.unchanged + 6 } },
+      }));
+      expect(parsed.state).toBe('schema-unknown');
+    });
+
+    it('workspace: a forged unchanged count disagrees with the raw report', () => {
+      const parsed = parseToolReadJson('sync', JSON.stringify({
+        ...baseRaw,
+        summary: { ...baseSummary, workspace: { ...baseSummary.workspace, unchanged: baseSummary.workspace.unchanged + 8 } },
+      }));
+      expect(parsed.state).toBe('schema-unknown');
+    });
+
+    it('git: a forged commits count disagrees with the raw report', () => {
+      const parsed = parseToolReadJson('sync', JSON.stringify({
+        ...baseRaw,
+        summary: { ...baseSummary, git: { ...baseSummary.git!, commits: 999 } },
+      }));
+      expect(parsed.state).toBe('schema-unknown');
+    });
+
+    it('git: a forged `detection` disagrees with a raw report whose provenance was actually a clean range (7104: a git failure must never look like "no changes", nor the reverse)', () => {
+      // `baseRaw.gitChanges.detection.mode` is 'range'; claiming 'unavailable'
+      // in the summary is exactly the kind of provenance lie this equality
+      // check exists to catch.
+      const parsed = parseToolReadJson('sync', JSON.stringify({
+        ...baseRaw,
+        summary: { ...baseSummary, git: { ...baseSummary.git!, detection: 'unavailable' } },
+      }));
+      expect(parsed.state).toBe('schema-unknown');
+    });
+
+    it('git: a forged `issueCode` disagrees with the raw report’s actual issue code (raw names `GIT_LOG_FAILED`, summary claims `GIT_DIFF_FAILED`)', () => {
+      const unavailableRaw: SyncCommandOutput = {
+        ...baseRaw,
+        gitChanges: {
+          commits: 0, sprintId: '7104', modified: [], added: [], deleted: [], renamed: [],
+          detection: { mode: 'unavailable', issue: { code: 'GIT_LOG_FAILED', detail: 'fatal: bad object HEAD' } },
+        },
+      };
+      const unavailableSummary = buildSyncAggregate(unavailableRaw);
+      const parsed = parseToolReadJson('sync', JSON.stringify({
+        ...unavailableRaw,
+        summary: { ...unavailableSummary, git: { ...unavailableSummary.git!, issueCode: 'GIT_DIFF_FAILED' } },
+      }));
+      expect(parsed.state).toBe('schema-unknown');
+    });
+
+    it('git: a forged null `issueCode` disagrees with a raw report that names a real issue', () => {
+      const unavailableRaw: SyncCommandOutput = {
+        ...baseRaw,
+        gitChanges: {
+          commits: 0, sprintId: '7104', modified: [], added: [], deleted: [], renamed: [],
+          detection: { mode: 'unavailable', issue: { code: 'GIT_LOG_FAILED', detail: 'fatal: bad object HEAD' } },
+        },
+      };
+      const unavailableSummary = buildSyncAggregate(unavailableRaw);
+      const parsed = parseToolReadJson('sync', JSON.stringify({
+        ...unavailableRaw,
+        summary: { ...unavailableSummary, git: { ...unavailableSummary.git!, issueCode: null } },
+      }));
+      expect(parsed.state).toBe('schema-unknown');
+    });
+
+    it('git: a forged null block disagrees with a raw report that has real git changes', () => {
+      const parsed = parseToolReadJson('sync', JSON.stringify({
+        ...baseRaw,
+        summary: { ...baseSummary, git: null },
+      }));
+      expect(parsed.state).toBe('schema-unknown');
+    });
+
+    it('git: a forged non-null block disagrees with a raw report that has no git changes', () => {
+      const { gitChanges: _gitChanges, ...rawWithoutGit } = baseRaw;
+      const parsed = parseToolReadJson('sync', JSON.stringify({ ...rawWithoutGit, summary: baseSummary }));
+      expect(parsed.state).toBe('schema-unknown');
+    });
+
+    it('missingBaseline: a forged count/agentIds pair disagrees with the raw report, despite being internally shape-consistent', () => {
+      const parsed = parseToolReadJson('sync', JSON.stringify({
+        ...baseRaw,
+        summary: { ...baseSummary, missingBaseline: { count: 2, agentIds: ['unverified', 'ghost'] } },
+      }));
+      expect(parsed.state).toBe('schema-unknown');
+    });
+
+    it('conflicts: an extra entry with no corresponding raw conflict record is rejected', () => {
+      const parsed = parseToolReadJson('sync', JSON.stringify({
+        ...baseRaw,
+        summary: {
+          ...baseSummary,
+          conflicts: [...baseSummary.conflicts, { scope: 'agent-manifest', agentId: 'ghost', kind: 'local-edit' }],
+        },
+      }));
+      expect(parsed.state).toBe('schema-unknown');
+    });
+
+    it('warnings: a forged warnings count disagrees with the raw report', () => {
+      const parsed = parseToolReadJson('sync', JSON.stringify({
+        ...baseRaw,
+        summary: { ...baseSummary, warnings: baseSummary.warnings + 4 },
+      }));
+      expect(parsed.state).toBe('schema-unknown');
+    });
+  });
+
+  it('rejects a summary whose conflicts contain a missing-baseline entry even when it is otherwise shape-consistent', () => {
+    const parsed = parseToolReadJson('sync', JSON.stringify({
+      warnings: [],
+      summary: {
+        schemaVersion: 1,
+        adapters: { synced: 0, errors: 0 },
+        agentPrompts: { created: 0, updated: 0, keptLocal: 0 },
+        agentManifests: { created: 0, updated: 0, keptLocal: 0 },
+        capabilities: { migrated: 0, issues: 0 },
+        skills: { created: 0, updated: 0, keptLocal: 0, unchanged: 0, issues: 0 },
+        workspace: { changed: 0, unchanged: 0 },
+        git: null,
+        missingBaseline: { count: 0, agentIds: [] },
+        conflicts: [{ scope: 'agent-prompt', agentId: 'x', kind: 'missing-baseline' }],
+        warnings: 0,
+      },
+    }));
+    expect(parsed.state).toBe('schema-unknown');
+  });
+
+  it('leaves state and count unchanged for the canonical sync sample when no aggregate summary is present', () => {
+    const report = {
+      adaptersSynced: ['Claude'],
+      adapterErrors: [{ label: 'Gemini', file: 'GEMINI.md', reason: 'kept-local' }],
+      agentPromptSync: { created: [], updated: ['worker'], keptLocal: [], conflicts: [] },
+      agentManifestSync: { created: [], updated: [], keptLocal: [], conflicts: [] },
+      agentCapabilitiesSync: { migrated: [], alreadyV3: ['worker'], issues: [], protected: [] },
+      skillManifestSync: { created: [], updated: [], keptLocal: [], unchanged: ['audit'], issues: [] },
+      workspaceSync: { changed: [], unchanged: ['AGENTS.md'] },
+      gitChanges: { commits: 0, sprintId: null, modified: [], added: [], deleted: [], renamed: [], detection: { mode: 'range', issue: null } },
+      warnings: [],
+      future: { retained: true },
+    };
+    const parsed = parseToolReadJson('sync', JSON.stringify(report));
+    expect(parsed.state).toBe('valid');
+    expect(parsed.count).toBeNull();
+    expect(parsed.rows).toHaveLength(1);
+    expect(parsed.rows[0]?.id).toBe('sync:summary');
   });
 
   it('keeps producer error JSON visibly raw and never promotes it to a successful structured action', () => {
@@ -279,5 +769,128 @@ describe('structured tool read model', () => {
     expect(parsed.rows[0]?.fields).toContainEqual({ key: 'future', value: '{"version":2}' });
     expect(parseToolReadJson('audit-compliance', JSON.stringify({ ...report, controls: { ...report.controls, auditChainIntact: 'UNKNOWN' } })).state)
       .toBe('schema-unknown');
+  });
+
+  // MASTER 7104 F2 (external review, second pass): the raw nested sync
+  // reports (`agentPromptSync` / `agentManifestSync` / `agentCapabilitiesSync`
+  // / `skillManifestSync`) were previously only shape-checked with `isRecord`.
+  // `buildSyncAggregate` reads nothing but `.length` off their arrays, so an
+  // array-LIKE object (e.g. `{ length: 1 }`) derives the exact same count a
+  // real array of that length would — meaning a forged raw report paired with
+  // a hand-matched `summary` slipped past the canonical-equality gate too.
+  // These cases prove the raw reports are now deep-validated (real arrays,
+  // real conflict/issue records) BEFORE the equality gate is ever reached.
+  describe('deep raw-report validation (7104 F2)', () => {
+    it('agentCapabilitiesSync: array-like `migrated`/`issues` are rejected even when a hand-built summary claims matching counts (only the deep validator catches this — the equality gate alone cannot)', () => {
+      const raw = {
+        agentCapabilitiesSync: { migrated: { length: 1 }, alreadyV3: [], issues: { length: 0 }, protected: [] },
+        summary: {
+          schemaVersion: 1,
+          adapters: { synced: 0, errors: 0 },
+          agentPrompts: { created: 0, updated: 0, keptLocal: 0 },
+          agentManifests: { created: 0, updated: 0, keptLocal: 0 },
+          capabilities: { migrated: 1, issues: 0 },
+          skills: { created: 0, updated: 0, keptLocal: 0, unchanged: 0, issues: 0 },
+          workspace: { changed: 0, unchanged: 0 },
+          git: null,
+          missingBaseline: { count: 0, agentIds: [] },
+          conflicts: [],
+          warnings: 0,
+        },
+      };
+      expect(parseToolReadJson('sync', JSON.stringify(raw)).state).toBe('schema-unknown');
+    });
+
+    it('agentPromptSync: array-like `created` is rejected', () => {
+      const raw = {
+        agentPromptSync: { created: { length: 0 }, updated: [], keptLocal: [], conflicts: [] },
+      };
+      expect(parseToolReadJson('sync', JSON.stringify(raw)).state).toBe('schema-unknown');
+    });
+
+    it('agentPromptSync.conflicts: a non-record entry, and separately an entry with an out-of-range `kind`, are both rejected', () => {
+      expect(parseToolReadJson('sync', JSON.stringify({
+        agentPromptSync: { created: [], updated: [], keptLocal: [], conflicts: ['not-a-record'] },
+      })).state).toBe('schema-unknown');
+      expect(parseToolReadJson('sync', JSON.stringify({
+        agentPromptSync: {
+          created: [], updated: [], keptLocal: [],
+          conflicts: [{ agentId: 'a', shadowPath: 'p', builtinPath: 'b', reason: 'r', kind: 'bogus' }],
+        },
+      })).state).toBe('schema-unknown');
+    });
+
+    it('skillManifestSync.issues: a record missing `skillId`/`reason` is rejected', () => {
+      const raw = {
+        skillManifestSync: { created: [], updated: [], unchanged: [], keptLocal: [], issues: [{}] },
+      };
+      expect(parseToolReadJson('sync', JSON.stringify(raw)).state).toBe('schema-unknown');
+    });
+
+    it('agentCapabilitiesSync.issues: a record missing `code`/`message` is rejected', () => {
+      const raw = {
+        agentCapabilitiesSync: { migrated: [], alreadyV3: [], issues: [{ agentId: 'a' }], protected: [] },
+      };
+      expect(parseToolReadJson('sync', JSON.stringify(raw)).state).toBe('schema-unknown');
+    });
+
+    it('agentManifestSync.keptLocal: a string instead of a string array is rejected', () => {
+      const raw = {
+        agentManifestSync: { created: [], updated: [], keptLocal: 'worker', conflicts: [] },
+      };
+      expect(parseToolReadJson('sync', JSON.stringify(raw)).state).toBe('schema-unknown');
+    });
+
+    it('accepts a real producer-shaped report with all four nested reports fully populated, including conflicts of both kinds and a non-empty capabilities.protected', () => {
+      const raw: SyncCommandOutput = {
+        adaptersSynced: ['Claude', 'Gemini'],
+        adapterErrors: [{ label: 'Cursor', file: 'AGENTS.md', reason: 'kept-local' }],
+        agentPromptSync: {
+          created: ['new-agent'],
+          updated: ['worker'],
+          keptLocal: ['legacy'],
+          conflicts: [
+            { agentId: 'legacy', shadowPath: 'p1', builtinPath: 'b1', reason: 'r1', kind: 'missing-baseline' },
+            { agentId: 'worker', shadowPath: 'p2', builtinPath: 'b2', reason: 'r2', kind: 'local-edit' },
+          ],
+        },
+        agentManifestSync: {
+          created: [],
+          updated: ['worker'],
+          keptLocal: ['legacy'],
+          conflicts: [
+            { agentId: 'legacy', shadowPath: 'p3', builtinPath: 'b3', reason: 'r3', kind: 'missing-baseline' },
+          ],
+        },
+        agentCapabilitiesSync: {
+          migrated: ['worker'],
+          alreadyV3: ['audit'],
+          issues: [{ agentId: 'ghost', code: 'MANIFEST_UNREADABLE', message: 'bad json' }],
+          protected: ['legacy'],
+        },
+        skillManifestSync: {
+          created: ['s1'], updated: ['s2'], unchanged: ['s3'], keptLocal: ['s4'],
+          issues: [{ skillId: 's5', reason: 'schema-unknown' }],
+        },
+        workspaceSync: { changed: ['IDENTITY.md'], unchanged: ['AGENTS.md'] },
+        gitChanges: { commits: 2, sprintId: '7104', modified: ['x.ts'], added: [], deleted: [], renamed: [], detection: { mode: 'range', issue: null } },
+        warnings: ['w1'],
+      };
+      const summary = buildSyncAggregate(raw);
+      const parsed = parseToolReadJson('sync', JSON.stringify({ ...raw, summary }));
+      expect(parsed.state).toBe('valid');
+    });
+
+    it('accepts a legacy conflict entry with no `kind` field at all (predates the field; buildSyncAggregate conservatively classifies it as local-edit)', () => {
+      const raw = {
+        agentPromptSync: {
+          created: [], updated: [], keptLocal: ['legacy'],
+          conflicts: [{ agentId: 'legacy', shadowPath: 'p', builtinPath: 'b', reason: 'r' }],
+        },
+      } as unknown as SyncCommandOutput;
+      const summary = buildSyncAggregate(raw);
+      const parsed = parseToolReadJson('sync', JSON.stringify({ ...raw, summary }));
+      expect(parsed.state).toBe('valid');
+    });
   });
 });

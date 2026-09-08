@@ -43,11 +43,14 @@ vi.mock('../../../src/core/memory-store.js', () => ({
 
 import { ensureDeckentImport } from '../../../src/core/utils.js';
 import { ensureCursorRules } from '../../../src/cli/helpers/cursor-config.js';
+import { getMessage } from '../../../src/cli/helpers/messages.js';
 import {
   getLastSprintTimestamp,
   isGitRepo,
   getCommitsSince,
   getChangedFiles,
+  probeCommitsSince,
+  collectGitChanges,
   writeSyncToMemory,
   formatSyncOutput,
   runSync,
@@ -190,6 +193,22 @@ describe('getCommitsSince', () => {
     const commits = getCommitsSince('/project', '2026-03-20T00:00:00Z');
     expect(commits).toHaveLength(0);
   });
+
+  it('legacy-compat: matches probeCommitsSince(...).commits ([]) on a git log failure', () => {
+    vi.mocked(spawnSync).mockReturnValue({
+      status: 128,
+      stdout: '',
+      stderr: "fatal: your current branch 'main' does not have any commits yet\n",
+      pid: 1,
+      output: [],
+      signal: null,
+    });
+
+    expect(getCommitsSince('/project', '2026-03-20T00:00:00Z')).toEqual(
+      probeCommitsSince('/project', '2026-03-20T00:00:00Z').commits,
+    );
+    expect(getCommitsSince('/project', '2026-03-20T00:00:00Z')).toEqual([]);
+  });
 });
 
 // ─── Unit Tests: getChangedFiles ────────────────────────────────────
@@ -199,21 +218,33 @@ describe('getChangedFiles', () => {
     vi.clearAllMocks();
   });
 
-  it('categorizes modified, added, deleted, and renamed files', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: 'M\tsrc/auth/jwt.ts\nA\tsrc/utils/crypto.ts\nD\tsrc/old-auth.ts\nR100\tsrc/foo.ts\tsrc/bar.ts\n',
-      stderr: '',
-      pid: 1,
-      output: [],
-      signal: null,
+  /**
+   * Stub both git calls getChangedFiles makes: `rev-list --count HEAD`
+   * (history depth) then `diff --name-status` (the actual comparison).
+   * Dispatches on args[0] the way the real two-call sequence does (7104).
+   */
+  function mockGitCalls(historyDepth: number, diffStdout: string): void {
+    vi.mocked(spawnSync).mockImplementation((_cmd, args) => {
+      const argv = (args ?? []) as string[];
+      if (argv[0] === 'rev-list') {
+        return { status: 0, stdout: `${historyDepth}\n`, stderr: '', pid: 1, output: [], signal: null };
+      }
+      return { status: 0, stdout: diffStdout, stderr: '', pid: 1, output: [], signal: null };
     });
+  }
+
+  it('categorizes modified, added, deleted, and renamed files', () => {
+    mockGitCalls(10, 'M\tsrc/auth/jwt.ts\nA\tsrc/utils/crypto.ts\nD\tsrc/old-auth.ts\nR100\tsrc/foo.ts\tsrc/bar.ts\n');
 
     const changes = getChangedFiles('/project', 3);
     expect(changes.modified).toEqual(['src/auth/jwt.ts']);
     expect(changes.added).toEqual(['src/utils/crypto.ts']);
     expect(changes.deleted).toEqual(['src/old-auth.ts']);
     expect(changes.renamed).toEqual(['src/bar.ts']);
+    expect(changes.detection).toEqual({ mode: 'range', issue: null });
+
+    const diffCall = vi.mocked(spawnSync).mock.calls.find(call => (call[1] as string[])[0] === 'diff');
+    expect(diffCall?.[1]).toEqual(['diff', '--name-status', '-M', 'HEAD~3', 'HEAD']);
   });
 
   it('returns empty arrays when commitCount is 0', () => {
@@ -222,14 +253,33 @@ describe('getChangedFiles', () => {
     expect(changes.added).toEqual([]);
     expect(changes.deleted).toEqual([]);
     expect(changes.renamed).toEqual([]);
+    expect(changes.detection).toEqual({ mode: 'range', issue: null });
     expect(spawnSync).not.toHaveBeenCalled();
   });
 
-  it('returns empty arrays when git diff fails', () => {
+  it('returns empty arrays and reports GIT_DIFF_FAILED when git diff fails', () => {
+    vi.mocked(spawnSync).mockImplementation((_cmd, args) => {
+      const argv = (args ?? []) as string[];
+      if (argv[0] === 'rev-list') {
+        return { status: 0, stdout: '10\n', stderr: '', pid: 1, output: [], signal: null };
+      }
+      return { status: 1, stdout: '', stderr: 'error\n', pid: 1, output: [], signal: null };
+    });
+
+    const changes = getChangedFiles('/project', 2);
+    expect(changes.modified).toEqual([]);
+    expect(changes.added).toEqual([]);
+    expect(changes.deleted).toEqual([]);
+    expect(changes.renamed).toEqual([]);
+    expect(changes.detection.mode).toBe('unavailable');
+    expect(changes.detection.issue).toEqual({ code: 'GIT_DIFF_FAILED', detail: 'error' });
+  });
+
+  it('returns empty arrays and reports GIT_REV_LIST_FAILED when the history-depth probe fails', () => {
     vi.mocked(spawnSync).mockReturnValue({
-      status: 1,
+      status: 128,
       stdout: '',
-      stderr: 'error',
+      stderr: 'fatal: not a git repository\n',
       pid: 1,
       output: [],
       signal: null,
@@ -238,6 +288,174 @@ describe('getChangedFiles', () => {
     const changes = getChangedFiles('/project', 2);
     expect(changes.modified).toEqual([]);
     expect(changes.added).toEqual([]);
+    expect(changes.deleted).toEqual([]);
+    expect(changes.renamed).toEqual([]);
+    expect(changes.detection.mode).toBe('unavailable');
+    expect(changes.detection.issue).toEqual({
+      code: 'GIT_REV_LIST_FAILED',
+      detail: 'fatal: not a git repository',
+    });
+  });
+
+  it('uses ls-tree root enumeration (not a fixed empty-tree diff id) when commitCount reaches history depth', () => {
+    vi.mocked(spawnSync).mockImplementation((_cmd, args) => {
+      const argv = (args ?? []) as string[];
+      if (argv[0] === 'rev-list') {
+        return { status: 0, stdout: '2\n', stderr: '', pid: 1, output: [], signal: null };
+      }
+      if (argv[0] === 'ls-tree') {
+        return { status: 0, stdout: 'src/root-file.ts\nREADME.md\n', stderr: '', pid: 1, output: [], signal: null };
+      }
+      throw new Error(`unexpected spawnSync call: ${argv.join(' ')}`);
+    });
+
+    const changes = getChangedFiles('/project', 2);
+    expect(changes.detection).toEqual({ mode: 'root-fallback', issue: null });
+    expect(changes.added).toEqual(['src/root-file.ts', 'README.md']);
+    expect(changes.modified).toEqual([]);
+    expect(changes.deleted).toEqual([]);
+    expect(changes.renamed).toEqual([]);
+
+    const lsTreeCall = vi.mocked(spawnSync).mock.calls.find(call => (call[1] as string[])[0] === 'ls-tree');
+    expect(lsTreeCall?.[1]).toEqual(['ls-tree', '-r', '--name-only', 'HEAD']);
+
+    const diffCall = vi.mocked(spawnSync).mock.calls.find(call => (call[1] as string[])[0] === 'diff');
+    expect(diffCall).toBeUndefined();
+  });
+
+  it('returns empty arrays and reports GIT_LS_TREE_FAILED when the root-fallback ls-tree enumeration fails', () => {
+    vi.mocked(spawnSync).mockImplementation((_cmd, args) => {
+      const argv = (args ?? []) as string[];
+      if (argv[0] === 'rev-list') {
+        return { status: 0, stdout: '2\n', stderr: '', pid: 1, output: [], signal: null };
+      }
+      return { status: 128, stdout: '', stderr: 'fatal: not a tree\n', pid: 1, output: [], signal: null };
+    });
+
+    const changes = getChangedFiles('/project', 2);
+    expect(changes.modified).toEqual([]);
+    expect(changes.added).toEqual([]);
+    expect(changes.deleted).toEqual([]);
+    expect(changes.renamed).toEqual([]);
+    expect(changes.detection.mode).toBe('unavailable');
+    expect(changes.detection.issue).toEqual({ code: 'GIT_LS_TREE_FAILED', detail: 'fatal: not a tree' });
+  });
+
+  it.each([NaN, 1.5, -1, Infinity])('throws RangeError for commitCount=%p without calling spawnSync', (value) => {
+    expect(() => getChangedFiles('/project', value)).toThrow(RangeError);
+    expect(spawnSync).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Unit Tests: probeCommitsSince ───────────────────────────────────
+
+describe('probeCommitsSince', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns commit lines and issue null on success', () => {
+    vi.mocked(spawnSync).mockReturnValue({
+      status: 0,
+      stdout: 'abc1 one\nabc2 two\n',
+      stderr: '',
+      pid: 1,
+      output: [],
+      signal: null,
+    });
+
+    const probe = probeCommitsSince('/project', '2026-03-20T00:00:00Z');
+    expect(probe.commits).toEqual(['abc1 one', 'abc2 two']);
+    expect(probe.issue).toBeNull();
+  });
+
+  it('returns commits [] and a typed GIT_LOG_FAILED issue with the first stderr line as detail on failure', () => {
+    vi.mocked(spawnSync).mockReturnValue({
+      status: 128,
+      stdout: '',
+      stderr: "fatal: your current branch 'main' does not have any commits yet\n",
+      pid: 1,
+      output: [],
+      signal: null,
+    });
+
+    const probe = probeCommitsSince('/project', '2026-03-20T00:00:00Z');
+    expect(probe.commits).toEqual([]);
+    expect(probe.issue).toEqual({
+      code: 'GIT_LOG_FAILED',
+      detail: "fatal: your current branch 'main' does not have any commits yet",
+    });
+  });
+
+  it('falls back to "exit <status>" as detail when stderr is empty', () => {
+    vi.mocked(spawnSync).mockReturnValue({
+      status: 1,
+      stdout: '',
+      stderr: '',
+      pid: 1,
+      output: [],
+      signal: null,
+    });
+
+    const probe = probeCommitsSince('/project', '2026-03-20T00:00:00Z');
+    expect(probe.commits).toEqual([]);
+    expect(probe.issue).toEqual({ code: 'GIT_LOG_FAILED', detail: 'exit 1' });
+  });
+});
+
+// ─── Unit Tests: collectGitChanges ───────────────────────────────────
+
+describe('collectGitChanges', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('short-circuits on a git log failure: commits 0, detection unavailable/GIT_LOG_FAILED, spawnSync called exactly once (never reaches getChangedFiles)', () => {
+    vi.mocked(spawnSync).mockReturnValue({
+      status: 128,
+      stdout: '',
+      stderr: "fatal: your current branch 'main' does not have any commits yet\n",
+      pid: 1,
+      output: [],
+      signal: null,
+    });
+
+    const result = collectGitChanges('/project', '2026-03-20T00:00:00Z');
+    expect(result.commits).toBe(0);
+    expect(result.modified).toEqual([]);
+    expect(result.added).toEqual([]);
+    expect(result.deleted).toEqual([]);
+    expect(result.renamed).toEqual([]);
+    expect(result.detection).toEqual({
+      mode: 'unavailable',
+      issue: {
+        code: 'GIT_LOG_FAILED',
+        detail: "fatal: your current branch 'main' does not have any commits yet",
+      },
+    });
+
+    expect(spawnSync).toHaveBeenCalledTimes(1);
+    const call = vi.mocked(spawnSync).mock.calls[0];
+    expect((call?.[1] as string[])[0]).toBe('log');
+  });
+
+  it('collects commit count + changed files on success (log, rev-list, diff)', () => {
+    vi.mocked(spawnSync).mockImplementation((_cmd, args) => {
+      const argv = (args ?? []) as string[];
+      if (argv[0] === 'log') {
+        return { status: 0, stdout: 'a1 c1\na2 c2\na3 c3\n', stderr: '', pid: 1, output: [], signal: null };
+      }
+      if (argv[0] === 'rev-list') {
+        return { status: 0, stdout: '10\n', stderr: '', pid: 1, output: [], signal: null };
+      }
+      return { status: 0, stdout: 'M\ta.ts\n', stderr: '', pid: 1, output: [], signal: null };
+    });
+
+    const result = collectGitChanges('/project', '2026-03-20T00:00:00Z');
+    expect(result.commits).toBe(3);
+    expect(result.modified).toEqual(['a.ts']);
+    expect(result.added).toEqual([]);
+    expect(result.detection).toEqual({ mode: 'range', issue: null });
   });
 });
 
@@ -252,8 +470,9 @@ describe('formatSyncOutput', () => {
       added: [],
       deleted: [],
       renamed: [],
+      detection: { mode: 'range', issue: null },
     };
-    expect(formatSyncOutput(result)).toBe('No changes since last sprint');
+    expect(formatSyncOutput(result, 'en')).toBe(getMessage('sync.no_changes', 'en'));
   });
 
   it('formats full sync output with all change types', () => {
@@ -264,14 +483,15 @@ describe('formatSyncOutput', () => {
       added: ['src/utils/crypto.ts'],
       deleted: ['src/old-auth.ts'],
       renamed: [],
+      detection: { mode: 'range', issue: null },
     };
 
-    const output = formatSyncOutput(result);
-    expect(output).toContain('Synced: 3 commit(s) since Sprint #042');
-    expect(output).toContain('Modified: src/auth/jwt.ts, src/middleware/guard.ts');
-    expect(output).toContain('New: src/utils/crypto.ts');
-    expect(output).toContain('Deleted: src/old-auth.ts');
-    expect(output).toContain('→ Recorded to memory.db for next sprint context');
+    const output = formatSyncOutput(result, 'en');
+    expect(output).toContain(getMessage('sync.format_synced', 'en', { commits: '3', sprint: getMessage('sync.format_sprint_label', 'en', { n: '042' }) }));
+    expect(output).toContain(getMessage('sync.format_modified', 'en', { files: 'src/auth/jwt.ts, src/middleware/guard.ts' }));
+    expect(output).toContain(getMessage('sync.format_new', 'en', { files: 'src/utils/crypto.ts' }));
+    expect(output).toContain(getMessage('sync.format_deleted', 'en', { files: 'src/old-auth.ts' }));
+    expect(output).toContain(getMessage('sync.format_recorded', 'en'));
     expect(output).not.toContain('Renamed');
   });
 
@@ -283,10 +503,11 @@ describe('formatSyncOutput', () => {
       added: [],
       deleted: [],
       renamed: [],
+      detection: { mode: 'range', issue: null },
     };
 
-    const output = formatSyncOutput(result);
-    expect(output).toContain('Modified: README.md');
+    const output = formatSyncOutput(result, 'en');
+    expect(output).toContain(getMessage('sync.format_modified', 'en', { files: 'README.md' }));
     expect(output).not.toContain('New:');
     expect(output).not.toContain('Deleted:');
   });
@@ -310,6 +531,7 @@ describe('writeSyncToMemory', () => {
       added: [],
       deleted: [],
       renamed: [],
+      detection: { mode: 'range', issue: null },
     };
 
     writeSyncToMemory('/project', syncResult);
@@ -330,6 +552,7 @@ describe('writeSyncToMemory', () => {
       added: ['src/added.ts'],
       deleted: [],
       renamed: [],
+      detection: { mode: 'range', issue: null },
     };
 
     writeSyncToMemory('/project', syncResult);
@@ -348,6 +571,7 @@ describe('writeSyncToMemory', () => {
       added: [],
       deleted: [],
       renamed: [],
+      detection: { mode: 'range', issue: null },
     };
 
     writeSyncToMemory('/project', syncResult);

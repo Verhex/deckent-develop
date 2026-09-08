@@ -6,6 +6,7 @@ import {
   syncBuiltinSkillManifests,
   type BuiltinSkillSyncReport,
 } from '../../src/core/skill-pool.js';
+import { SKILL_PROFILE_DERIVATION_VERSION } from '../../src/core/skill-profile-derivation.js';
 
 const roots: string[] = [];
 
@@ -42,7 +43,7 @@ describe('deckent sync builtin skill branch', () => {
     expect(observability.builtinContentHash).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(observability.profileProvenance).toMatchObject({
       origin: 'derived-profile',
-      derivationVersion: 2,
+      derivationVersion: SKILL_PROFILE_DERIVATION_VERSION,
     });
     expect(observability.profile).toMatchObject({ profileVersion: 3 });
     expect(readFileSync(
@@ -99,7 +100,7 @@ describe('deckent sync builtin skill branch', () => {
     });
     expect(persisted.profileProvenance).toMatchObject({
       origin: 'manifest-profile',
-      derivationVersion: 2,
+      derivationVersion: SKILL_PROFILE_DERIVATION_VERSION,
     });
 
     const second = syncBuiltinSkillManifests(root);
@@ -151,7 +152,7 @@ describe('deckent sync builtin skill branch', () => {
     expect(repaired.builtinContentHash).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(repaired.profileProvenance).toMatchObject({
       origin: 'derived-profile',
-      derivationVersion: 2,
+      derivationVersion: SKILL_PROFILE_DERIVATION_VERSION,
     });
     expect(repaired.profile).toMatchObject({ profileVersion: 3 });
     expect(readFileSync(join(targetDir, 'SKILL.md'), 'utf8')).toBe(readFileSync(

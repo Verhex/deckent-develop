@@ -148,6 +148,7 @@ describe('sync: formatSyncOutput with large file lists', () => {
       added: [],
       deleted: [],
       renamed: [],
+      detection: { mode: 'range', issue: null },
     };
     const output = formatSyncOutput(result);
     expect(output).toContain('and 50 more...');

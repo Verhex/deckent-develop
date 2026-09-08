@@ -169,6 +169,7 @@ describe('Sync + Explain flow', () => {
       added: ['src/core/environment.ts'],
       deleted: [],
       renamed: [],
+      detection: { mode: 'range', issue: null },
     };
     const output = formatSyncOutput(syncResult);
     expect(output).toContain('3 commit(s)');

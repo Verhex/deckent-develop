@@ -26,6 +26,9 @@ import {
   type WorkspaceArtifactAction,
 } from '../../orchestra/workspace-artifacts.js';
 import { getWorkspaceArtifactDescriptor } from '../../core/workspace-artifact-contract.js';
+import { buildSyncAggregate } from '../helpers/sync-aggregate.js';
+import type { SyncCommandOutput, SyncAggregateSummary } from '../helpers/sync-aggregate.js';
+import type { SyncChangeDetectionMode, SyncChangeDetectionIssue, SyncChangeDetection } from '../helpers/sync-change-detection.js';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -45,6 +48,19 @@ const AGENT_MANIFEST_FILENAME = 'agent.json';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
+/**
+ * Change-detection provenance contract — see
+ * `../helpers/sync-change-detection.ts` (the single runtime source for the
+ * closed mode / issue-code enums). Re-exported here so existing consumers of
+ * this module keep importing the types from the producer.
+ */
+export type {
+  SyncChangeDetectionMode,
+  SyncChangeDetectionIssueCode,
+  SyncChangeDetectionIssue,
+  SyncChangeDetection,
+} from '../helpers/sync-change-detection.js';
+
 export interface SyncResult {
   commits: number;
   sprintId: string | null;
@@ -52,6 +68,7 @@ export interface SyncResult {
   added: string[];
   deleted: string[];
   renamed: string[];
+  detection: SyncChangeDetection;
 }
 
 /**
@@ -166,41 +183,151 @@ export function isGitRepo(root: string): boolean {
   return result.status === 0 && result.stdout.trim() === 'true';
 }
 
+/** Typed result of `probeCommitsSince`: the commit list, or WHY it is unknown. */
+export interface SyncCommitProbe {
+  /** Oneline commit strings; empty when `issue` is set (unknown, not zero). */
+  commits: string[];
+  /** `null` on success (a genuinely empty list is a SUCCESSFUL zero). */
+  issue: SyncChangeDetectionIssue | null;
+}
+
 /**
- * Get git commits since a given ISO timestamp.
- * Returns array of oneline commit strings.
+ * Get git commits since a given ISO timestamp, distinguishing a successful
+ * empty result from a failed `git log` (7104): a failure is reported as a
+ * typed `GIT_LOG_FAILED` issue and MUST NOT be read as "0 commits" —
+ * e.g. an unborn branch (repository with no commits yet) makes `git log`
+ * exit 128, and a caller that fed that `0` into `getChangedFiles` would
+ * otherwise print a clean "no changes" over an unverified working tree.
  */
-export function getCommitsSince(root: string, since: string): string[] {
+export function probeCommitsSince(root: string, since: string): SyncCommitProbe {
   const result = spawnSync('git', ['log', '--oneline', `--since=${since}`], {
     cwd: root,
     encoding: 'utf-8',
     timeout: 10000,
   });
-  if (result.status !== 0) return [];
-  return result.stdout.trim().split('\n').filter(line => line.length > 0);
+  if (result.status !== 0) {
+    return { commits: [], issue: { code: 'GIT_LOG_FAILED', detail: firstStderrLine(result.stderr, result.status) } };
+  }
+  return { commits: result.stdout.trim().split('\n').filter(line => line.length > 0), issue: null };
 }
 
 /**
- * Get changed files from git diff --stat for the last N commits.
- * Categorizes into modified, added, deleted, renamed.
+ * Legacy shape of `probeCommitsSince`: the commit list only, `[]` on failure.
+ * Kept for existing consumers of this export — it cannot tell a failed log
+ * from zero commits, so NEW callers use `probeCommitsSince` / `collectGitChanges`.
  */
-export function getChangedFiles(root: string, commitCount: number): Pick<SyncResult, 'modified' | 'added' | 'deleted' | 'renamed'> {
+export function getCommitsSince(root: string, since: string): string[] {
+  return probeCommitsSince(root, since).commits;
+}
+
+/**
+ * First line of a git stderr blob, or a status-code fallback when stderr is
+ * empty (e.g. the process was killed, or wrote nothing before failing).
+ */
+function firstStderrLine(stderr: string | null | undefined, status: number | null): string {
+  const line = (stderr ?? '').split('\n').find(l => l.trim().length > 0);
+  return line ? line.trim() : `exit ${status ?? 'unknown'}`;
+}
+
+/**
+ * Get changed files for the last N commits and report HOW the comparison
+ * was made (or why it could not be trusted) via `detection` — a silent git
+ * failure must never be reported as "no changes" (7104):
+ * - `commitCount < historyDepth` → `git diff --name-status -M HEAD~N HEAD` ('range').
+ * - `commitCount >= historyDepth` → every path present at HEAD via
+ *   `git ls-tree -r --name-only HEAD` ('root-fallback'): exactly the diff
+ *   against the empty tree (nothing to modify, delete or rename from), but
+ *   derived from the repository itself instead of a fixed empty-tree object
+ *   id — so it holds for SHA-256 repositories, where the SHA-1 id does not exist.
+ * - any git failure → 'unavailable' with a typed issue; lists empty.
+ *
+ * `commitCount` is the number of commits a SUCCESSFUL `probeCommitsSince`
+ * returned (see `collectGitChanges`) — a non-negative safe integer. Any other
+ * value is a caller bug and throws (`RangeError`) rather than returning an
+ * authoritative-looking empty result.
+ */
+export function getChangedFiles(root: string, commitCount: number): Pick<SyncResult, 'modified' | 'added' | 'deleted' | 'renamed' | 'detection'> {
+  if (!Number.isSafeInteger(commitCount) || commitCount < 0) {
+    throw new RangeError(`getChangedFiles: commitCount must be a non-negative safe integer, got ${String(commitCount)}`);
+  }
+
   const modified: string[] = [];
   const added: string[] = [];
   const deleted: string[] = [];
   const renamed: string[] = [];
 
-  if (commitCount <= 0) return { modified, added, deleted, renamed };
+  if (commitCount === 0) {
+    return { modified, added, deleted, renamed, detection: { mode: 'range', issue: null } };
+  }
 
-  const result = spawnSync('git', ['diff', '--name-status', `HEAD~${commitCount}`, 'HEAD'], {
+  const revListResult = spawnSync('git', ['rev-list', '--count', 'HEAD'], {
     cwd: root,
     encoding: 'utf-8',
     timeout: 10000,
   });
 
-  if (result.status !== 0) return { modified, added, deleted, renamed };
+  const historyDepth = revListResult.status === 0 ? parseInt(revListResult.stdout.trim(), 10) : NaN;
+  if (revListResult.status !== 0 || !Number.isFinite(historyDepth)) {
+    return {
+      modified,
+      added,
+      deleted,
+      renamed,
+      detection: {
+        mode: 'unavailable',
+        issue: { code: 'GIT_REV_LIST_FAILED', detail: firstStderrLine(revListResult.stderr, revListResult.status) },
+      },
+    };
+  }
 
-  const lines = result.stdout.trim().split('\n').filter(l => l.length > 0);
+  const attemptedMode: SyncChangeDetectionMode = commitCount >= historyDepth ? 'root-fallback' : 'range';
+
+  if (attemptedMode === 'root-fallback') {
+    const lsTreeResult = spawnSync('git', ['ls-tree', '-r', '--name-only', 'HEAD'], {
+      cwd: root,
+      encoding: 'utf-8',
+      timeout: 10000,
+    });
+    if (lsTreeResult.status !== 0) {
+      return {
+        modified,
+        added,
+        deleted,
+        renamed,
+        detection: {
+          mode: 'unavailable',
+          issue: { code: 'GIT_LS_TREE_FAILED', detail: firstStderrLine(lsTreeResult.stderr, lsTreeResult.status) },
+        },
+      };
+    }
+    for (const line of lsTreeResult.stdout.split('\n')) {
+      if (line.length > 0) added.push(line);
+    }
+    return { modified, added, deleted, renamed, detection: { mode: 'root-fallback', issue: null } };
+  }
+
+  const diffResult = spawnSync('git', ['diff', '--name-status', '-M', `HEAD~${commitCount}`, 'HEAD'], {
+    cwd: root,
+    encoding: 'utf-8',
+    timeout: 10000,
+  });
+
+  if (diffResult.status !== 0) {
+    return {
+      modified,
+      added,
+      deleted,
+      renamed,
+      detection: {
+        // The file lists below are empty and not trustworthy — the mode the
+        // caller was attempting is irrelevant once the diff itself failed.
+        mode: 'unavailable',
+        issue: { code: 'GIT_DIFF_FAILED', detail: firstStderrLine(diffResult.stderr, diffResult.status) },
+      },
+    };
+  }
+
+  const lines = diffResult.stdout.trim().split('\n').filter(l => l.length > 0);
   for (const line of lines) {
     const parts = line.split('\t');
     const status = parts[0]?.charAt(0);
@@ -223,17 +350,39 @@ export function getChangedFiles(root: string, commitCount: number): Pick<SyncRes
     }
   }
 
-  return { modified, added, deleted, renamed };
+  return { modified, added, deleted, renamed, detection: { mode: 'range', issue: null } };
+}
+
+/**
+ * The full git provenance step of a sync: commit count since `since` PLUS the
+ * changed-file lists, as ONE typed record. A failed `git log` short-circuits
+ * to `commits: 0` + `detection: unavailable / GIT_LOG_FAILED` — it never
+ * reaches `getChangedFiles`, so a failure can never masquerade as the
+ * successful-zero early return there (7104).
+ */
+export function collectGitChanges(root: string, since: string): Omit<SyncResult, 'sprintId'> {
+  const probe = probeCommitsSince(root, since);
+  if (probe.issue) {
+    return {
+      commits: 0,
+      modified: [],
+      added: [],
+      deleted: [],
+      renamed: [],
+      detection: { mode: 'unavailable', issue: probe.issue },
+    };
+  }
+  return { commits: probe.commits.length, ...getChangedFiles(root, probe.commits.length) };
 }
 
 /**
  * Truncate a file list to MAX_FILE_LIST with "and N more..." suffix.
  */
-export function truncateFileList(files: string[]): string {
+export function truncateFileList(files: string[], lang: string = getLanguage()): string {
   if (files.length <= MAX_FILE_LIST) return files.join(', ');
   const shown = files.slice(0, MAX_FILE_LIST);
   const remaining = files.length - MAX_FILE_LIST;
-  return `${shown.join(', ')}, and ${remaining} more...`;
+  return `${shown.join(', ')}${getMessage('sync.format_more', lang, { remaining: String(remaining) })}`;
 }
 
 /**
@@ -324,17 +473,20 @@ export function writeSyncToMemory(root: string, syncResult: SyncResult): void {
   const sprintLabel = syncResult.sprintId ? `Sprint #${syncResult.sprintId.replace('sprint-', '')}` : 'last sprint';
   sectionLines.push(`- ${syncResult.commits} commit(s) since ${sprintLabel}`);
 
+  // F1 (7104): this record is a persisted, English-only machine-read record in
+  // memory.db, not a user surface — pin to 'en' so a DECKENT_LANGUAGE=tr shell
+  // can never mix languages into the stored record.
   if (syncResult.modified.length > 0) {
-    sectionLines.push(`- Modified: ${truncateFileList(syncResult.modified)}`);
+    sectionLines.push(`- Modified: ${truncateFileList(syncResult.modified, 'en')}`);
   }
   if (syncResult.added.length > 0) {
-    sectionLines.push(`- New: ${truncateFileList(syncResult.added)}`);
+    sectionLines.push(`- New: ${truncateFileList(syncResult.added, 'en')}`);
   }
   if (syncResult.deleted.length > 0) {
-    sectionLines.push(`- Deleted: ${truncateFileList(syncResult.deleted)}`);
+    sectionLines.push(`- Deleted: ${truncateFileList(syncResult.deleted, 'en')}`);
   }
   if (syncResult.renamed.length > 0) {
-    sectionLines.push(`- Renamed: ${truncateFileList(syncResult.renamed)}`);
+    sectionLines.push(`- Renamed: ${truncateFileList(syncResult.renamed, 'en')}`);
   }
 
   try {
@@ -360,30 +512,32 @@ export function writeSyncToMemory(root: string, syncResult: SyncResult): void {
 /**
  * Format sync result for terminal output.
  */
-export function formatSyncOutput(syncResult: SyncResult): string {
-  const lines: string[] = [];
-  const sprintLabel = syncResult.sprintId ? `Sprint #${syncResult.sprintId.replace('sprint-', '')}` : 'last sprint';
-
+export function formatSyncOutput(syncResult: SyncResult, lang: string = getLanguage()): string {
   if (syncResult.commits === 0) {
-    return 'No changes since last sprint';
+    return getMessage('sync.no_changes', lang);
   }
 
-  lines.push(`Synced: ${syncResult.commits} commit(s) since ${sprintLabel}`);
+  const lines: string[] = [];
+  const sprintLabel = syncResult.sprintId
+    ? getMessage('sync.format_sprint_label', lang, { n: syncResult.sprintId.replace('sprint-', '') })
+    : getMessage('sync.format_last_sprint', lang);
+
+  lines.push(getMessage('sync.format_synced', lang, { commits: String(syncResult.commits), sprint: sprintLabel }));
 
   if (syncResult.modified.length > 0) {
-    lines.push(`  Modified: ${truncateFileList(syncResult.modified)}`);
+    lines.push(getMessage('sync.format_modified', lang, { files: truncateFileList(syncResult.modified, lang) }));
   }
   if (syncResult.added.length > 0) {
-    lines.push(`  New: ${truncateFileList(syncResult.added)}`);
+    lines.push(getMessage('sync.format_new', lang, { files: truncateFileList(syncResult.added, lang) }));
   }
   if (syncResult.deleted.length > 0) {
-    lines.push(`  Deleted: ${truncateFileList(syncResult.deleted)}`);
+    lines.push(getMessage('sync.format_deleted', lang, { files: truncateFileList(syncResult.deleted, lang) }));
   }
   if (syncResult.renamed.length > 0) {
-    lines.push(`  Renamed: ${truncateFileList(syncResult.renamed)}`);
+    lines.push(getMessage('sync.format_renamed', lang, { files: truncateFileList(syncResult.renamed, lang) }));
   }
 
-  lines.push('  → Recorded to memory.db for next sprint context');
+  lines.push(getMessage('sync.format_recorded', lang));
 
   return lines.join('\n');
 }
@@ -402,13 +556,9 @@ export function runSync(root: string): SyncResult | null {
     return null; // caller handles info message
   }
 
-  const commits = getCommitsSince(root, lastSprint.timestamp);
-  const changes = getChangedFiles(root, commits.length);
-
   return {
-    commits: commits.length,
     sprintId: lastSprint.sprintId,
-    ...changes,
+    ...collectGitChanges(root, lastSprint.timestamp),
   };
 }
 
@@ -584,10 +734,33 @@ export interface AgentCapabilitiesSyncReport {
   alreadyV3: string[];
   /** Non-fatal problems encountered while migrating (never aborts the sweep). */
   issues: AgentCapabilitiesMigrationIssue[];
+  /**
+   * Agent ids skipped because the manifest sync kept the shadow local
+   * (missing baseline or local edit); left byte-untouched.
+   */
+  protected: string[];
 }
 
 function emptyAgentCapabilitiesSyncReport(): AgentCapabilitiesSyncReport {
-  return { migrated: [], alreadyV3: [], issues: [] };
+  return { migrated: [], alreadyV3: [], issues: [], protected: [] };
+}
+
+/**
+ * Options for {@link syncAgentCapabilities}. The legacy plain-`boolean`
+ * `dryRun` call form (predates F1/7104) is still accepted directly by the
+ * function for source compatibility with existing callers/tests — this
+ * object form is additive, not a breaking replacement.
+ */
+export interface AgentCapabilitiesSyncOptions {
+  /** When true, compute the report but never write to disk. */
+  dryRun?: boolean;
+  /**
+   * Agent ids the manifest sync (`syncBuiltinAgentManifests`) reported as
+   * kept-local (kind `'missing-baseline'` or `'local-edit'`). These shadows
+   * are unverifiable/user-owned — skipped before this function ever reads
+   * or migrates them (F1: they must never be silently overwritten here).
+   */
+  protectedAgentIds?: readonly string[];
 }
 
 /**
@@ -598,6 +771,9 @@ function emptyAgentCapabilitiesSyncReport(): AgentCapabilitiesSyncReport {
  * `activation.rules` (dual-carry — nothing removed), flagged
  * `capabilitiesProvisional: true`. A manifest that already carries
  * `capabilities`, or whose `source` isn't `'builtin'`, is left byte-untouched.
+ * A manifest whose agent id is in `protectedAgentIds` is skipped entirely
+ * (F1: the preceding three-way manifest sync already determined this shadow
+ * is locally owned/unverifiable and must not be touched here either).
  *
  * Unlike the 444-005 PROMPT.md shadow sync, this needs no external "builtin
  * source" reference: every input the migrator reads (activation rules,
@@ -605,7 +781,13 @@ function emptyAgentCapabilitiesSyncReport(): AgentCapabilitiesSyncReport {
  * manifest object being migrated. Never throws: one unreadable/malformed
  * manifest is recorded as a typed issue and the sweep continues.
  */
-export function syncAgentCapabilities(root: string, dryRun = false): AgentCapabilitiesSyncReport {
+export function syncAgentCapabilities(
+  root: string,
+  opts: boolean | AgentCapabilitiesSyncOptions = false,
+): AgentCapabilitiesSyncReport {
+  const resolved: AgentCapabilitiesSyncOptions = typeof opts === 'boolean' ? { dryRun: opts } : opts;
+  const dryRun = resolved.dryRun ?? false;
+  const protectedSet = new Set(resolved.protectedAgentIds ?? []);
   const report = emptyAgentCapabilitiesSyncReport();
   const agentsDir = join(root, AGENTS_DIR);
   if (!existsSync(agentsDir)) return report;
@@ -622,6 +804,13 @@ export function syncAgentCapabilities(root: string, dryRun = false): AgentCapabi
     if (!entry.isDirectory || !entry.isDirectory()) continue;
     const agentId = entry.name;
     if (agentId === 'archive') continue;
+
+    // F1: shadows the manifest sync kept local (missing baseline or a real
+    // local edit) are unverifiable/user-owned — never read or migrated here.
+    if (protectedSet.has(agentId)) {
+      report.protected.push(agentId);
+      continue;
+    }
 
     const manifestPath = join(agentsDir, agentId, AGENT_MANIFEST_FILENAME);
     if (!existsSync(manifestPath)) continue;
@@ -756,19 +945,33 @@ export function registerSync(program: Command): void {
     .option('--json', cliContractMessage('cliContract.sync.opt.json', helpLang))
     .action((opts: { gitOnly?: boolean; adaptersOnly?: boolean; dryRun?: boolean; json?: boolean }) => {
       const root = resolveProjectRoot();
+      const lang = getLanguage();
 
-      const output: {
-        adaptersSynced?: string[];
-        adapterErrors?: AdapterSyncError[];
-        agentPromptSync?: AgentPromptSyncReport;
-        agentManifestSync?: AgentManifestSyncReport;
-        agentCapabilitiesSync?: AgentCapabilitiesSyncReport;
-        skillManifestSync?: BuiltinSkillSyncReport;
-        workspaceSync?: WorkspaceSyncReport;
-        gitChanges?: SyncResult | null;
-        warnings?: string[];
-      } = {};
+      const output: SyncCommandOutput & { summary?: SyncAggregateSummary } = {};
       const warnings: string[] = [];
+
+      // 7104 SYNC-PROVENANCE-TRUTH-001: the aggregate (`output.summary`) is the
+      // single source of truth for every count this action reports, in both
+      // --json and text mode. `emitJson` stamps it onto `output` immediately
+      // before the one-and-only JSON stdout write; `printAggregateSummary`
+      // derives the same numbers for the human-readable one-line footer. Both
+      // helpers close over the same mutable `output`, so whichever fields the
+      // action has populated so far are always what gets summarized.
+      const emitJson = (): void => {
+        output.summary = buildSyncAggregate(output);
+        console.log(JSON.stringify(output));
+      };
+
+      const printAggregateSummary = (): void => {
+        const summary = buildSyncAggregate(output);
+        print(getMessage('sync.aggregate_summary', lang, {
+          adapters: String(summary.adapters.synced),
+          skills: String(summary.skills.created + summary.skills.updated),
+          commits: String(summary.git ? summary.git.commits : 0),
+          conflicts: String(summary.conflicts.length),
+          missing: String(summary.missingBaseline.count),
+        }));
+      };
 
       // --- Adapter file sync ---
       if (!opts.gitOnly) {
@@ -790,30 +993,41 @@ export function registerSync(program: Command): void {
         }
 
         if (!opts.json) {
+          const prefix = opts.dryRun ? getMessage('sync.dry_run_prefix', lang) : '';
           for (const label of adapterReport.synced) {
-            print(`${opts.dryRun ? '[dry-run] ' : ''}${label} synced → @DECKENT.md ensured`);
+            print(getMessage('sync.adapter_synced', lang, { prefix, label }));
           }
           for (const err of adapterReport.errors) {
-            print(`Warning: ${err.label} skipped (${err.file}) — ${err.reason}`);
+            print(getMessage('sync.adapter_skipped', lang, { label: err.label, file: err.file, reason: err.reason }));
           }
           if (!opts.dryRun) {
-            print('Sync complete. Existing file contents preserved.');
+            print(getMessage('sync.complete', lang));
           }
         }
 
         // --- Builtin agent PROMPT.md -> .deckent/agents/<id>/ shadow sync (444-005) ---
-        const promptSyncReport = syncBuiltinAgentPrompts(root, { dryRun: opts.dryRun });
+        const promptSyncReport: AgentPromptSyncReport = syncBuiltinAgentPrompts(root, { dryRun: opts.dryRun });
         output.agentPromptSync = promptSyncReport;
 
         if (!opts.json) {
+          const prefix = opts.dryRun ? getMessage('sync.dry_run_prefix', lang) : '';
           for (const id of promptSyncReport.created) {
-            print(`${opts.dryRun ? '[dry-run] ' : ''}Agent prompt created: .deckent/agents/${id}/PROMPT.md`);
+            print(getMessage('sync.agent_prompt_created', lang, { prefix, id }));
           }
           for (const id of promptSyncReport.updated) {
-            print(`${opts.dryRun ? '[dry-run] ' : ''}Agent prompt updated: .deckent/agents/${id}/PROMPT.md`);
+            print(getMessage('sync.agent_prompt_updated', lang, { prefix, id }));
           }
+          // 7104: only a real three-way conflict ('local-edit') is presented as
+          // a per-item Conflict line — 'missing-baseline' entries (unverifiable
+          // provenance, not necessarily a local edit) are summarized once below,
+          // right before the git-changes section, never printed per item here.
           for (const conflict of promptSyncReport.conflicts) {
-            print(`Warning: agent prompt "${conflict.agentId}" kept as local edit (${conflict.reason})`);
+            if (conflict.kind !== 'local-edit') continue;
+            print(getMessage('sync.conflict_local_edit', lang, {
+              scope: getMessage('sync.scope_prompt', lang),
+              id: conflict.agentId,
+              path: conflict.shadowPath,
+            }));
           }
         }
 
@@ -823,37 +1037,65 @@ export function registerSync(program: Command): void {
         // (real capability blocks) first, so the migrator below only fills
         // provisional blocks for shadows that STILL lack capabilities
         // (kept-local edits). Never both on the same shadow in one run.
-        const manifestSyncReport = syncBuiltinAgentManifests(root, { dryRun: opts.dryRun });
+        const manifestSyncReport: AgentManifestSyncReport = syncBuiltinAgentManifests(root, { dryRun: opts.dryRun });
         output.agentManifestSync = manifestSyncReport;
 
         if (!opts.json) {
+          const prefix = opts.dryRun ? getMessage('sync.dry_run_prefix', lang) : '';
           for (const id of manifestSyncReport.created) {
-            print(`${opts.dryRun ? '[dry-run] ' : ''}Agent manifest created: .deckent/agents/${id}/agent.json`);
+            print(getMessage('sync.agent_manifest_created', lang, { prefix, id }));
           }
           for (const id of manifestSyncReport.updated) {
-            print(`${opts.dryRun ? '[dry-run] ' : ''}Agent manifest updated: .deckent/agents/${id}/agent.json`);
+            print(getMessage('sync.agent_manifest_updated', lang, { prefix, id }));
           }
+          // 7104: same local-edit-only presentation rule as the prompt sync above.
           for (const conflict of manifestSyncReport.conflicts) {
-            print(`Warning: agent manifest "${conflict.agentId}" kept as local edit (${conflict.reason})`);
+            if (conflict.kind !== 'local-edit') continue;
+            print(getMessage('sync.conflict_local_edit', lang, {
+              scope: getMessage('sync.scope_manifest', lang),
+              id: conflict.agentId,
+              path: conflict.shadowPath,
+            }));
           }
         }
 
         // --- Builtin agent.json V2->V3 capabilities dual-carry sync (445-011) ---
-        const capabilitiesSyncReport = syncAgentCapabilities(root, opts.dryRun);
+        // F1 (7104): shadows the manifest sync above kept local (kind
+        // 'missing-baseline' or 'local-edit') are unverifiable/user-owned —
+        // carried forward as protectedAgentIds so the capabilities migrator
+        // never reads or rewrites them either.
+        const protectedAgentIds = [...new Set([
+          ...manifestSyncReport.keptLocal,
+          ...manifestSyncReport.conflicts.map((c) => c.agentId),
+        ])].sort();
+        const capabilitiesSyncReport = syncAgentCapabilities(root, { dryRun: opts.dryRun, protectedAgentIds });
         output.agentCapabilitiesSync = capabilitiesSyncReport;
 
         if (!opts.json) {
+          const prefix = opts.dryRun ? getMessage('sync.dry_run_prefix', lang) : '';
           for (const id of capabilitiesSyncReport.migrated) {
-            print(`${opts.dryRun ? '[dry-run] ' : ''}Agent capabilities migrated: .deckent/agents/${id}/agent.json (provisional v3)`);
+            print(getMessage('sync.capabilities_migrated', lang, { prefix, id }));
           }
           for (const issue of capabilitiesSyncReport.issues) {
-            print(`Warning: agent "${issue.agentId}" capabilities migration issue (${issue.code}) — ${issue.message}`);
+            print(getMessage('sync.capabilities_issue', lang, { id: issue.agentId, code: issue.code, message: issue.message }));
           }
-          print(`Agent capabilities: ${capabilitiesSyncReport.migrated.length} migrated, ${capabilitiesSyncReport.alreadyV3.length} already v3`);
+          print(getMessage('sync.capabilities_summary', lang, {
+            migrated: String(capabilitiesSyncReport.migrated.length),
+            alreadyV3: String(capabilitiesSyncReport.alreadyV3.length),
+          }));
+          if (capabilitiesSyncReport.protected.length > 0) {
+            print(getMessage('sync.capabilities_protected', lang, {
+              count: String(capabilitiesSyncReport.protected.length),
+              // readdirSync enumeration order is not guaranteed stable across
+              // platforms/filesystems — sort so this line's content is
+              // deterministic regardless of host (Law 2: every environment).
+              ids: [...capabilitiesSyncReport.protected].sort().join(', '),
+            }));
+          }
         }
 
         // --- Builtin skill definition -> v2-derived shadow manifest sync ---
-        const skillSyncReport = syncBuiltinSkillManifests(root, { dryRun: opts.dryRun });
+        const skillSyncReport: BuiltinSkillSyncReport = syncBuiltinSkillManifests(root, { dryRun: opts.dryRun });
         output.skillManifestSync = skillSyncReport;
         if (!opts.json) {
           for (const id of skillSyncReport.created) {
@@ -896,16 +1138,33 @@ export function registerSync(program: Command): void {
         }
       }
 
+      // 7104: one summary line for every shadow kept as-is because it has no
+      // recorded sync baseline (unverifiable provenance, NOT a conflict —
+      // see agent-sync-conflict.ts). Printed once here, after both the prompt
+      // and manifest sections above and before the git-changes section below,
+      // never per-item. A `--git-only` run never populates agentPromptSync /
+      // agentManifestSync, so the aggregate's count is 0 and nothing prints.
+      if (!opts.json) {
+        const preGitSummary = buildSyncAggregate(output);
+        if (preGitSummary.missingBaseline.count > 0) {
+          print(getMessage('sync.missing_baseline_summary', lang, {
+            count: String(preGitSummary.missingBaseline.count),
+            ids: preGitSummary.missingBaseline.agentIds.join(', '),
+          }));
+        }
+      }
+
       // --- Git-based change detection ---
       if (!opts.adaptersOnly) {
         if (!isGitRepo(root)) {
-          warnings.push('Not a git repository — skipping change detection.');
-          if (!opts.json) {
-            print('Warning: Not a git repository — skipping change detection.');
-          }
+          const notGitRepoMsg = getMessage('sync.not_git_repo', lang);
+          warnings.push(notGitRepoMsg);
           if (opts.json) {
             output.warnings = warnings;
-            console.log(JSON.stringify(output, null, 2));
+            emitJson();
+          } else {
+            print(notGitRepoMsg);
+            printAggregateSummary();
           }
           return;
         }
@@ -913,46 +1172,59 @@ export function registerSync(program: Command): void {
         const lastSprint = getLastSprintTimestamp(root);
         if (!lastSprint) {
           // C) Explicit warning when no previous sprint exists
-          const noSprintMsg = 'Warning: No previous sprint found in .brain/sprints/ — run `deckent start` to begin your first sprint.';
+          const noSprintMsg = getMessage('sync.no_previous_sprint', lang);
           warnings.push(noSprintMsg);
-          if (!opts.json) {
-            print(noSprintMsg);
-          }
           if (opts.json) {
             output.warnings = warnings;
-            console.log(JSON.stringify(output, null, 2));
+            emitJson();
+          } else {
+            print(noSprintMsg);
+            printAggregateSummary();
           }
           return;
         }
 
-        const commits = getCommitsSince(root, lastSprint.timestamp);
-        const changes = getChangedFiles(root, commits.length);
-
         const syncResult: SyncResult = {
-          commits: commits.length,
           sprintId: lastSprint.sprintId,
-          ...changes,
+          ...collectGitChanges(root, lastSprint.timestamp),
         };
 
         output.gitChanges = syncResult;
 
-        if (syncResult.commits === 0) {
-          if (!opts.json) print('No changes since last sprint');
+        if (syncResult.detection.issue) {
+          // Git failed at some step: the commit count and/or the file lists
+          // are UNKNOWN, not zero. Never print "no changes", and never persist
+          // an unverified record to memory — the typed issue is the output.
+          if (!opts.json) {
+            print('');
+            print(getMessage('sync.git_change_detection_unavailable', lang, {
+              code: syncResult.detection.issue.code,
+              detail: syncResult.detection.issue.detail,
+            }));
+            if (syncResult.commits > 0) print(formatSyncOutput(syncResult, lang));
+          }
+        } else if (syncResult.commits === 0) {
+          if (!opts.json) print(getMessage('sync.no_changes', lang));
         } else {
           if (!opts.dryRun) {
             writeSyncToMemory(root, syncResult);
           }
           if (!opts.json) {
             print('');
-            if (opts.dryRun) print('[dry-run] Would record to memory.db:');
-            print(formatSyncOutput(syncResult));
+            if (opts.dryRun) print(getMessage('sync.dry_run_memory', lang));
+            if (syncResult.detection.mode === 'root-fallback') {
+              print(getMessage('sync.git_change_detection_root_fallback', lang));
+            }
+            print(formatSyncOutput(syncResult, lang));
           }
         }
       }
 
       if (opts.json) {
         if (warnings.length > 0) output.warnings = warnings;
-        console.log(JSON.stringify(output, null, 2));
+        emitJson();
+      } else {
+        printAggregateSummary();
       }
     });
 }

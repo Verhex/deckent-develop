@@ -19,6 +19,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { DECKENT_DIR, PROJECT_CONFIG_PATH } from './constants.js';
+import type { AgentSyncConflictKind } from './agent-sync-conflict.js';
 
 const AGENTS_DIR = path.join(DECKENT_DIR, 'agents');
 const PROMPT_MD_FILENAME = 'PROMPT.md';
@@ -31,6 +32,7 @@ export interface AgentPromptSyncConflict {
   shadowPath: string;
   builtinPath: string;
   reason: string;
+  kind: AgentSyncConflictKind;
 }
 
 export interface AgentPromptSyncReport {
@@ -238,6 +240,7 @@ export function syncBuiltinAgentPrompts(
       reason: lastSyncedHash === undefined
         ? 'no prior sync baseline recorded for this shadow — content differs from the current builtin and provenance cannot be verified'
         : 'shadow content differs from both the last-synced builtin baseline and the current builtin content (locally edited)',
+      kind: lastSyncedHash === undefined ? 'missing-baseline' : 'local-edit',
     });
   }
 

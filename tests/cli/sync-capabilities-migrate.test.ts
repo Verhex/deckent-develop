@@ -168,7 +168,7 @@ describe('syncAgentCapabilities', () => {
 
     const report = syncAgentCapabilities(root);
 
-    expect(report).toEqual({ migrated: [], alreadyV3: [], issues: [] });
+    expect(report).toEqual({ migrated: [], alreadyV3: [], issues: [], protected: [] });
   });
 
   it('report shape always exposes migrated/alreadyV3/issues arrays', () => {
