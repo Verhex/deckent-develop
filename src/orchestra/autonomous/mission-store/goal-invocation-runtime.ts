@@ -3,7 +3,11 @@ import type { HostRoleInvocationAdmissionRequest, HostRoleInvocationAdmissionRun
 import { INVOCATION_RECEIPT_SCHEMA_VERSION, type InvocationOutputArtifactRef, type InvocationPurpose, type InvocationReceipt, type InvocationReceiptLedger, type InvocationRole, type InvocationSelection } from '../../../core/invocation-receipt.js';
 import type { ProviderLimitAdmissionAllowed } from '../../../core/provider-limit-admission.js';
 import type { ProviderLimitReservationEvent } from '../../../core/provider-limit-truth.js';
-import type { GoalInvocationTransportResult } from '../goal-invocation-transport.js';
+import type {
+  GoalInvocationTransportBackend,
+  GoalInvocationTransportInput,
+  GoalInvocationTransportResult,
+} from '../goal-invocation-transport.js';
 import { GoalInvocationTransportError } from '../goal-invocation-transport.js';
 import type { FinalOnlyUsageAuthorization } from '../../../core/execution-budget-policy.js';
 import { GoalInvocationHeldError } from './goal-mission.js';
@@ -41,7 +45,9 @@ export class GoalInvocationRuntime {
   constructor(private readonly deps: {
     admissionRuntime: HostRoleInvocationAdmissionRuntime;
     receiptLedger: InvocationReceiptLedger;
-    executeSelected(input: { provider: string; model: string; prompt: string; maxWallClockSeconds: number }): Promise<GoalInvocationTransportResult>;
+    executeSelected: ((input: GoalInvocationTransportInput) => Promise<GoalInvocationTransportResult>) & {
+      preflight?(input: Pick<GoalInvocationTransportInput, 'backend'>): void;
+    };
     now?: () => Date;
   }) {}
 
@@ -63,7 +69,11 @@ export class GoalInvocationRuntime {
             || artifact.reservationRequest.callId !== `${input.purpose}:${input.round}`
             || artifact.reservationRequest.receiptRef !== receiptAuthorityRef
             || !candidate || candidate.provider !== artifact.ref.provider
-            || candidate.model !== artifact.ref.model) throw new Error('binding mismatch');
+            || candidate.model !== artifact.ref.model
+            || !sameBackend(artifact.reservationRequest.backend, candidate.reachabilityQuery)
+            || !sameBackend(artifact.reservationRequest.backend, replay.receipt.backend)) {
+            throw new Error('binding mismatch');
+          }
           this.deps.admissionRuntime.settleExistingDispatch(artifact.reservationRequest, artifact.usageEvent);
           return this.pendingConsumer(Buffer.from(artifact.bytes).toString('utf8'), artifact.ref, invocationId);
         } catch (error) {
@@ -74,14 +84,34 @@ export class GoalInvocationRuntime {
       }
       throw new Error('GOAL_INVOCATION_RECONCILIATION_REQUIRED');
     }
+    let transportPreflightFailure: unknown = null;
     const admission = this.deps.admissionRuntime.admit({
       ...input.admission,
       buildReservation: selected => {
         const reservation = input.admission.buildReservation(selected);
         assertReservationPreflight(reservation, input, this.deps.receiptLedger.projectId, receiptAuthorityRef);
+        try {
+          const preflight = this.deps.executeSelected.preflight;
+          if (!preflight) throw new Error('goal transport capability unavailable');
+          preflight({ backend: reservation.backend });
+        } catch (error) {
+          transportPreflightFailure = error;
+          throw error;
+        }
         return reservation;
       },
     });
+    if (transportPreflightFailure !== null) {
+      throw new GoalInvocationHeldError({
+        schemaVersion: 1,
+        reasonCode: 'reservation_not_executable',
+        evidenceRefs: [`goal-transport-backend:${hash(JSON.stringify(transportPreflightFailure instanceof Error
+          ? transportPreflightFailure.name
+          : 'unavailable'))}`],
+        invocationReceiptRef: null,
+        heldAt: now().toISOString(),
+      });
+    }
     if (admission.decision !== 'allow') throw new Error(`GOAL_INVOCATION_HOLD:${admission.decision}`);
     assertMeterable(admission);
     if (admission.reservation.tenantId !== input.tenantId
@@ -112,12 +142,21 @@ export class GoalInvocationRuntime {
     this.deps.receiptLedger.append(receiptRef, invocationId, { eventId: `${invocationId}-dispatch`, type: 'dispatch_started', payload: { attempt: input.round, calledProvider: String(selected.provider), calledModel: selected.model } });
     let result: GoalInvocationTransportResult;
     try {
-      result = await this.deps.executeSelected({ provider: String(selected.provider), model: selected.model, prompt: input.prompt, maxWallClockSeconds: input.finalOnlyUsage.maxWallClockSeconds });
+      result = await this.deps.executeSelected({
+        provider: String(selected.provider),
+        model: selected.model,
+        prompt: input.prompt,
+        backend: admission.reservation.backend,
+        maxWallClockSeconds: input.finalOnlyUsage.maxWallClockSeconds,
+      });
     } catch (error) {
       const failure = error instanceof GoalInvocationTransportError ? error : null;
       this.deps.receiptLedger.append(receiptRef, invocationId, { eventId: `${invocationId}-transport`, type: 'transport_settled', payload: {
         outcome: failure?.outcome ?? 'unknown', exitCode: failure?.exitCode ?? null,
-        signal: failure?.signal ?? null, reasonCode: failure?.reasonCode ?? 'spawn_error',
+        signal: failure?.signal ?? null,
+        reasonCode: failure?.reasonCode === 'backend_identity_mismatch'
+          ? 'validation_failed'
+          : failure?.reasonCode ?? 'spawn_error',
         durationMs: failure?.durationMs ?? 0,
       } });
       if (failure?.dispatchStarted === false) {
@@ -125,7 +164,8 @@ export class GoalInvocationRuntime {
       }
       throw error;
     }
-    if (result.provider !== selected.provider || result.model !== selected.model) {
+    if (result.provider !== selected.provider || result.model !== selected.model
+      || !sameBackend(result.backend, admission.reservation.backend)) {
       this.deps.receiptLedger.append(receiptRef, invocationId, { eventId: `${invocationId}-transport`, type: 'transport_settled', payload: {
         outcome: 'failed', exitCode: 0, signal: null, reasonCode: 'validation_failed', durationMs: result.durationMs,
       } });
@@ -162,6 +202,9 @@ export class GoalInvocationRuntime {
       || artifact.ref.purpose !== checkpoint.purpose
       || artifact.ref.provider !== view.receipt.called.provider
       || artifact.ref.model !== view.receipt.called.model
+      || artifact.reservationRequest.provider !== view.receipt.called.provider
+      || artifact.reservationRequest.model !== view.receipt.called.model
+      || !sameBackend(artifact.reservationRequest.backend, view.receipt.backend)
       || artifact.ref.contentSha256 !== checkpoint.outputDigest
       || createHash('sha256').update(artifact.bytes).digest('hex') !== checkpoint.outputDigest
       || view.transportOutcome !== 'succeeded' || view.consumerOutcome === 'rejected') {
@@ -210,6 +253,16 @@ export class GoalInvocationRuntime {
       },
     };
   }
+}
+
+function sameBackend(
+  left: (Omit<GoalInvocationTransportBackend, 'endpointRefHash'> & { readonly endpointRefHash?: string | null }) | null | undefined,
+  right: (Omit<GoalInvocationTransportBackend, 'endpointRefHash'> & { readonly endpointRefHash?: string | null }) | null | undefined,
+): boolean {
+  return !!left && !!right
+    && left.transport === right.transport
+    && left.executionBackend === right.executionBackend
+    && (left.endpointRefHash ?? null) === (right.endpointRefHash ?? null);
 }
 
 function assertMeterable(admission: ProviderLimitAdmissionAllowed): void {

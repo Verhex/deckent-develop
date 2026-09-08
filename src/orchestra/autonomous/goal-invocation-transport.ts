@@ -1,20 +1,41 @@
 import type { ModelType } from '../../core/model-registry.js';
 import type { TokenUsage } from '../../core/token-usage.js';
 import type { ProviderAdapter } from '../../core/provider.js';
+import type { InvocationExecutionBackend, InvocationTransport } from '../../core/invocation-receipt.js';
 import { buildPlannerSpawnArgs, createPlannerSpawn, resolveAdapter, type PlannerSpawnFn } from '../planner.js';
+
+export interface GoalInvocationTransportBackend {
+  readonly transport: InvocationTransport;
+  readonly executionBackend: InvocationExecutionBackend;
+  readonly endpointRefHash: string | null;
+}
+
+export interface GoalInvocationTransportInput {
+  readonly provider: string;
+  readonly model: string;
+  readonly prompt: string;
+  readonly backend: GoalInvocationTransportBackend;
+  readonly maxWallClockSeconds?: number;
+}
 
 export interface GoalInvocationTransportResult {
   readonly output: string;
   readonly usage: TokenUsage;
   readonly provider: string;
   readonly model: string;
+  readonly backend: GoalInvocationTransportBackend;
   readonly durationMs: number;
+}
+
+export interface GoalInvocationTransport {
+  (input: GoalInvocationTransportInput): Promise<GoalInvocationTransportResult>;
+  preflight(input: Pick<GoalInvocationTransportInput, 'backend'>): void;
 }
 
 export class GoalInvocationTransportError extends Error {
   constructor(
     readonly outcome: 'failed' | 'timeout' | 'unknown',
-    readonly reasonCode: 'command_build_failed' | 'spawn_error' | 'nonzero_exit' | 'timeout' | 'empty_output' | 'validation_failed',
+    readonly reasonCode: 'command_build_failed' | 'spawn_error' | 'nonzero_exit' | 'timeout' | 'empty_output' | 'validation_failed' | 'backend_identity_mismatch',
     readonly exitCode: number | null,
     readonly signal: string | null,
     readonly durationMs: number,
@@ -22,7 +43,7 @@ export class GoalInvocationTransportError extends Error {
   ) {
     super(reasonCode === 'validation_failed' && dispatchStarted
       ? 'GOAL_PROVIDER_REPORTED_USAGE_UNAVAILABLE'
-      : reasonCode === 'validation_failed'
+      : reasonCode === 'validation_failed' || reasonCode === 'backend_identity_mismatch'
         ? 'GOAL_SELECTED_TRANSPORT_IDENTITY_MISMATCH'
         : 'GOAL_SELECTED_TRANSPORT_FAILED');
     this.name = 'GoalInvocationTransportError';
@@ -35,11 +56,22 @@ export function createGoalInvocationTransport(options: {
   readonly maxOutputBytes?: number;
   readonly now?: () => number;
   readonly resolveAdapter?: (provider: string, model: string) => ProviderAdapter;
-} = {}) {
+} = {}): GoalInvocationTransport {
   const spawn = options.spawn ?? createPlannerSpawn();
   const now = options.now ?? (() => performance.now());
-  return async (input: { provider: string; model: string; prompt: string; maxWallClockSeconds?: number }): Promise<GoalInvocationTransportResult> => {
+  const preflight = (input: Pick<GoalInvocationTransportInput, 'backend'>): void => {
+    if (!input || !input.backend
+      || input.backend.transport !== 'cli'
+      || input.backend.executionBackend !== 'host-subprocess'
+      || input.backend.endpointRefHash !== null) {
+      throw new GoalInvocationTransportError(
+        'failed', 'backend_identity_mismatch', null, null, 0, false,
+      );
+    }
+  };
+  const execute = async (input: GoalInvocationTransportInput): Promise<GoalInvocationTransportResult> => {
     const started = now();
+    preflight(input);
     let adapter: ProviderAdapter;
     let spec: ReturnType<typeof buildPlannerSpawnArgs>;
     try {
@@ -49,8 +81,10 @@ export function createGoalInvocationTransport(options: {
     } catch {
       throw new GoalInvocationTransportError('failed', 'command_build_failed', null, null, Math.max(0, now() - started), false);
     }
-    if (spec.calledProvider !== input.provider || spec.calledModel !== input.model) {
-      throw new GoalInvocationTransportError('failed', 'validation_failed', null, null, Math.max(0, now() - started), false);
+    if (spec.calledProvider !== input.provider || spec.calledModel !== input.model
+      || spec.transport !== input.backend.transport
+      || spec.executionBackend !== input.backend.executionBackend) {
+      throw new GoalInvocationTransportError('failed', 'backend_identity_mismatch', null, null, Math.max(0, now() - started), false);
     }
     let result;
     try {
@@ -79,7 +113,9 @@ export function createGoalInvocationTransport(options: {
       usage,
       provider: spec.calledProvider,
       model: spec.calledModel,
+      backend: Object.freeze({ ...input.backend }),
       durationMs: Math.max(0, now() - started),
     });
   };
+  return Object.assign(execute, { preflight });
 }
