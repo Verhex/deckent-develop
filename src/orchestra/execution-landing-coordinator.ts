@@ -185,9 +185,17 @@ export function assertExactDockerExecutionLandingCaptureV2(
     || terminal.providerStream.admissionReceiptDigest !== preparation.admissionReceiptDigest
     || terminal.providerStream.policyDigest !== preparation.policyDigest
     || terminal.providerStream.artifactClass !== 'pristine-provider-stream'
+    || terminal.providerUsage.providerStreamReceiptDigest
+      !== terminal.providerStream.receiptDigest
+    || terminal.providerUsage.evidence.capturedAt !== terminal.providerStream.capturedAt
+    || terminal.providerUsage.evidenceDigest
+      !== `sha256:${sha256(canonicalJson(terminal.providerUsage.evidence))}`
     || terminal.providerBilling.providerStreamReceiptDigest
       !== terminal.providerStream.receiptDigest
-    || terminal.providerBilling.evidence.capturedAt !== terminal.providerStream.capturedAt
+    || (terminal.providerBilling.state === 'available'
+      ? terminal.providerBilling.evidence.capturedAt !== terminal.providerStream.capturedAt
+      : terminal.providerBilling.billingMode !== 'subscription'
+        || terminal.providerBilling.reasonCode !== 'PROVIDER_PRICE_ENVELOPE_NOT_EMITTED')
     || times.some(value => !Number.isFinite(Date.parse(value)))
     || times.some((value, index) => index > 0
       && Date.parse(value) < Date.parse(times[index - 1]!))
@@ -207,8 +215,13 @@ export function stampExactDockerExecutionLandingCheckpointV2(
 ): ExactDockerExecutionLandingCheckpointResultV2 {
   assertExactDockerExecutionLandingCaptureV2(input.capture);
   const { dispatch, terminal } = input.capture;
-  if (terminal.providerBilling.evidence.provider
-    !== input.operationalInput.identity.calledProvider) {
+  if (terminal.providerUsage.evidence.provider
+      !== input.operationalInput.identity.calledProvider
+    || terminal.providerUsage.evidence.model
+      !== input.operationalInput.identity.calledModel
+    || (terminal.providerBilling.state === 'available'
+      && terminal.providerBilling.evidence.provider
+        !== input.operationalInput.identity.calledProvider)) {
     throw createExecutionAuthorityError(
       'Exact Docker landing provider billing identity does not match operational authority',
     );
@@ -307,9 +320,11 @@ export function stampExactDockerExecutionLandingCheckpointV2(
       evidenceDigests: Object.freeze([
         terminal.providerExit.observationReceiptDigest,
         terminal.providerStream.receiptDigest,
+        terminal.providerUsage.evidenceDigest,
         terminal.resultArtifact.receiptDigest,
         terminal.landingProposal.artifact.receiptDigest,
-        terminal.providerBilling.evidenceDigest,
+        ...(terminal.providerBilling.state === 'available'
+          ? [terminal.providerBilling.evidenceDigest] : []),
         diskEvidence.evidenceDigest,
       ]),
       retiredAt: hostTimestampAtOrAfter(landedAt),

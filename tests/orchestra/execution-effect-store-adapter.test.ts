@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { setImmediate as yieldToEventLoop } from 'node:timers/promises';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   createExecutionEffectLandingTerminalSealV1,
@@ -15,7 +16,10 @@ import type {
   Sha256Digest,
   TaskAttemptCustodyArtifactReceiptV2,
 } from '../../src/core/task-attempt-custody-store.js';
-import { TaskAttemptCustodyStore } from '../../src/core/task-attempt-custody-store.js';
+import {
+  TaskAttemptCustodyHold,
+  TaskAttemptCustodyStore,
+} from '../../src/core/task-attempt-custody-store.js';
 import { EXECUTION_EFFECT_CAPTURE_HARD_LIMITS } from '../../src/core/execution-effect-containment.js';
 import {
   createExecutionEffectLifecycleStoreAdmissionAdapterV1,
@@ -34,6 +38,7 @@ import {
   createTaskResultSettlementV2Fixture,
   type TaskResultSettlementV2Fixture,
 } from '../helpers/task-result-settlement-v2-fixture.js';
+import { produceExactAcceptanceFixtureEffectsV2 } from '../helpers/exact-acceptance-evidence-fixture.js';
 
 function digest(value: string): Sha256Digest {
   return `sha256:${createHash('sha256').update(value, 'utf8').digest('hex')}`;
@@ -62,11 +67,13 @@ function admission(fixture: TaskResultSettlementV2Fixture) {
 }
 
 function admissionOnlyClone(fixture: TaskResultSettlementV2Fixture): Readonly<{
+  adapter: InMemoryTaskAttemptCustodyAdapter;
   store: TaskAttemptCustodyStore;
   admissionReceiptDigest: Sha256Digest;
 }> {
+  const adapter = new InMemoryTaskAttemptCustodyAdapter();
   const store = TaskAttemptCustodyStore.open({
-    adapter: new InMemoryTaskAttemptCustodyAdapter(),
+    adapter,
     absoluteRoot: '/fixture/store-adapter-custody',
     canonicalProjectRoot: '/fixture/project',
     projectId: fixture.identity.projectId,
@@ -99,7 +106,7 @@ function admissionOnlyClone(fixture: TaskResultSettlementV2Fixture): Readonly<{
     predecessorIdentity = identity;
   }
   if (predecessorDigest === null) throw new Error('cloned admission is unavailable');
-  return { store, admissionReceiptDigest: predecessorDigest };
+  return { adapter, store, admissionReceiptDigest: predecessorDigest };
 }
 
 function verifiedBundle(fixture: TaskResultSettlementV2Fixture): Readonly<{
@@ -193,6 +200,46 @@ function publishedRef(
   expect(receipt?.receiptDigest).toBe(ref?.artifactReceiptDigest);
   return ref!;
 }
+
+async function committedReleasePendingFixture(suffix: string) {
+  const source = createTaskResultSettlementV2Fixture({
+    tailArtifactKey: `committed-release-pending-${suffix}`,
+  });
+  const cloned = admissionOnlyClone(source);
+  const admission = cloned.store.readAdmission(source.identity, source.policy);
+  if (!admission) throw new Error('cloned fixture admission is unavailable');
+  const committed = await produceExactAcceptanceFixtureEffectsV2({
+    store: cloned.store,
+    identity: source.identity,
+    policy: source.policy,
+    admission,
+    stopAfterCommittedAnchor: true,
+  });
+  return Object.freeze({ ...committed, adapter: cloned.adapter, store: cloned.store,
+    identity: source.identity, policy: source.policy });
+}
+
+function mutateStoredArtifact(
+  fixture: Awaited<ReturnType<typeof committedReleasePendingFixture>>,
+  artifactClass: string,
+  artifactKey: string,
+  mutation: 'missing' | 'tampered',
+): void {
+  const suffix = `/artifacts/${artifactClass}/${artifactKey}.bin`;
+  const path = [...fixture.adapter.files.keys()].find(candidate => candidate.endsWith(suffix));
+  if (!path) throw new Error(`fixture artifact unavailable: ${artifactClass}/${artifactKey}`);
+  if (mutation === 'missing') {
+    fixture.adapter.files.delete(path);
+    return;
+  }
+  const artifact = fixture.adapter.files.get(path)!;
+  fixture.adapter.files.set(path, { ...artifact,
+    bytes: Uint8Array.from(Buffer.from('{"tampered":true}', 'utf8')) });
+}
+
+afterEach(async () => {
+  await yieldToEventLoop();
+});
 
 describe('execution effect Store adapter', () => {
   it('fails closed when a later cleanup artifact exists behind a missing predecessor', () => {
@@ -448,6 +495,7 @@ describe('execution effect Store adapter', () => {
       journalBytes(fixture, bundle.terminal.journalArtifacts.committed),
       bridge,
     );
+    expect(bridge.readCommittedReleasePendingEvidence()).toBeNull();
     const leaseSource = fixture.store.readVerifiedArtifact({
       identity: fixture.identity,
       policy: fixture.policy,
@@ -517,6 +565,87 @@ describe('execution effect Store adapter', () => {
     expect(() => bridge.readAcceptedAuthority('store-adapter-primary')).toThrow(
       /Verified execution effect landing authority is unavailable/u,
     );
+  }, 60_000);
+
+  it('proves a committed coordinator journal without mutating Store bytes', async () => {
+    const fixture = await committedReleasePendingFixture('valid');
+    const storeSnapshot = () => ({
+      files: [...fixture.adapter.files.entries()]
+        .map(([path, file]) => [path, Buffer.from(file.bytes).toString('hex')] as const)
+        .sort(([left], [right]) => left.localeCompare(right)),
+      directories: [...fixture.adapter.directories.keys()].sort(),
+    });
+    const before = storeSnapshot();
+    const evidence = fixture.bridge.readCommittedReleasePendingEvidence();
+    expect(evidence).toMatchObject({
+      phase: 'COMMITTED_JOURNAL_RELEASE_PENDING',
+      semanticVerifier: 'orchestra-required-v1',
+      landingRecoveryAnchor: { artifactClass: 'execution-effect-lifecycle-authority' },
+      readyLifecycle: { artifactClass: 'execution-effect-lifecycle-authority' },
+      committedJournal: {
+        artifactClass: 'execution-effect-landing-journal',
+        artifactKey: fixture.terminalSeal.journalArtifacts.committed.artifactKey,
+      },
+      leaseEvidence: {
+        artifactKey: fixture.terminalSeal.receiptArtifacts.leaseTerminalReceipt.artifactKey,
+      },
+      finalEvidence: {
+        artifactKey: fixture.terminalSeal.receiptArtifacts.finalVerificationReceipt?.artifactKey,
+      },
+      finalManifest: { artifactClass: 'execution-effect-manifest' },
+    });
+    expect(evidence?.semanticEvidenceDigest).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    expect(Object.isFrozen(evidence)).toBe(true);
+    expect(storeSnapshot()).toEqual(before);
+    expect(fixture.bridge.readLatestReleaseProgress()).toBeNull();
+    expect(fixture.store.readVerifiedEffectLanding({
+      identity: fixture.identity,
+      policy: fixture.policy,
+      artifactKey: 'primary',
+    })).toBeNull();
+    expect(() => fixture.bridge.readAcceptedAuthority('primary')).toThrow(
+      /Verified execution effect landing authority is unavailable/u,
+    );
+  }, 60_000);
+
+  it.each([
+    ['prepared', 'missing', 'execution-effect-landing-journal'],
+    ['prepared', 'tampered', 'execution-effect-landing-journal'],
+    ['native', 'missing', 'execution-effect-landing-receipt-evidence'],
+    ['native', 'tampered', 'execution-effect-landing-receipt-evidence'],
+    ['final', 'missing', 'execution-effect-landing-receipt-evidence'],
+    ['final', 'tampered', 'execution-effect-landing-receipt-evidence'],
+    ['lease', 'missing', 'execution-effect-landing-receipt-evidence'],
+    ['lease', 'tampered', 'execution-effect-landing-receipt-evidence'],
+  ] as const)('rejects %s evidence when immutable bytes are %s',
+    async (target, mutation, artifactClass) => {
+      const fixture = await committedReleasePendingFixture(`${target}-${mutation}`);
+      expect(fixture.bridge.readCommittedReleasePendingEvidence()).not.toBeNull();
+      const targets = {
+        prepared: fixture.terminalSeal.journalArtifacts.prepared.artifactKey,
+        native: fixture.terminalSeal.receiptArtifacts.nativeReceipts[0]!.artifactKey,
+        final: fixture.terminalSeal.receiptArtifacts.finalVerificationReceipt!.artifactKey,
+        lease: fixture.terminalSeal.receiptArtifacts.leaseTerminalReceipt.artifactKey,
+      } as const;
+      mutateStoredArtifact(fixture, artifactClass, targets[target], mutation);
+      const reread = () => fixture.bridge.readCommittedReleasePendingEvidence();
+      expect(reread).toThrowError(TaskAttemptCustodyHold);
+      expect(reread).toThrow(/INCOMPLETE_PUBLICATION|CAPABILITY_UNVERIFIED/u);
+    }, 60_000);
+
+  it('rejects committed-pending evidence after release progress is durable', async () => {
+    const fixture = await committedReleasePendingFixture('release-progress');
+    expect(fixture.bridge.readCommittedReleasePendingEvidence()).not.toBeNull();
+    fixture.bridge.publishReleasePrepared({
+      lifecycleAuthorityDigest: fixture.captured.lifecycleAuthority.authorityDigest as Sha256Digest,
+      landingReceipt: fixture.receipt,
+      terminalSeal: fixture.terminalSeal,
+      progressedAt: fixture.terminalSeal.committedAt,
+    });
+    expect(fixture.bridge.readLatestReleaseProgress()).toMatchObject({
+      mode: 'RELEASE', state: 'RELEASE_PREPARED',
+    });
+    expect(fixture.bridge.readCommittedReleasePendingEvidence()).toBeNull();
   }, 60_000);
 
   it('rejects journal replacement, forged references, missing landings and policy-null authority', () => {
@@ -663,5 +792,80 @@ describe('execution effect Store adapter', () => {
     expect(terminalReceipt?.receiptDigest).toBe(
       bundle.terminal.journalArtifacts.committed.artifactReceiptDigest,
     );
+  }, 60_000);
+
+  it('proves a production-shaped coordinator commit before release or accepted-result publication', async () => {
+    const fixture = await committedReleasePendingFixture('valid');
+    const evidence = fixture.bridge.readCommittedReleasePendingEvidence();
+    expect(evidence).toMatchObject({
+      phase: 'COMMITTED_JOURNAL_RELEASE_PENDING',
+      semanticVerifier: 'orchestra-required-v1',
+      landingRecoveryAnchor: { artifactClass: 'execution-effect-lifecycle-authority' },
+      readyLifecycle: { artifactClass: 'execution-effect-lifecycle-authority' },
+      committedJournal: {
+        artifactClass: 'execution-effect-landing-journal',
+        artifactKey: fixture.terminalSeal.journalArtifacts.committed.artifactKey,
+      },
+      leaseEvidence: {
+        artifactKey: fixture.terminalSeal.receiptArtifacts.leaseTerminalReceipt.artifactKey,
+      },
+      finalEvidence: {
+        artifactKey: fixture.terminalSeal.receiptArtifacts.finalVerificationReceipt?.artifactKey,
+      },
+      finalManifest: { artifactClass: 'execution-effect-manifest' },
+    });
+    expect(evidence?.semanticEvidenceDigest).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    expect(Object.isFrozen(evidence)).toBe(true);
+    expect(fixture.bridge.readLatestReleaseProgress()).toBeNull();
+    expect(fixture.store.readVerifiedEffectLanding({
+      identity: fixture.identity,
+      policy: fixture.policy,
+      artifactKey: 'primary',
+    })).toBeNull();
+    expect(() => fixture.bridge.readAcceptedAuthority('primary')).toThrow(
+      /Verified execution effect landing authority is unavailable/u,
+    );
+  }, 60_000);
+
+  it.each([
+    ['prepared', 'missing', 'execution-effect-landing-journal'],
+    ['prepared', 'tampered', 'execution-effect-landing-journal'],
+    ['native', 'missing', 'execution-effect-landing-receipt-evidence'],
+    ['native', 'tampered', 'execution-effect-landing-receipt-evidence'],
+    ['final', 'missing', 'execution-effect-landing-receipt-evidence'],
+    ['final', 'tampered', 'execution-effect-landing-receipt-evidence'],
+    ['lease', 'missing', 'execution-effect-landing-receipt-evidence'],
+    ['lease', 'tampered', 'execution-effect-landing-receipt-evidence'],
+  ] as const)('rejects %s evidence when immutable bytes are %s',
+    async (target, mutation, artifactClass) => {
+      const fixture = await committedReleasePendingFixture(`${target}-${mutation}`);
+      expect(fixture.bridge.readCommittedReleasePendingEvidence()).not.toBeNull();
+      const targets = {
+        prepared: fixture.terminalSeal.journalArtifacts.prepared.artifactKey,
+        native: fixture.terminalSeal.receiptArtifacts.nativeReceipts[0]!.artifactKey,
+        final: fixture.terminalSeal.receiptArtifacts.finalVerificationReceipt!.artifactKey,
+        lease: fixture.terminalSeal.receiptArtifacts.leaseTerminalReceipt.artifactKey,
+      } as const;
+      mutateStoredArtifact(fixture, artifactClass, targets[target], mutation);
+      const reread = () => fixture.bridge.readCommittedReleasePendingEvidence();
+      expect(reread).toThrowError(TaskAttemptCustodyHold);
+      expect(reread).toThrow(
+        /INCOMPLETE_PUBLICATION|CAPABILITY_UNVERIFIED/u,
+      );
+    }, 60_000);
+
+  it('rejects committed-pending evidence after release progress is durable', async () => {
+    const fixture = await committedReleasePendingFixture('release-progress');
+    expect(fixture.bridge.readCommittedReleasePendingEvidence()).not.toBeNull();
+    fixture.bridge.publishReleasePrepared({
+      lifecycleAuthorityDigest: fixture.captured.lifecycleAuthority.authorityDigest as Sha256Digest,
+      landingReceipt: fixture.receipt,
+      terminalSeal: fixture.terminalSeal,
+      progressedAt: fixture.terminalSeal.committedAt,
+    });
+    expect(fixture.bridge.readLatestReleaseProgress()).toMatchObject({
+      mode: 'RELEASE', state: 'RELEASE_PREPARED',
+    });
+    expect(fixture.bridge.readCommittedReleasePendingEvidence()).toBeNull();
   }, 60_000);
 });

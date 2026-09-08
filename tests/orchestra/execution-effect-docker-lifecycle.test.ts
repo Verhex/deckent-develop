@@ -24,6 +24,7 @@ import {
   authorizeDurableExecutionEffectDockerAllocationV1,
   allocateExecutionEffectDockerWorkspaceV1,
   captureExecutionEffectDockerFinalV1,
+  ExecutionEffectDockerCaptureAdapterErrorV1,
   createExecutionEffectDockerDependencyAuthorityReceiptV1,
   createExecutionEffectDockerExclusiveAttachmentReceiptV1,
   createExecutionEffectDockerImageObservationV1,
@@ -213,6 +214,7 @@ interface AdapterOptions {
   readonly revalidationIdentitySalt?: string;
   readonly finalFirstIdentitySalt?: string;
   readonly finalSecondIdentitySalt?: string;
+  readonly finalCaptureError?: Error;
 }
 
 function fakeAdapter(
@@ -453,6 +455,9 @@ function fakeAdapter(
     },
     async captureWorkspace(input) {
       calls.push(`capture:${input.operation}`);
+      if (input.operation.startsWith('FINAL_QUIESCENCE_') && options.finalCaptureError) {
+        throw options.finalCaptureError;
+      }
       const raw = capture(
         input.operation,
         input.authorityDigest,
@@ -798,15 +803,16 @@ describe('execution effect Docker lifecycle authority', () => {
     expect(resumedFake.calls).toContain('create');
   });
 
-  it('screens sensitive paths without reading or returning their names', () => {
+  it('projects sensitive paths out without reading or returning their names', () => {
     const result = screenExecutionEffectDockerWorkspaceInventoryV1(Object.freeze([
       'src/index.ts', '.env.production', 'certs/service.pem', '.docker/config.json',
     ]));
     expect(result).toMatchObject({
-      state: 'HOLD',
-      code: 'SENSITIVE_PATH_DENIED',
-      pathCount: 4,
-      rejectedPathCount: 3,
+      state: 'ADMITTED',
+      paths: ['src/index.ts'],
+      pathCount: 1,
+      excludedSensitivePathCount: 3,
+      excludedSensitivePathsDigest: expect.stringMatching(/^sha256:[a-f0-9]{64}$/u),
     });
     expect(JSON.stringify(result)).not.toContain('.env.production');
     expect(JSON.stringify(result)).not.toContain('service.pem');
@@ -814,7 +820,72 @@ describe('execution effect Docker lifecycle authority', () => {
     expect(screenExecutionEffectDockerWorkspaceInventoryV1(Object.freeze([
       '.env.example', 'src/credential-parser.ts',
     ])).state).toBe('ADMITTED');
-    expect(() => plan(['src/index.ts', '.env.production'])).toThrow(TypeError);
+    const safePlan = plan(['src/index.ts', '.env.production']);
+    expect(safePlan.inventoryPaths).toEqual(['src/index.ts']);
+    expect(safePlan.inventoryRejectedPathCount).toBe(1);
+    expect(safePlan.inventoryRejectedPathsDigest).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    expect(() => plan(['src/index.ts', '.env.production'])).not.toThrow();
+  });
+
+  it('admits public design token assets but keeps credential-shaped token JSON fail-closed', () => {
+    const result = screenExecutionEffectDockerWorkspaceInventoryV1(Object.freeze([
+      'design/tokens/colors.tokens.json',
+      'src/design/tokens/spacing.tokens.json',
+      'DESIGN/TOKENS/typography.tokens.json',
+      'design/tokens/credentials.json',
+      'src/credential.tokens.json',
+      '.NPMRC',
+    ]));
+    expect(result).toMatchObject({
+      state: 'ADMITTED',
+      paths: [
+        'DESIGN/TOKENS/typography.tokens.json',
+        'design/tokens/colors.tokens.json',
+        'src/design/tokens/spacing.tokens.json',
+      ],
+      pathCount: 3,
+      excludedSensitivePathCount: 3,
+      excludedSensitivePathsDigest: expect.stringMatching(/^sha256:[a-f0-9]{64}$/u),
+    });
+    expect(JSON.stringify(result)).not.toContain('credential.tokens.json');
+    expect(JSON.stringify(result)).not.toContain('credentials.json');
+    expect(JSON.stringify(result)).not.toContain('.NPMRC');
+  });
+
+  it('round-trips host-screened exclusions through allocation without exposing their paths', () => {
+    const workspacePlan = plan(Object.freeze([
+      '.npmrc',
+      'design/tokens/colors.tokens.json',
+      'package.json',
+    ]));
+    expect(workspacePlan).toMatchObject({
+      inventoryPaths: ['design/tokens/colors.tokens.json', 'package.json'],
+      inventoryRejectedPathCount: 1,
+    });
+    expect(JSON.stringify(workspacePlan)).not.toContain('.npmrc');
+
+    const allocation = allocateExecutionEffectDockerWorkspaceV1(
+      prepareInput(workspacePlan, ['docs/execution/canary/CANARY-NOTE.md']),
+    );
+    expect(allocation.state).toBe('ALLOCATING');
+
+    const tampered = Object.freeze({
+      ...workspacePlan,
+      inventoryRejectedPathCount: workspacePlan.inventoryRejectedPathCount + 1,
+    });
+    expect(allocateExecutionEffectDockerWorkspaceV1(
+      prepareInput(tampered, ['docs/execution/canary/CANARY-NOTE.md']),
+    )).toMatchObject({ state: 'HOLD', code: 'INVALID_INPUT' });
+  });
+
+  it('denies an explicit sensitive write scope before any lifecycle adapter effect', async () => {
+    const workspacePlan = plan();
+    const fake = fakeAdapter(workspacePlan);
+    const result = await prepareExecutionEffectDockerWorkspaceV1(
+      prepareInput(workspacePlan, ['.npmrc']), fake.adapter, clock(),
+    );
+    expect(result).toMatchObject({ state: 'HOLD', code: 'SENSITIVE_PATH_WRITE_DENIED' });
+    expect(fake.calls).toEqual([]);
   });
 
   it('binds image-owned read-only dependencies outside the workspace effect manifest', () => {
@@ -1053,6 +1124,33 @@ describe('execution effect Docker lifecycle authority', () => {
     if (prepared.state !== 'PREPARED') return;
     const result = await authorizeExecutionEffectDockerProviderStartV1(prepared.session);
     expect(result).toMatchObject({ state: 'HOLD', code: 'CAPTURE_HOLD' });
+  });
+
+  it.each([
+    [new ExecutionEffectDockerCaptureAdapterErrorV1('HELPER_RUN'), 'HELPER_RUN'],
+    [new Error('FOREIGN_SECRET /private/custody/provider.stderr'), null],
+  ] as const)('preserves the final capture boundary without projecting raw exceptions (%s)', async (error, adapterStage) => {
+    const workspacePlan = plan();
+    const fake = fakeAdapter(workspacePlan, { finalCaptureError: error });
+    const prepared = await prepareExecutionEffectDockerWorkspaceV1(
+      prepareInput(workspacePlan), fake.adapter, clock(),
+    );
+    if (prepared.state !== 'PREPARED') throw new Error('prepare failed');
+    const authorized = await authorizeExecutionEffectDockerProviderStartV1(prepared.session);
+    if (authorized.state !== 'PROVIDER_START_AUTHORIZED') throw new Error('authorize failed');
+    const stopped = createExecutionEffectDockerProviderStoppedReceiptV1({
+      providerStartAuthorityDigest: authorized.providerStartAuthorityDigest,
+      containerName: 'deckent-x-attempt-21-1',
+      containerIdentityDigest: sha('container'), exitCode: 0,
+      exitObservationReceiptDigest: sha('exit'), stoppedAt: '2026-09-01T00:00:12.000Z',
+    });
+    const result = await captureExecutionEffectDockerFinalV1(authorized.session, stopped);
+    expect(result).toMatchObject({
+      state: 'HOLD', code: 'ADAPTER_UNAVAILABLE',
+      diagnostic: { schemaVersion: 1, stage: 'FIRST_CAPTURE', adapterStage },
+    });
+    expect(JSON.stringify(result)).not.toMatch(/FOREIGN_SECRET|private\/custody|stderr/u);
+    expect(fake.calls).not.toContain('capture:FINAL_QUIESCENCE_SECOND');
   });
 
   it('captures stopped-provider hidden effects and quarantines the whole attempt', async () => {

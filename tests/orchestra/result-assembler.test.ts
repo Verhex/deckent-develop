@@ -450,10 +450,27 @@ describe('assembleResult — validation', () => {
       capturedAt: '2026-09-01T00:00:00.000Z',
     };
     const hostTerminalBilling = {
+      state: 'available' as const,
       evidence: hostBilling,
       evidenceDigest: `sha256:${createHash('sha256').update(canonicalJson(hostBilling)).digest('hex')}` as const,
       providerStreamReceiptDigest: `sha256:${'e'.repeat(64)}` as const,
       billingMode: 'api' as const,
+    };
+    const hostUsage = {
+      source: 'provider-adapter' as const,
+      provider: 'fixture-provider',
+      model: 'fixture-model',
+      inputTokens: 10,
+      outputTokens: 5,
+      cacheReadTokens: 2,
+      cacheCreationTokens: 1,
+      totalTokens: 18,
+      capturedAt: '2026-09-01T00:00:00.000Z',
+    };
+    const hostTerminalUsage = {
+      evidence: hostUsage,
+      evidenceDigest: `sha256:${createHash('sha256').update(canonicalJson(hostUsage)).digest('hex')}` as const,
+      providerStreamReceiptDigest: hostTerminalBilling.providerStreamReceiptDigest,
     };
     const hostWorkEvidence = {
       filesChanged: [],
@@ -519,6 +536,7 @@ describe('assembleResult — validation', () => {
       hostWorkArtifact,
       jsonBounds: policy.jsonBounds,
       hostEffectAuthority,
+      hostTerminalUsage,
       hostTerminalBilling,
       hostWorkAuthority,
       hostPromptDeliveryAuthority,
@@ -531,6 +549,54 @@ describe('assembleResult — validation', () => {
     expect(result.attemptCustody.hostPromotion.authority)
       .toBe('host-canonical-ingress-assembler');
     expect(result.runPolicyEvidence).toEqual(ingress.runPolicyEvidence);
+    expect(result.terminalUsageEvidence).toEqual({
+      evidenceDigest: hostTerminalUsage.evidenceDigest,
+      providerStreamReceiptDigest: hostTerminalUsage.providerStreamReceiptDigest,
+      normalizationContract: 'provider-adapter-normalized-v1',
+    });
+
+    const subscriptionResult = assembleCanonicalIngressResultV2(ingress, {
+      taskId: identity.taskId,
+      workerId: 'docker-fixture-001',
+      provider: 'fixture-provider',
+      model: 'fixture-model',
+      promptCompilePlanId,
+    }, {
+      attemptCustody: sourceBinding,
+      hostWorkArtifact,
+      jsonBounds: policy.jsonBounds,
+      hostEffectAuthority,
+      hostTerminalUsage,
+      hostTerminalBilling: {
+        state: 'not-emitted',
+        billingMode: 'subscription',
+        reasonCode: 'PROVIDER_PRICE_ENVELOPE_NOT_EMITTED',
+        providerStreamReceiptDigest: hostTerminalUsage.providerStreamReceiptDigest,
+      },
+      hostWorkAuthority,
+      hostPromptDeliveryAuthority,
+    });
+    expect(subscriptionResult.providerBilling).toBeUndefined();
+    expect(subscriptionResult.cost).toEqual({
+      usd: 0,
+      currency: 'USD',
+      billingMode: 'subscription',
+      pricingSource: 'subscription-no-provider-price-envelope',
+      isLocal: false,
+    });
+    expect(() => assembleCanonicalIngressResultV2(ingress, {
+      taskId: identity.taskId, workerId: 'docker-fixture-001',
+      provider: 'fixture-provider', model: 'fixture-model', promptCompilePlanId,
+    }, {
+      attemptCustody: sourceBinding, hostWorkArtifact, jsonBounds: policy.jsonBounds,
+      hostEffectAuthority, hostTerminalUsage,
+      hostTerminalBilling: {
+        state: 'not-emitted', billingMode: 'api',
+        reasonCode: 'PROVIDER_PRICE_ENVELOPE_NOT_EMITTED',
+        providerStreamReceiptDigest: hostTerminalUsage.providerStreamReceiptDigest,
+      },
+      hostWorkAuthority, hostPromptDeliveryAuthority,
+    } as never)).toThrow(/Host terminal billing authority is invalid/u);
 
     const workerSpoof = assembleCanonicalIngressResultV2({
       ...ingress,
@@ -538,6 +604,11 @@ describe('assembleResult — validation', () => {
       tokenUsage: { inputTokens: 999999, outputTokens: 999999 },
       cost: { usd: 999999 },
       providerBilling: { providerReportedUsd: 999999 },
+      terminalUsageEvidence: {
+        evidenceDigest: `sha256:${'f'.repeat(64)}`,
+        providerStreamReceiptDigest: `sha256:${'f'.repeat(64)}`,
+        normalizationContract: 'provider-adapter-normalized-v1',
+      },
       filesChanged: [{ path: 'src/forged.ts', status: 'added', linesAdded: 999, linesRemoved: 0 }],
       totalLinesAdded: 999,
       totalLinesRemoved: 0,
@@ -562,6 +633,7 @@ describe('assembleResult — validation', () => {
       hostWorkArtifact,
       jsonBounds: policy.jsonBounds,
       hostEffectAuthority,
+      hostTerminalUsage,
       hostTerminalBilling,
       hostWorkAuthority,
       hostPromptDeliveryAuthority,
@@ -602,6 +674,7 @@ describe('assembleResult — validation', () => {
       attemptCustody: sourceBinding,
       hostWorkArtifact,
       jsonBounds: policy.jsonBounds,
+      hostTerminalUsage,
       hostTerminalBilling,
       hostPromptDeliveryAuthority,
     };
@@ -845,6 +918,7 @@ describe('assembleResult — validation', () => {
       hostWorkArtifact,
       jsonBounds: policy.jsonBounds,
       hostEffectAuthority,
+      hostTerminalUsage,
       hostTerminalBilling,
       hostWorkAuthority,
       hostPromptDeliveryAuthority: {
@@ -976,7 +1050,9 @@ describe('assembleResult — prompt delivery identity authority', () => {
       expect(missing.promptDeliveryAttribution).toEqual({ state: 'HOLD', reason: 'missing' });
 
       mkdirSync(join(root, '.tasks'), { recursive: true });
-      writeFileSync(promptDeliveryReceiptPath(root, 'task-1'), '{malformed', 'utf8');
+      const malformedReceiptPath = join(root, '.tasks', 'task-task-1.skill-delivery.json');
+      expect(malformedReceiptPath).toBe(promptDeliveryReceiptPath(root, 'task-1'));
+      writeFileSync(malformedReceiptPath, '{malformed', 'utf8');
       const malformed = await assembleResult(input);
       expect(malformed.agent).toBeNull();
       expect(malformed.skills).toEqual([]);

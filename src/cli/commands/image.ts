@@ -86,6 +86,14 @@ interface ResolvedDockerfile {
   exists: boolean;
 }
 
+const WORKER_IMAGE_RUNTIME_AUTHORITY_PATHS = Object.freeze([
+  ['package.json'],
+  ['npm-shrinkwrap.json'],
+  ['dist', 'core', 'exec-authority-native.js'],
+  ['native', 'exec-authority', 'index.mjs'],
+  ['native', 'exec-authority', 'package.json'],
+] as const);
+
 /**
  * Resolve the packaged Dockerfile.worker for a given package root.
  *
@@ -151,7 +159,10 @@ export async function handleImageBuild(
 
   const root = opts.root ?? resolvePackageRoot();
   const { path: dockerfilePath, exists } = resolvePackagedDockerfile(root);
-  const context = dirname(dockerfilePath);
+  // Dockerfile.worker copies the exact native authority runtime from the
+  // package root. npm's shipped package contains only admitted `files`, while
+  // the development checkout is protected by .dockerignore.
+  const context = root;
   const args = buildDockerBuildArgs(dockerfilePath, context, tag, opts);
   const planStr = `docker ${args.join(' ')}`;
 
@@ -173,6 +184,16 @@ export async function handleImageBuild(
         getMessage('image.dockerfile_missing', lang, { path: dockerfilePath }),
       ),
     );
+    return 1;
+  }
+
+  const missingRuntimeAuthority = WORKER_IMAGE_RUNTIME_AUTHORITY_PATHS
+    .map(parts => join(root, ...parts))
+    .find(path => !existsSync(path));
+  if (missingRuntimeAuthority) {
+    printError(new Error(getMessage('image.runtime_authority_missing', lang, {
+      path: missingRuntimeAuthority,
+    })));
     return 1;
   }
 

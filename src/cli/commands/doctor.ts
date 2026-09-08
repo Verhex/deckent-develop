@@ -990,6 +990,12 @@ export function formatWorkerImageLines(report: WorkerImageReport, lang: string =
   if (report.missingCaCerts) {
     lines.push(`         ${getMessage('doctor.image_missing_cacerts', lang)}`);
   }
+  if (report.missingRuntimeAuthority) {
+    lines.push(`         ${getMessage('doctor.image_missing_runtime_authority', lang)}`);
+  }
+  if (report.missingDependencyAuthority) {
+    lines.push(`         ${getMessage('doctor.image_missing_dependency_authority', lang)}`);
+  }
   lines.push(`         ${getMessage('doctor.image_build_hint', lang, { cmd: report.suggestedBuildCmd })}`);
   lines.push(`         ${getMessage('doctor.image_fix_hint', lang)}`);
   return lines;

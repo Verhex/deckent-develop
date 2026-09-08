@@ -28,6 +28,8 @@ function makeReport(over: Partial<WorkerImageReport> = {}): WorkerImageReport {
     state: 'stale',
     missingClis: ['codex'],
     missingCaCerts: false,
+    missingRuntimeAuthority: false,
+    missingDependencyAuthority: false,
     suggestedBuildCmd: 'docker build -f Dockerfile.worker --build-arg INSTALL_CODEX=true -t deckent-worker:latest .',
     ...over,
   };
@@ -71,6 +73,7 @@ describe('formatWorkerImageLines', () => {
     const joined = lines.join('\n');
     expect(joined).toContain('[PASS]');
     expect(joined).toContain('Worker image ready');
+    expect(joined).toContain('exact runtime authority');
     expect(joined).not.toContain('[WARN]');
     expect(joined).not.toContain('docker build');
   });
@@ -91,6 +94,20 @@ describe('formatWorkerImageLines', () => {
     ).join('\n');
     expect(joined).toContain('gemini');
     expect(joined).toContain('ca-certificates');
+  });
+
+  it('names missing exact runtime authority for a stale image', () => {
+    const joined = formatWorkerImageLines(
+      makeReport({ missingClis: [], missingRuntimeAuthority: true }),
+    ).join('\n');
+    expect(joined).toContain('runtime authority');
+  });
+
+  it('names missing image-owned dependency authority for a stale image', () => {
+    const joined = formatWorkerImageLines(
+      makeReport({ missingClis: [], missingDependencyAuthority: true }),
+    ).join('\n');
+    expect(joined).toContain('dependency authority');
   });
 
   it('localizes the WARN lines to Turkish when lang=tr', () => {

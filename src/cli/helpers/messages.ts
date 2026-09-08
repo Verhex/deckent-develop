@@ -2031,8 +2031,8 @@ const BASE_MESSAGES: MessageMap = {
 
   // ─── doctor: worker image readiness + --fix-image (F1-IMG, Sprint 270 — 270-008) ──
   'doctor.image_ready': {
-    en: 'Worker image ready — provider CLIs + ca-certificates present',
-    tr: 'Worker imajı hazır — sağlayıcı CLI\'ları + ca-certificates mevcut',
+    en: 'Worker image ready — provider CLIs, ca-certificates, exact runtime authority, and dependency authority present',
+    tr: 'Worker imajı hazır — sağlayıcı CLI\'ları, ca-certificates, exact runtime authority ve dependency authority mevcut',
   },
   'doctor.image_not_ready': {
     en: 'Worker image {state} — rebuild needed before docker-backend workers can run',
@@ -2045,6 +2045,14 @@ const BASE_MESSAGES: MessageMap = {
   'doctor.image_missing_cacerts': {
     en: 'Missing ca-certificates (TLS will fail for codex/gemini)',
     tr: 'ca-certificates eksik (codex/gemini için TLS başarısız olur)',
+  },
+  'doctor.image_missing_runtime_authority': {
+    en: 'Missing or mismatched exact runtime authority (Docker dispatch will fail closed)',
+    tr: 'Exact runtime authority eksik veya uyuşmuyor (Docker dispatch fail-closed durur)',
+  },
+  'doctor.image_missing_dependency_authority': {
+    en: 'Missing image-owned dependency authority (Docker dispatch will fail closed)',
+    tr: 'Image-owned dependency authority eksik (Docker dispatch fail-closed durur)',
   },
   'doctor.image_build_hint': {
     en: 'Build: {cmd}',
@@ -8233,6 +8241,10 @@ const BASE_MESSAGES: MessageMap = {
   'image.dockerfile_missing': {
     en: 'Packaged Dockerfile.worker not found at {path}. Reinstall deckent (the Dockerfile ships in the npm package) or report this packaging error.',
     tr: 'Paketlenmiş Dockerfile.worker {path} konumunda bulunamadı. deckent paketini yeniden yükleyin (Dockerfile npm paketiyle gelir) veya bu paketleme hatasını bildirin.',
+  },
+  'image.runtime_authority_missing': {
+    en: 'Worker image runtime authority source is missing at {path}. Rebuild deckent before building the worker image.',
+    tr: 'Worker image runtime authority kaynağı {path} konumunda eksik. Worker imajını oluşturmadan önce deckent\'i yeniden derleyin.',
   },
   'image.build_running': {
     en: 'Building worker image: {cmd}',

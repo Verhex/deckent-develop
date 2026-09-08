@@ -22,6 +22,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zstd \
     && rm -rf /var/lib/apt/lists/*
 
+# Exact Docker custody executes its native capability probe from the immutable
+# worker image before any project mount or provider work. Keep this runtime
+# image-owned; the host compares its capability manifest with the trusted host
+# runtime and fails closed on absence or drift.
+COPY package.json npm-shrinkwrap.json /app/
+RUN npm ci --prefix /app --include=dev
+COPY dist/core/exec-authority-native.js /app/dist/core/exec-authority-native.js
+COPY native/exec-authority /app/native/exec-authority
+RUN chmod -R a=rX /app/dist /app/native && chmod -R a+rX /app/node_modules && chmod a=r /app/package.json /app/npm-shrinkwrap.json && \
+    node --input-type=module -e "import { lstatSync } from 'node:fs'; import { loadExecAuthorityNative } from '/app/dist/core/exec-authority-native.js'; const native = loadExecAuthorityNative(); const dependencies = lstatSync('/app/node_modules'); if (!native.available || !native.effect || native.effect.available === false || !dependencies.isDirectory() || dependencies.isSymbolicLink()) process.exit(78);" && \
+    setpriv --reuid 65532 --regid 65532 --clear-groups node --input-type=module -e "import { lstatSync } from 'node:fs'; import { loadExecAuthorityNative } from '/app/dist/core/exec-authority-native.js'; const native = loadExecAuthorityNative(); const dependencies = lstatSync('/app/node_modules'); if (!native.available || !native.effect || native.effect.available === false || !dependencies.isDirectory() || dependencies.isSymbolicLink()) process.exit(78);"
+
 # Install the exact Claude Code release admitted by the built-in model catalog.
 # Claude Fable 5.1 rejects clients older than 2.1.251; 2.1.259 is the host- and
 # Docker-proven release for this catalog revision (2026-09-03). Pinning keeps a

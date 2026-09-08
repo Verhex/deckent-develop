@@ -213,6 +213,7 @@ const tokenUsageSchema = z.object({
   outputTokens: z.number().int().nonnegative(),
   cacheReadTokens: z.number().int().nonnegative().default(0),
   cacheCreationTokens: z.number().int().nonnegative().default(0),
+  reasoningTokens: z.number().int().nonnegative().optional(),
   totalTokens: z.number().int().nonnegative(),
   source: z.enum(['provider-adapter', 'tokenizer-fallback', 'host-runtime-budget']),
 });
@@ -371,6 +372,11 @@ export const taskResultSchema = z.object({
   tokenUsage: tokenUsageSchema,
   cost: costSchema,
   providerBilling: providerBillingSchema.optional(),
+  terminalUsageEvidence: z.object({
+    evidenceDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    providerStreamReceiptDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    normalizationContract: z.literal('provider-adapter-normalized-v1'),
+  }).strict().optional(),
 
   // verification (worker-run, orchestrator-captured)
   tests: testsSchema,
@@ -701,7 +707,7 @@ export const TASK_RESULT_FIELD_ORDER: readonly string[] = [
   'backend', 'status', 'workAttribution', 'workerWorkClaim', 'preDispatchSettlement',
   'promptDeliveryAttribution', 'promptCompilePlanId', 'hostTerminalProjection',
   // maliyet
-  'tokenUsage', 'cost', 'providerBilling',
+  'tokenUsage', 'cost', 'providerBilling', 'terminalUsageEvidence',
 ];
 
 /** Return a copy of `result` with keys in {@link TASK_RESULT_FIELD_ORDER}; unknown keys keep their original relative order at the end. */

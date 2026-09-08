@@ -362,6 +362,16 @@ export interface ExactAcceptedTaskResultRefV2 {
   readonly artifactReceiptDigest: Sha256Digest;
 }
 
+/** Canonical metadata for one immutable accepted result, independent of its orchestration consumer. */
+export interface ExactAcceptedTaskResultAuthorityMetadata {
+  readonly executionMode: 'normal-docker';
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly admissionReceiptDigest: Sha256Digest;
+  readonly acceptedResultRef: ExactAcceptedTaskResultRefV2;
+  readonly acceptedResultChainDigest: Sha256Digest;
+  readonly resultDigest: Sha256Digest;
+}
+
 export interface InspectExactAcceptedTaskResultAuthorityInput {
   readonly executionMode: 'normal-docker';
   readonly authorityKind: 'accepted-result';

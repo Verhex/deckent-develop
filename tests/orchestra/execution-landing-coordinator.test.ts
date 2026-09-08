@@ -20,6 +20,7 @@ import {
   writeTaskResultSettlementAttemptAtomic,
 } from '../../src/core/task-result-settlement.js';
 import { TaskStatus, type Task } from '../../src/core/task-types.js';
+import { canonicalJson } from '../../src/core/audit-writer.js';
 import {
   ExecutionLandingHoldError,
   assertExactDockerExecutionLandingCaptureV2,
@@ -243,7 +244,27 @@ function exactLandingCapture(root?: string): ExactDockerExecutionLandingCaptureV
       },
     },
     resultArtifact,
+    providerUsage: (() => {
+      const evidence = {
+        source: 'provider-adapter' as const,
+        provider: 'claude',
+        model: 'claude-fable-5',
+        inputTokens: 1,
+        outputTokens: 1,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+        totalTokens: 2,
+        capturedAt: providerStream.capturedAt,
+      };
+      return {
+        evidence,
+        evidenceDigest: `sha256:${createHash('sha256')
+          .update(canonicalJson(evidence)).digest('hex')}` as const,
+        providerStreamReceiptDigest: providerStream.receiptDigest,
+      };
+    })(),
     providerBilling: {
+      state: 'available' as const,
       evidence: {
         source: 'provider-envelope' as const,
         provider: 'claude',
@@ -305,6 +326,39 @@ describe('Docker execution landing coordinator', () => {
       ...capture,
       terminal: {
         ...capture.terminal,
+        providerUsage: {
+          ...capture.terminal.providerUsage,
+          evidence: {
+            ...capture.terminal.providerUsage.evidence,
+            capturedAt: '2026-09-01T00:59:59.000Z',
+          },
+        },
+      },
+    })).toThrow(/does not match released custody/);
+    expect(() => assertExactDockerExecutionLandingCaptureV2({
+      ...capture,
+      terminal: {
+        ...capture.terminal,
+        providerUsage: {
+          ...capture.terminal.providerUsage,
+          evidenceDigest: `sha256:${'f'.repeat(64)}`,
+        },
+      },
+    })).toThrow(/does not match released custody/);
+    expect(() => assertExactDockerExecutionLandingCaptureV2({
+      ...capture,
+      terminal: {
+        ...capture.terminal,
+        providerUsage: {
+          ...capture.terminal.providerUsage,
+          providerStreamReceiptDigest: `sha256:${'f'.repeat(64)}`,
+        },
+      },
+    })).toThrow(/does not match released custody/);
+    expect(() => assertExactDockerExecutionLandingCaptureV2({
+      ...capture,
+      terminal: {
+        ...capture.terminal,
         landingProposal: {
           ...capture.terminal.landingProposal,
           proposal: {
@@ -336,11 +390,29 @@ describe('Docker execution landing coordinator', () => {
     })).toThrow(/does not match released custody/);
   });
 
-  it('writes the pre-provider baseline then stamps only the path-free terminal custody chain', () => {
+  it.each([
+    ['available', true],
+    ['not-emitted', false],
+  ] as const)(
+    'writes the pre-provider baseline then stamps the path-free %s billing custody chain',
+    (billingState, includesBillingDigest) => {
     vi.useFakeTimers();
     vi.setSystemTime('2026-09-01T00:59:00.000Z');
     const { root } = fixture();
-    const capture = exactLandingCapture(root);
+    const baseCapture = exactLandingCapture(root);
+    const capture = billingState === 'available' ? baseCapture : {
+      ...baseCapture,
+      terminal: {
+        ...baseCapture.terminal,
+        providerBilling: {
+          state: 'not-emitted' as const,
+          billingMode: 'subscription' as const,
+          reasonCode: 'PROVIDER_PRICE_ENVELOPE_NOT_EMITTED' as const,
+          evidenceDigest: null,
+          providerStreamReceiptDigest: baseCapture.terminal.providerStream.receiptDigest,
+        },
+      },
+    };
     const preparation = capture.dispatch.preparationRef;
     const identity = {
       configuredProvider: 'claude',
@@ -441,7 +513,14 @@ describe('Docker execution landing coordinator', () => {
       state: 'RETIRED',
       resourcesReleased: true,
       runtimeDisposition: 'checkpointed-process-exited',
+      evidenceDigests: expect.arrayContaining([
+        capture.terminal.providerStream.receiptDigest,
+        capture.terminal.providerUsage.evidenceDigest,
+      ]),
     });
+    expect(stamped.retirement.evidenceDigests.includes(
+      baseCapture.terminal.providerBilling.evidenceDigest,
+    )).toBe(includesBillingDigest);
     const durable = JSON.stringify(stamped);
     expect(durable).not.toContain('.tasks');
     expect(durable).not.toContain('/workspace');
@@ -454,6 +533,22 @@ describe('Docker execution landing coordinator', () => {
         identity: { ...identity, calledProvider: 'foreign-provider' },
       },
     })).toThrow(/billing identity/);
+
+    if (billingState === 'not-emitted') {
+      for (const malformedBilling of [
+        { ...capture.terminal.providerBilling, billingMode: 'api' as const },
+        { ...capture.terminal.providerBilling, reasonCode: 'WRONG_REASON' },
+        {
+          ...capture.terminal.providerBilling,
+          providerStreamReceiptDigest: `sha256:${'f'.repeat(64)}`,
+        },
+      ]) {
+        expect(() => assertExactDockerExecutionLandingCaptureV2({
+          ...capture,
+          terminal: { ...capture.terminal, providerBilling: malformedBilling as never },
+        })).toThrow(/does not match released custody/);
+      }
+    }
   });
 
   it('selects the finite proposal cadence only for the closed xverify protocol', () => {
@@ -842,6 +937,9 @@ describe('Docker execution landing coordinator', () => {
   });
 
   it('stamps host truth around an untrusted attempt-bound semantic proposal', () => {
+    const hostNow = Date.now();
+    vi.useFakeTimers();
+    vi.setSystemTime(hostNow - 60_000);
     const { root, task } = fixture();
     const settlementRef = createTaskResultSettlementRef(root, task.id);
     writeTaskResultSettlementAttemptAtomic(settlementRef);
@@ -883,9 +981,12 @@ describe('Docker execution landing coordinator', () => {
       backend: 'docker',
     });
 
-    writeFileSync(join(root, 'source.ts'), 'export const value = 2;\n');
+    vi.useRealTimers();
+    const sourcePath = join(root, 'source.ts');
+    const proposalPath = executionLandingProposalPath(root, task.id);
+    writeFileSync(sourcePath, 'export const value = 2;\n');
     const now = new Date().toISOString();
-    writeFileSync(executionLandingProposalPath(root, task.id), JSON.stringify({
+    writeFileSync(proposalPath, JSON.stringify({
       version: 1,
       taskId: task.id,
       attemptId: settlementRef.attemptId,
@@ -900,7 +1001,7 @@ describe('Docker execution landing coordinator', () => {
       updatedAt: '2000-01-01T00:00:00.000Z',
     }));
 
-    const checkpoint = stampDockerExecutionLandingCheckpoint({
+    const stamp = () => stampDockerExecutionLandingCheckpoint({
       projectRoot: root,
       settlementRef,
       terminalUsage: terminalUsage(settlementRef, {
@@ -944,6 +1045,19 @@ describe('Docker execution landing coordinator', () => {
         requestedAt: now,
       },
     });
+
+    const preparedAtMs = Date.parse(prepared.context!.context.preparedAt);
+    const staleProposalMtime = new Date(preparedAtMs - 10_000);
+    utimesSync(proposalPath, staleProposalMtime, staleProposalMtime);
+    expect(stamp).toThrow(/proposal file predates the current attempt/);
+
+    // Both inputs remain safely behind the restored host clock, while their
+    // ordering stays explicit across filesystems with coarse mtime precision.
+    const sourceMtime = new Date(preparedAtMs + 10_000);
+    const proposalMtime = new Date(preparedAtMs + 20_000);
+    utimesSync(sourcePath, sourceMtime, sourceMtime);
+    utimesSync(proposalPath, proposalMtime, proposalMtime);
+    const checkpoint = stamp();
 
     expect(checkpoint.checkpoint.semanticState.summary).toContain('Source change');
     expect(checkpoint.checkpoint.cumulativeUsage.cacheReadTokens).toBe(800);

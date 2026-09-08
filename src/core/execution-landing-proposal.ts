@@ -531,6 +531,7 @@ export function buildExecutionLandingProposalPromptSegment(
 export function buildExactExecutionLandingProposalPromptSegment(
   taskId: string,
   dispatchRequestId: string,
+  protocol: 'legacy-entry-v1' | 'private-draft-v2' = 'legacy-entry-v1',
 ): string {
   assertTaskId(taskId);
   if (!dispatchRequestId || dispatchRequestId.length > 512) {
@@ -551,23 +552,45 @@ export function buildExactExecutionLandingProposalPromptSegment(
     unresolvedRisks: ['specific unresolved risk'],
     updatedAt: new Date(0).toISOString(),
   };
-  const entryCommand = [
-    'node dist/agents/landing-proposal-entry.js',
-    '--exact',
-    quoteBashArgument(taskId),
-    quoteBashArgument(dispatchRequestId),
-  ].join(' ');
+  if (protocol === 'legacy-entry-v1') {
+    const entryCommand = [
+      'node dist/agents/landing-proposal-entry.js',
+      '--exact',
+      quoteBashArgument(taskId),
+      quoteBashArgument(dispatchRequestId),
+    ].join(' ');
+    return [
+      '## Exact Custody Landing Proposal Protocol',
+      `Maintain the bounded semantic proposal at \`${path}\` for dispatch \`${dispatchRequestId}\`.`,
+      'This path is an attempt-private output mount. Never read or write the project shared `.tasks` directory.',
+      'Write sequence 1 before provider-intensive work. Replace it after each coherent completed step and after the final scoped mutation.',
+      'Before writing the worker result, publish sequence 2 or higher. Replace `updatedAt` with the current ISO-8601 timestamp.',
+      'Use the provider-neutral writer below with complete JSON on stdin. Do not add attempt, result-path, provider, usage, approval, or settlement authority.',
+      '```bash',
+      `${entryCommand} <<'LANDING_PROPOSAL_JSON'`,
+      JSON.stringify(initialProposal, null, 2),
+      'LANDING_PROPOSAL_JSON',
+      '```',
+      'Use exactly this JSON shape and no extra fields. Increment `sequence` on every replacement.',
+      'This is an untrusted semantic proposal. Only the host may capture it, bind exact custody, and stamp a checkpoint.',
+    ].join('\n');
+  }
+  if (protocol !== 'private-draft-v2') {
+    throw createExecutionAuthorityError(
+      'Exact execution landing proposal private output protocol is invalid',
+    );
+  }
   return [
     '## Exact Custody Landing Proposal Protocol',
     `Maintain the bounded semantic proposal at \`${path}\` for dispatch \`${dispatchRequestId}\`.`,
     'This path is an attempt-private output mount. Never read or write the project shared `.tasks` directory.',
-    'Write sequence 1 before provider-intensive work. Replace it after each coherent completed step and after the final scoped mutation.',
-    'Before writing the worker result, publish sequence 2 or higher. Replace `updatedAt` with the current ISO-8601 timestamp.',
-    'Use the provider-neutral writer below with complete JSON on stdin. Do not add attempt, result-path, provider, usage, approval, or settlement authority.',
-    '```bash',
-    `${entryCommand} <<'LANDING_PROPOSAL_JSON'`,
+    'Write the complete untrusted JSON draft directly to this exact path in one file-write operation before provider-intensive work.',
+    'Replace the complete draft after each coherent completed step and after the final scoped mutation. Never append or patch a partial JSON document.',
+    'Before writing the worker result, publish sequence 2 or higher and replace `updatedAt` with the current ISO-8601 timestamp.',
+    'For this proposal protocol, do not invoke a repository executable and do not read or write any other project file to stage, serialize, validate, or publish the draft.',
+    'Do not add attempt, result-path, provider, usage, approval, or settlement authority.',
+    '```json',
     JSON.stringify(initialProposal, null, 2),
-    'LANDING_PROPOSAL_JSON',
     '```',
     'Use exactly this JSON shape and no extra fields. Increment `sequence` on every replacement.',
     'This is an untrusted semantic proposal. Only the host may capture it, bind exact custody, and stamp a checkpoint.',

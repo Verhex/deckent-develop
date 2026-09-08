@@ -270,6 +270,13 @@ function isSensitiveInventoryPath(path: string): boolean {
   const lowerPath = path.toLowerCase();
   const basename = path.slice(path.lastIndexOf('/') + 1).toLowerCase();
   if (PUBLIC_ENV_EXAMPLES.has(basename)) return false;
+  // Design-system token assets are public workspace inputs, not authentication
+  // token stores. Keep the exception scoped to the conventional design/tokens
+  // tree so a credential-shaped `*.tokens.json` elsewhere remains fail-closed.
+  const segments = lowerPath.split('/');
+  const isDesignTokenAsset = basename.endsWith('.tokens.json')
+    && segments.some((segment, index) => segment === 'design' && segments[index + 1] === 'tokens');
+  if (isDesignTokenAsset) return false;
   if (EXACT_SENSITIVE_NAMES.has(basename) || basename.startsWith('.env.')) return true;
   const extension = basename.includes('.') ? basename.slice(basename.lastIndexOf('.')) : '';
   if (SENSITIVE_EXTENSIONS.has(extension)) return true;
@@ -286,22 +293,23 @@ export type ExecutionEffectDockerInventoryAdmissionV1 =
     readonly version: 1;
     readonly kind: 'execution-effect-docker-inventory-admission';
     readonly state: 'ADMITTED';
+    /** Safe provider projection; sensitive source names are never returned. */
     readonly paths: readonly string[];
     readonly pathCount: number;
     readonly totalPathBytes: number;
     readonly inventoryDigest: Digest;
-    readonly rejectedPathCount: 0;
-    readonly rejectedPathsDigest: Digest;
+    readonly excludedSensitivePathCount: number;
+    readonly excludedSensitivePathsDigest: Digest;
     readonly receiptDigest: Digest;
   }>
   | Readonly<{
     readonly version: 1;
     readonly kind: 'execution-effect-docker-inventory-admission';
     readonly state: 'HOLD';
-    readonly code: 'INVALID_INVENTORY' | 'SENSITIVE_PATH_DENIED';
+    readonly code: 'INVALID_INVENTORY';
     readonly pathCount: number;
-    readonly rejectedPathCount: number;
-    readonly rejectedPathsDigest: Digest;
+    readonly excludedSensitivePathCount: 0;
+    readonly excludedSensitivePathsDigest: Digest;
     readonly receiptDigest: Digest;
   }>;
 
@@ -317,8 +325,11 @@ export function screenExecutionEffectDockerWorkspaceInventoryV1(
       state: 'HOLD' as const,
       code: 'INVALID_INVENTORY' as const,
       pathCount: Array.isArray(value) && Number.isSafeInteger(value.length) ? value.length : 0,
-      rejectedPathCount: 0,
-      rejectedPathsDigest: digest('execution-effect-docker-rejected-inventory-paths-v1', []),
+      excludedSensitivePathCount: 0,
+      excludedSensitivePathsDigest: digest(
+        'execution-effect-docker-rejected-inventory-paths-v1',
+        [],
+      ),
     });
     return Object.freeze({
       ...body,
@@ -326,41 +337,30 @@ export function screenExecutionEffectDockerWorkspaceInventoryV1(
     });
   }
   const rejected = paths.filter(isSensitiveInventoryPath);
-  const rejectedPathsDigest = digest('execution-effect-docker-rejected-inventory-paths-v1', rejected);
-  if (rejected.length > 0) {
-    const body = Object.freeze({
-      version: 1 as const,
-      kind: 'execution-effect-docker-inventory-admission' as const,
-      state: 'HOLD' as const,
-      code: 'SENSITIVE_PATH_DENIED' as const,
-      pathCount: paths.length,
-      rejectedPathCount: rejected.length,
-      rejectedPathsDigest,
-    });
-    return Object.freeze({
-      ...body,
-      receiptDigest: digest('execution-effect-docker-inventory-admission-v1', body),
-    });
-  }
-  const totalPathBytes = paths.reduce(
+  const safePaths = paths.filter(path => !isSensitiveInventoryPath(path));
+  const excludedSensitivePathsDigest = digest(
+    'execution-effect-docker-rejected-inventory-paths-v1',
+    rejected,
+  );
+  const totalPathBytes = safePaths.reduce(
     (total, path) => total + Buffer.byteLength(path, 'utf8'),
     0,
   );
   const inventoryBody = Object.freeze({
-    paths,
-    pathCount: paths.length,
+    paths: safePaths,
+    pathCount: safePaths.length,
     totalPathBytes,
   });
   const body = Object.freeze({
     version: 1 as const,
     kind: 'execution-effect-docker-inventory-admission' as const,
     state: 'ADMITTED' as const,
-    paths,
-    pathCount: paths.length,
+    paths: Object.freeze(safePaths),
+    pathCount: safePaths.length,
     totalPathBytes,
     inventoryDigest: digest('execution-effect-docker-workspace-inventory-v1', inventoryBody),
-    rejectedPathCount: 0 as const,
-    rejectedPathsDigest,
+    excludedSensitivePathCount: rejected.length,
+    excludedSensitivePathsDigest,
   });
   return Object.freeze({
     ...body,
@@ -406,7 +406,7 @@ export interface ExecutionEffectDockerWorkspacePlanV1 {
   readonly inventoryTotalPathBytes: number;
   readonly inventoryDigest: Digest;
   readonly inventoryAdmissionReceiptDigest: Digest;
-  readonly inventoryRejectedPathCount: 0;
+  readonly inventoryRejectedPathCount: number;
   readonly inventoryRejectedPathsDigest: Digest;
   readonly planDigest: Digest;
 }
@@ -534,8 +534,8 @@ export function createExecutionEffectDockerWorkspacePlanV1(input: Readonly<{
     inventoryTotalPathBytes,
     inventoryDigest: admittedInventory!.inventoryDigest,
     inventoryAdmissionReceiptDigest: admittedInventory!.receiptDigest,
-    inventoryRejectedPathCount: 0 as const,
-    inventoryRejectedPathsDigest: admittedInventory!.rejectedPathsDigest,
+    inventoryRejectedPathCount: admittedInventory!.excludedSensitivePathCount,
+    inventoryRejectedPathsDigest: admittedInventory!.excludedSensitivePathsDigest,
   });
   return Object.freeze({
     ...body,
@@ -560,7 +560,10 @@ function parseWorkspacePlan(value: unknown): ExecutionEffectDockerWorkspacePlanV
     || !isDigest(record.dependencyLabelsDigest)
     || !isDigest(record.dependencyResourceInstanceDigest) || !isDigest(record.mountPlanDigest)
     || !isDigest(record.dependencyPlanDigest) || !isDigest(record.inventoryDigest)
-    || !isDigest(record.inventoryAdmissionReceiptDigest) || record.inventoryRejectedPathCount !== 0
+    || !isDigest(record.inventoryAdmissionReceiptDigest)
+    || !Number.isSafeInteger(record.inventoryRejectedPathCount)
+    || (record.inventoryRejectedPathCount as number) < 0
+    || (record.inventoryRejectedPathCount as number) > EXECUTION_EFFECT_PORTABLE_PATH_LIMITS.maxEntries
     || !isDigest(record.inventoryRejectedPathsDigest) || !isDigest(record.planDigest)) return null;
   try {
     const recreated = createExecutionEffectDockerWorkspacePlanV1({
@@ -577,7 +580,47 @@ function parseWorkspacePlan(value: unknown): ExecutionEffectDockerWorkspacePlanV
       dependencyPlan: record.dependencyPlan as ExecutionEffectDockerWorkspacePlanV1['dependencyPlan'],
       inventoryPaths: record.inventoryPaths as readonly string[],
     });
-    return sameCanonical(recreated, value) ? recreated : null;
+    // `inventoryPaths` is deliberately the provider-safe projection. Re-screening
+    // it cannot reproduce the rejected path names (and must never make them
+    // recoverable), so restore only the host-authored opaque count/digest proof.
+    // Bind that proof back to the canonical admission receipt and final plan
+    // digest before accepting the round trip.
+    if (recreated.inventoryRejectedPathCount !== 0) return null;
+    const rejectedPathCount = record.inventoryRejectedPathCount as number;
+    const rejectedPathsDigest = record.inventoryRejectedPathsDigest as Digest;
+    if (rejectedPathCount === 0
+      && rejectedPathsDigest !== digest('execution-effect-docker-rejected-inventory-paths-v1', [])) {
+      return null;
+    }
+    const restoredAdmissionBody = Object.freeze({
+      version: 1 as const,
+      kind: 'execution-effect-docker-inventory-admission' as const,
+      state: 'ADMITTED' as const,
+      paths: recreated.inventoryPaths,
+      pathCount: recreated.inventoryPathCount,
+      totalPathBytes: recreated.inventoryTotalPathBytes,
+      inventoryDigest: recreated.inventoryDigest,
+      excludedSensitivePathCount: rejectedPathCount,
+      excludedSensitivePathsDigest: rejectedPathsDigest,
+    });
+    const inventoryAdmissionReceiptDigest = digest(
+      'execution-effect-docker-inventory-admission-v1',
+      restoredAdmissionBody,
+    );
+    if (inventoryAdmissionReceiptDigest !== record.inventoryAdmissionReceiptDigest) return null;
+
+    const { planDigest: _safeProjectionPlanDigest, ...safeProjectionBody } = recreated;
+    const restoredBody = Object.freeze({
+      ...safeProjectionBody,
+      inventoryAdmissionReceiptDigest,
+      inventoryRejectedPathCount: rejectedPathCount,
+      inventoryRejectedPathsDigest: rejectedPathsDigest,
+    });
+    const restored = Object.freeze({
+      ...restoredBody,
+      planDigest: digest('execution-effect-docker-workspace-plan-v1', restoredBody),
+    });
+    return sameCanonical(restored, value) ? restored : null;
   } catch {
     return null;
   }
@@ -1193,7 +1236,7 @@ export interface ExecutionEffectDockerPopulationReceiptV1 {
   readonly inventoryAdmissionReceiptDigest: Digest;
   readonly dependencyPlanDigest: Digest;
   readonly dependencyAuthorityReceiptDigest: Digest;
-  readonly rejectedPathCount: 0;
+  readonly rejectedPathCount: number;
   readonly rejectedPathsDigest: Digest;
   readonly captureReceiptDigest: Digest;
   readonly populatedPathCount: number;
@@ -1221,7 +1264,10 @@ export function createExecutionEffectDockerPopulationReceiptV1(input: Omit<
   if (record === null || !isDigest(record.authorityDigest)
     || !VOLUME_NAME.test(record.volumeName as string) || !isDigest(record.volumeIdentityDigest)
     || !isDigest(record.inventoryDigest) || !isDigest(record.inventoryAdmissionReceiptDigest)
-    || !isDigest(record.dependencyPlanDigest) || record.rejectedPathCount !== 0
+    || !isDigest(record.dependencyPlanDigest)
+    || !Number.isSafeInteger(record.rejectedPathCount)
+    || (record.rejectedPathCount as number) < 0
+    || (record.rejectedPathCount as number) > EXECUTION_EFFECT_PORTABLE_PATH_LIMITS.maxEntries
     || !isDigest(record.dependencyAuthorityReceiptDigest)
     || !isDigest(record.rejectedPathsDigest) || !isDigest(record.captureReceiptDigest)
     || !Number.isSafeInteger(record.populatedPathCount) || (record.populatedPathCount as number) < 0
@@ -1248,7 +1294,7 @@ export function createExecutionEffectDockerPopulationReceiptV1(input: Omit<
     inventoryAdmissionReceiptDigest: record.inventoryAdmissionReceiptDigest,
     dependencyPlanDigest: record.dependencyPlanDigest,
     dependencyAuthorityReceiptDigest: record.dependencyAuthorityReceiptDigest,
-    rejectedPathCount: 0 as const,
+    rejectedPathCount: record.rejectedPathCount as number,
     rejectedPathsDigest: record.rejectedPathsDigest,
     captureReceiptDigest: record.captureReceiptDigest,
     populatedPathCount: record.populatedPathCount as number,
@@ -1286,7 +1332,7 @@ function parsePopulationReceipt(value: unknown): ExecutionEffectDockerPopulation
       inventoryAdmissionReceiptDigest: record.inventoryAdmissionReceiptDigest as Digest,
       dependencyPlanDigest: record.dependencyPlanDigest as Digest,
       dependencyAuthorityReceiptDigest: record.dependencyAuthorityReceiptDigest as Digest,
-      rejectedPathCount: record.rejectedPathCount as 0,
+      rejectedPathCount: record.rejectedPathCount as number,
       rejectedPathsDigest: record.rejectedPathsDigest as Digest,
       captureReceiptDigest: record.captureReceiptDigest as Digest,
       populatedPathCount: record.populatedPathCount as number,
@@ -1683,6 +1729,7 @@ function readClock(adapters: SnapshottedAdapters, lowerBound: string): string | 
 export type ExecutionEffectDockerLifecycleHoldCode =
   | 'UNSUPPORTED_PLATFORM'
   | 'INVALID_INPUT'
+  | 'SENSITIVE_PATH_WRITE_DENIED'
   | 'ADAPTER_UNAVAILABLE'
   | 'CLOCK_INVALID'
   | 'VOLUME_NOT_ABSENT'
@@ -1704,6 +1751,35 @@ export interface ExecutionEffectDockerLifecycleHoldV1 {
   readonly code: ExecutionEffectDockerLifecycleHoldCode;
   readonly evidenceDigest: Digest;
   readonly containmentDecision: ExecutionEffectContainmentDecision | null;
+  /** Path-free diagnostic only; never a lifecycle or landing authority. */
+  readonly diagnostic?: ExecutionEffectDockerFinalDiagnosticV1;
+}
+
+export const EXECUTION_EFFECT_DOCKER_CAPTURE_ADAPTER_STAGES = Object.freeze([
+  'PRE_GENERATION', 'HELPER_RUN', 'POST_GENERATION', 'CLOCK', 'RAW_CAPTURE',
+  'POPULATION_MANIFEST',
+] as const);
+
+export type ExecutionEffectDockerCaptureAdapterStageV1 =
+  (typeof EXECUTION_EFFECT_DOCKER_CAPTURE_ADAPTER_STAGES)[number];
+
+/** Only trusted adapter boundaries construct this error; raw errors never project. */
+export class ExecutionEffectDockerCaptureAdapterErrorV1 extends Error {
+  constructor(readonly stage: ExecutionEffectDockerCaptureAdapterStageV1) {
+    super('EXECUTION_EFFECT_DOCKER_CAPTURE_ADAPTER_HOLD');
+    this.name = 'ExecutionEffectDockerCaptureAdapterErrorV1';
+  }
+}
+
+export const EXECUTION_EFFECT_DOCKER_FINAL_STAGES = Object.freeze([
+  'SESSION', 'PROVIDER_STOPPED', 'ATTACHMENTS', 'FIRST_CAPTURE', 'SECOND_CAPTURE',
+  'QUIESCENCE_SEAL', 'CONTAINMENT', 'READY_AUTHORITY',
+] as const);
+
+export interface ExecutionEffectDockerFinalDiagnosticV1 {
+  readonly schemaVersion: 1;
+  readonly stage: (typeof EXECUTION_EFFECT_DOCKER_FINAL_STAGES)[number];
+  readonly adapterStage: ExecutionEffectDockerCaptureAdapterStageV1 | null;
 }
 
 function hold(
@@ -2119,7 +2195,7 @@ function snapshotDurableLifecycleCommon(
       !== workspacePlan.inventoryAdmissionReceiptDigest
     || populationReceipt.dependencyPlanDigest !== workspacePlan.dependencyPlanDigest
     || populationReceipt.dependencyAuthorityReceiptDigest !== dependencyAuthority.receiptDigest
-    || populationReceipt.rejectedPathCount !== 0
+    || populationReceipt.rejectedPathCount !== workspacePlan.inventoryRejectedPathCount
     || populationReceipt.rejectedPathsDigest !== workspacePlan.inventoryRejectedPathsDigest
     || baselineManifest.phase !== 'baseline' || !sameAttempt(baselineManifest.attempt, attempt)
     || baselineManifest.policy.digest !== writePolicy.digest
@@ -2623,6 +2699,14 @@ export function allocateExecutionEffectDockerWorkspaceV1(
     return hold(platform === 'darwin' || platform === 'win32'
       ? 'UNSUPPORTED_PLATFORM' : 'INVALID_INPUT', { stage: 'allocation-input', platform });
   }
+  const sensitiveWriteCount = base.writePolicy.filesWrite
+    .filter(isSensitiveInventoryPath).length;
+  if (sensitiveWriteCount > 0) {
+    return hold('SENSITIVE_PATH_WRITE_DENIED', {
+      stage: 'allocation-input',
+      sensitiveWriteCount,
+    });
+  }
   const lifecycleAuthority = createExecutionEffectDockerAllocatingLifecycleAuthorityV1(input);
   const opaque = session() as AllocatedExecutionEffectDockerWorkspaceV1;
   allocatingAuthorities.set(opaque, Object.freeze({ base, lifecycleAuthority }));
@@ -2971,7 +3055,7 @@ export async function prepareAllocatedExecutionEffectDockerWorkspaceV1(
       || populationReceipt.inventoryAdmissionReceiptDigest !== plan.inventoryAdmissionReceiptDigest
       || populationReceipt.dependencyPlanDigest !== plan.dependencyPlanDigest
       || populationReceipt.dependencyAuthorityReceiptDigest !== dependencyAuthority.receiptDigest
-      || populationReceipt.rejectedPathCount !== 0
+      || populationReceipt.rejectedPathCount !== plan.inventoryRejectedPathCount
       || populationReceipt.rejectedPathsDigest !== plan.inventoryRejectedPathsDigest
       || populationReceipt.captureReceiptDigest !== rawCapture.receipt.receiptDigest
       || populationReceipt.populatedPathCount !== plan.inventoryPathCount
@@ -3341,16 +3425,27 @@ export async function captureExecutionEffectDockerFinalV1(
   provider: AuthorizedExecutionEffectDockerProviderV1,
   stoppedValue: ExecutionEffectDockerProviderStoppedReceiptV1,
 ): Promise<CaptureExecutionEffectDockerFinalV1Result> {
+  let stage: ExecutionEffectDockerFinalDiagnosticV1['stage'] = 'SESSION';
+  const finalHold = (
+    code: ExecutionEffectDockerLifecycleHoldCode,
+    evidence: unknown,
+    containmentDecision: ExecutionEffectContainmentDecision | null = null,
+    adapterStage: ExecutionEffectDockerCaptureAdapterStageV1 | null = null,
+  ): ExecutionEffectDockerLifecycleHoldV1 => Object.freeze({
+    ...hold(code, evidence, containmentDecision),
+    diagnostic: Object.freeze({ schemaVersion: 1 as const, stage, adapterStage }),
+  });
   if (provider === null || typeof provider !== 'object' || nodeTypes.isProxy(provider)) {
-    return hold('SESSION_INVALID', { stage: 'final' });
+    return finalHold('SESSION_INVALID', { stage: 'final' });
   }
   const authority = providerAuthorities.get(provider);
-  if (!authority) return hold('SESSION_INVALID', { stage: 'final' });
+  if (!authority) return finalHold('SESSION_INVALID', { stage: 'final' });
   providerAuthorities.delete(provider);
+  stage = 'PROVIDER_STOPPED';
   const stopped = parseProviderStoppedReceipt(stoppedValue);
   if (!stopped || stopped.providerStartAuthorityDigest !== authority.providerStartAuthorityDigest
     || !timestampAtOrAfter(stopped.stoppedAt, authority.authorizedAt)) {
-    return hold('AUTHORITY_MISMATCH', {
+    return finalHold('AUTHORITY_MISMATCH', {
       stage: 'provider-stopped', providerStartAuthorityDigest: authority.providerStartAuthorityDigest,
     });
   }
@@ -3361,6 +3456,7 @@ export async function captureExecutionEffectDockerFinalV1(
     dependencyAuthorityReceiptDigest: authority.dependencyAuthority.receiptDigest,
   });
   try {
+    stage = 'ATTACHMENTS';
     const attachmentRaw = await Reflect.apply(
       authority.adapters.verifyExclusiveAttachments,
       authority.adapters.adapterThis,
@@ -3385,7 +3481,7 @@ export async function captureExecutionEffectDockerFinalV1(
       notBefore: stopped.stoppedAt,
     });
     if (!postProviderAttachmentReceipt) {
-      return hold('ATTACHMENT_HOLD', {
+      return finalHold('ATTACHMENT_HOLD', {
         stage: 'post-provider-attachment', authorityDigest: attachmentAuthorityDigest,
       });
     }
@@ -3398,6 +3494,7 @@ export async function captureExecutionEffectDockerFinalV1(
         exclusiveAttachmentReceiptDigest: postProviderAttachmentReceipt.receiptDigest,
       },
     );
+    stage = 'FIRST_CAPTURE';
     const firstRaw = await Reflect.apply(
       authority.adapters.captureWorkspace,
       authority.adapters.adapterThis,
@@ -3427,7 +3524,7 @@ export async function captureExecutionEffectDockerFinalV1(
       || firstCaptured.receipt.manifestStateDigest
         !== executionEffectDockerManifestStateDigestV1(firstManifest)
       || !timestampAtOrAfter(firstCaptured.startedAt, postProviderAttachmentReceipt.observedAt)) {
-      return hold('CAPTURE_HOLD', {
+      return finalHold('CAPTURE_HOLD', {
         stage: 'final-quiescence-first', authorityDigest: firstCaptureAuthorityDigest,
       });
     }
@@ -3440,6 +3537,7 @@ export async function captureExecutionEffectDockerFinalV1(
         firstManifestStateDigest,
       },
     );
+    stage = 'SECOND_CAPTURE';
     const secondRaw = await Reflect.apply(
       authority.adapters.captureWorkspace,
       authority.adapters.adapterThis,
@@ -3470,12 +3568,13 @@ export async function captureExecutionEffectDockerFinalV1(
     if (!secondCaptured || !finalManifest || finalManifestStateDigest !== firstManifestStateDigest
       || secondCaptured.receipt.manifestStateDigest !== finalManifestStateDigest
       || !timestampAtOrAfter(secondCaptured.startedAt, firstCaptured.completedAt)) {
-      return hold('QUIESCENCE_HOLD', {
+      return finalHold('QUIESCENCE_HOLD', {
         stage: 'final-quiescence-second', authorityDigest: secondCaptureAuthorityDigest,
       });
     }
+    stage = 'QUIESCENCE_SEAL';
     const quiescenceSealedAt = readClock(authority.adapters, secondCaptured.completedAt);
-    if (!quiescenceSealedAt) return hold('CLOCK_INVALID', { stage: 'final-quiescence-seal' });
+    if (!quiescenceSealedAt) return finalHold('CLOCK_INVALID', { stage: 'final-quiescence-seal' });
     const quiescenceSeal = createExecutionEffectDockerQuiescenceSealV1({
       authorityDigest: secondCaptureAuthorityDigest,
       attachmentReceiptDigest: postProviderAttachmentReceipt.receiptDigest,
@@ -3485,15 +3584,17 @@ export async function captureExecutionEffectDockerFinalV1(
       secondManifestStateDigest: finalManifestStateDigest,
       sealedAt: quiescenceSealedAt,
     });
+    stage = 'CONTAINMENT';
     const decision = evaluateExecutionEffectContainment({
       baseline: Object.freeze({ ok: true as const, manifest: authority.baselineManifest }),
       final: Object.freeze({ ok: true as const, manifest: finalManifest }),
     });
     if (decision.state !== 'VERIFIED') {
-      return hold('CONTAINMENT_HOLD', {
+      return finalHold('CONTAINMENT_HOLD', {
         stage: 'containment', decisionDigest: decision.decisionDigest,
       }, decision);
     }
+    stage = 'READY_AUTHORITY';
     const preparedLifecycleAuthority = createExecutionEffectDockerLifecycleAuthorityV1({
       ...lifecycleCommonInputFromPrepared(authority),
       state: 'PREPARED',
@@ -3567,9 +3668,10 @@ export async function captureExecutionEffectDockerFinalV1(
       session: opaque,
     });
   } catch (error) {
-    return hold('ADAPTER_UNAVAILABLE', {
+    return finalHold('ADAPTER_UNAVAILABLE', {
       stage: 'final-quiescence-call', authorityDigest: attachmentAuthorityDigest,
-    });
+    }, null, error instanceof ExecutionEffectDockerCaptureAdapterErrorV1
+      ? error.stage : null);
   }
 }
 

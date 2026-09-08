@@ -15,7 +15,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join } from 'node:path';
 import { Command } from 'commander';
 import { handleImageBuild, registerImage } from '../../src/cli/commands/image.js';
 import { DEFAULT_WORKER_IMAGE } from '../../src/core/worker-image-check.js';
@@ -78,9 +78,16 @@ const roots: string[] = [];
 /** Create a tmpdir package root WITH a fake assets/Dockerfile.worker. */
 function rootWithDockerfile(): string {
   const root = mkdtempSync(join(tmpdir(), 'img-build-'));
+  writeFileSync(join(root, 'package.json'), '{"name":"deckent","version":"0.0.0-test"}\n');
+  writeFileSync(join(root, 'npm-shrinkwrap.json'), '{"lockfileVersion":3}\n');
   const assets = join(root, 'assets');
   mkdirSync(assets, { recursive: true });
   writeFileSync(join(assets, 'Dockerfile.worker'), 'FROM node:24-trixie-slim\n');
+  mkdirSync(join(root, 'dist', 'core'), { recursive: true });
+  writeFileSync(join(root, 'dist', 'core', 'exec-authority-native.js'), 'export {};\n');
+  mkdirSync(join(root, 'native', 'exec-authority'), { recursive: true });
+  writeFileSync(join(root, 'native', 'exec-authority', 'index.mjs'), 'export {};\n');
+  writeFileSync(join(root, 'native', 'exec-authority', 'package.json'), '{}\n');
   roots.push(root);
   return root;
 }
@@ -165,13 +172,20 @@ describe('handleImageBuild — --dry-run', () => {
     roots.push(parent);
     const root = join(parent, 'package with spaces');
     mkdirSync(join(root, 'assets'), { recursive: true });
+    writeFileSync(join(root, 'package.json'), '{"name":"deckent","version":"0.0.0-test"}\n');
+    writeFileSync(join(root, 'npm-shrinkwrap.json'), '{"lockfileVersion":3}\n');
     writeFileSync(join(root, 'assets', 'Dockerfile.worker'), 'FROM node:24-trixie-slim\n');
+    mkdirSync(join(root, 'dist', 'core'), { recursive: true });
+    writeFileSync(join(root, 'dist', 'core', 'exec-authority-native.js'), 'export {};\n');
+    mkdirSync(join(root, 'native', 'exec-authority'), { recursive: true });
+    writeFileSync(join(root, 'native', 'exec-authority', 'index.mjs'), 'export {};\n');
+    writeFileSync(join(root, 'native', 'exec-authority', 'package.json'), '{}\n');
     const rec = emptyRecord();
 
     await handleImageBuild({ root }, closeSpawn(0, rec));
 
     expect(rec.calls[0]!.args).toContain(join(root, 'assets', 'Dockerfile.worker'));
-    expect(rec.calls[0]!.args.at(-1)).toBe(join(root, 'assets'));
+    expect(rec.calls[0]!.args.at(-1)).toBe(root);
   });
 });
 
@@ -200,7 +214,7 @@ describe('handleImageBuild — real build (injected seam)', () => {
     expect(args[tIdx + 1]).toBe('my-worker:v9');
   });
 
-  it('uses the Dockerfile directory (assets) as the build context — never cwd', async () => {
+  it('uses the package root as build context so trusted runtime authority is available', async () => {
     const root = rootWithDockerfile();
     const rec = emptyRecord();
 
@@ -208,8 +222,43 @@ describe('handleImageBuild — real build (injected seam)', () => {
 
     const { args } = rec.calls[0]!;
     const context = args[args.length - 1]; // context is the final positional arg
-    expect(context).toBe(dirname(join(root, 'assets', 'Dockerfile.worker')));
-    expect(context).toBe(join(root, 'assets'));
+    expect(context).toBe(root);
+  });
+
+  it('honest-fails before docker spawn when the trusted runtime authority is absent', async () => {
+    const root = rootWithDockerfile();
+    rmSync(join(root, 'dist', 'core', 'exec-authority-native.js'));
+    const rec = emptyRecord();
+
+    const code = await handleImageBuild({ root }, closeSpawn(0, rec));
+
+    expect(code).toBe(1);
+    expect(rec.calls).toHaveLength(0);
+    expect(stderr.join('')).toContain('exec-authority-native.js');
+  });
+
+  it('honest-fails before docker spawn when root package identity metadata is absent', async () => {
+    const root = rootWithDockerfile();
+    rmSync(join(root, 'package.json'));
+    const rec = emptyRecord();
+
+    const code = await handleImageBuild({ root }, closeSpawn(0, rec));
+
+    expect(code).toBe(1);
+    expect(rec.calls).toHaveLength(0);
+    expect(stderr.join('')).toContain('package.json');
+  });
+
+  it('honest-fails before docker spawn when the locked dependency authority is absent', async () => {
+    const root = rootWithDockerfile();
+    rmSync(join(root, 'npm-shrinkwrap.json'));
+    const rec = emptyRecord();
+
+    const code = await handleImageBuild({ root }, closeSpawn(0, rec));
+
+    expect(code).toBe(1);
+    expect(rec.calls).toHaveLength(0);
+    expect(stderr.join('')).toContain('npm-shrinkwrap.json');
   });
 
   it('defaults the tag to deckent-worker:latest when none is given', async () => {

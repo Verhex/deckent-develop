@@ -167,13 +167,49 @@ describe('execution landing proposal', () => {
     const segment = buildExactExecutionLandingProposalPromptSegment(
       'm1-007',
       'dispatch-request-m1-007-1',
+      'private-draft-v2',
     );
-    expect(segment).toContain('--exact');
+    expect(segment).toContain('.tasks/task-m1-007.landing-proposal.json');
     expect(segment).toContain('dispatch-request-m1-007-1');
     expect(segment).toContain('attempt-private output mount');
+    expect(segment).toContain('complete untrusted JSON draft directly to this exact path');
+    expect(segment).toContain('before provider-intensive work');
+    expect(segment).toContain('after the final scoped mutation');
+    expect(segment).toContain('do not read or write any other project file');
+    expect(segment).toContain('"version": 3');
+    expect(segment).toContain('"sequence": 1');
+    expect(segment).toContain('"updatedAt": "1970-01-01T00:00:00.000Z"');
+    expect(segment).not.toContain('landing-proposal-entry');
+    expect(segment).not.toContain('node dist/');
+    expect(segment).not.toContain('--exact');
     expect(segment).not.toContain(ATTEMPT);
     expect(segment).not.toContain('resultReference');
     expect(segment).not.toContain('generation');
+  });
+
+  it('preserves the historical V1 helper protocol bytes unless V2 is explicit', () => {
+    const historicalDefault = buildExactExecutionLandingProposalPromptSegment(
+      'm1-007',
+      'dispatch-request-m1-007-1',
+    );
+    const historicalV1 = buildExactExecutionLandingProposalPromptSegment(
+      'm1-007',
+      'dispatch-request-m1-007-1',
+      'legacy-entry-v1',
+    );
+
+    expect(historicalDefault).toBe(historicalV1);
+    expect(historicalV1).toContain(
+      "node dist/agents/landing-proposal-entry.js --exact 'm1-007' 'dispatch-request-m1-007-1'",
+    );
+    expect(historicalV1).toContain("<<'LANDING_PROPOSAL_JSON'");
+    expect(historicalV1).toContain('Use the provider-neutral writer below with complete JSON on stdin.');
+    expect(historicalV1).not.toContain('complete untrusted JSON draft directly');
+    expect(() => buildExactExecutionLandingProposalPromptSegment(
+      'm1-007',
+      'dispatch-request-m1-007-1',
+      'invalid' as 'legacy-entry-v1',
+    )).toThrow(/private output protocol is invalid/);
   });
 
   it('validates and atomically replaces a structured V2 proposal', () => {

@@ -6,7 +6,12 @@ import { ensureSession, spawnWorker as tmuxSpawnWorker, killWorker as tmuxKillWo
 import { SubprocessSpawnBackend, CLAUDE_SUBPROCESS_CONFIG } from '../providers/subprocess.js';
 import type { SubprocessProviderConfig } from '../providers/subprocess.js';
 import { CODEX_USAGE_EMIT_ARGS } from '../providers/codex.js';
-import { DockerSpawnBackend } from './spawn-backend-docker.js';
+import {
+  DockerSpawnBackend,
+  inspectExactDockerPlanningRecoveryHealth,
+  preflightExactDockerCustodyRoot,
+  type ExactDockerPlanningRecoveryIssue,
+} from './spawn-backend-docker.js';
 import { createExactProductionWiringHostObserver } from './production-wiring-host-observation.js';
 import { assertNotLethalWithoutApproval } from '../nervous/panic-gate.js';
 import { SandboxSpawnBackend } from '../providers/sandbox.js';
@@ -23,8 +28,10 @@ import { resolveHostExecutionBudget } from './runtime-budget-monitor.js';
 import type { TaskResultSettlementRefV1 } from '../core/task-result-settlement.js';
 import type { ExecutionLandingContextEnvelopeV1 } from '../core/execution-landing-context.js';
 import type { ProviderBillingEvidence } from '../core/provider-billing-evidence.js';
+import type { ProviderTerminalUsageEvidence } from '../core/provider-terminal-usage-evidence.js';
 import type { TaskResultAttemptCustodySourceBindingV2 } from '../core/task-result-schema.js';
 import type { TaskResultV2 } from '../core/task-result-schema.js';
+import type { ExactAttemptIpcQuestionAuthorityState } from './ipc-registry.js';
 import type { CanonicalIngressAuthority } from './result-ingress.js';
 import type { CanonicalIngressEffectAuthorityV1 } from './result-ingress.js';
 import type {
@@ -39,6 +46,7 @@ import type {
 } from './exact-accepted-result-terminal-authority.js';
 import type { ExactAcceptedTaskResultRefV2 } from '../core/task-settlement-authority.js';
 import type { ExactExecutionLandingProposalV3 } from '../core/execution-landing-proposal.js';
+import type { ExecutionEffectDockerFinalDiagnosticV1 } from './execution-effect-docker-lifecycle.js';
 import type { ExecutionLandingPreparationRefV2 } from '../core/execution-landing-checkpoint.js';
 import type {
   Sha256Digest,
@@ -69,6 +77,15 @@ export interface HostTerminalResultContractV1 {
 export interface SpawnBackendRecoveryReport {
   adopted: string[];
   closedNotDispatched: string[];
+  /** Durable reservation-only records retired by canonical recovery before an
+   * admission/provider effect existed. Optional for custom backend parity. */
+  closedBeforeAdmission?: string[];
+  /** Started attempts explicitly retained as failed; never zero-work or success. */
+  closedStartedFailed?: string[];
+  /** Main effect is durably committed, while release/acceptance/settlement remain
+   * absent. These attempts stay failed and unresolved; retention only prevents
+   * the old provider attempt from being replayed during startup. */
+  retainedCommittedUnsettled?: string[];
   closedAbsentAfterExit: string[];
   retiredLanded: string[];
   resumedContinuations: string[];
@@ -164,8 +181,16 @@ export interface ExactDockerAcceptedResultV2 {
   readonly acceptedResultChainDigest: Sha256Digest;
   readonly resultDigest: Sha256Digest;
   readonly result: TaskResultV2;
-  readonly hostBillingAuthority: Readonly<{
+  readonly hostUsageAuthority: Readonly<{
     readonly evidenceDigest: Sha256Digest;
+    readonly providerStreamReceiptDigest: Sha256Digest;
+    readonly acceptedResultArtifactReceiptDigest: Sha256Digest;
+    readonly acceptedResultChainDigest: Sha256Digest;
+    readonly bindingDigest: Sha256Digest;
+  }>;
+  readonly hostBillingAuthority: Readonly<{
+    readonly state: 'available' | 'not-emitted';
+    readonly evidenceDigest: Sha256Digest | null;
     readonly providerStreamReceiptDigest: Sha256Digest;
     readonly acceptedResultArtifactReceiptDigest: Sha256Digest;
     readonly acceptedResultChainDigest: Sha256Digest;
@@ -184,6 +209,8 @@ export type ExactDockerAcceptResultOutcomeV2 = ExactDockerAcceptedResultV2 | Rea
   readonly custodyRef: ExactDockerCustodyRefV2;
   readonly releaseReceipt: ExactDockerCustodyReceiptRefV2;
   readonly projectionFence: Sha256Digest;
+  readonly effectDiagnostic?: ExactDockerEffectDiagnosticRefV1;
+  readonly captureDiagnostic?: ExactDockerCaptureDiagnosticRefV1;
 }>;
 
 export interface AcceptExactDockerCustodyResultInputV2 {
@@ -378,9 +405,12 @@ export type ExactDockerCustodyTerminalHoldReasonCodeV2 =
   | 'DOCKER_WAIT_UNAVAILABLE'
   | 'DOCKER_WAIT_INVALID'
   | 'PRISTINE_PROVIDER_STREAM_INCOMPLETE'
+  | 'PROVIDER_USAGE_UNAVAILABLE'
+  | 'PROVIDER_USAGE_INVALID'
   | 'PROVIDER_BILLING_UNAVAILABLE'
   | 'HOST_WORK_ATTRIBUTION_HOLD'
   | 'WORKER_RESULT_CAPTURE_HOLD'
+  | 'WORKER_IPC_QUESTION_CAPTURE_HOLD'
   | 'LANDING_PROPOSAL_CAPTURE_HOLD'
   | 'LIVE_MONITOR_UNAVAILABLE'
   | 'EFFECT_PREPARE_HOLD'
@@ -389,6 +419,54 @@ export type ExactDockerCustodyTerminalHoldReasonCodeV2 =
   | 'EFFECT_LANDING_HOLD'
   | 'EFFECT_RELEASE_HOLD'
   | 'EFFECT_PUBLICATION_HOLD';
+
+export interface ExactDockerEffectFailureV1 {
+  readonly state: 'HOLD';
+  readonly phase: 'FINAL_CAPTURE' | 'READY_PUBLICATION' | 'LANDING';
+  readonly stage: 'LAUNCH_AUTHORITY' | 'CAPTURE_SESSION' | 'PROVIDER_STOPPED'
+    | 'FINAL_CAPTURE' | 'READY_PUBLICATION' | 'NATIVE_CAPABILITY'
+    | 'PREPARED_WORKSPACE' | 'LANDING_PREPARE' | 'LANDING_APPLY'
+    | 'TERMINAL_SEAL' | 'RECOVERY_ANCHOR';
+  readonly code: string;
+  readonly sourceEvidenceDigest: Sha256Digest | null;
+  readonly capture: ExecutionEffectDockerFinalDiagnosticV1 | null;
+}
+
+/** Immutable first-failure evidence, not result/landing/settlement authority. */
+export interface ExactDockerEffectDiagnosticRefV1 {
+  readonly schemaVersion: 1;
+  readonly kind: 'exact-docker-effect-diagnostic';
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly admissionRefDigest: Sha256Digest;
+  readonly providerExitObservationReceiptDigest: Sha256Digest;
+  readonly failure: ExactDockerEffectFailureV1;
+  readonly observedAt: string;
+  readonly observationReceiptDigest: Sha256Digest;
+  readonly observationEvidenceDigest: Sha256Digest;
+}
+
+export interface ExactDockerCaptureFailureV1 {
+  readonly stage: 'WORKER_RESULT' | 'WORKER_IPC_QUESTION' | 'WORKER_LANDING_PROPOSAL';
+  /** Safe typed Store/native code only; never an exception message. */
+  readonly code: string;
+  /** Safe typed Store operation only; never a path or provider payload. */
+  readonly operation: string;
+}
+
+/** Immutable first capture failure using the existing dispatch-observation lane. */
+export interface ExactDockerCaptureDiagnosticRefV1 {
+  readonly schemaVersion: 1;
+  readonly kind: 'exact-docker-capture-diagnostic';
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly admissionRefDigest: Sha256Digest;
+  readonly anchorObservationClass: 'PROVIDER_EXIT';
+  readonly anchorObservationReceiptDigest: Sha256Digest;
+  readonly anchorObservationEvidenceDigest: Sha256Digest;
+  readonly failure: ExactDockerCaptureFailureV1;
+  readonly observedAt: string;
+  readonly observationReceiptDigest: Sha256Digest;
+  readonly observationEvidenceDigest: Sha256Digest;
+}
 
 interface ExactDockerCustodyTerminalBaseV2 {
   readonly custodyRef: ExactDockerCustodyRefV2;
@@ -405,9 +483,21 @@ interface ExactDockerCustodyCapturedTerminalBaseV2
   readonly result: TaskResultAttemptCustodySourceBindingV2;
   /** Receipt projection carrying the Store-authoritative result capture time. */
   readonly resultArtifact: ExactDockerWorkerResultArtifactRefV2;
+  readonly providerUsage: Readonly<{
+    readonly evidence: ProviderTerminalUsageEvidence;
+    readonly evidenceDigest: Sha256Digest;
+    readonly providerStreamReceiptDigest: Sha256Digest;
+  }>;
   readonly providerBilling: Readonly<{
+    readonly state: 'available';
     readonly evidence: ProviderBillingEvidence;
     readonly evidenceDigest: Sha256Digest;
+    readonly providerStreamReceiptDigest: Sha256Digest;
+  }> | Readonly<{
+    readonly state: 'not-emitted';
+    readonly billingMode: 'subscription';
+    readonly reasonCode: 'PROVIDER_PRICE_ENVELOPE_NOT_EMITTED';
+    readonly evidenceDigest: null;
     readonly providerStreamReceiptDigest: Sha256Digest;
   }>;
 }
@@ -428,6 +518,8 @@ export type ExactDockerCustodyCompletionV2 =
   | Readonly<ExactDockerCustodyTerminalBaseV2 & {
       readonly kind: 'capture-hold';
       readonly reasonCode: ExactDockerCustodyTerminalHoldReasonCodeV2;
+      readonly effectDiagnostic?: ExactDockerEffectDiagnosticRefV1;
+      readonly captureDiagnostic?: ExactDockerCaptureDiagnosticRefV1;
       readonly evidence:
         | Readonly<{
             readonly kind: 'release-authority';
@@ -562,6 +654,11 @@ export interface SpawnBackend {
     readonly expectedTerminalAuthority: ExactAcceptedResultTerminalAuthorityV2;
     readonly reader?: ExactDockerAcceptedResultReaderV2;
   }>): ExactAcceptedTaskTerminalAuthorityRead;
+
+  /** Backend-owned private IPC authority for one immutable released attempt. */
+  resolveExactAttemptIpcAuthority?(
+    query: ExactDockerCustodyTerminalQueryV2,
+  ): ExactAttemptIpcQuestionAuthorityState;
 
   /**
    * Kill a running worker by task ID.
@@ -1173,6 +1270,68 @@ export function resolveBackend(backend: string): string {
   }
 
   return backend;
+}
+
+export type PlanningExecutionAuthority = Readonly<{
+  state: 'ready';
+  backend: string;
+  authorityKind: 'exact-docker-custody-root' | 'backend-does-not-require-exact-docker-custody';
+  rootId?: string;
+  capabilityEvidenceDigest?: string;
+}>;
+
+export class PlanningExecutionAdmissionHold extends Error {
+  readonly code = 'EXACT_CUSTODY_RECOVERY_REQUIRED' as const;
+  readonly unresolved: readonly ExactDockerPlanningRecoveryIssue[];
+  readonly recoveryListReceiptDigest: string;
+
+  constructor(input: Readonly<{
+    unresolved: readonly ExactDockerPlanningRecoveryIssue[];
+    recoveryListReceiptDigest: string;
+  }>) {
+    super('EXACT_CUSTODY_RECOVERY_REQUIRED');
+    this.name = 'PlanningExecutionAdmissionHold';
+    this.unresolved = Object.freeze([...input.unresolved]);
+    this.recoveryListReceiptDigest = input.recoveryListReceiptDigest;
+    Object.freeze(this);
+  }
+}
+
+/** Effective-backend preflight for proposal planning. A Docker result exists
+ * only after the dispatch adapter has produced native physical-separation
+ * authority; all typed custody HOLDs propagate unchanged to the caller. */
+export function preflightPlanningExecutionAuthority(input: Readonly<{
+  projectRoot: string;
+  backend: string;
+  platform?: NodeJS.Platform;
+  env?: NodeJS.ProcessEnv;
+  stateDir?: string;
+}>): PlanningExecutionAuthority {
+  const backend = resolveBackend(input.backend);
+  if (backend !== 'docker') {
+    return Object.freeze({
+      state: 'ready',
+      backend,
+      authorityKind: 'backend-does-not-require-exact-docker-custody',
+    });
+  }
+  const options = {
+    ...(input.platform ? { platform: input.platform } : {}),
+    ...(input.env ? { env: input.env } : {}),
+    ...(input.stateDir ? { stateDir: input.stateDir } : {}),
+  };
+  const proof = preflightExactDockerCustodyRoot(input.projectRoot, options);
+  const health = inspectExactDockerPlanningRecoveryHealth(input.projectRoot, options);
+  if (health.state === 'hold') {
+    throw new PlanningExecutionAdmissionHold(health);
+  }
+  return Object.freeze({
+    state: 'ready',
+    backend,
+    authorityKind: 'exact-docker-custody-root',
+    rootId: proof.rootId,
+    capabilityEvidenceDigest: proof.capabilityEvidenceDigest,
+  });
 }
 
 // ─── SpawnBackendFactory ──────────────────────────────────────────────────────

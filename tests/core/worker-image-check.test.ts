@@ -8,6 +8,7 @@ import {
   type SpawnImpl,
   type SpawnedProcessLike,
 } from '../../src/core/worker-image-check.js';
+import { loadExecAuthorityNative } from '../../src/core/exec-authority-native.js';
 
 // ─── Hermetic docker mock ───────────────────────────────────────────────────
 // Routes by docker subcommand: `image inspect` (args[0]==='image') vs
@@ -31,10 +32,27 @@ function emit(child: EventEmitter & SpawnedProcessLike, r: CannedResult): void {
 }
 
 /** Build a fake spawn that returns `inspect` for `docker image inspect`, `run` for `docker run`. */
-function makeDockerSpawn(routes: { inspect?: CannedResult; run?: CannedResult }): ReturnType<typeof vi.fn<SpawnImpl>> {
+function makeDockerSpawn(routes: {
+  inspect?: CannedResult;
+  run?: CannedResult;
+  native?: CannedResult;
+}): ReturnType<typeof vi.fn<SpawnImpl>> {
+  const nativeOutput = JSON.stringify({
+    manifest: loadExecAuthorityNative().manifest,
+    dependencySource: {
+      schemaVersion: 1,
+      kind: 'worker-image-dependency-source',
+      path: '/app/node_modules',
+      state: 'AVAILABLE',
+    },
+  });
   return vi.fn<SpawnImpl>((_command, args) => {
     const child = new EventEmitter() as EventEmitter & SpawnedProcessLike;
-    const result: CannedResult = args[0] === 'image' ? routes.inspect ?? {} : routes.run ?? {};
+    const result: CannedResult = args[0] === 'image'
+      ? routes.inspect ?? {}
+      : args.includes('node')
+        ? routes.native ?? { code: 0, stdout: nativeOutput }
+        : routes.run ?? {};
     child.stdout = Readable.from([result.stdout ?? '']);
     child.stderr = Readable.from([result.stderr ?? '']);
     emit(child, result);
@@ -59,6 +77,8 @@ describe('checkWorkerImage', () => {
     expect(report.state).toBe('missing');
     expect(report.missingClis).toEqual(['claude', 'codex']);
     expect(report.missingCaCerts).toBe(true);
+    expect(report.missingRuntimeAuthority).toBe(true);
+    expect(report.missingDependencyAuthority).toBe(true);
     // run probe must NOT be attempted once the image is known absent
     expect(spawnImpl).toHaveBeenCalledTimes(1);
     expect(spawnImpl).toHaveBeenCalledWith('docker', ['image', 'inspect', DEFAULT_WORKER_IMAGE], { shell: false });
@@ -74,7 +94,45 @@ describe('checkWorkerImage', () => {
     expect(report.state).toBe('ready');
     expect(report.missingClis).toEqual([]);
     expect(report.missingCaCerts).toBe(false);
-    expect(spawnImpl).toHaveBeenCalledTimes(2);
+    expect(report.missingRuntimeAuthority).toBe(false);
+    expect(report.missingDependencyAuthority).toBe(false);
+    expect(spawnImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it("reports 'stale' when the exact native runtime authority probe fails", async () => {
+    const spawnImpl = makeDockerSpawn({
+      inspect: { code: 0, stdout: 'ok' },
+      run: { code: 0, stdout: probeOutput({ okClis: ['claude', 'codex'], caCerts: true }) },
+      native: { code: 78, stderr: 'ERR_MODULE_NOT_FOUND' },
+    });
+
+    const report = await checkWorkerImage({ requiredProviders: ['claude', 'codex'], spawnImpl });
+
+    expect(report.state).toBe('stale');
+    expect(report.missingClis).toEqual([]);
+    expect(report.missingCaCerts).toBe(false);
+    expect(report.missingRuntimeAuthority).toBe(true);
+    expect(report.missingDependencyAuthority).toBe(true);
+  });
+
+  it("reports 'stale' when the exact image-owned dependency source is absent", async () => {
+    const spawnImpl = makeDockerSpawn({
+      inspect: { code: 0, stdout: 'ok' },
+      run: { code: 0, stdout: probeOutput({ okClis: ['claude', 'codex'], caCerts: true }) },
+      native: {
+        code: 0,
+        stdout: JSON.stringify({
+          manifest: loadExecAuthorityNative().manifest,
+          dependencySource: null,
+        }),
+      },
+    });
+
+    const report = await checkWorkerImage({ requiredProviders: ['claude', 'codex'], spawnImpl });
+
+    expect(report.state).toBe('stale');
+    expect(report.missingRuntimeAuthority).toBe(false);
+    expect(report.missingDependencyAuthority).toBe(true);
   });
 
   it("reports 'stale' when a required CLI is missing from the image", async () => {

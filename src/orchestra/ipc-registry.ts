@@ -34,6 +34,11 @@ import type {
   Sha256Digest,
   TaskAttemptCustodyArtifactReceiptV2,
   TaskAttemptCustodyIdentityV2,
+  TaskAttemptCustodyWorkerIpcConversationCursorV2,
+} from '../core/task-attempt-custody-store.js';
+import {
+  parseTaskAttemptCustodyIdentityV2,
+  taskAttemptCustodyArtifactDataRelativePath,
 } from '../core/task-attempt-custody-store.js';
 // Type-only — question-approval-bridge.ts imports NPM_ADVISORY_MARKER (a VALUE)
 // from THIS file, so a value-import back here would be a real runtime import
@@ -147,7 +152,6 @@ export function cleanupQuestionFiles(projectRoot: string, taskId: string): void 
 
 const EXACT_ATTEMPT_IPC_SCHEMA_VERSION = 2 as const;
 const SHA256_DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/u;
-const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u;
 const EXACT_QUESTION_KEYS = Object.freeze([
   'taskId',
   'workerId',
@@ -203,6 +207,8 @@ export interface ExactAttemptIpcQuestionAuthority {
   readonly kind: 'task-attempt-ipc-question-authority';
   readonly identity: TaskAttemptCustodyIdentityV2;
   readonly admissionReceiptDigest: Sha256Digest;
+  readonly dispatchRequestId: string;
+  readonly cursorReceiptDigest: Sha256Digest;
   readonly fenceDigest: Sha256Digest;
   readonly sequence: number;
   readonly questionReceiptDigest: Sha256Digest;
@@ -216,6 +222,8 @@ export interface ExactAttemptIpcAnswerEnvelope {
   readonly kind: 'task-attempt-ipc-answer-envelope';
   readonly identity: TaskAttemptCustodyIdentityV2;
   readonly admissionReceiptDigest: Sha256Digest;
+  readonly dispatchRequestId: string;
+  readonly cursorReceiptDigest: Sha256Digest;
   readonly fenceDigest: Sha256Digest;
   readonly sequence: number;
   readonly questionReceiptDigest: Sha256Digest;
@@ -224,13 +232,15 @@ export interface ExactAttemptIpcAnswerEnvelope {
   readonly envelopeDigest: Sha256Digest;
 }
 
-/** Receipt shape the missing T18 Store answer-delivery API must return. T4
- * deliberately supplies no filesystem implementation for this port. */
+/** Receipt shape returned by the exact Store-backed private answer-delivery
+ * port. Public compatibility files never satisfy this authority. */
 export interface ExactAttemptIpcPrivateAnswerReceipt {
   readonly schemaVersion: typeof EXACT_ATTEMPT_IPC_SCHEMA_VERSION;
   readonly kind: 'task-attempt-ipc-private-answer-receipt';
   readonly identity: TaskAttemptCustodyIdentityV2;
   readonly admissionReceiptDigest: Sha256Digest;
+  readonly dispatchRequestId: string;
+  readonly questionCursorReceiptDigest: Sha256Digest;
   readonly fenceDigest: Sha256Digest;
   readonly sequence: number;
   readonly questionReceiptDigest: Sha256Digest;
@@ -259,6 +269,8 @@ export interface ExactAttemptIpcPrivateAnswerPublisher {
   publishAnswerFirstWriter(input: {
     readonly identity: TaskAttemptCustodyIdentityV2;
     readonly admissionReceiptDigest: Sha256Digest;
+    readonly dispatchRequestId: string;
+    readonly expectedCursorReceiptDigest: Sha256Digest;
     readonly fenceDigest: Sha256Digest;
     readonly sequence: number;
     readonly questionReceiptDigest: Sha256Digest;
@@ -507,29 +519,17 @@ function isExactDataRecord(value: unknown, keys: readonly string[]): value is Re
 }
 
 function snapshotExactIdentity(value: TaskAttemptCustodyIdentityV2): TaskAttemptCustodyIdentityV2 {
+  const parsed = parseTaskAttemptCustodyIdentityV2(value);
   if (
     !isExactDataRecord(value, [
       'schemaVersion', 'backend', 'projectRootSha256', 'projectId', 'taskId',
       'attemptId', 'generation',
     ])
-    || value.schemaVersion !== EXACT_ATTEMPT_IPC_SCHEMA_VERSION
-    || value.backend !== 'docker'
-    || !SHA256_HEX_PATTERN.test(value.projectRootSha256)
-    || !boundedIdentityComponent(value.projectId)
-    || !boundedIdentityComponent(value.taskId)
-    || !boundedIdentityComponent(value.attemptId)
-    || !Number.isSafeInteger(value.generation)
-    || value.generation <= 0
+    || parsed === null
+    || !boundedIdentityComponent(parsed.projectId)
+    || !boundedIdentityComponent(parsed.taskId)
   ) throw new ExactAttemptIpcHold('INVALID_EXACT_IDENTITY');
-  return Object.freeze({
-    schemaVersion: EXACT_ATTEMPT_IPC_SCHEMA_VERSION,
-    backend: 'docker',
-    projectRootSha256: value.projectRootSha256,
-    projectId: value.projectId,
-    taskId: value.taskId,
-    attemptId: value.attemptId,
-    generation: value.generation,
-  });
+  return Object.freeze(parsed);
 }
 
 function boundedIdentityComponent(value: unknown): value is string {
@@ -607,11 +607,27 @@ export function createExactAttemptIpcQuestionAuthority(input: {
   readonly admissionReceiptDigest: Sha256Digest;
   readonly fenceDigest: Sha256Digest;
   readonly sequence: number;
+  readonly conversationCursor: Extract<
+    TaskAttemptCustodyWorkerIpcConversationCursorV2,
+    { readonly state: 'question-open' }
+  >;
   readonly privateQuestionBytes: Uint8Array;
   readonly privateQuestionReceipt: TaskAttemptCustodyArtifactReceiptV2;
 }): ExactAttemptIpcQuestionAuthority {
   const identity = snapshotExactIdentity(input.expectedIdentity);
+  const cursor = input.conversationCursor;
   const receipt = input.privateQuestionReceipt;
+  const cursorRecordValid = isExactDataRecord(cursor, [
+    'schemaVersion', 'kind', 'state', 'identity', 'admissionReceiptDigest', 'policyDigest',
+    'dispatchRequestId', 'sequence', 'nextSequence', 'predecessorCursorReceiptDigest',
+    'sealedSourceReceiptDigest', 'sourceFileIdentityDigest', 'sourceEpoch',
+    'questionArtifactKey', 'questionReceiptDigest', 'questionArtifactSha256', 'recordedAt',
+    'cursorReceiptDigest',
+  ]);
+  let cursorIdentity: TaskAttemptCustodyIdentityV2 | null = null;
+  if (cursorRecordValid) {
+    try { cursorIdentity = snapshotExactIdentity(cursor.identity); } catch { cursorIdentity = null; }
+  }
   const receiptRecordValid = isExactDataRecord(receipt, [
     'schemaVersion', 'kind', 'identity', 'admissionReceiptDigest', 'artifactClass',
     'captureMode', 'artifactKey', 'capturedAt', 'policyDigest', 'artifact',
@@ -630,6 +646,28 @@ export function createExactAttemptIpcQuestionAuthority(input: {
     || !isDigest(input.fenceDigest)
     || !Number.isSafeInteger(input.sequence)
     || input.sequence <= 0
+    || !cursorRecordValid
+    || cursor.schemaVersion !== 2
+    || cursor.kind !== 'task-attempt-custody-worker-ipc-conversation-cursor'
+    || cursor.state !== 'question-open'
+    || cursorIdentity === null
+    || !sameExactIdentity(cursorIdentity, identity)
+    || cursor.admissionReceiptDigest !== input.admissionReceiptDigest
+    || cursor.policyDigest !== receipt.policyDigest
+    || !/^dreq-[a-f0-9]{64}$/u.test(cursor.dispatchRequestId)
+    || cursor.sequence !== input.sequence
+    || cursor.nextSequence !== null
+    || (cursor.predecessorCursorReceiptDigest !== null
+      && !isDigest(cursor.predecessorCursorReceiptDigest))
+    || !isDigest(cursor.sealedSourceReceiptDigest)
+    || !isDigest(cursor.sourceFileIdentityDigest)
+    || !Number.isSafeInteger(cursor.sourceEpoch)
+    || cursor.sourceEpoch <= 0
+    || cursor.questionArtifactKey !== `ipc-question-${input.sequence}`
+    || !isDigest(cursor.cursorReceiptDigest)
+    || !Number.isFinite(Date.parse(cursor.recordedAt))
+    || cursor.questionReceiptDigest !== receipt.receiptDigest
+    || cursor.questionArtifactSha256 !== receipt.artifact.sha256
     || !receiptRecordValid
     || !artifactRecordValid
     || receipt.schemaVersion !== 2
@@ -649,7 +687,11 @@ export function createExactAttemptIpcQuestionAuthority(input: {
     || receipt.artifact.relativePath.startsWith('/')
     || receipt.artifact.relativePath.includes('\\')
     || receipt.artifact.relativePath.split('/').some(part => part === '' || part === '..')
-    || !receipt.artifact.relativePath.endsWith(`/task-${identity.taskId}.question`)
+    || receipt.artifact.relativePath !== taskAttemptCustodyArtifactDataRelativePath({
+      identity,
+      artifactClass: 'worker-ipc-question',
+      artifactKey: `ipc-question-${input.sequence}`,
+    })
     || !Number.isSafeInteger(receipt.artifact.byteLength)
     || receipt.artifact.byteLength <= 0
     || !boundedIdentityComponent(receipt.artifact.volumeId)
@@ -669,6 +711,8 @@ export function createExactAttemptIpcQuestionAuthority(input: {
     kind: 'task-attempt-ipc-question-authority' as const,
     identity,
     admissionReceiptDigest: input.admissionReceiptDigest,
+    dispatchRequestId: cursor.dispatchRequestId,
+    cursorReceiptDigest: cursor.cursorReceiptDigest,
     fenceDigest: input.fenceDigest,
     sequence: input.sequence,
     questionReceiptDigest: receipt.receiptDigest,
@@ -691,6 +735,8 @@ function createExactAttemptIpcAnswerEnvelope(
     kind: 'task-attempt-ipc-answer-envelope' as const,
     identity: authority.identity,
     admissionReceiptDigest: authority.admissionReceiptDigest,
+    dispatchRequestId: authority.dispatchRequestId,
+    cursorReceiptDigest: authority.cursorReceiptDigest,
     fenceDigest: authority.fenceDigest,
     sequence: authority.sequence,
     questionReceiptDigest: authority.questionReceiptDigest,
@@ -754,7 +800,8 @@ function snapshotExactQuestionAuthority(
   expectedTaskId: string,
 ): ExactAttemptIpcQuestionAuthority {
   if (!isExactDataRecord(value, [
-    'schemaVersion', 'kind', 'identity', 'admissionReceiptDigest', 'fenceDigest',
+    'schemaVersion', 'kind', 'identity', 'admissionReceiptDigest', 'dispatchRequestId',
+    'cursorReceiptDigest', 'fenceDigest',
     'sequence', 'questionReceiptDigest', 'questionArtifactSha256', 'question',
     'envelopeDigest',
   ])) throw new ExactAttemptIpcHold('PRIVATE_IPC_AUTHORITY_UNAVAILABLE');
@@ -765,6 +812,9 @@ function snapshotExactQuestionAuthority(
     || value['kind'] !== 'task-attempt-ipc-question-authority'
     || identity.taskId !== expectedTaskId
     || !isDigest(value['admissionReceiptDigest'])
+    || typeof value['dispatchRequestId'] !== 'string'
+    || !/^dreq-[a-f0-9]{64}$/u.test(value['dispatchRequestId'])
+    || !isDigest(value['cursorReceiptDigest'])
     || !isDigest(value['fenceDigest'])
     || !Number.isSafeInteger(value['sequence'])
     || (value['sequence'] as number) <= 0
@@ -777,6 +827,8 @@ function snapshotExactQuestionAuthority(
     kind: 'task-attempt-ipc-question-authority' as const,
     identity,
     admissionReceiptDigest: value['admissionReceiptDigest'],
+    dispatchRequestId: value['dispatchRequestId'],
+    cursorReceiptDigest: value['cursorReceiptDigest'],
     fenceDigest: value['fenceDigest'],
     sequence: value['sequence'] as number,
     questionReceiptDigest: value['questionReceiptDigest'],
@@ -924,6 +976,8 @@ function exactAuthorityKey(authority: ExactAttemptIpcQuestionAuthority): string 
     attemptId: identity.attemptId,
     generation: identity.generation,
     admissionReceiptDigest: authority.admissionReceiptDigest,
+    dispatchRequestId: authority.dispatchRequestId,
+    cursorReceiptDigest: authority.cursorReceiptDigest,
     fenceDigest: authority.fenceDigest,
     questionReceiptDigest: authority.questionReceiptDigest,
     questionArtifactSha256: authority.questionArtifactSha256,
@@ -955,6 +1009,8 @@ function sameExactQuestionAuthority(
 ): boolean {
   return sameExactIdentity(observed.identity, expected.identity)
     && observed.admissionReceiptDigest === expected.admissionReceiptDigest
+    && observed.dispatchRequestId === expected.dispatchRequestId
+    && observed.cursorReceiptDigest === expected.cursorReceiptDigest
     && observed.fenceDigest === expected.fenceDigest
     && observed.sequence === expected.sequence
     && observed.questionReceiptDigest === expected.questionReceiptDigest
@@ -985,7 +1041,8 @@ function validatePrivateAnswerReceipt(
       && Object.getPrototypeOf(receipt) !== null)
   ) return false;
   const expectedKeys = [
-    'schemaVersion', 'kind', 'identity', 'admissionReceiptDigest', 'fenceDigest',
+    'schemaVersion', 'kind', 'identity', 'admissionReceiptDigest', 'dispatchRequestId',
+    'questionCursorReceiptDigest', 'fenceDigest',
     'sequence', 'questionReceiptDigest', 'questionEnvelopeDigest',
     'answerEnvelopeDigest', 'answerArtifactSha256', 'artifactKey', 'destinationChildRelativePath',
     'destinationProofDigest', 'deliveredAt', 'receiptDigest',
@@ -1013,6 +1070,8 @@ function validatePrivateAnswerReceipt(
     kind: receipt.kind,
     identity: receipt.identity,
     admissionReceiptDigest: receipt.admissionReceiptDigest,
+    dispatchRequestId: receipt.dispatchRequestId,
+    questionCursorReceiptDigest: receipt.questionCursorReceiptDigest,
     fenceDigest: receipt.fenceDigest,
     sequence: receipt.sequence,
     questionReceiptDigest: receipt.questionReceiptDigest,
@@ -1028,6 +1087,8 @@ function validatePrivateAnswerReceipt(
     && receipt.kind === 'task-attempt-ipc-private-answer-receipt'
     && sameExactIdentity(receiptIdentity, authority.identity)
     && receipt.admissionReceiptDigest === authority.admissionReceiptDigest
+    && receipt.dispatchRequestId === authority.dispatchRequestId
+    && receipt.questionCursorReceiptDigest === authority.cursorReceiptDigest
     && receipt.fenceDigest === authority.fenceDigest
     && receipt.sequence === authority.sequence
     && receipt.questionReceiptDigest === authority.questionReceiptDigest
@@ -1059,6 +1120,8 @@ function snapshotPrivateAnswerReceipt(
     kind: 'task-attempt-ipc-private-answer-receipt',
     identity: snapshotExactIdentity(receipt.identity),
     admissionReceiptDigest: receipt.admissionReceiptDigest,
+    dispatchRequestId: receipt.dispatchRequestId,
+    questionCursorReceiptDigest: receipt.questionCursorReceiptDigest,
     fenceDigest: receipt.fenceDigest,
     sequence: receipt.sequence,
     questionReceiptDigest: receipt.questionReceiptDigest,
@@ -1424,8 +1487,8 @@ type ExactAttemptIpcTransientEntry =
       readonly decision: ExactAttemptQuestionDecision;
     };
 
-/** Process-local run-scoped latch. Durable restart truth remains a T18 Store
- * dependency; this object intentionally carries no cross-process authority. */
+/** Process-local run-scoped latch. Durable restart truth lives in the Store;
+ * this object intentionally carries no cross-process authority. */
 export interface ExactAttemptIpcTransientRegistry {
   readonly kind: 'exact-attempt-ipc-transient-registry';
 }
@@ -1679,6 +1742,8 @@ async function settleExactAttemptQuestion(
         const publication = current.answerPublisher.publishAnswerFirstWriter({
           identity: authority.identity,
           admissionReceiptDigest: authority.admissionReceiptDigest,
+          dispatchRequestId: authority.dispatchRequestId,
+          expectedCursorReceiptDigest: authority.cursorReceiptDigest,
           fenceDigest: authority.fenceDigest,
           sequence: authority.sequence,
           questionReceiptDigest: authority.questionReceiptDigest,

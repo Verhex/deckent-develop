@@ -7,6 +7,8 @@ import {
 } from '../core/execution-effect-containment.js';
 import {
   createTaskAttemptEffectLandingBindingV2,
+  createExecutionEffectPersistenceOperationV1,
+  createExecutionEffectStagedSourceSealV1,
   executionEffectPersistenceRawDigest,
   executionEffectWorkspaceAuthorityDigestV1,
   parseExecutionEffectLandingFinalReceiptEvidenceV1,
@@ -42,12 +44,16 @@ import {
   type TaskAttemptCustodyPolicyV2,
   type TaskAttemptCustodyStore,
   type TaskAttemptCustodyVerifiedEffectLandingV2,
+  type TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2,
+  type TaskAttemptCustodyPreservedArtifactRefV2,
 } from '../core/task-attempt-custody-store.js';
 import {
   createExecutionEffectLandingJournalCapabilityV1,
   type ExecutionEffectLandingJournalAdapterV1,
   type ExecutionEffectLandingJournalArtifactV1,
 } from './execution-effect-landing-coordinator.js';
+import { readExecutionEffectLandingReceiptV1 } from './execution-effect-landing-coordinator.js';
+import { createExecutionEffectLandingLeaseCapabilityV1 } from '../core/execution-effect-persistence-contract.js';
 import {
   createExecutionEffectDockerResourceAbsenceReceiptV1,
   parseExecutionEffectDockerLifecycleAuthorityV1,
@@ -725,6 +731,249 @@ export class ExecutionEffectStoreAdapterV1 {
 
   readLandingRecoveryAnchor(): ExecutionEffectStoreLandingRecoveryAnchorV1 | null {
     return this.#readLandingRecoveryAnchor();
+  }
+
+  /** Read-only semantic proof for a committed journal whose resource release
+   * and accepted-result stages have not been published. */
+  readCommittedReleasePendingEvidence():
+    TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2 | null {
+    const anchor = this.#readLandingRecoveryAnchor();
+    const ready = this.#readLifecyclePublication('READY_FOR_LANDING');
+    const committedRef = anchor?.resumeContext.committed?.journal ?? null;
+    if (!anchor || !ready || !committedRef
+      || this.readLatestReleaseProgress() !== null) return null;
+    const anchorArtifact = this.#readArtifact(
+      'execution-effect-lifecycle-authority', this.#landingRecoveryAnchorKey(),
+    );
+    const committedArtifact = this.journal.readImmutable(committedRef.artifactKey);
+    if (!anchorArtifact || !committedArtifact
+      || committedArtifact.publicationReceiptDigest !== committedRef.artifactReceiptDigest
+      || committedArtifact.contentDigest !== committedRef.contentDigest
+      || committedArtifact.byteLength !== committedRef.byteLength) return null;
+    const preparedArtifact = this.journal.readImmutable(anchor.resumeContext.prepared.artifactKey);
+    let committedValue: unknown;
+    let preparedValue: unknown;
+    try {
+      committedValue = JSON.parse(Buffer.from(committedArtifact.bytes).toString('utf8'));
+      preparedValue = preparedArtifact
+        ? JSON.parse(Buffer.from(preparedArtifact.bytes).toString('utf8')) : null;
+    }
+    catch { return null; }
+    const committedRecord = exactRecord(committedValue, [
+      'version', 'kind', 'phase', 'disposition', 'transaction', 'preparedJournalDigest',
+      'applyingJournalDigest', 'lastJournalDigest', 'operationReceiptDigests',
+      'finalVerificationReceipt', 'committedAt', 'recordDigest',
+    ]);
+    const preparedRecord = exactRecord(preparedValue, [
+      'version', 'kind', 'phase', 'transaction', 'operations', 'nativeCapabilityDigest',
+      'journalCapabilityDigest', 'leaseCapabilityDigest', 'acquiredLease', 'preparedAt',
+      'recordDigest',
+    ]);
+    if (!preparedArtifact || !committedRecord || !preparedRecord
+      || committedRecord.disposition !== 'COMMITTED'
+      || !Array.isArray(preparedRecord.operations)
+      || !Array.isArray(committedRecord.operationReceiptDigests)) return null;
+    const verifiedRef = (
+      artifactClass: 'execution-effect-landing-receipt-evidence' | 'execution-effect-manifest',
+      value: Record<string, unknown>,
+    ): TaskAttemptCustodyPreservedArtifactRefV2 | null => {
+      if (typeof value.artifactKey !== 'string' || !SAFE_KEY.test(value.artifactKey)
+        || !isDigest(value.artifactReceiptDigest) || !isDigest(value.contentDigest)
+        || !Number.isSafeInteger(value.byteLength) || (value.byteLength as number) <= 0) return null;
+      const artifact = this.#readArtifact(artifactClass, value.artifactKey);
+      if (!artifact || artifact.receipt.receiptDigest !== value.artifactReceiptDigest
+        || artifact.proof.sha256 !== value.contentDigest
+        || artifact.proof.byteLength !== value.byteLength) return null;
+      return Object.freeze({ artifactClass, artifactKey: value.artifactKey,
+        receiptDigest: value.artifactReceiptDigest as Sha256Digest,
+        contentDigest: value.contentDigest as Sha256Digest, byteLength: value.byteLength as number });
+    };
+    const transactionDigest = anchor.transactionDigest;
+    const evidenceRefForKey = (artifactKey: string) => {
+      const artifact = this.#readArtifact('execution-effect-landing-receipt-evidence', artifactKey);
+      return artifact ? Object.freeze({ artifactKey,
+        artifactReceiptDigest: artifact.receipt.receiptDigest,
+        contentDigest: artifact.proof.sha256, byteLength: artifact.proof.byteLength }) : null;
+    };
+    const leaseRef = evidenceRefForKey(`effect-lease-${transactionDigest.slice(7, 39)}`);
+    const finalRef = evidenceRefForKey(`effect-final-${transactionDigest.slice(7, 39)}`);
+    const leaseEvidence = leaseRef
+      ? verifiedRef('execution-effect-landing-receipt-evidence', leaseRef) : null;
+    const finalEvidence = finalRef
+      ? verifiedRef('execution-effect-landing-receipt-evidence', finalRef) : null;
+    const finalManifest = ready.durableAuthority.finalManifestArtifact;
+    if (!leaseEvidence || !finalEvidence || !finalManifest) return null;
+    const leaseArtifact = this.#readArtifact(
+      'execution-effect-landing-receipt-evidence', leaseEvidence.artifactKey,
+    );
+    let leaseValue: unknown;
+    try { leaseValue = leaseArtifact
+      ? JSON.parse(Buffer.from(leaseArtifact.bytes).toString('utf8')) : null; }
+    catch { return null; }
+    const leaseTerminal = parseExecutionEffectLandingLeaseTerminalReceiptEvidenceV1(leaseValue);
+    if (!leaseTerminal) return null;
+    if (committedRecord.operationReceiptDigests.length !== preparedRecord.operations.length) {
+      return null;
+    }
+    const operations: ExecutionEffectPersistenceOperationV1[] = [];
+    for (let index = 0; index < preparedRecord.operations.length; index += 1) {
+      const operation = exactRecord(preparedRecord.operations[index], [
+        'version', 'index', 'kind', 'path', 'effectDigests', 'derivedParent', 'stagedSource',
+        'entryPreimages', 'entryPostimages', 'parentAuthorities', 'operationDigest',
+      ]);
+      const stepArtifact = this.journal.readImmutable(
+        `effect-landing/${transactionDigest.slice(7)}/step-${String(index).padStart(7, '0')}.json`,
+      );
+      let stepValue: unknown;
+      try { stepValue = stepArtifact
+        ? JSON.parse(Buffer.from(stepArtifact.bytes).toString('utf8')) : null; }
+      catch { return null; }
+      const step = exactRecord(stepValue, [
+        'version', 'kind', 'phase', 'transactionDigest', 'preparedJournalDigest',
+        'applyingJournalDigest', 'previousJournalDigest', 'index', 'operationDigest',
+        'nativeReceipt', 'reconciledAfterCrash', 'appliedAt', 'recordDigest',
+      ]);
+      const nativeReceipt = exactRecord(step?.nativeReceipt, [
+        'version', 'state', 'operationDigest', 'entryPreimages', 'entryPostimages',
+        'parentAuthorities', 'durabilityEvidenceDigest', 'receiptDigest',
+      ]);
+      if (!operation || !step || !nativeReceipt || operation.index !== index
+        || step.index !== index || step.operationDigest !== operation.operationDigest
+        || nativeReceipt.receiptDigest !== committedRecord.operationReceiptDigests[index]) return null;
+      try {
+        const source = operation.stagedSource === null ? null : exactRecord(
+          operation.stagedSource,
+          [
+            'version', 'path', 'contentDigest', 'byteLength', 'workspaceIdentityDigest',
+            'attemptDigest', 'admissionReceiptDigest', 'custodyPolicyDigest',
+            'landingIntentDigest', 'chunks', 'stageAuthorityDigest',
+          ],
+        );
+        if (operation.stagedSource !== null && (!source || !Array.isArray(source.chunks))) return null;
+        const stagedSource = source ? createExecutionEffectStagedSourceSealV1({
+          path: source.path as string,
+          byteLength: source.byteLength as number,
+          contentDigest: source.contentDigest as Sha256Digest,
+          workspaceIdentityDigest: source.workspaceIdentityDigest as Sha256Digest,
+          attemptDigest: source.attemptDigest as Sha256Digest,
+          admissionReceiptDigest: source.admissionReceiptDigest as Sha256Digest,
+          custodyPolicyDigest: source.custodyPolicyDigest as Sha256Digest,
+          landingIntentDigest: source.landingIntentDigest as Sha256Digest,
+          chunks: (source.chunks as readonly Record<string, unknown>[]).map(chunk => ({
+            byteLength: chunk.byteLength as number,
+            artifactKey: chunk.artifactKey as string,
+            artifactReceiptDigest: chunk.artifactReceiptDigest as Sha256Digest,
+            contentDigest: chunk.contentDigest as Sha256Digest,
+          })),
+        }) : null;
+        const persisted = createExecutionEffectPersistenceOperationV1({
+          index,
+          kind: operation.kind as ExecutionEffectPersistenceOperationV1['kind'],
+          path: operation.path as string,
+          effectDigests: operation.effectDigests as readonly Sha256Digest[],
+          derivedParent:
+            operation.derivedParent as ExecutionEffectPersistenceOperationV1['derivedParent'],
+          stagedSource,
+          entryPreimages:
+            operation.entryPreimages as ExecutionEffectPersistenceOperationV1['entryPreimages'],
+          entryPostimages:
+            operation.entryPostimages as ExecutionEffectPersistenceOperationV1['entryPostimages'],
+          parentAuthorities:
+            operation.parentAuthorities as ExecutionEffectPersistenceOperationV1['parentAuthorities'],
+          nativeReceiptDigest: nativeReceipt.receiptDigest as Sha256Digest,
+          durabilityEvidenceDigest: nativeReceipt.durabilityEvidenceDigest as Sha256Digest,
+        });
+        if (persisted.operationDigest !== operation.operationDigest) return null;
+        operations.push(persisted);
+      } catch { return null; }
+    }
+    const nativeReceipts: ExecutionEffectLandingNativeReceiptEvidenceV1[] = [];
+    for (let index = 0; index < operations.length; index += 1) {
+      const artifact = this.#readArtifact('execution-effect-landing-receipt-evidence',
+        `effect-native-${transactionDigest.slice(7, 31)}-${index.toString(36)}`);
+      let value: unknown;
+      try { value = artifact ? JSON.parse(Buffer.from(artifact.bytes).toString('utf8')) : null; }
+      catch { return null; }
+      const receipt = parseExecutionEffectLandingNativeReceiptEvidenceV1(value, operations[index]!);
+      if (!receipt || receipt.receiptDigest !== committedRecord.operationReceiptDigests[index]) return null;
+      nativeReceipts.push(receipt);
+    }
+    const finalArtifact = this.#readArtifact(
+      'execution-effect-landing-receipt-evidence', finalEvidence.artifactKey,
+    );
+    let finalValue: unknown;
+    try { finalValue = finalArtifact
+      ? JSON.parse(Buffer.from(finalArtifact.bytes).toString('utf8')) : null; }
+    catch { return null; }
+    const finalReceipt = parseExecutionEffectLandingFinalReceiptEvidenceV1(
+      finalValue, transactionDigest,
+      (anchor.resumeContext.transaction.planDigest as Sha256Digest), operations, nativeReceipts,
+    );
+    const committedFinal = committedRecord.finalVerificationReceipt as Record<string, unknown> | null;
+    if (!finalReceipt || !committedFinal
+      || finalReceipt.receiptDigest !== committedFinal.receiptDigest
+      || !sameBytes(canonicalTaskAttemptCustodyJson(finalReceipt, this.#policy.jsonBounds),
+        canonicalTaskAttemptCustodyJson(committedFinal, this.#policy.jsonBounds))) return null;
+    const leaseCapability = createExecutionEffectLandingLeaseCapabilityV1({
+      adapterId: 'deckent.execution-effect-lock.v1',
+      projectRootIdentityDigest:
+        this.journal.capability.projectRootIdentityDigest as Sha256Digest,
+    });
+    if (leaseCapability.capabilityDigest !== preparedRecord.leaseCapabilityDigest) return null;
+    const readOnlyViolation = (): never => {
+      throw new TypeError('Committed release-pending verification is read-only');
+    };
+    const landing = readExecutionEffectLandingReceiptV1({
+      transaction: anchor.resumeContext.transaction,
+      adapters: { journal: this.journal, lease: {
+        capability: leaseCapability,
+        acquire: readOnlyViolation,
+        resume: readOnlyViolation,
+        assert: readOnlyViolation,
+        renew: readOnlyViolation,
+        beginBoundary: readOnlyViolation,
+        quarantine: readOnlyViolation,
+        completeBoundary: readOnlyViolation,
+        releaseNoChange: readOnlyViolation,
+        readTerminal: (transactionDigest, committedJournalDigest) => (
+          leaseTerminal.transactionDigest === transactionDigest
+          && leaseTerminal.committedJournalDigest === committedJournalDigest
+            ? Object.freeze({ transactionDigest, committedJournalDigest,
+                terminal: leaseTerminal.terminal,
+                terminalReceiptDigest: leaseTerminal.terminalReceiptDigest }) : null
+        ),
+      } },
+    });
+    if (landing.state !== 'COMMITTED') return null;
+    const preserved = (
+      artifactClass: TaskAttemptCustodyPreservedArtifactRefV2['artifactClass'],
+      artifactKey: string, receiptDigest: Sha256Digest, contentDigest: Sha256Digest,
+      byteLength: number,
+    ): TaskAttemptCustodyPreservedArtifactRefV2 => Object.freeze({
+      artifactClass, artifactKey, receiptDigest, contentDigest, byteLength,
+    });
+    const evidenceWithoutDigest = Object.freeze({
+      phase: 'COMMITTED_JOURNAL_RELEASE_PENDING' as const,
+      landingRecoveryAnchor: preserved('execution-effect-lifecycle-authority',
+        anchorArtifact.receipt.artifactKey, anchorArtifact.receipt.receiptDigest,
+        anchorArtifact.proof.sha256, anchorArtifact.proof.byteLength),
+      readyLifecycle: preserved('execution-effect-lifecycle-authority', ready.artifact.artifactKey,
+        ready.artifact.artifactReceiptDigest, ready.artifact.contentDigest, ready.artifact.byteLength),
+      committedJournal: preserved('execution-effect-landing-journal',
+        executionEffectStoreJournalArtifactKeyV1(committedRef.artifactKey)!,
+        committedRef.artifactReceiptDigest as Sha256Digest,
+        committedRef.contentDigest as Sha256Digest, committedRef.byteLength),
+      leaseEvidence,
+      finalEvidence,
+      finalManifest: preserved('execution-effect-manifest', finalManifest.artifactKey,
+        finalManifest.artifactReceiptDigest, finalManifest.contentDigest, finalManifest.byteLength),
+      semanticVerifier: 'orchestra-required-v1' as const,
+    });
+    return Object.freeze({ ...evidenceWithoutDigest, semanticEvidenceDigest:
+      executionEffectPersistenceRawDigest(canonicalTaskAttemptCustodyJson(Object.freeze({
+        domain: 'execution-effect-committed-release-pending-semantic-v1',
+        evidence: evidenceWithoutDigest, landingReceiptDigest: landing.receiptDigest,
+      }), this.#policy.jsonBounds)) });
   }
 
   #cleanupDeleteIntentDigest(

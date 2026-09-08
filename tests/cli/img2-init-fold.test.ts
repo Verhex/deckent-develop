@@ -18,6 +18,7 @@ import {
   reprovisionWorkerImageAfterUpgrade,
 } from '../../src/cli/commands/upgrade.js';
 import type { SpawnImpl, SpawnedProcessLike } from '../../src/core/worker-image-check.js';
+import { loadExecAuthorityNative } from '../../src/core/exec-authority-native.js';
 
 // ─── Docker mock helpers ───────────────────────────────────────────────────────
 //
@@ -70,7 +71,19 @@ function makeSpawn(inspect: InspectBehaviour, record: SpawnRecord): SpawnImpl {
     const child = new EventEmitter() as EventEmitter & SpawnedProcessLike;
 
     let stdoutContent = '';
-    if (route === 'run') stdoutContent = PROBE_OK;
+    if (route === 'run') {
+      stdoutContent = args.includes('node')
+        ? JSON.stringify({
+            manifest: loadExecAuthorityNative().manifest,
+            dependencySource: {
+              schemaVersion: 1,
+              kind: 'worker-image-dependency-source',
+              path: '/app/node_modules',
+              state: 'AVAILABLE',
+            },
+          })
+        : PROBE_OK;
+    }
 
     child.stdout = Readable.from([stdoutContent]);
     child.stderr = Readable.from(['']);

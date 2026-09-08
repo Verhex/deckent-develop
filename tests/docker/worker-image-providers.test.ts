@@ -53,6 +53,22 @@ describe('Dockerfile.worker — provider CLI readiness (static analysis)', () =>
     }
   });
 
+  it('source and packaged worker images contain the exact native runtime authority', () => {
+    for (const path of [dockerfileWorkerPath, packagedDockerfileWorkerPath]) {
+      const content = readFileSync(path, 'utf-8');
+      expect(content).toContain(
+        'COPY dist/core/exec-authority-native.js /app/dist/core/exec-authority-native.js',
+      );
+      expect(content).toContain('COPY package.json npm-shrinkwrap.json /app/');
+      expect(content).toContain('npm ci --prefix /app --include=dev');
+      expect(content).toContain('COPY native/exec-authority /app/native/exec-authority');
+      expect(content).toContain('chmod -R a=rX /app/dist /app/native');
+      expect(content).toContain('chmod -R a+rX /app/node_modules');
+      expect(content).toContain("lstatSync('/app/node_modules')");
+      expect(content).toContain('setpriv --reuid 65532 --regid 65532 --clear-groups node');
+    }
+  });
+
   it('Dockerfile.worker HEALTHCHECK references claude --version', () => {
     const content = readFileSync(dockerfileWorkerPath, 'utf-8');
     expect(content).toContain('claude --version');

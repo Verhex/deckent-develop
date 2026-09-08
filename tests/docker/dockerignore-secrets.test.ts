@@ -43,4 +43,15 @@ describe('.dockerignore secret exclusions', () => {
     const dockerfile = readFileSync(join(ROOT, 'Dockerfile.worker'), 'utf-8');
     expect(dockerfile).not.toContain('.deck');
   });
+
+  it('admits only the exact built runtime file needed by Dockerfile.worker', () => {
+    expect(entries).toContain('dist/*');
+    expect(entries).toContain('!dist/core/');
+    expect(entries).toContain('dist/core/*');
+    expect(entries).toContain('!dist/core/exec-authority-native.js');
+  });
+
+  it('keeps host adapter and analysis state out of the expanded package-root context', () => {
+    expectIgnoredWithoutLaterNegation(['.codex', '.cursor', '.gemini', '.analysis'], entries);
+  });
 });

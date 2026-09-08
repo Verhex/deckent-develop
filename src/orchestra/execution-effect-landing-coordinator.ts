@@ -201,6 +201,12 @@ export type ExecutionEffectLandingHoldCode =
   | 'ADAPTER_UNSUPPORTED'
   | 'LEASE_UNAVAILABLE'
   | 'PREIMAGE_MISMATCH'
+  | 'STAGED_SOURCE_CAPTURE_FAILED'
+  | 'STAGED_SOURCE_AUTHORITY_MISMATCH'
+  | 'PARENT_AUTHORITY_MISMATCH'
+  | 'STAGED_SOURCE_REVALIDATION_FAILED'
+  | 'PREIMAGE_REVALIDATION_FAILED'
+  | 'PARENT_AUTHORITY_REVALIDATION_FAILED'
   | 'JOURNAL_CONFLICT'
   | 'JOURNAL_MALFORMED'
   | 'NATIVE_EFFECT_UNCERTAIN'
@@ -239,6 +245,15 @@ function hold(
     ...body,
     holdDigest: digest('execution-effect-landing-hold-v1', body),
   });
+}
+
+/** Fingerprint only, not recovery authority: consumers must independently verify
+ * the immutable diagnostic, exact attempt and absence of journal/effect authority.
+ * A post-lease HOLD carries transaction/evidence and cannot match this digest. */
+export function executionEffectLandingPretransactionHoldDigestV1(
+  code: ExecutionEffectLandingHoldCode,
+): string {
+  return hold(code, 'prepare', null).holdDigest;
 }
 
 export interface ExecutionEffectLandingCapabilityV1 {
@@ -1331,12 +1346,14 @@ async function buildOperations(
   native: ExecutionEffectLandingNativeAdapterV1,
   workspaceIdentityDigest: string,
   landingIntentDigest: string,
-): Promise<readonly ExecutionEffectLandingOperationV1[] | null> {
-  const reject = (_reason: string): null => {
-    return null;
-  };
+): Promise<readonly ExecutionEffectLandingOperationV1[] | ExecutionEffectLandingHoldV1> {
+  // These failures precede a transaction/lease. Preserve their actual boundary
+  // instead of labelling source-copy and parent-authority failures as changed
+  // project bytes. Only typed codes are persisted, never raw exception text.
+  const reject = (code: ExecutionEffectLandingHoldCode): ExecutionEffectLandingHoldV1 =>
+    hold(code, 'prepare', null);
   const seeds = operationSeeds(effects);
-  if (!seeds) return reject('OPERATION_SEEDS');
+  if (!seeds) return reject('PLAN_UNSUPPORTED');
   const before = new Map(baseline.entries.map(entry => [entry.path, entry]));
   const after = new Map(final.entries.map(entry => [entry.path, entry]));
   const expandedSeeds = [...seeds];
@@ -1348,7 +1365,7 @@ async function buildOperations(
     if (seed.kind !== 'ADD' && seed.kind !== 'ADD_DIRECTORY') continue;
     let candidate = parentPath(seed.path);
     while (candidate !== '.' && !before.has(candidate) && !realDirectoryAdds.has(candidate)) {
-      if (after.get(candidate)?.kind !== 'directory') return reject(`DERIVED_PARENT:${candidate}`);
+      if (after.get(candidate)?.kind !== 'directory') return reject('PARENT_AUTHORITY_MISMATCH');
       const evidence = derivedParents.get(candidate) ?? [];
       evidence.push(...seed.effectDigests);
       derivedParents.set(candidate, evidence);
@@ -1379,14 +1396,14 @@ async function buildOperations(
   const directoryAdds = new Map<string, ExecutionEffectLandingOperationV1>();
   for (let index = 0; index < expandedSeeds.length; index += 1) {
     const seed = expandedSeeds[index]!;
-    if (seed.path === '.') return reject('ROOT_OPERATION');
+    if (seed.path === '.') return reject('PLAN_UNSUPPORTED');
     const affected = [seed.path];
     const preimages: ExecutionEffectLandingPathStateV1[] = [];
     const postimages: ExecutionEffectLandingExpectedPathStateV1[] = [];
     for (const path of affected) {
       const observed = inspect(native, path);
       if (!observed || !stateMatchesEntry(observed, before.get(path))) {
-        return reject(`PREIMAGE:${path}:${observed?.state ?? 'UNAVAILABLE'}`);
+        return reject('PREIMAGE_MISMATCH');
       }
       preimages.push(pathState(path, observed));
       const expectedAfter = after.get(path);
@@ -1414,13 +1431,10 @@ async function buildOperations(
           || stagedSource.chunks.some(chunk =>
             chunk.byteLength > native.capability.maxStagedChunkBytes)
           || native.verifyStagedSource(stagedSource) !== true) {
-          return reject(`STAGED_SOURCE_AUTHORITY:${seed.path}`);
+          return reject('STAGED_SOURCE_AUTHORITY_MISMATCH');
         }
-      } catch (error) {
-        const code = error && typeof error === 'object' && 'code' in error
-          ? String(Reflect.get(error, 'code'))
-          : error instanceof Error ? error.name : typeof error;
-        return reject(`STAGE_SOURCE:${seed.path}:${code}`);
+      } catch {
+        return reject('STAGED_SOURCE_CAPTURE_FAILED');
       }
     }
     const parents = [...new Set(affected.map(parentPath))].sort(compareCodePoint);
@@ -1436,7 +1450,7 @@ async function buildOperations(
       const parentAdd = directoryAdds.get(path);
       const expectedDirectory = after.get(path);
       if (observed?.state !== 'ABSENT' || !parentAdd || expectedDirectory?.kind !== 'directory') {
-        return reject(`PARENT:${path}:${observed?.state ?? 'UNAVAILABLE'}`);
+        return reject('PARENT_AUTHORITY_MISMATCH');
       }
       parentAuthorities.push(objectFreeze({
         path,
@@ -1478,29 +1492,74 @@ async function buildOperations(
 function revalidatePreparedAuthority(
   operations: readonly ExecutionEffectLandingOperationV1[],
   native: ExecutionEffectLandingNativeAdapterV1,
-): boolean {
-  try {
-    for (const operation of operations) {
-      if (operation.stagedSource && native.verifyStagedSource(operation.stagedSource) !== true) {
-        return false;
-      }
-      for (const preimage of operation.entryPreimages) {
-        const current = snapshotState(native.inspectProjectEntry(preimage.path));
-        if (!current || !sameJson(current, preimage.entry)) return false;
-      }
-      for (const parent of operation.parentAuthorities) {
-        const current = snapshotState(native.inspectProjectEntry(parent.path));
-        if (parent.source === 'PREPARED_PREIMAGE') {
-          if (!current || !sameJson(current, parent.entry)) return false;
-        } else if (!current || current.state !== 'ABSENT') {
-          return false;
+): Readonly<{ state: 'VALID' }> | Readonly<{
+  state: 'HOLD'; code: ExecutionEffectLandingHoldCode; contextDigest: string;
+}> {
+  // This diagnostic is post-lease only. It must not change the pretransaction
+  // fingerprints consumed by failed-attempt retention. The existing durable
+  // HOLD commits this context; it does not expose readable paths or exceptions.
+  const reject = (
+    code: ExecutionEffectLandingHoldCode,
+    boundary: 'STAGED_SOURCE' | 'ENTRY_PREIMAGE' | 'PARENT_AUTHORITY',
+    failureKind: 'AUTHORITY_MISMATCH' | 'ADAPTER_EXCEPTION',
+    operation: ExecutionEffectLandingOperationV1,
+    path: string,
+    expectedAuthorityDigest: string,
+    observedAuthorityDigest: string | null = null,
+  ) => objectFreeze({
+    state: 'HOLD' as const,
+    code,
+    contextDigest: digest('execution-effect-landing-revalidation-context-v1', objectFreeze({
+      version: 1,
+      boundary,
+      failureKind,
+      operationDigest: operation.operationDigest,
+      pathDigest: digest('execution-effect-landing-relative-path-v1', { path }),
+      expectedAuthorityDigest,
+      observedAuthorityDigest,
+    })),
+  });
+  for (const operation of operations) {
+    if (operation.stagedSource) {
+      try {
+        if (native.verifyStagedSource(operation.stagedSource) !== true) {
+          return reject('STAGED_SOURCE_AUTHORITY_MISMATCH', 'STAGED_SOURCE', 'AUTHORITY_MISMATCH',
+            operation, operation.path, operation.stagedSource.stageAuthorityDigest);
         }
+      } catch {
+        return reject('STAGED_SOURCE_REVALIDATION_FAILED', 'STAGED_SOURCE', 'ADAPTER_EXCEPTION',
+          operation, operation.path, operation.stagedSource.stageAuthorityDigest);
       }
     }
-    return true;
-  } catch {
-    return false;
+    for (const preimage of operation.entryPreimages) {
+      try {
+        const current = snapshotState(native.inspectProjectEntry(preimage.path));
+        if (!current || !sameJson(current, preimage.entry)) {
+          return reject('PREIMAGE_MISMATCH', 'ENTRY_PREIMAGE', 'AUTHORITY_MISMATCH',
+            operation, preimage.path, preimage.entry.stateDigest, current?.stateDigest ?? null);
+        }
+      } catch {
+        return reject('PREIMAGE_REVALIDATION_FAILED', 'ENTRY_PREIMAGE', 'ADAPTER_EXCEPTION',
+          operation, preimage.path, preimage.entry.stateDigest);
+      }
+    }
+    for (const parent of operation.parentAuthorities) {
+      const expectedDigest = parent.source === 'PREPARED_PREIMAGE'
+        ? parent.entry.stateDigest : createExecutionEffectLandingEntryStateV1({ entry: null }).stateDigest;
+      try {
+        const current = snapshotState(native.inspectProjectEntry(parent.path));
+        if (!current || (parent.source === 'PREPARED_PREIMAGE'
+          ? !sameJson(current, parent.entry) : current.state !== 'ABSENT')) {
+          return reject('PARENT_AUTHORITY_MISMATCH', 'PARENT_AUTHORITY', 'AUTHORITY_MISMATCH',
+            operation, parent.path, expectedDigest, current?.stateDigest ?? null);
+        }
+      } catch {
+        return reject('PARENT_AUTHORITY_REVALIDATION_FAILED', 'PARENT_AUTHORITY', 'ADAPTER_EXCEPTION',
+          operation, parent.path, expectedDigest);
+      }
+    }
   }
+  return objectFreeze({ state: 'VALID' as const });
 }
 
 function validateLease(
@@ -2538,7 +2597,7 @@ export async function prepareExecutionEffectLandingV1(
     workspaceIdentityDigest,
     landingIntentDigest,
   );
-  if (!operations) return hold('PREIMAGE_MISMATCH', 'prepare', null);
+  if ('state' in operations) return operations;
   if (operations.length > adapters.native.capability.maxOperations
     || operations.length > EXECUTION_EFFECT_LANDING_HARD_MAX_OPERATIONS) {
     return hold('PLAN_UNSUPPORTED', 'prepare', null, [
@@ -2669,11 +2728,13 @@ export async function prepareExecutionEffectLandingV1(
     lease = validateLease(adapters.lease.acquire(transaction.transactionDigest), transaction.transactionDigest);
     if (!lease) throw new Error('lease');
     adapters.lease.assert(lease);
-    if (!revalidatePreparedAuthority(operations, adapters.native)) {
+    const revalidated = revalidatePreparedAuthority(operations, adapters.native);
+    if (revalidated.state === 'HOLD') {
       const evidence = quarantineSafely(adapters, lease, null, [
         transaction.transactionDigest,
+        revalidated.contextDigest,
       ]);
-      return hold('PREIMAGE_MISMATCH', 'prepare', transaction.transactionDigest, evidence);
+      return hold(revalidated.code, 'prepare', transaction.transactionDigest, evidence);
     }
     const preparedBody = objectFreeze({
       version: 1 as const,

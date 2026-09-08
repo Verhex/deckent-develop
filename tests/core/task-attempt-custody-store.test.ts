@@ -7,6 +7,7 @@ import {
   TASK_ATTEMPT_CUSTODY_CHAIN_STAGES,
   TASK_ATTEMPT_CUSTODY_HARD_MAX_BYTES,
   TASK_ATTEMPT_CUSTODY_HOST_AUTHORITY_ARTIFACT_CLASSES,
+  TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS,
   TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
   TaskAttemptCustodyHold,
   TaskAttemptCustodyStore,
@@ -17,12 +18,14 @@ import {
   createTaskAttemptCustodyDirectoryScanReceiptV2,
   createTaskAttemptCustodyEffectLandingReceiptV2,
   createTaskAttemptCustodyPolicy,
+  createTaskAttemptCustodyWorkerIpcSealedQuestionSourceV2,
   parseTaskAttemptCustodyAdmissionV2,
   parseTaskAttemptCustodyArtifactReceiptV2,
   parseTaskAttemptCustodyEffectLandingReceiptV2,
   parseTaskAttemptCustodyWorkerIpcAnswerDeliveryReceiptV2,
   parseTaskAttemptCustodyHistoricalV1Sentinel,
   taskAttemptCustodyDigest,
+  taskAttemptCustodyArtifactDataRelativePath,
   taskAttemptCustodyRelativePath,
   verifyTaskAttemptCustodyHistoricalV1Sentinel,
   type Sha256Digest,
@@ -52,6 +55,7 @@ import {
   type TaskAttemptCustodyRelativePath,
   type TaskAttemptCustodyRootProof,
   type TaskAttemptCustodyWorkerIpcAnswerDeliveryReceiptV2,
+  type TaskAttemptCustodyWorkerIpcConversationCursorV2,
   type TaskAttemptCustodyVerifiedHistoricalV1Sentinel,
 } from '../../src/core/task-attempt-custody-store.js';
 import {
@@ -72,6 +76,11 @@ import {
 } from '../../src/core/execution-effect-containment.js';
 import { compileExecutionEffectWritePolicy } from '../../src/core/execution-write-scope-policy.js';
 import { DockerSpawnBackend } from '../../src/orchestra/spawn-backend-docker.js';
+import type {
+  ExactDockerEffectDiagnosticRefV1,
+  ExactDockerEffectFailureV1,
+  ExactDockerProviderExitObservationRefV2,
+} from '../../src/orchestra/spawn-backend.js';
 
 function sha256(bytes: Uint8Array): Sha256Digest {
   return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
@@ -188,6 +197,7 @@ class InMemoryCustodyAdapter implements TaskAttemptCustodyAdapter {
   failOutcomeForPublishedPathSuffix: string | null = null;
   readFirstWriterError: unknown | null = null;
   readVerifiedError: unknown | null = null;
+  afterReadVerified: ((path: TaskAttemptCustodyRelativePath) => void) | null = null;
   readPrivateDirectoryError: unknown | null = null;
   readDurableEffectMarkerError: unknown | null = null;
   readVerifiedErrorForPathSuffix: Readonly<{ suffix: string; error: unknown }> | null = null;
@@ -228,7 +238,10 @@ class InMemoryCustodyAdapter implements TaskAttemptCustodyAdapter {
   private sharedCaptureCapability: TaskAttemptCustodyPathCapability | null = null;
   private sharedPublicationToken: TaskAttemptCustodyAdapterPublicationToken | null = null;
 
-  constructor(state: MemoryCustodyState = memoryCustodyState()) {
+  constructor(
+    state: MemoryCustodyState = memoryCustodyState(),
+    private readonly rootProof: TaskAttemptCustodyRootProof = ROOT_PROOF,
+  ) {
     this.directories = state.directories;
     this.files = state.files;
     this.effectMarkers = state.effectMarkers;
@@ -241,7 +254,7 @@ class InMemoryCustodyAdapter implements TaskAttemptCustodyAdapter {
     readonly create: boolean;
   }): TaskAttemptCustodyRootProof {
     return Object.freeze({
-      ...ROOT_PROOF,
+      ...this.rootProof,
       projectId: input.projectId,
       canonicalProjectRootSha256: createHash('sha256')
         .update(input.canonicalProjectRoot)
@@ -303,7 +316,7 @@ class InMemoryCustodyAdapter implements TaskAttemptCustodyAdapter {
   }): TaskAttemptCustodyDirectoryScanReceiptV2 {
     const prefix = `${input.relativeDirectory}/`;
     const children = new Set<string>();
-    for (const path of this.directories.keys()) {
+    for (const path of [...this.directories.keys(), ...this.files.keys()]) {
       if (!path.startsWith(prefix)) continue;
       const remainder = path.slice(prefix.length);
       if (remainder.length !== 0 && !remainder.includes('/')) children.add(remainder);
@@ -598,7 +611,9 @@ class InMemoryCustodyAdapter implements TaskAttemptCustodyAdapter {
         proof: Object.freeze({ ...entry.proof, fileId: `${entry.proof.fileId}:substituted` }),
       };
     }
-    return { bytes: Uint8Array.from(entry.bytes), proof: entry.proof };
+    const observed = { bytes: Uint8Array.from(entry.bytes), proof: entry.proof };
+    this.afterReadVerified?.(input.proof.relativePath);
+    return observed;
   }
 
   captureStableFile(input: {
@@ -1628,6 +1643,69 @@ function publishWorkerIpcAnswer(input: {
       ?? Buffer.from(`{"kind":"authority-envelope","sequence":${sequence}}`),
     deliveryBytes: input.deliveryBytes
       ?? Buffer.from(`{"answer":"approved-${sequence}"}`),
+  });
+}
+
+function captureNextIpcQuestion(input: {
+  readonly adapter: InMemoryCustodyAdapter;
+  readonly store: TaskAttemptCustodyStore;
+  readonly admissionRef: TaskAttemptCustodyDispatchAdmissionRefV2;
+  readonly policy: TaskAttemptCustodyPolicyV2;
+  readonly cursor: TaskAttemptCustodyWorkerIpcConversationCursorV2;
+  readonly sequence: number;
+  readonly sourceEpoch: number;
+  readonly bytes?: Uint8Array;
+}) {
+  const capturedAt = new Date(
+    Date.parse('2026-08-30T20:01:00.000Z') + ((input.sequence - 1) * 1_000),
+  ).toISOString();
+  const bytes = input.bytes ?? Buffer.from(JSON.stringify({
+    taskId: input.admissionRef.identity.taskId,
+    workerId: 'worker-exact',
+    question: `question-${input.sequence}`,
+    timestamp: capturedAt,
+  }));
+  const access = input.store.openAttemptAccess({
+    identity: input.admissionRef.identity,
+    policy: input.policy,
+    admissionReceiptDigest: input.admissionRef.admissionReceiptDigest,
+  });
+  if (access === null) throw new Error('attempt access missing');
+  const sealedChildRelativePath = `sealed-output-v1/${input.admissionRef.dispatchRequestId}/ipc/question-${String(input.sequence).padStart(6, '0')}.bin`;
+  const admission = input.store.readAdmission(input.admissionRef.identity, input.policy);
+  if (admission === null) throw new Error('admission missing');
+  const sealedPath = taskAttemptCustodyRelativePath(
+    `${admission.workerOutputDirectory.relativePath}/${sealedChildRelativePath}`,
+  );
+  input.adapter.putWorkerOutput(sealedPath, bytes);
+  const source = input.store.issueAttemptOutputCaptureSource({
+    access,
+    childRelativePath: sealedChildRelativePath,
+    artifactClass: 'worker-ipc-question',
+    artifactKey: `ipc-question-${input.sequence}`,
+  });
+  const sealedSourceReceipt = createTaskAttemptCustodyWorkerIpcSealedQuestionSourceV2({
+    identity: input.admissionRef.identity,
+    admissionReceiptDigest: input.admissionRef.admissionReceiptDigest,
+    dispatchRequestId: input.admissionRef.dispatchRequestId,
+    sequence: input.sequence,
+    sourceFileIdentityDigest: sha256(Buffer.from(`sealed-source-${input.sequence}`)),
+    sourceEpoch: input.sourceEpoch,
+    sealedChildRelativePath,
+    contentSha256: sha256(bytes),
+    byteLength: bytes.byteLength,
+    capturedAt,
+  }, input.policy);
+  return input.store.captureNextWorkerIpcQuestion({
+    identity: input.admissionRef.identity,
+    policy: input.policy,
+    admissionReceiptDigest: input.admissionRef.admissionReceiptDigest,
+    dispatchRequestId: input.admissionRef.dispatchRequestId,
+    access,
+    expectedCursorReceiptDigest: input.cursor.cursorReceiptDigest,
+    sequence: input.sequence,
+    sealedSourceReceipt,
+    source,
   });
 }
 
@@ -3227,6 +3305,54 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
     expect(Buffer.from(deliveredPath?.[1].bytes ?? [])).toEqual(deliveryBytes);
   });
 
+  it('probes an exact worker-output question without minting authority', () => {
+    const { adapter, store } = openedStore();
+    const taskPolicy = policy();
+    const taskIdentity = identity();
+    const admission = admit(store, taskIdentity, taskPolicy);
+    const access = store.openAttemptAccess({
+      identity: taskIdentity,
+      policy: taskPolicy,
+      admissionReceiptDigest: admission.receiptDigest,
+    });
+    if (access === null) throw new Error('attempt access missing');
+    const childRelativePath = `task-${taskIdentity.taskId}.question`;
+    const firstBytes = Buffer.from('{"taskId":"001-001","question":"first"}');
+    const workerPath = taskAttemptCustodyRelativePath(
+      `${admission.workerOutputDirectory.relativePath}/${childRelativePath}`,
+    );
+
+    expect(store.hasAttemptOutputArtifact({
+      access,
+      policy: taskPolicy,
+      childRelativePath,
+      artifactClass: 'worker-ipc-question',
+    })).toBe(false);
+    adapter.putWorkerOutput(workerPath, firstBytes);
+    expect(store.hasAttemptOutputArtifact({
+      access,
+      policy: taskPolicy,
+      childRelativePath,
+      artifactClass: 'worker-ipc-question',
+    })).toBe(true);
+
+    const firstSource = store.issueAttemptOutputCaptureSource({
+      access,
+      childRelativePath,
+      artifactClass: 'worker-ipc-question',
+      artifactKey: 'ipc-question-1',
+    });
+    store.captureAttemptOutputArtifact({
+      identity: taskIdentity,
+      policy: taskPolicy,
+      admissionReceiptDigest: admission.receiptDigest,
+      artifactClass: 'worker-ipc-question',
+      artifactKey: 'ipc-question-1',
+      capturedAt: '2026-08-30T20:01:00.000Z',
+      source: firstSource,
+    });
+  });
+
   it('reconstructs IPC answer delivery after restart and keeps same-sequence replay idempotent', () => {
     const shared = memoryCustodyState();
     const firstAdapter = new InMemoryCustodyAdapter(shared);
@@ -3313,6 +3439,396 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
       sequence: 2,
       artifactKey: 'ipc-answer-2',
     })).toEqual(second);
+  });
+
+  it('owns a durable contiguous IPC cursor across answer, restart, and the next sealed question', () => {
+    const shared = memoryCustodyState();
+    const adapter = new InMemoryCustodyAdapter(shared);
+    const { store } = openedStore(adapter);
+    const taskPolicy = policy();
+    const admitted = reserveDispatch({ store, policy: taskPolicy });
+    if (admitted.state !== 'admitted') throw new Error('dispatch admission missing');
+    const empty = store.readWorkerIpcConversationCursor({
+      identity: admitted.ref.identity,
+      policy: taskPolicy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+      dispatchRequestId: admitted.ref.dispatchRequestId,
+    });
+    expect(empty).toMatchObject({ state: 'empty', nextSequence: 1, cursorReceiptDigest: null });
+
+    const first = captureNextIpcQuestion({
+      adapter,
+      store,
+      admissionRef: admitted.ref,
+      policy: taskPolicy,
+      cursor: empty,
+      sequence: 1,
+      sourceEpoch: 1,
+    });
+    expect(first.cursor).toMatchObject({
+      state: 'question-open', sequence: 1, nextSequence: null,
+      questionReceiptDigest: first.question.receiptDigest,
+    });
+    const access = store.openAttemptAccess({
+      identity: admitted.ref.identity,
+      policy: taskPolicy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+    });
+    if (access === null) throw new Error('attempt access missing');
+    const answerInput = {
+      identity: admitted.ref.identity,
+      policy: taskPolicy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+      dispatchRequestId: admitted.ref.dispatchRequestId,
+      access,
+      expectedCursorReceiptDigest: first.cursor.cursorReceiptDigest,
+      questionReceiptDigest: first.question.receiptDigest,
+      sequence: 1,
+      artifactKey: 'ipc-answer-1',
+      destinationChildRelativePath: `task-${admitted.ref.identity.taskId}.answer`,
+      deliveredAt: '2026-08-30T20:01:01.000Z',
+      authorityEnvelopeBytes: Buffer.from('{"kind":"authority","sequence":1}'),
+      deliveryBytes: Buffer.from('{"taskId":"001-001","action":"continue"}'),
+    } as const;
+    const answered = store.publishNextWorkerIpcAnswerDelivery(answerInput);
+    expect(answered.cursor).toMatchObject({ state: 'answered', sequence: 1, nextSequence: 2 });
+    expect(store.publishNextWorkerIpcAnswerDelivery(answerInput)).toEqual(answered);
+
+    const restarted = openedStore(new InMemoryCustodyAdapter(shared));
+    const recovered = restarted.store.readWorkerIpcConversationCursor({
+      identity: admitted.ref.identity,
+      policy: taskPolicy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+      dispatchRequestId: admitted.ref.dispatchRequestId,
+    });
+    expect(recovered).toEqual(answered.cursor);
+    const second = captureNextIpcQuestion({
+      adapter: restarted.adapter,
+      store: restarted.store,
+      admissionRef: admitted.ref,
+      policy: taskPolicy,
+      cursor: recovered,
+      sequence: 2,
+      sourceEpoch: 2,
+    });
+    expect(second.cursor).toMatchObject({ state: 'question-open', sequence: 2 });
+    expect(second.question.artifactKey).toBe('ipc-question-2');
+  });
+
+  it('rejects IPC gaps, duplicate open questions, reused source epochs, and stale answer publishers', () => {
+    const { adapter, store } = openedStore();
+    const taskPolicy = policy();
+    const admitted = reserveDispatch({ store, policy: taskPolicy });
+    if (admitted.state !== 'admitted') throw new Error('dispatch admission missing');
+    const empty = store.readWorkerIpcConversationCursor({
+      identity: admitted.ref.identity,
+      policy: taskPolicy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+      dispatchRequestId: admitted.ref.dispatchRequestId,
+    });
+    expectHold(() => captureNextIpcQuestion({
+      adapter, store, admissionRef: admitted.ref, policy: taskPolicy, cursor: empty,
+      sequence: 2, sourceEpoch: 2,
+    }), 'ARTIFACT_REPLAY_MISMATCH');
+    const first = captureNextIpcQuestion({
+      adapter, store, admissionRef: admitted.ref, policy: taskPolicy, cursor: empty,
+      sequence: 1, sourceEpoch: 1,
+    });
+    expectHold(() => captureNextIpcQuestion({
+      adapter, store, admissionRef: admitted.ref, policy: taskPolicy, cursor: first.cursor,
+      sequence: 2, sourceEpoch: 2,
+    }), 'ARTIFACT_REPLAY_MISMATCH');
+    const access = store.openAttemptAccess({
+      identity: admitted.ref.identity,
+      policy: taskPolicy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+    });
+    if (access === null) throw new Error('attempt access missing');
+    const firstAnswer = {
+      identity: admitted.ref.identity,
+      policy: taskPolicy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+      dispatchRequestId: admitted.ref.dispatchRequestId,
+      access,
+      expectedCursorReceiptDigest: first.cursor.cursorReceiptDigest,
+      questionReceiptDigest: first.question.receiptDigest,
+      sequence: 1,
+      artifactKey: 'ipc-answer-1',
+      destinationChildRelativePath: `task-${admitted.ref.identity.taskId}.answer`,
+      deliveredAt: '2026-08-30T20:01:01.000Z',
+      authorityEnvelopeBytes: Buffer.from('{"kind":"authority","sequence":1}'),
+      deliveryBytes: Buffer.from('{"taskId":"001-001","action":"continue"}'),
+    } as const;
+    const answered = store.publishNextWorkerIpcAnswerDelivery(firstAnswer);
+    const publicationsBeforeStaleAnsweredReplay = adapter.publishBytesCalls;
+    expectHold(() => store.publishNextWorkerIpcAnswerDelivery({
+      ...firstAnswer,
+      expectedCursorReceiptDigest: repeatedDigest('f'),
+    }), 'ARTIFACT_REPLAY_MISMATCH');
+    expect(adapter.publishBytesCalls).toBe(publicationsBeforeStaleAnsweredReplay);
+    expectHold(() => captureNextIpcQuestion({
+      adapter, store, admissionRef: admitted.ref, policy: taskPolicy, cursor: answered.cursor,
+      sequence: 3, sourceEpoch: 3,
+    }), 'ARTIFACT_REPLAY_MISMATCH');
+    expectHold(() => captureNextIpcQuestion({
+      adapter, store, admissionRef: admitted.ref, policy: taskPolicy, cursor: answered.cursor,
+      sequence: 2, sourceEpoch: 1,
+    }), 'ARTIFACT_REPLAY_MISMATCH');
+    const second = captureNextIpcQuestion({
+      adapter, store, admissionRef: admitted.ref, policy: taskPolicy, cursor: answered.cursor,
+      sequence: 2, sourceEpoch: 2,
+    });
+    expectHold(() => store.publishNextWorkerIpcAnswerDelivery(firstAnswer),
+      'ARTIFACT_REPLAY_MISMATCH');
+    expect(second.cursor.sequence).toBe(2);
+  });
+
+  it('rejects deleted cursor prefixes, later-record gaps, and answered records without their open record', () => {
+    const buildTwoQuestionChain = () => {
+      const shared = memoryCustodyState();
+      const adapter = new InMemoryCustodyAdapter(shared);
+      const { store } = openedStore(adapter);
+      const taskPolicy = policy();
+      const admitted = reserveDispatch({ store, policy: taskPolicy });
+      if (admitted.state !== 'admitted') throw new Error('dispatch admission missing');
+      const empty = store.readWorkerIpcConversationCursor({
+        identity: admitted.ref.identity,
+        policy: taskPolicy,
+        admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+        dispatchRequestId: admitted.ref.dispatchRequestId,
+      });
+      const first = captureNextIpcQuestion({
+        adapter, store, admissionRef: admitted.ref, policy: taskPolicy, cursor: empty,
+        sequence: 1, sourceEpoch: 1,
+      });
+      const access = store.openAttemptAccess({
+        identity: admitted.ref.identity,
+        policy: taskPolicy,
+        admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+      });
+      if (access === null) throw new Error('attempt access missing');
+      const answered = store.publishNextWorkerIpcAnswerDelivery({
+        identity: admitted.ref.identity,
+        policy: taskPolicy,
+        admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+        dispatchRequestId: admitted.ref.dispatchRequestId,
+        access,
+        expectedCursorReceiptDigest: first.cursor.cursorReceiptDigest,
+        questionReceiptDigest: first.question.receiptDigest,
+        sequence: 1,
+        artifactKey: 'ipc-answer-1',
+        destinationChildRelativePath: `task-${admitted.ref.identity.taskId}.answer`,
+        deliveredAt: '2026-08-30T20:01:01.000Z',
+        authorityEnvelopeBytes: Buffer.from('{"kind":"authority","sequence":1}'),
+        deliveryBytes: Buffer.from('{"taskId":"001-001","action":"continue"}'),
+      });
+      captureNextIpcQuestion({
+        adapter, store, admissionRef: admitted.ref, policy: taskPolicy, cursor: answered.cursor,
+        sequence: 2, sourceEpoch: 2,
+      });
+      return { shared, adapter, admitted, taskPolicy };
+    };
+    const assertRestartHold = (
+      fixture: ReturnType<typeof buildTwoQuestionChain>,
+      suffix: string,
+    ) => {
+      fixture.adapter.removeFirst(suffix);
+      const restarted = openedStore(new InMemoryCustodyAdapter(fixture.shared));
+      expectHold(() => restarted.store.readWorkerIpcConversationCursor({
+        identity: fixture.admitted.ref.identity,
+        policy: fixture.taskPolicy,
+        admissionReceiptDigest: fixture.admitted.ref.admissionReceiptDigest,
+        dispatchRequestId: fixture.admitted.ref.dispatchRequestId,
+      }), 'CORRUPT_CUSTODY_RECORD');
+    };
+    assertRestartHold(
+      buildTwoQuestionChain(),
+      '/ipc-conversation/000001.question-open.json',
+    );
+    assertRestartHold(
+      buildTwoQuestionChain(),
+      '/ipc-conversation/000001.answered.json',
+    );
+    const unknownTail = buildTwoQuestionChain();
+    const cursorRecordPath = [...unknownTail.adapter.files.keys()].find(path => (
+      path.endsWith('/ipc-conversation/000002.question-open.json')
+    ));
+    if (cursorRecordPath === undefined) throw new Error('cursor fixture missing');
+    unknownTail.adapter.putWorkerOutput(
+      taskAttemptCustodyRelativePath(cursorRecordPath.replace(
+        '000002.question-open.json',
+        'unrecognized-tail.json',
+      )),
+      Buffer.from('{}'),
+    );
+    const restarted = openedStore(new InMemoryCustodyAdapter(unknownTail.shared));
+    expectHold(() => restarted.store.readWorkerIpcConversationCursor({
+      identity: unknownTail.admitted.ref.identity,
+      policy: unknownTail.taskPolicy,
+      admissionReceiptDigest: unknownTail.admitted.ref.admissionReceiptDigest,
+      dispatchRequestId: unknownTail.admitted.ref.dispatchRequestId,
+    }), 'CORRUPT_CUSTODY_RECORD');
+  });
+
+  it('settles the bounded final IPC sequence without exposing or publishing sequence max plus one', () => {
+    const adapter = new InMemoryCustodyAdapter();
+    const taskPolicy = policy();
+    // The generic fixture scan intentionally walks every in-memory Store file. Real adapters scan
+    // the dedicated directory handle, so index that directory here to measure the cursor algorithm
+    // rather than an unrelated O(all-artifacts) test-adapter implementation.
+    const cursorNames = new Set<string>();
+    let cursorDirectoryScans = 0;
+    const publishBytesFirstWriter = adapter.publishBytesFirstWriter.bind(adapter);
+    adapter.publishBytesFirstWriter = input => {
+      const publication = publishBytesFirstWriter(input);
+      const marker = '/ipc-conversation/';
+      const index = input.relativePath.indexOf(marker);
+      if (index >= 0) cursorNames.add(input.relativePath.slice(index + marker.length));
+      return publication;
+    };
+    const scanPrivateDirectoryBounded = adapter.scanPrivateDirectoryBounded.bind(adapter);
+    adapter.scanPrivateDirectoryBounded = input => {
+      if (!input.relativeDirectory.endsWith('/ipc-conversation')) {
+        return scanPrivateDirectoryBounded(input);
+      }
+      cursorDirectoryScans += 1;
+      const names = Object.freeze([...cursorNames].sort());
+      const identityDigest = taskAttemptCustodyDigest(
+        'test-ipc-directory-scan-identity',
+        { rootId: input.root.rootId, relativeDirectory: input.relativeDirectory },
+        taskPolicy.jsonBounds,
+      );
+      return createTaskAttemptCustodyDirectoryScanReceiptV2({
+        rootId: input.root.rootId,
+        relativeDirectory: input.relativeDirectory,
+        names,
+        entryCount: names.length,
+        maxEntries: input.maxEntries,
+        maxNameBytes: input.maxNameBytes,
+        deadlineUnixMs: input.deadlineUnixMs,
+        nativeMutationEvidence: 'DIRECTORY_IDENTITY_STABLE',
+        nativeDirectoryIdentityBeforeDigest: identityDigest,
+        nativeDirectoryIdentityAfterDigest: identityDigest,
+      });
+    };
+    // Store snapshots native capabilities at construction, so the bounded scan capability must be
+    // installed before opening it. This test deliberately proves all 256 durable question/answer
+    // transitions; its explicit budget reflects that finite boundary, not a production timeout.
+    const { store } = openedStore(adapter);
+    const admitted = reserveDispatch({ store, policy: taskPolicy });
+    if (admitted.state !== 'admitted') throw new Error('dispatch admission missing');
+    let cursor = store.readWorkerIpcConversationCursor({
+      identity: admitted.ref.identity,
+      policy: taskPolicy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+      dispatchRequestId: admitted.ref.dispatchRequestId,
+    });
+    const access = store.openAttemptAccess({
+      identity: admitted.ref.identity,
+      policy: taskPolicy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+    });
+    if (access === null) throw new Error('attempt access missing');
+    for (let sequence = 1;
+      sequence <= TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS;
+      sequence += 1) {
+      const captured = captureNextIpcQuestion({
+        adapter,
+        store,
+        admissionRef: admitted.ref,
+        policy: taskPolicy,
+        cursor,
+        sequence,
+        sourceEpoch: sequence,
+      });
+      const deliveredAt = new Date(Date.parse(captured.question.capturedAt) + 1).toISOString();
+      const answered = store.publishNextWorkerIpcAnswerDelivery({
+        identity: admitted.ref.identity,
+        policy: taskPolicy,
+        admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+        dispatchRequestId: admitted.ref.dispatchRequestId,
+        access,
+        expectedCursorReceiptDigest: captured.cursor.cursorReceiptDigest,
+        questionReceiptDigest: captured.question.receiptDigest,
+        sequence,
+        artifactKey: `ipc-answer-${sequence}`,
+        destinationChildRelativePath: `task-${admitted.ref.identity.taskId}.answer`,
+        deliveredAt,
+        authorityEnvelopeBytes: Buffer.from(`{"kind":"authority","sequence":${sequence}}`),
+        deliveryBytes: Buffer.from(`{"taskId":"001-001","action":"continue","sequence":${sequence}}`),
+      });
+      cursor = answered.cursor;
+      if (sequence < TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS) {
+        adapter.removeFirst(`/worker-output/task-${admitted.ref.identity.taskId}.answer`);
+      }
+    }
+    expect(cursor).toMatchObject({
+      state: 'answered',
+      sequence: TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS,
+      nextSequence: null,
+    });
+    const publicationCount = adapter.publishBytesCalls;
+    expectHold(() => captureNextIpcQuestion({
+      adapter,
+      store,
+      admissionRef: admitted.ref,
+      policy: taskPolicy,
+      cursor,
+      sequence: TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS + 1,
+      sourceEpoch: TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS + 1,
+    }), 'DISPATCH_REQUEST_INVALID');
+    expect(adapter.publishBytesCalls).toBe(publicationCount);
+    expect(cursorDirectoryScans).toBeGreaterThan(0);
+    expect(cursorDirectoryScans).toBeLessThanOrEqual(
+      TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS * 6 + 4,
+    );
+    expect(adapter.publishBytesCalls).toBeLessThanOrEqual(
+      TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS * 10,
+    );
+    expect(adapter.effectMarkerPublishCalls).toBeLessThanOrEqual(
+      TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS * 20,
+    );
+  }, 30_000);
+
+  it('does not recover cursor authority from first-writer bytes without a durable publication outcome', () => {
+    const shared = memoryCustodyState();
+    const adapter = new InMemoryCustodyAdapter(shared);
+    const { store } = openedStore(adapter);
+    const taskPolicy = policy();
+    const admitted = reserveDispatch({ store, policy: taskPolicy });
+    if (admitted.state !== 'admitted') throw new Error('dispatch admission missing');
+    const empty = store.readWorkerIpcConversationCursor({
+      identity: admitted.ref.identity,
+      policy: taskPolicy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+      dispatchRequestId: admitted.ref.dispatchRequestId,
+    });
+    adapter.failOutcomeForPublishedPathSuffix = '/ipc-conversation/000001.question-open.json';
+    expectHold(() => captureNextIpcQuestion({
+      adapter,
+      store,
+      admissionRef: admitted.ref,
+      policy: taskPolicy,
+      cursor: empty,
+      sequence: 1,
+      sourceEpoch: 1,
+    }), 'PUBLISHED_UNCONFIRMED');
+
+    const restarted = openedStore(new InMemoryCustodyAdapter(shared));
+    expectHold(() => restarted.store.readWorkerIpcConversationCursor({
+      identity: admitted.ref.identity,
+      policy: taskPolicy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+      dispatchRequestId: admitted.ref.dispatchRequestId,
+    }), 'RECONCILIATION_REQUIRED');
+    expectHold(() => restarted.store.readWorkerIpcQuestionOpenCursor({
+      identity: admitted.ref.identity,
+      policy: taskPolicy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+      dispatchRequestId: admitted.ref.dispatchRequestId,
+      sequence: 1,
+      cursorReceiptDigest: repeatedDigest('1'),
+    }), 'RECONCILIATION_REQUIRED');
   });
 
   it('binds fixed worker destination and immutable artifact key to the exact IPC sequence', () => {
@@ -4815,8 +5331,8 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
     }), 'CHAIN_PREDECESSOR_MISMATCH');
   });
 
-  it('builds an exact accepted-result to archive predecessor chain', () => {
-    const { store } = openedStore();
+  function completePredecessorChain() {
+    const { store, adapter } = openedStore();
     const taskPolicy = policy();
     const taskIdentity = identity();
     const admission = admit(store, taskIdentity, taskPolicy);
@@ -4850,6 +5366,7 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
       ['settlement', 'settlement-receipt'],
       ['archive', 'archive-receipt'],
     ] as const;
+    const artifacts = new Map<string, ReturnType<TaskAttemptCustodyStore['publishHostArtifact']>>();
     let predecessor = effectChain.receiptDigest;
     for (const [index, [stage, artifactClass]] of stages.entries()) {
       const capturedAt = new Date(
@@ -4884,9 +5401,70 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
         predecessorDigest: predecessor,
         artifactReceipt: artifact,
       });
+      artifacts.set(stage, artifact);
       predecessor = chain.receiptDigest;
     }
+    return { store, adapter, taskIdentity, taskPolicy, predecessor, artifacts };
+  }
+
+  it('builds an exact accepted-result to archive predecessor chain', () => {
+    const { store, taskIdentity, taskPolicy, predecessor } = completePredecessorChain();
     expect(store.readChain(taskIdentity, taskPolicy, 'archive')?.receiptDigest).toBe(predecessor);
+  });
+
+  it('reads each predecessor once at the late validation boundary without an exponential traversal', () => {
+    const { store, taskIdentity, taskPolicy, predecessor } = completePredecessorChain();
+    const original = store.readChain;
+    const calls = new Map<string, number>();
+    store.readChain = (...args) => {
+      calls.set(args[2], (calls.get(args[2]) ?? 0) + 1);
+      return Reflect.apply(original, store, args);
+    };
+    try {
+      expect(store.readChain(taskIdentity, taskPolicy, 'archive')?.receiptDigest).toBe(predecessor);
+      // Accepted-result independently validates its effect-landing binding as well.
+      expect(Object.fromEntries(calls)).toEqual({
+        archive: 1, settlement: 1, finalizer: 1, evaluation: 1,
+        'accepted-result': 1, 'effect-landing': 2,
+      });
+    } finally {
+      Reflect.deleteProperty(store, 'readChain');
+    }
+  });
+
+  it.each([
+    ['receipt', 'corrupt'], ['receipt', 'delete'],
+    ['artifact', 'corrupt'], ['artifact', 'delete'],
+  ] as const)('holds when current artifact IO changes the predecessor %s by %s before late validation', (target, mutation) => {
+    const { store, adapter, taskIdentity, taskPolicy, artifacts } = completePredecessorChain();
+    const current = artifacts.get('archive')!;
+    const previous = artifacts.get('settlement')!;
+    const suffix = target === 'receipt' ? '/05-settlement.json' : previous.artifact.relativePath;
+    let mutated = false;
+    // Store captures adapter methods on construction; arm the hook inside that method.
+    adapter.afterReadVerified = path => {
+      if (!mutated && path === current.artifact.relativePath) {
+        mutated = true;
+        if (mutation === 'delete') adapter.removeFirst(suffix);
+        else adapter.tamperFirst(suffix, Buffer.from('corrupt predecessor'));
+      }
+    };
+    try {
+      let caught: unknown;
+      try { store.readChain(taskIdentity, taskPolicy, 'archive'); }
+      catch (error) { caught = error; }
+      expect(mutated).toBe(true);
+      expect(caught).toBeInstanceOf(TaskAttemptCustodyHold);
+    } finally {
+      adapter.afterReadVerified = null;
+    }
+  });
+
+  it('does not reuse predecessor authority across top-level reads after tampering', () => {
+    const { store, adapter, taskIdentity, taskPolicy, predecessor } = completePredecessorChain();
+    expect(store.readChain(taskIdentity, taskPolicy, 'archive')?.receiptDigest).toBe(predecessor);
+    adapter.tamperFirst('/05-settlement.json', Buffer.from('changed after previous read'));
+    expect(() => store.readChain(taskIdentity, taskPolicy, 'archive')).toThrow(TaskAttemptCustodyHold);
   });
 
   it('rejects accepted-result bindings with a foreign attempt, landing transaction, or chain', () => {
@@ -5439,6 +6017,108 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
     expect(discovered.entries[0]?.state).toBe('reserved-pending-admission');
   });
 
+  it('reconciles a current reservation crash from the host-staged task snapshot', () => {
+    const adapter = new InMemoryCustodyAdapter();
+    const originalRead = adapter.readFirstWriter.bind(adapter);
+    let interruptAdmission = true;
+    adapter.readFirstWriter = input => {
+      if (interruptAdmission && input.relativePath.endsWith('/admission.json')) {
+        interruptAdmission = false;
+        throw Object.freeze({ code: 'E_EXEC_AUTH_NATIVE_READ_UNCONFIRMED' });
+      }
+      return originalRead(input);
+    };
+    const { store } = openedStore(adapter);
+    const taskPolicy = policy();
+    expectHold(() => reserveDispatch({ store, policy: taskPolicy }), 'CAPABILITY_UNVERIFIED');
+
+    const reconciled = store.reconcilePendingDispatchReservation({
+      dispatchRequestId: dispatchId(),
+      policy: taskPolicy,
+      recoveryAuthority: {
+        executionId: 'sprint-001',
+        taskId: 'sprint-001',
+        attemptId: 'sprint-001:recovery:0',
+        fenceToken: 'fence-current-reservation',
+        approvalRef: 'approval:current-reservation',
+        idempotencyKey: 'reconcile-current-reservation-once',
+      },
+      reconciledAt: '2026-08-30T20:01:00.000Z',
+    });
+
+    expect(reconciled.state).toBe('admitted');
+    expect(store.readDispatchAdmission({
+      dispatchRequestId: dispatchId(),
+      policy: taskPolicy,
+    }).state).toBe('admitted');
+  });
+
+  it('retires one legacy reservation before admission with append-only exact recovery authority', () => {
+    const adapter = new InMemoryCustodyAdapter();
+    const originalRead = adapter.readFirstWriter.bind(adapter);
+    let interruptAdmission = true;
+    adapter.readFirstWriter = input => {
+      if (interruptAdmission && input.relativePath.endsWith('/admission.json')) {
+        interruptAdmission = false;
+        throw Object.freeze({ code: 'E_EXEC_AUTH_NATIVE_READ_UNCONFIRMED' });
+      }
+      return originalRead(input);
+    };
+    const { store } = openedStore(adapter);
+    const taskPolicy = policy();
+    expectHold(() => reserveDispatch({ store, policy: taskPolicy }), 'CAPABILITY_UNVERIFIED');
+
+    for (const path of [...adapter.files.keys()]) {
+      if (path.endsWith('/task-snapshot-pending.json')
+        || path.endsWith('/reservation-transition.json')) {
+        adapter.files.delete(path);
+      }
+    }
+    const input = {
+      dispatchRequestId: dispatchId(),
+      policy: taskPolicy,
+      recoveryAuthority: {
+        executionId: 'sprint-001',
+        taskId: 'sprint-001',
+        attemptId: 'sprint-001:recovery:0',
+        fenceToken: 'fence-legacy-reservation',
+        approvalRef: 'approval:legacy-reservation',
+        idempotencyKey: 'retire-legacy-reservation-once',
+      },
+      reconciledAt: '2026-08-30T20:01:00.000Z',
+    } as const;
+    const retired = store.reconcilePendingDispatchReservation(input);
+    const replay = store.reconcilePendingDispatchReservation(input);
+
+    expect(retired).toEqual(replay);
+    expect(retired).toMatchObject({
+      state: 'retired-before-admission',
+      reservation: { dispatchRequestId: dispatchId() },
+      transition: {
+        recoveryAuthority: {
+          executionId: 'sprint-001',
+          approvalRef: 'approval:legacy-reservation',
+        },
+      },
+    });
+    expect(() => reserveDispatch({ store, policy: taskPolicy })).toThrow(
+      /DISPATCH_RESERVATION_RETIRED/u,
+    );
+    expect(store.listDispatchAdmissionsForRecovery({
+      policy: taskPolicy,
+      maxEntries: 32,
+      maxNameBytes: 128,
+      deadlineAt: '2099-09-01T00:00:00.000Z',
+    })).toMatchObject({
+      candidateCount: 1,
+      admittedCount: 0,
+      pendingAdmissionCount: 0,
+      retiredBeforeAdmissionCount: 1,
+      heldAdmissionCount: 0,
+      entries: [{ state: 'retired-before-admission' }],
+    });
+  });
+
   it('isolates an identity-bound unreadable admission during recovery without trusting or suppressing its valid sibling', () => {
     const adapter = new InMemoryCustodyAdapter();
     const { store } = openedStore(adapter);
@@ -5486,7 +6166,7 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
     ]);
     expect(recovered.heldAdmissions).toEqual([
       expect.objectContaining({
-        state: 'admission-hold',
+        state: 'admission-graph-hold',
         reservation: expect.objectContaining({
           dispatchRequestId: broken.ref.dispatchRequestId,
           identity: broken.ref.identity,
@@ -5499,6 +6179,101 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
     expect(Object.isFrozen(recovered.entries)).toBe(true);
     expect(Object.isFrozen(recovered.heldAdmissions)).toBe(true);
     expect(Object.isFrozen(recovered.heldAdmissions[0])).toBe(true);
+  });
+
+  it('quarantines only an old-epoch admitted no-effect terminal with append-only recovery authority', () => {
+    const state = memoryCustodyState();
+    const oldAdapter = new InMemoryCustodyAdapter(state);
+    const oldStore = openedStore(oldAdapter).store;
+    const taskPolicy = policy();
+    const admitted = reserveDispatch({ store: oldStore, policy: taskPolicy });
+    const durableNoEffect = publishNoEffectObservation({
+      store: oldStore,
+      admissionRef: admitted.ref,
+      policy: taskPolicy,
+    });
+    const terminal = oldStore.settleNotDispatched({
+      admissionRef: admitted.ref,
+      policy: taskPolicy,
+      reasonCode: 'PRE_MOUNT_ABORTED',
+      noEffectObservation: durableNoEffect,
+    });
+    const currentRoot = Object.freeze({
+      ...ROOT_PROOF,
+      rootId: repeatedDigest('8'),
+      directoryId: 'test-directory-current-epoch',
+      capabilityEvidenceDigest: repeatedDigest('9'),
+    });
+    const currentAdapter = new InMemoryCustodyAdapter(state, currentRoot);
+    const currentStore = openedStore(currentAdapter).store;
+    const scanInput = {
+      policy: taskPolicy,
+      maxEntries: 32,
+      maxNameBytes: 128,
+      deadlineAt: '2099-09-01T00:00:00.000Z',
+    } as const;
+    const held = currentStore.listDispatchAdmissionsForRecovery(scanInput);
+    expect(held).toMatchObject({
+      pendingAdmissionCount: 0,
+      heldAdmissionCount: 1,
+      quarantinedHistoricalAdmissionCount: 0,
+      heldAdmissions: [{
+        state: 'admission-graph-hold',
+        custodyHoldCode: 'CORRUPT_CUSTODY_RECORD',
+      }],
+    });
+    expect(() => currentStore.listDispatchAdmissions(scanInput))
+      .toThrowError(expect.objectContaining({ code: 'DISPATCH_DISCOVERY_TAMPERED_CANDIDATE' }));
+
+    const recoveryAuthority = {
+      executionId: 'sprint-001',
+      taskId: 'sprint-001',
+      attemptId: 'sprint-001:recovery:epoch-quarantine',
+      fenceToken: 'fence-old-epoch-quarantine',
+      approvalRef: 'approval:old-epoch-quarantine',
+      idempotencyKey: 'old-epoch-quarantine-once',
+    } as const;
+    const input = {
+      dispatchRequestId: admitted.ref.dispatchRequestId,
+      policy: taskPolicy,
+      recoveryAuthority,
+      quarantinedAt: '2026-08-30T20:02:00.000Z',
+      maxEntries: 32,
+      maxNameBytes: 128,
+      deadlineAt: '2099-09-01T00:00:00.000Z',
+    } as const;
+    const quarantined = currentStore.quarantineHistoricalNoEffectDispatchAdmission(input);
+    const replay = currentStore.quarantineHistoricalNoEffectDispatchAdmission(input);
+
+    expect(quarantined).toEqual(replay);
+    expect(quarantined).toMatchObject({
+      state: 'quarantined-historical-admission',
+      reservation: { receiptDigest: admitted.reservation.receiptDigest },
+      historicalAdmission: { receiptDigest: admitted.admission.receiptDigest },
+      historicalTerminal: { receiptDigest: terminal.receiptDigest, state: 'NOT_DISPATCHED' },
+      quarantine: {
+        state: 'QUARANTINED_NO_EFFECT_CUSTODY_EPOCH',
+        previousCustodyRootId: ROOT_PROOF.rootId,
+        currentCustodyRootId: currentRoot.rootId,
+        recoveryAuthority,
+      },
+    });
+    expect(currentAdapter.publishedPaths.filter(path => (
+      path.endsWith('/historical-admission-quarantine.json')
+    ))).toHaveLength(1);
+    expect(currentStore.listDispatchAdmissionsForRecovery(scanInput)).toMatchObject({
+      candidateCount: 1,
+      admittedCount: 0,
+      pendingAdmissionCount: 0,
+      heldAdmissionCount: 0,
+      quarantinedHistoricalAdmissionCount: 1,
+      entries: [{ state: 'quarantined-historical-admission' }],
+    });
+    expect(currentStore.listDispatchAdmissions(scanInput)).toMatchObject({
+      candidateCount: 1,
+      quarantinedHistoricalAdmissionCount: 1,
+      entries: [{ state: 'quarantined-historical-admission' }],
+    });
   });
 
   it('distinguishes malformed and hash-tampered dispatch discovery candidates', () => {
@@ -6155,6 +6930,14 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
     const providerExitBytes = Buffer.from(
       '{"waitStatus":"EXITED","inspectStatus":"STOPPED","exitCode":0}',
     );
+    const effectDiagnosticBytes = Buffer.from('{"schemaVersion":1,"kind":"effect-diagnostic-test","state":"HOLD"}');
+    expectHold(() => store.publishDispatchObservation({
+      admissionRef: admitted.ref,
+      policy: taskPolicy,
+      observationClass: 'EFFECT_DIAGNOSTIC',
+      observedAt: '2026-08-30T20:04:00.000Z',
+      bytes: effectDiagnosticBytes,
+    }), 'DISPATCH_TRANSITION_INVALID');
     expect(store.readDispatchObservationByClass({
       admissionRef: admitted.ref,
       policy: taskPolicy,
@@ -6345,6 +7128,40 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
       observedAt: '2026-08-30T20:04:00.000Z',
       bytes: providerExitBytes,
     });
+    expectHold(() => store.publishDispatchObservation({
+      admissionRef: admitted.ref,
+      policy: taskPolicy,
+      observationClass: 'EFFECT_DIAGNOSTIC',
+      observedAt: '2026-08-30T20:03:59.000Z',
+      bytes: effectDiagnosticBytes,
+    }), 'DISPATCH_AUTHORITY_INVALID');
+    const effectDiagnostic = store.publishDispatchObservation({
+      admissionRef: admitted.ref,
+      policy: taskPolicy,
+      observationClass: 'EFFECT_DIAGNOSTIC',
+      observedAt: '2026-08-30T20:04:01.000Z',
+      bytes: effectDiagnosticBytes,
+    });
+    expect(effectDiagnostic.admissionRefDigest).toBe(admitted.ref.refDigest);
+    expect(restarted.readDispatchObservationByClass({
+      admissionRef: reopened.ref, policy: taskPolicy, observationClass: 'EFFECT_DIAGNOSTIC',
+    })?.receipt).toEqual(effectDiagnostic);
+    expect(restarted.publishDispatchObservation({
+      admissionRef: reopened.ref, policy: taskPolicy, observationClass: 'EFFECT_DIAGNOSTIC',
+      observedAt: effectDiagnostic.observedAt, bytes: effectDiagnosticBytes,
+    })).toEqual(effectDiagnostic);
+    expectHold(() => restarted.publishDispatchObservation({
+      admissionRef: reopened.ref, policy: taskPolicy, observationClass: 'EFFECT_DIAGNOSTIC',
+      observedAt: effectDiagnostic.observedAt, bytes: Buffer.from('{"state":"SUCCESS"}'),
+    }), 'DISPATCH_AUTHORITY_CONFLICT');
+    expectHold(() => restarted.readDispatchObservation({
+      admissionRef: foreignAdmission.ref, policy: taskPolicy, observationClass: 'EFFECT_DIAGNOSTIC',
+      receiptDigest: effectDiagnostic.receiptDigest,
+    }), 'DISPATCH_RESERVATION_RECONCILIATION_REQUIRED');
+    // A diagnostic observation must not rewrite dispatch or manufacture result authority.
+    expect(restarted.readDispatchAuthority({
+      admissionRef: reopened.ref, policy: taskPolicy,
+    })).toMatchObject({ state: 'terminal', authority: released });
     const providerStreamBytes = Buffer.from('provider output after durable exit');
     const providerStream = restarted.publishProviderStreamCapture({
       admissionRef: reopened.ref,
@@ -6438,6 +7255,442 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
       policy: taskPolicy,
     }), 'DISPATCH_RESERVATION_RECONCILIATION_REQUIRED');
   });
+
+  async function startedFailedFixture(invalidExit?: 'container' | 'code' | 'payload' | 'digest') {
+    const state = memoryCustodyState();
+    const { store, adapter } = openedStore(new InMemoryCustodyAdapter(state));
+    const taskPolicy = policy();
+    const admitted = reserveDispatch({ store, policy: taskPolicy });
+    const access = store.openAttemptAccess({ identity: admitted.ref.identity,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest, policy: taskPolicy });
+    if (!access) throw new Error('missing attempt access');
+    const transfer = await store.consumeAttemptMountLease(store.issueAttemptMountLease({ access, policy: taskPolicy }));
+    if (!transfer.backendExecutionId || !transfer.backendImageDigest || !transfer.backendAuthorityLabelDigest) {
+      throw new Error('missing mount transfer evidence');
+    }
+    const gate = publishGateAckObservation({ store, admissionRef: admitted.ref, policy: taskPolicy });
+    const released = store.settleReleasedDispatch({ admissionRef: admitted.ref, policy: taskPolicy,
+      mountTransferReceipt: transfer, recordedAt: '2026-08-30T20:03:00.000Z',
+      releaseEvidence: {
+        containerId: transfer.backendExecutionId, imageDigest: transfer.backendImageDigest,
+        mountReceiptDigest: transfer.receiptDigest, mountTransferEvidenceDigest: transfer.transferEvidenceDigest,
+        daemonAuthorityLabelDigest: transfer.backendAuthorityLabelDigest,
+        releaseNonceDigest: repeatedDigest('1'), providerInvocationDigest: repeatedDigest('2'),
+        gateAckReceiptDigest: gate.receiptDigest, gateAckEvidenceDigest: gate.evidenceDigest,
+        releasedAt: '2026-08-30T20:02:00.000Z', ackMethod: 'HOST_RELEASE_GATE', ackStatus: 'ACKNOWLEDGED',
+      },
+    });
+    const common = { schemaVersion: 2, admissionRefDigest: admitted.ref.refDigest,
+      containerId: released.backendExecutionId, taskSnapshotSha256: admitted.admission.taskSnapshot.sha256,
+      providerInvocationDigest: released.releaseEvidence.providerInvocationDigest,
+      authorityLabelsDigest: released.releaseEvidence.daemonAuthorityLabelDigest,
+      executionCommitNonceSha256: repeatedDigest('a'),
+      providerExecutionAttemptId: released.providerExecutionAttempt.providerExecutionAttemptId,
+      providerExecutionAttemptIdentityDigest: released.providerExecutionAttempt.identityDigest,
+      dispatchReceiptDigest: released.receiptDigest, releaseReceiptRef: released.releaseReceiptDigest,
+      releaseReceiptDigest: released.releaseEvidenceDigest, projectionFence: released.projectionFence,
+      startAuthorizationDigest: repeatedDigest('b') };
+    const startBody = { ...common, kind: 'exact-docker-provider-start', providerStartNonceSha256: repeatedDigest('c'),
+      pid1StartAckDigest: repeatedDigest('d'), state: 'START_AUTHORIZATION_ACCEPTED', providerState: 'NOT_STARTED',
+      observedAt: '2026-08-30T20:03:00.000Z' };
+    const executionBody = { ...common, kind: 'exact-docker-pid1-provider-execution-ack',
+      providerStartAckBytesSha256: repeatedDigest('e'), childPid: 123, providerExecutionAckBytesSha256: repeatedDigest('f'),
+      state: 'PROVIDER_PROCESS_SPAWNED', providerState: 'STARTED', observedAt: '2026-08-30T20:03:01.000Z' };
+    const waitBody = { admissionRefDigest: admitted.ref.refDigest,
+      containerId: invalidExit === 'container' ? 'foreign-container' : released.backendExecutionId,
+      exitCode: invalidExit === 'code' ? 999 : 0, dockerWaitProcessExitCode: 0, dockerWaitSignal: null,
+      stdoutSha256: repeatedDigest('a'), stderrSha256: repeatedDigest('b'), observedAt: '2026-08-30T20:03:02.000Z' };
+    const exitBody = { schemaVersion: 2, kind: 'exact-docker-provider-exit', ...waitBody,
+      waitEvidenceDigest: invalidExit === 'digest' ? repeatedDigest('0')
+        : sha256(canonicalTaskAttemptCustodyJson(waitBody, taskPolicy.jsonBounds)) };
+    for (const [observationClass, body] of [['PROVIDER_START', startBody], ['PROVIDER_EXECUTION', executionBody],
+      ['PROVIDER_EXIT', exitBody]] as const) {
+      store.publishDispatchObservation({ admissionRef: admitted.ref, policy: taskPolicy, observationClass,
+        observedAt: body.observedAt, bytes: canonicalTaskAttemptCustodyJson(
+          observationClass === 'PROVIDER_EXIT' && invalidExit === 'payload' ? { exitCode: 0 } : body,
+          taskPolicy.jsonBounds,
+        ) });
+    }
+    const stream = store.publishProviderStreamCapture({ admissionRef: admitted.ref, policy: taskPolicy,
+      artifactKey: 'retained-stream', capturedAt: '2026-08-30T20:03:02.000Z',
+      bytes: Buffer.from('{"usage":{"input_tokens":123,"output_tokens":17}}') });
+    const input = { admissionRef: admitted.ref, policy: taskPolicy,
+      recoveryAuthority: { executionId: 'sprint-001', taskId: 'sprint-001',
+        attemptId: 'sprint-001:recovery:1', fenceToken: 'verified-fence',
+        approvalRef: 'owner:test', idempotencyKey: 'retain-started-failed-once' },
+      recordedAt: '2026-08-30T20:04:00.000Z', stoppedExecutionEvidenceDigest: repeatedDigest('c') };
+    return { state, store, adapter, taskPolicy, admitted, released, stream, input, exitBody };
+  }
+
+  async function committedReleasePendingFixture(
+    invalidExit?: 'container' | 'code' | 'payload' | 'digest',
+  ) {
+    const fixture = await startedFailedFixture(invalidExit);
+    const { store, taskPolicy, admitted } = fixture;
+    const publish = (
+      artifactClass: 'execution-effect-lifecycle-authority'
+        | 'execution-effect-landing-journal'
+        | 'execution-effect-landing-receipt-evidence'
+        | 'execution-effect-manifest',
+      artifactKey: string,
+      capturedAt: string,
+    ) => {
+      const bytes = canonicalTaskAttemptCustodyJson({ artifactClass, artifactKey }, taskPolicy.jsonBounds);
+      const receipt = store.publishHostArtifact({ identity: admitted.ref.identity, policy: taskPolicy,
+        admissionReceiptDigest: admitted.ref.admissionReceiptDigest, artifactClass, artifactKey,
+        capturedAt, bytes });
+      return { artifactClass, artifactKey, receiptDigest: receipt.receiptDigest,
+        contentDigest: receipt.artifact.sha256, byteLength: receipt.artifact.byteLength };
+    };
+    const evidence = {
+      phase: 'COMMITTED_JOURNAL_RELEASE_PENDING' as const,
+      landingRecoveryAnchor: publish('execution-effect-lifecycle-authority', 'landing-recovery-anchor',
+        '2026-08-30T20:03:03.000Z'),
+      readyLifecycle: publish('execution-effect-lifecycle-authority', 'ready-for-landing',
+        '2026-08-30T20:03:04.000Z'),
+      committedJournal: publish('execution-effect-landing-journal', 'committed-journal',
+        '2026-08-30T20:03:05.000Z'),
+      leaseEvidence: publish('execution-effect-landing-receipt-evidence', 'lease-evidence',
+        '2026-08-30T20:03:06.000Z'),
+      finalEvidence: publish('execution-effect-landing-receipt-evidence', 'final-evidence',
+        '2026-08-30T20:03:07.000Z'),
+      finalManifest: publish('execution-effect-manifest', 'final-manifest',
+        '2026-08-30T20:03:08.000Z'),
+      semanticVerifier: 'orchestra-required-v1' as const,
+      semanticEvidenceDigest: repeatedDigest('8'),
+    };
+    const input = {
+      admissionRef: admitted.ref,
+      policy: taskPolicy,
+      evidence,
+      recoveryAuthority: { executionId: 'sprint-001', taskId: 'sprint-001',
+        attemptId: 'sprint-001:recovery:committed', fenceToken: 'committed-fence',
+        approvalRef: 'owner:test-committed', idempotencyKey: 'retain-committed-once' },
+      recordedAt: '2026-08-30T20:04:00.000Z',
+      stoppedResourceEvidenceDigest: repeatedDigest('6'),
+      hostObservationDigest: repeatedDigest('7'),
+    };
+    return { ...fixture, startedInput: fixture.input, evidence, input };
+  }
+
+  it('retains committed-journal release-pending truth with complete immutable inventory', async () => {
+    const { state, store, adapter, taskPolicy, admitted, released, stream, evidence, input } =
+      await committedReleasePendingFixture();
+    const beforeFiles = new Map([...adapter.files].map(([path, file]) => [path, Buffer.from(file.bytes)]));
+    const candidate = store.inspectEffectCommittedReleasePendingCandidate({
+      admissionRef: admitted.ref,
+      policy: taskPolicy,
+      evidence,
+    });
+    expect(candidate).toMatchObject({ state: 'EFFECT_COMMITTED_RELEASE_PENDING_CANDIDATE',
+      identity: admitted.ref.identity, releasedDispatchReceiptDigest: released.receiptDigest, evidence });
+    expect(candidate.preservedArtifacts).toHaveLength(7);
+    expect(candidate.preservedArtifacts).toContainEqual({ artifactClass: stream.artifactClass,
+      artifactKey: stream.artifactKey, receiptDigest: stream.receiptDigest,
+      contentDigest: stream.artifact.sha256, byteLength: stream.artifact.byteLength });
+    for (const reference of [evidence.landingRecoveryAnchor, evidence.readyLifecycle,
+      evidence.committedJournal, evidence.leaseEvidence, evidence.finalEvidence, evidence.finalManifest]) {
+      expect(candidate.preservedArtifacts).toContainEqual(reference);
+    }
+    const retained = store.retainEffectCommittedReleasePendingDispatch(input);
+    expect(retained).toMatchObject({ state: 'COMMITTED_JOURNAL_RELEASE_PENDING',
+      identity: admitted.ref.identity, evidenceDigest: candidate.evidenceDigest,
+      preservationManifestDigest: candidate.preservationManifestDigest });
+    expect(store.retainEffectCommittedReleasePendingDispatch(input)).toEqual(retained);
+    const restarted = openedStore(new InMemoryCustodyAdapter(state)).store;
+    expect(restarted.readEffectCommittedReleasePendingDispatch({ admissionRef: admitted.ref,
+      policy: taskPolicy })).toEqual(retained);
+    expect(restarted.readDispatchAuthority({ admissionRef: admitted.ref, policy: taskPolicy }))
+      .toMatchObject({ state: 'terminal', authority: { state: 'RELEASED', attemptCount: 1 } });
+    for (const [path, bytes] of beforeFiles) expect(Buffer.from(adapter.files.get(path)!.bytes)).toEqual(bytes);
+    expect(adapter.files.size).toBe(beforeFiles.size + 1);
+    expectHold(() => restarted.publishHostArtifact({ identity: admitted.ref.identity, policy: taskPolicy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest, artifactClass: 'host-work-attribution',
+      artifactKey: 'late-accepted-work', capturedAt: input.recordedAt, bytes: Buffer.from('{}') }),
+    'DISPATCH_TRANSITION_INVALID');
+    expectHold(() => restarted.publishDispatchObservation({ admissionRef: admitted.ref, policy: taskPolicy,
+      observationClass: 'EFFECT_DIAGNOSTIC', observedAt: input.recordedAt,
+      bytes: Buffer.from('{"state":"late"}') }), 'DISPATCH_TRANSITION_INVALID');
+  });
+
+  it('rejects partial artifact publication and binds recovery time after committed evidence', async () => {
+    const partial = await committedReleasePendingFixture();
+    partial.store.publishHostArtifact({ identity: partial.admitted.ref.identity, policy: partial.taskPolicy,
+      admissionReceiptDigest: partial.admitted.ref.admissionReceiptDigest,
+      artifactClass: 'host-work-attribution', artifactKey: 'partial-publication',
+      capturedAt: '2026-08-30T20:03:09.000Z', bytes: Buffer.from('{}') });
+    partial.adapter.removeFirst('/artifacts/host-work-attribution/partial-publication.receipt.json');
+    expectHold(() => partial.store.retainEffectCommittedReleasePendingDispatch(partial.input),
+      'INCOMPLETE_PUBLICATION');
+
+    const stale = await committedReleasePendingFixture();
+    expectHold(() => stale.store.retainEffectCommittedReleasePendingDispatch({
+      ...stale.input,
+      recordedAt: '2026-08-30T20:03:07.000Z',
+    }), 'DISPATCH_REQUEST_INVALID');
+  });
+
+  it.each(['execution-workspace-release', 'execution-effect-landing-receipt', 'canonical-accepted-result',
+    'production-wiring-host-settlement', 'evaluation-receipt', 'finalizer-receipt',
+    'settlement-receipt', 'archive-receipt'] as const)(
+    'refuses committed release-pending disposition when forbidden %s directory exists empty',
+    async (artifactClass) => {
+      const { adapter, store, admitted, input } = await committedReleasePendingFixture();
+      const path = taskAttemptCustodyArtifactDataRelativePath({ identity: admitted.ref.identity,
+        artifactClass, artifactKey: 'forbidden' });
+      adapter.ensurePrivateDirectory(ROOT_PROOF,
+        taskAttemptCustodyRelativePath(path.slice(0, path.lastIndexOf('/'))));
+      expectHold(() => store.retainEffectCommittedReleasePendingDispatch(input),
+        'DISPATCH_TRANSITION_INVALID');
+    },
+  );
+
+  it('requires an exactly empty chain and exact structural evidence refs', async () => {
+    const chained = await committedReleasePendingFixture();
+    const artifactPath = taskAttemptCustodyArtifactDataRelativePath({ identity: chained.admitted.ref.identity,
+      artifactClass: 'execution-effect-manifest', artifactKey: 'final-manifest' });
+    const prefix = artifactPath.slice(0, artifactPath.indexOf('/artifacts/'));
+    chained.adapter.ensurePrivateDirectory(ROOT_PROOF,
+      taskAttemptCustodyRelativePath(`${prefix}/chain/unknown-future-stage`));
+    expectHold(() => chained.store.retainEffectCommittedReleasePendingDispatch(chained.input),
+      'DISPATCH_TRANSITION_INVALID');
+
+    const tampered = await committedReleasePendingFixture();
+    expectHold(() => tampered.store.inspectEffectCommittedReleasePendingCandidate({
+      admissionRef: tampered.admitted.ref,
+      policy: tampered.taskPolicy,
+      evidence: { ...tampered.evidence, finalManifest: {
+        ...tampered.evidence.finalManifest,
+        contentDigest: repeatedDigest('0'),
+      } },
+    }), 'ARTIFACT_REPLAY_MISMATCH');
+    expectHold(() => tampered.store.inspectEffectCommittedReleasePendingCandidate({
+      admissionRef: tampered.admitted.ref,
+      policy: tampered.taskPolicy,
+      evidence: { ...tampered.evidence, unexpected: true },
+    } as never), 'DISPATCH_AUTHORITY_INVALID');
+
+    const unknownArtifact = await committedReleasePendingFixture();
+    const unknownArtifactPath = taskAttemptCustodyArtifactDataRelativePath({
+      identity: unknownArtifact.admitted.ref.identity,
+      artifactClass: 'execution-effect-manifest',
+      artifactKey: 'final-manifest',
+    });
+    const unknownArtifactPrefix = unknownArtifactPath.slice(0, unknownArtifactPath.indexOf('/artifacts/'));
+    unknownArtifact.adapter.ensurePrivateDirectory(ROOT_PROOF,
+      taskAttemptCustodyRelativePath(`${unknownArtifactPrefix}/artifacts/unknown-artifact-class`));
+    expectHold(() => unknownArtifact.store.retainEffectCommittedReleasePendingDispatch(
+      unknownArtifact.input,
+    ), 'DISPATCH_TRANSITION_INVALID');
+  });
+
+  it('rejects stale/sibling authority, provider-observation substitution and disposition conflicts', async () => {
+    const authority = await committedReleasePendingFixture();
+    expectHold(() => authority.store.retainEffectCommittedReleasePendingDispatch({
+      ...authority.input,
+      recoveryAuthority: { ...authority.input.recoveryAuthority,
+        executionId: 'sprint-002', taskId: 'sprint-002' },
+    }), 'DISPATCH_REQUEST_INVALID');
+    authority.store.retainEffectCommittedReleasePendingDispatch(authority.input);
+    expectHold(() => authority.store.retainEffectCommittedReleasePendingDispatch({
+      ...authority.input,
+      recoveryAuthority: { ...authority.input.recoveryAuthority, fenceToken: 'foreign-fence' },
+    }), 'DISPATCH_REQUEST_CONFLICT');
+    expectHold(() => authority.store.retainStartedFailedDispatch(authority.startedInput),
+      'DISPATCH_TRANSITION_INVALID');
+    expectHold(() => authority.store.readEffectCommittedReleasePendingDispatch({
+      admissionRef: authority.admitted.ref,
+      policy: authority.taskPolicy,
+      unexpected: true,
+    } as never), 'DISPATCH_AUTHORITY_INVALID');
+
+    const provider = await committedReleasePendingFixture('container');
+    expectHold(() => provider.store.retainEffectCommittedReleasePendingDispatch(provider.input),
+      'DISPATCH_AUTHORITY_INVALID');
+    const sibling = reserveDispatch({ store: provider.store, policy: provider.taskPolicy,
+      requestId: dispatchId('2') });
+    expect(provider.store.readEffectCommittedReleasePendingDispatch({ admissionRef: sibling.ref,
+      policy: provider.taskPolicy })).toBeNull();
+  });
+
+  async function realStoreEffectDiagnosticFixture() {
+    const fixture = await startedFailedFixture();
+    const { store, taskPolicy, admitted, exitBody } = fixture;
+    const scope = { store, policy: taskPolicy, admissionRef: admitted.ref, identity: admitted.ref.identity };
+    const exit = store.readDispatchObservationByClass({ admissionRef: admitted.ref,
+      policy: taskPolicy, observationClass: 'PROVIDER_EXIT' });
+    if (!exit) throw new Error('missing real Store provider exit observation');
+    const providerExit: ExactDockerProviderExitObservationRefV2 = {
+      containerId: exitBody.containerId, exitCode: exitBody.exitCode, observedAt: exitBody.observedAt,
+      waitEvidenceDigest: exitBody.waitEvidenceDigest, observationReceiptDigest: exit.receipt.receiptDigest,
+      observationEvidenceDigest: exit.receipt.evidenceDigest,
+    };
+    // Exercise the production publisher AND reader, with no fake receipt/hash or Docker process.
+    const backend = new DockerSpawnBackend(CANONICAL_PROJECT_ROOT, {
+      custodyStateDir: '/test/state', nowIso: () => '2026-08-30T20:03:03.000Z',
+    }) as unknown as {
+      publishExactDockerEffectDiagnostic(preparedScope: typeof scope, providerExit: ExactDockerProviderExitObservationRefV2,
+        failure: ExactDockerEffectFailureV1): ExactDockerEffectDiagnosticRefV1;
+      readExactDockerEffectDiagnostic(preparedScope: typeof scope,
+        providerExit: ExactDockerProviderExitObservationRefV2): ExactDockerEffectDiagnosticRefV1 | null;
+    };
+    const failure: ExactDockerEffectFailureV1 = { state: 'HOLD', phase: 'LANDING',
+      stage: 'LANDING_PREPARE', code: 'PREIMAGE_MISMATCH', sourceEvidenceDigest: repeatedDigest('b'), capture: null };
+    return { ...fixture, scope, providerExit, backend, failure };
+  }
+
+  it('roundtrips real Store domain-separated EFFECT_DIAGNOSTIC through the Docker publisher and reader', async () => {
+    const { store, scope, providerExit, backend, failure } = await realStoreEffectDiagnosticFixture();
+    expect(backend.readExactDockerEffectDiagnostic(scope, providerExit)).toBeNull();
+    const diagnostic = backend.publishExactDockerEffectDiagnostic(scope, providerExit, failure);
+    const observed = store.readDispatchObservation({ admissionRef: scope.admissionRef, policy: scope.policy,
+      observationClass: 'EFFECT_DIAGNOSTIC', receiptDigest: diagnostic.observationReceiptDigest });
+    // A raw-SHA receipt stub masks the production bug: the Store deliberately hashes a bound claim.
+    expect(observed.receipt.evidenceDigest).not.toBe(sha256(observed.bytes));
+    expect(diagnostic).toMatchObject({ identity: scope.identity, admissionRefDigest: scope.admissionRef.refDigest,
+      providerExitObservationReceiptDigest: providerExit.observationReceiptDigest, failure,
+      observationEvidenceDigest: observed.receipt.evidenceDigest });
+    expect(backend.readExactDockerEffectDiagnostic(scope, providerExit)).toEqual(diagnostic);
+    expect(backend.publishExactDockerEffectDiagnostic(scope, providerExit,
+      { ...failure, code: 'LATER_FAILURE' })).toEqual(diagnostic);
+  });
+
+  it('keeps sibling and byte-tampered diagnostics on HOLD through the real Store boundary', async () => {
+    const { store, adapter, scope, providerExit, backend, failure } = await realStoreEffectDiagnosticFixture();
+    const diagnostic = backend.publishExactDockerEffectDiagnostic(scope, providerExit, failure);
+    const sibling = reserveDispatch({ store, policy: scope.policy, requestId: dispatchId('2') });
+    expect(() => store.readDispatchObservation({ admissionRef: sibling.ref, policy: scope.policy,
+      observationClass: 'EFFECT_DIAGNOSTIC', receiptDigest: diagnostic.observationReceiptDigest }))
+      .toThrow(TaskAttemptCustodyHold);
+    // This is still a parseable same-length payload: only the durable byte binding can reject it.
+    const observed = store.readDispatchObservation({ admissionRef: scope.admissionRef, policy: scope.policy,
+      observationClass: 'EFFECT_DIAGNOSTIC', receiptDigest: diagnostic.observationReceiptDigest });
+    adapter.tamperFirst('/observations/effect-diagnostic/observation.bin',
+      Buffer.from(Buffer.from(observed.bytes).toString('utf8').replace('PREIMAGE_MISMATCH', 'PREIMAGE_MISMATCI')));
+    expect(() => backend.readExactDockerEffectDiagnostic(scope, providerExit)).toThrow(TaskAttemptCustodyHold);
+    expect(() => backend.publishExactDockerEffectDiagnostic(scope, providerExit, failure)).toThrow(TaskAttemptCustodyHold);
+  });
+
+  it('rejects a cryptographically intact diagnostic carrying a sibling identity', async () => {
+    const { store, scope, providerExit, backend, failure } = await realStoreEffectDiagnosticFixture();
+    const sibling = reserveDispatch({ store, policy: scope.policy, requestId: dispatchId('2') });
+    const receipt = store.publishDispatchObservation({ admissionRef: scope.admissionRef, policy: scope.policy,
+      observationClass: 'EFFECT_DIAGNOSTIC', observedAt: '2026-08-30T20:03:03.000Z',
+      bytes: canonicalTaskAttemptCustodyJson({ schemaVersion: 1, kind: 'exact-docker-effect-diagnostic',
+        identity: sibling.ref.identity, admissionRefDigest: scope.admissionRef.refDigest,
+        providerExitObservationReceiptDigest: providerExit.observationReceiptDigest, failure,
+        observedAt: '2026-08-30T20:03:03.000Z' }, scope.policy.jsonBounds) });
+    expect(store.readDispatchObservation({ admissionRef: scope.admissionRef, policy: scope.policy,
+      observationClass: 'EFFECT_DIAGNOSTIC', receiptDigest: receipt.receiptDigest }).receipt).toEqual(receipt);
+    expect(() => backend.readExactDockerEffectDiagnostic(scope, providerExit))
+      .toThrow('EXACT_DOCKER_OBSERVATION_REREAD_INVALID');
+  });
+
+  it('preserves READY lifecycle artifact bytes and a real diagnostic in a failed-unlanded candidate', async () => {
+    const { state, store, scope, input, providerExit, backend, failure } = await realStoreEffectDiagnosticFixture();
+    const before = store.inspectStartedFailedDispatchCandidate({ admissionRef: scope.admissionRef, policy: scope.policy });
+    const diagnostic = backend.publishExactDockerEffectDiagnostic(scope, providerExit, failure);
+    // The Store owns custody, not lifecycle semantics. This opaque fixture tests byte preservation;
+    // it is deliberately not evidence of a validated native READY authority or permission to land.
+    const readyBytes = canonicalTaskAttemptCustodyJson({ state: 'READY_FOR_LANDING',
+      identity: scope.identity, finalManifestDigest: repeatedDigest('e') }, scope.policy.jsonBounds);
+    const ready = store.publishHostArtifact({ identity: scope.identity, policy: scope.policy,
+      admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+      artifactClass: 'execution-effect-lifecycle-authority', artifactKey: 'ready-for-landing',
+      capturedAt: '2026-08-30T20:03:03.000Z', bytes: readyBytes });
+    const candidate = store.inspectStartedFailedDispatchCandidate({ admissionRef: scope.admissionRef, policy: scope.policy });
+    expect(candidate.preservationManifestDigest).not.toBe(before.preservationManifestDigest);
+    expect(candidate.preservedArtifacts).toContainEqual({ artifactClass: ready.artifactClass,
+      artifactKey: ready.artifactKey, receiptDigest: ready.receiptDigest,
+      contentDigest: sha256(readyBytes), byteLength: readyBytes.byteLength });
+    const retained = store.retainStartedFailedDispatch(input);
+    const restarted = openedStore(new InMemoryCustodyAdapter(state)).store;
+    expect(restarted.readStartedFailedDispatch({ admissionRef: scope.admissionRef, policy: scope.policy })).toEqual(retained);
+    expect(retained.evidenceDigest).toBe(candidate.evidenceDigest);
+    expect(backend.readExactDockerEffectDiagnostic({ ...scope, store: restarted }, providerExit)).toEqual(diagnostic);
+    expect(restarted.readDispatchAuthority({ admissionRef: scope.admissionRef, policy: scope.policy }))
+      .toMatchObject({ state: 'terminal', authority: { state: 'RELEASED', attemptCount: 1 } });
+  });
+
+  it('retains started failure without erasing usage or reclassifying RELEASED as no-effect', async () => {
+    const { state, store, adapter, taskPolicy, admitted, released, stream, input } = await startedFailedFixture();
+    const beforeFiles = new Map([...adapter.files].map(([path, file]) => [path, Buffer.from(file.bytes)]));
+    const candidate = store.inspectStartedFailedDispatchCandidate({ admissionRef: admitted.ref, policy: taskPolicy });
+    expect(candidate.preservedArtifacts).toContainEqual({ artifactClass: 'pristine-provider-stream',
+      artifactKey: stream.artifactKey, receiptDigest: stream.receiptDigest,
+      contentDigest: stream.artifact.sha256, byteLength: stream.artifact.byteLength });
+    const disposition = store.retainStartedFailedDispatch(input);
+    expect(disposition).toMatchObject({ state: 'STARTED_FAILED_RETAINED', identity: admitted.ref.identity,
+      evidenceDigest: candidate.evidenceDigest, releasedDispatchReceiptDigest: released.receiptDigest });
+    expect(store.retainStartedFailedDispatch(input)).toEqual(disposition);
+    const restarted = openedStore(new InMemoryCustodyAdapter(state)).store;
+    expect(restarted.readStartedFailedDispatch({ admissionRef: admitted.ref, policy: taskPolicy })).toEqual(disposition);
+    expect(restarted.readDispatchAuthority({ admissionRef: admitted.ref, policy: taskPolicy }))
+      .toMatchObject({ state: 'terminal', authority: { state: 'RELEASED', attemptCount: 1 } });
+    for (const [path, bytes] of beforeFiles) expect(Buffer.from(adapter.files.get(path)!.bytes)).toEqual(bytes);
+    expect(adapter.files.size).toBe(beforeFiles.size + 1);
+    expectHold(() => restarted.publishDispatchObservation({ admissionRef: admitted.ref, policy: taskPolicy,
+      observationClass: 'EFFECT_DIAGNOSTIC', observedAt: input.recordedAt, bytes: Buffer.from('{"state":"HOLD"}') }),
+    'DISPATCH_TRANSITION_INVALID');
+    expectHold(() => restarted.publishHostArtifact({ identity: admitted.ref.identity, policy: taskPolicy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest, artifactClass: 'execution-effect-landing-journal',
+      artifactKey: 'forbidden-late-landing', capturedAt: input.recordedAt, bytes: Buffer.from('{}') }),
+    'DISPATCH_TRANSITION_INVALID');
+    expectHold(() => restarted.publishProviderStreamCapture({ admissionRef: admitted.ref, policy: taskPolicy,
+      artifactKey: 'rewritten-usage', capturedAt: '2026-08-30T20:03:02.000Z', bytes: Buffer.from('zero') }),
+    'DISPATCH_TRANSITION_INVALID');
+  });
+
+  it.each(['execution-effect-landing-journal', 'execution-effect-landing-receipt-evidence',
+    'execution-effect-landing-receipt', 'canonical-accepted-result', 'execution-workspace-release'] as const)(
+    'refuses started-failed disposition even for an empty %s directory', async (artifactClass) => {
+      const { adapter, store, input, admitted } = await startedFailedFixture();
+      const path = taskAttemptCustodyArtifactDataRelativePath({ identity: admitted.ref.identity, artifactClass, artifactKey: 'pending' });
+      adapter.ensurePrivateDirectory(ROOT_PROOF, taskAttemptCustodyRelativePath(path.slice(0, path.lastIndexOf('/'))));
+      expectHold(() => store.retainStartedFailedDispatch(input), 'DISPATCH_TRANSITION_INVALID');
+      expect(store.readStartedFailedDispatch({ admissionRef: admitted.ref, policy: input.policy })).toBeNull();
+    },
+  );
+
+  it('rejects stale authority replay, foreign identity, corrupt evidence and an old custody epoch', async () => {
+    const { state, adapter, store, input, admitted, taskPolicy } = await startedFailedFixture();
+    expectHold(() => store.retainStartedFailedDispatch({ ...input, recoveryAuthority: {
+      ...input.recoveryAuthority, executionId: 'sprint-002', taskId: 'sprint-002',
+    } }), 'DISPATCH_REQUEST_INVALID');
+    expectHold(() => store.retainStartedFailedDispatch({ ...input, recordedAt: '2026-08-30T20:00:00.000Z' }), 'DISPATCH_REQUEST_INVALID');
+    store.retainStartedFailedDispatch(input);
+    expectHold(() => store.retainStartedFailedDispatch({ ...input, recoveryAuthority: {
+      ...input.recoveryAuthority, fenceToken: 'different-fence',
+    } }), 'DISPATCH_REQUEST_CONFLICT');
+    const sibling = reserveDispatch({ store, policy: taskPolicy, requestId: dispatchId('2') });
+    expect(store.readStartedFailedDispatch({ admissionRef: sibling.ref, policy: taskPolicy })).toBeNull();
+    const differentRootAdapter = new InMemoryCustodyAdapter(state);
+    const openRoot = differentRootAdapter.openRoot.bind(differentRootAdapter);
+    differentRootAdapter.openRoot = options => ({ ...openRoot(options), rootId: repeatedDigest('e') });
+    const differentRootStore = openedStore(differentRootAdapter).store;
+    expect(() => differentRootStore.readStartedFailedDispatch({ admissionRef: admitted.ref, policy: taskPolicy })).toThrow(TaskAttemptCustodyHold);
+    adapter.tamperFirst('/started-failed-retained.json', Buffer.from('{"state":"SUCCESS"}'));
+    expect(() => store.readStartedFailedDispatch({ admissionRef: admitted.ref, policy: taskPolicy })).toThrow(TaskAttemptCustodyHold);
+    expect(() => store.publishHostArtifact({ identity: admitted.ref.identity, policy: taskPolicy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest, artifactClass: 'host-work-attribution',
+      artifactKey: 'late-result', capturedAt: input.recordedAt, bytes: Buffer.from('{}') })).toThrow(TaskAttemptCustodyHold);
+  });
+
+  it('does not invent started-failed authority from a reservation without provider execution', () => {
+    const { store } = openedStore();
+    const taskPolicy = policy();
+    const admitted = reserveDispatch({ store, policy: taskPolicy });
+    expectHold(() => store.inspectStartedFailedDispatchCandidate({ admissionRef: admitted.ref, policy: taskPolicy }),
+      'DISPATCH_TRANSITION_INVALID');
+  });
+
+  it.each(['container', 'code', 'payload', 'digest'] as const)(
+    'rejects semantically invalid provider exit despite a valid observation receipt (%s)', async (invalidExit) => {
+      const { store, input } = await startedFailedFixture(invalidExit);
+      expectHold(() => store.retainStartedFailedDispatch(input), 'DISPATCH_AUTHORITY_INVALID');
+      expect(store.readStartedFailedDispatch({ admissionRef: input.admissionRef, policy: input.policy })).toBeNull();
+    },
+  );
 
   it('settles proven NOT_DISPATCHED at zero public attempts and blocks later mount', () => {
     const { adapter, store } = openedStore();
@@ -6949,6 +8202,191 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
         observedAt: '2026-08-30T20:04:00.000Z',
       },
     }), 'DISPATCH_AUTHORITY_CONFLICT');
+  });
+
+  async function startedFailedFixture(invalidExit?: 'container' | 'code' | 'payload' | 'digest') {
+    const state = memoryCustodyState();
+    const { store, adapter } = openedStore(new InMemoryCustodyAdapter(state));
+    const taskPolicy = policy();
+    const admitted = reserveDispatch({ store, policy: taskPolicy });
+    const access = store.openAttemptAccess({ identity: admitted.ref.identity,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest, policy: taskPolicy });
+    if (!access) throw new Error('missing attempt access');
+    const transfer = await store.consumeAttemptMountLease(store.issueAttemptMountLease({ access, policy: taskPolicy }));
+    if (!transfer.backendExecutionId || !transfer.backendImageDigest || !transfer.backendAuthorityLabelDigest) {
+      throw new Error('missing mount transfer evidence');
+    }
+    const gate = publishGateAckObservation({ store, admissionRef: admitted.ref, policy: taskPolicy });
+    const released = store.settleReleasedDispatch({ admissionRef: admitted.ref, policy: taskPolicy,
+      mountTransferReceipt: transfer, recordedAt: '2026-08-30T20:03:00.000Z',
+      releaseEvidence: {
+        containerId: transfer.backendExecutionId, imageDigest: transfer.backendImageDigest,
+        mountReceiptDigest: transfer.receiptDigest, mountTransferEvidenceDigest: transfer.transferEvidenceDigest,
+        daemonAuthorityLabelDigest: transfer.backendAuthorityLabelDigest,
+        releaseNonceDigest: repeatedDigest('1'), providerInvocationDigest: repeatedDigest('2'),
+        gateAckReceiptDigest: gate.receiptDigest, gateAckEvidenceDigest: gate.evidenceDigest,
+        releasedAt: '2026-08-30T20:02:00.000Z', ackMethod: 'HOST_RELEASE_GATE', ackStatus: 'ACKNOWLEDGED',
+      },
+    });
+    const common = { schemaVersion: 2, admissionRefDigest: admitted.ref.refDigest,
+      containerId: released.backendExecutionId, taskSnapshotSha256: admitted.admission.taskSnapshot.sha256,
+      providerInvocationDigest: released.releaseEvidence.providerInvocationDigest,
+      authorityLabelsDigest: released.releaseEvidence.daemonAuthorityLabelDigest,
+      executionCommitNonceSha256: repeatedDigest('a'),
+      providerExecutionAttemptId: released.providerExecutionAttempt.providerExecutionAttemptId,
+      providerExecutionAttemptIdentityDigest: released.providerExecutionAttempt.identityDigest,
+      dispatchReceiptDigest: released.receiptDigest, releaseReceiptRef: released.releaseReceiptDigest,
+      releaseReceiptDigest: released.releaseEvidenceDigest, projectionFence: released.projectionFence,
+      startAuthorizationDigest: repeatedDigest('b') };
+    const startBody = { ...common, kind: 'exact-docker-provider-start', providerStartNonceSha256: repeatedDigest('c'),
+      pid1StartAckDigest: repeatedDigest('d'), state: 'START_AUTHORIZATION_ACCEPTED', providerState: 'NOT_STARTED',
+      observedAt: '2026-08-30T20:03:00.000Z' };
+    const executionBody = { ...common, kind: 'exact-docker-pid1-provider-execution-ack',
+      providerStartAckBytesSha256: repeatedDigest('e'), childPid: 123, providerExecutionAckBytesSha256: repeatedDigest('f'),
+      state: 'PROVIDER_PROCESS_SPAWNED', providerState: 'STARTED', observedAt: '2026-08-30T20:03:01.000Z' };
+    const waitBody = { admissionRefDigest: admitted.ref.refDigest,
+      containerId: invalidExit === 'container' ? 'foreign-container' : released.backendExecutionId,
+      exitCode: invalidExit === 'code' ? 999 : 0, dockerWaitProcessExitCode: 0, dockerWaitSignal: null,
+      stdoutSha256: repeatedDigest('a'), stderrSha256: repeatedDigest('b'), observedAt: '2026-08-30T20:03:02.000Z' };
+    const exitBody = { schemaVersion: 2, kind: 'exact-docker-provider-exit', ...waitBody,
+      waitEvidenceDigest: invalidExit === 'digest' ? repeatedDigest('0')
+        : sha256(canonicalTaskAttemptCustodyJson(waitBody, taskPolicy.jsonBounds)) };
+    for (const [observationClass, body] of [['PROVIDER_START', startBody], ['PROVIDER_EXECUTION', executionBody],
+      ['PROVIDER_EXIT', exitBody]] as const) {
+      store.publishDispatchObservation({ admissionRef: admitted.ref, policy: taskPolicy, observationClass,
+        observedAt: body.observedAt, bytes: canonicalTaskAttemptCustodyJson(
+          observationClass === 'PROVIDER_EXIT' && invalidExit === 'payload' ? { exitCode: 0 } : body,
+          taskPolicy.jsonBounds,
+        ) });
+    }
+    const stream = store.publishProviderStreamCapture({ admissionRef: admitted.ref, policy: taskPolicy,
+      artifactKey: 'retained-stream', capturedAt: '2026-08-30T20:03:02.000Z',
+      bytes: Buffer.from('{"usage":{"input_tokens":123,"output_tokens":17}}') });
+    const input = { admissionRef: admitted.ref, policy: taskPolicy,
+      recoveryAuthority: { executionId: 'sprint-001', taskId: 'sprint-001',
+        attemptId: 'sprint-001:recovery:1', fenceToken: 'verified-fence',
+        approvalRef: 'owner:test', idempotencyKey: 'retain-started-failed-once' },
+      recordedAt: '2026-08-30T20:04:00.000Z', stoppedExecutionEvidenceDigest: repeatedDigest('c') };
+    return { state, store, adapter, taskPolicy, admitted, released, stream, input, exitBody };
+  }
+
+  async function committedReleasePendingFixture(
+    invalidExit?: 'container' | 'code' | 'payload' | 'digest',
+  ) {
+    const fixture = await startedFailedFixture(invalidExit);
+    const { store, taskPolicy, admitted } = fixture;
+    const publish = (
+      artifactClass: 'execution-effect-lifecycle-authority'
+        | 'execution-effect-landing-journal'
+        | 'execution-effect-landing-receipt-evidence'
+        | 'execution-effect-manifest',
+      artifactKey: string,
+      capturedAt: string,
+    ) => {
+      const bytes = canonicalTaskAttemptCustodyJson({ artifactClass, artifactKey }, taskPolicy.jsonBounds);
+      const receipt = store.publishHostArtifact({ identity: admitted.ref.identity, policy: taskPolicy,
+        admissionReceiptDigest: admitted.ref.admissionReceiptDigest, artifactClass, artifactKey,
+        capturedAt, bytes });
+      return { artifactClass, artifactKey, receiptDigest: receipt.receiptDigest,
+        contentDigest: receipt.artifact.sha256, byteLength: receipt.artifact.byteLength };
+    };
+    const evidence = {
+      phase: 'COMMITTED_JOURNAL_RELEASE_PENDING' as const,
+      landingRecoveryAnchor: publish('execution-effect-lifecycle-authority', 'landing-recovery-anchor',
+        '2026-08-30T20:03:03.000Z'),
+      readyLifecycle: publish('execution-effect-lifecycle-authority', 'ready-for-landing',
+        '2026-08-30T20:03:04.000Z'),
+      committedJournal: publish('execution-effect-landing-journal', 'committed-journal',
+        '2026-08-30T20:03:05.000Z'),
+      leaseEvidence: publish('execution-effect-landing-receipt-evidence', 'lease-evidence',
+        '2026-08-30T20:03:06.000Z'),
+      finalEvidence: publish('execution-effect-landing-receipt-evidence', 'final-evidence',
+        '2026-08-30T20:03:07.000Z'),
+      finalManifest: publish('execution-effect-manifest', 'final-manifest',
+        '2026-08-30T20:03:08.000Z'),
+      semanticVerifier: 'orchestra-required-v1' as const,
+      semanticEvidenceDigest: repeatedDigest('8'),
+    };
+    const input = {
+      admissionRef: admitted.ref,
+      policy: taskPolicy,
+      evidence,
+      recoveryAuthority: { executionId: 'sprint-001', taskId: 'sprint-001',
+        attemptId: 'sprint-001:recovery:committed', fenceToken: 'committed-fence',
+        approvalRef: 'owner:test-committed', idempotencyKey: 'retain-committed-once' },
+      recordedAt: '2026-08-30T20:04:00.000Z',
+      stoppedResourceEvidenceDigest: repeatedDigest('6'),
+      hostObservationDigest: repeatedDigest('7'),
+    };
+    return { ...fixture, startedInput: fixture.input, evidence, input };
+  }
+
+  it('retains committed-journal release-pending truth with complete immutable inventory', async () => {
+    const { state, store, adapter, taskPolicy, admitted, released, stream, evidence, input } =
+      await committedReleasePendingFixture();
+    const beforeFiles = new Map([...adapter.files].map(([path, file]) => [path, Buffer.from(file.bytes)]));
+    const candidate = store.inspectEffectCommittedReleasePendingCandidate({
+      admissionRef: admitted.ref,
+      policy: taskPolicy,
+      evidence,
+    });
+    expect(candidate).toMatchObject({ state: 'EFFECT_COMMITTED_RELEASE_PENDING_CANDIDATE',
+      identity: admitted.ref.identity, releasedDispatchReceiptDigest: released.receiptDigest, evidence });
+    expect(candidate.preservedArtifacts).toHaveLength(7);
+    expect(candidate.preservedArtifacts).toContainEqual({ artifactClass: stream.artifactClass,
+      artifactKey: stream.artifactKey, receiptDigest: stream.receiptDigest,
+      contentDigest: stream.artifact.sha256, byteLength: stream.artifact.byteLength });
+    for (const reference of [evidence.landingRecoveryAnchor, evidence.readyLifecycle,
+      evidence.committedJournal, evidence.leaseEvidence, evidence.finalEvidence, evidence.finalManifest]) {
+      expect(candidate.preservedArtifacts).toContainEqual(reference);
+    }
+    const retained = store.retainEffectCommittedReleasePendingDispatch(input);
+    expect(retained).toMatchObject({ state: 'COMMITTED_JOURNAL_RELEASE_PENDING',
+      identity: admitted.ref.identity, evidenceDigest: candidate.evidenceDigest,
+      preservationManifestDigest: candidate.preservationManifestDigest });
+    expect(store.retainEffectCommittedReleasePendingDispatch(input)).toEqual(retained);
+    const restarted = openedStore(new InMemoryCustodyAdapter(state)).store;
+    expect(restarted.readEffectCommittedReleasePendingDispatch({ admissionRef: admitted.ref,
+      policy: taskPolicy })).toEqual(retained);
+    expect(restarted.readDispatchAuthority({ admissionRef: admitted.ref, policy: taskPolicy }))
+      .toMatchObject({ state: 'terminal', authority: { state: 'RELEASED', attemptCount: 1 } });
+    for (const [path, bytes] of beforeFiles) expect(Buffer.from(adapter.files.get(path)!.bytes)).toEqual(bytes);
+    expect(adapter.files.size).toBe(beforeFiles.size + 1);
+    expectHold(() => restarted.publishHostArtifact({ identity: admitted.ref.identity, policy: taskPolicy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest, artifactClass: 'host-work-attribution',
+      artifactKey: 'late-accepted-work', capturedAt: input.recordedAt, bytes: Buffer.from('{}') }),
+    'DISPATCH_TRANSITION_INVALID');
+    expectHold(() => restarted.publishDispatchObservation({ admissionRef: admitted.ref, policy: taskPolicy,
+      observationClass: 'EFFECT_DIAGNOSTIC', observedAt: input.recordedAt,
+      bytes: Buffer.from('{"state":"late"}') }), 'DISPATCH_TRANSITION_INVALID');
+  });
+  it('retains started failure without erasing usage or reclassifying RELEASED as no-effect', async () => {
+    const { state, store, adapter, taskPolicy, admitted, released, stream, input } = await startedFailedFixture();
+    const beforeFiles = new Map([...adapter.files].map(([path, file]) => [path, Buffer.from(file.bytes)]));
+    const candidate = store.inspectStartedFailedDispatchCandidate({ admissionRef: admitted.ref, policy: taskPolicy });
+    expect(candidate.preservedArtifacts).toContainEqual({ artifactClass: 'pristine-provider-stream',
+      artifactKey: stream.artifactKey, receiptDigest: stream.receiptDigest,
+      contentDigest: stream.artifact.sha256, byteLength: stream.artifact.byteLength });
+    const disposition = store.retainStartedFailedDispatch(input);
+    expect(disposition).toMatchObject({ state: 'STARTED_FAILED_RETAINED', identity: admitted.ref.identity,
+      evidenceDigest: candidate.evidenceDigest, releasedDispatchReceiptDigest: released.receiptDigest });
+    expect(store.retainStartedFailedDispatch(input)).toEqual(disposition);
+    const restarted = openedStore(new InMemoryCustodyAdapter(state)).store;
+    expect(restarted.readStartedFailedDispatch({ admissionRef: admitted.ref, policy: taskPolicy })).toEqual(disposition);
+    expect(restarted.readDispatchAuthority({ admissionRef: admitted.ref, policy: taskPolicy }))
+      .toMatchObject({ state: 'terminal', authority: { state: 'RELEASED', attemptCount: 1 } });
+    for (const [path, bytes] of beforeFiles) expect(Buffer.from(adapter.files.get(path)!.bytes)).toEqual(bytes);
+    expect(adapter.files.size).toBe(beforeFiles.size + 1);
+    expectHold(() => restarted.publishDispatchObservation({ admissionRef: admitted.ref, policy: taskPolicy,
+      observationClass: 'EFFECT_DIAGNOSTIC', observedAt: input.recordedAt, bytes: Buffer.from('{"state":"HOLD"}') }),
+    'DISPATCH_TRANSITION_INVALID');
+    expectHold(() => restarted.publishHostArtifact({ identity: admitted.ref.identity, policy: taskPolicy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest, artifactClass: 'execution-effect-landing-journal',
+      artifactKey: 'forbidden-late-landing', capturedAt: input.recordedAt, bytes: Buffer.from('{}') }),
+    'DISPATCH_TRANSITION_INVALID');
+    expectHold(() => restarted.publishProviderStreamCapture({ admissionRef: admitted.ref, policy: taskPolicy,
+      artifactKey: 'rewritten-usage', capturedAt: '2026-08-30T20:03:02.000Z', bytes: Buffer.from('zero') }),
+    'DISPATCH_TRANSITION_INVALID');
   });
 
   it('propagates a typed platform capability HOLD instead of fabricating support', () => {

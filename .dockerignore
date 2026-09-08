@@ -13,9 +13,16 @@ README.md
 .deck
 .deck.*
 .deckent
-dist
+dist/*
+!dist/core/
+dist/core/*
+!dist/core/exec-authority-native.js
 .brain
 .claude
+.codex
+.cursor
+.gemini
+.analysis
 .vscode
 .idea
 .cache

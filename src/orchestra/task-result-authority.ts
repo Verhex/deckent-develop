@@ -25,7 +25,7 @@ import type { TaskResult } from '../core/task-types.js';
 import {
   inspectExactAcceptedTaskResultAuthority,
   inspectExactTaskResultSettlementAuthority,
-  type ExactAcceptedTaskResultRefV2,
+  type ExactAcceptedTaskResultAuthorityMetadata,
   type ExactTaskResultSettlementRefV2,
   type InspectExactAcceptedTaskResultAuthorityInput,
   type InspectExactTaskResultAttemptSettlementInput,
@@ -70,14 +70,7 @@ export interface ExactTaskResultAuthorityMetadata {
   };
 }
 
-export interface ExactAcceptedTaskResultAuthorityMetadata {
-  readonly executionMode: 'normal-docker';
-  readonly identity: TaskAttemptCustodyIdentityV2;
-  readonly admissionReceiptDigest: Sha256Digest;
-  readonly acceptedResultRef: ExactAcceptedTaskResultRefV2;
-  readonly acceptedResultChainDigest: Sha256Digest;
-  readonly resultDigest: Sha256Digest;
-}
+export type { ExactAcceptedTaskResultAuthorityMetadata } from '../core/task-settlement-authority.js';
 
 export type ExactAuthoritativeTaskResult<T> = T & {
   readonly exactSettlementAuthority: ExactTaskResultAuthorityMetadata;

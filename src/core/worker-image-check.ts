@@ -20,9 +20,12 @@
 import { spawn as nodeSpawn } from 'node:child_process';
 import type { SpawnOptionsWithoutStdio } from 'node:child_process';
 import { getProviderCommandSpec } from './provider-command-spec.js';
+import { canonicalJson } from './audit-writer.js';
+import { loadExecAuthorityNative } from './exec-authority-native.js';
 
 /** Default worker image tag — kept in sync with spawn-backend-docker's DEFAULT_IMAGE. */
 export const DEFAULT_WORKER_IMAGE = 'deckent-worker:latest';
+export const WORKER_IMAGE_DEPENDENCY_SOURCE_PATH = '/app/node_modules';
 
 /** Readiness verdict for the worker image. */
 export type WorkerImageState = 'ready' | 'missing' | 'stale';
@@ -39,8 +42,70 @@ export interface WorkerImageReport {
   missingClis: string[];
   /** True when the image lacks ca-certificates (or it could not be confirmed). */
   missingCaCerts: boolean;
+  /** True when the exact backend's image-owned native authority is absent or differs from host. */
+  missingRuntimeAuthority: boolean;
+  /** True when the exact backend's immutable dependency source is absent from the image. */
+  missingDependencyAuthority: boolean;
   /** Real `docker build` command (with the right build-args) that yields a ready image. */
   suggestedBuildCmd: string;
+}
+
+/** Shared byte-identical probe used by image readiness and exact Docker dispatch. */
+export const WORKER_IMAGE_RUNTIME_AUTHORITY_PROBE_SOURCE = String.raw`
+import { lstatSync } from 'node:fs';
+import { loadExecAuthorityNative } from '/app/dist/core/exec-authority-native.js';
+const native = loadExecAuthorityNative();
+if (!native.available || !native.effect || native.effect.available === false) process.exit(78);
+let dependencySource = null;
+try {
+  const observed = lstatSync('${WORKER_IMAGE_DEPENDENCY_SOURCE_PATH}');
+  if (observed.isDirectory() && !observed.isSymbolicLink()) dependencySource = {
+    schemaVersion: 1,
+    kind: 'worker-image-dependency-source',
+    path: '${WORKER_IMAGE_DEPENDENCY_SOURCE_PATH}',
+    state: 'AVAILABLE',
+  };
+} catch { dependencySource = null; }
+process.stdout.write(JSON.stringify({ manifest: native.manifest, dependencySource }));
+`;
+
+interface WorkerImageRuntimeAuthorityProbe {
+  readonly manifest: unknown;
+  readonly dependencySource: unknown;
+}
+
+function parseRuntimeAuthorityProbe(raw: string): WorkerImageRuntimeAuthorityProbe | null {
+  let observed: unknown;
+  try {
+    observed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!observed || typeof observed !== 'object' || Array.isArray(observed)) return null;
+  const record = observed as Record<string, unknown>;
+  if (Object.keys(record).sort().join('\0') !== 'dependencySource\0manifest') return null;
+  return Object.freeze({
+    manifest: record.manifest,
+    dependencySource: record.dependencySource,
+  });
+}
+
+function runtimeAuthorityMatchesHost(manifest: unknown): boolean {
+  const host = loadExecAuthorityNative();
+  return host.available
+    && host.manifest.effectContract.available
+    && manifest !== null
+    && canonicalJson(manifest) === canonicalJson(host.manifest);
+}
+
+export function verifyWorkerImageDependencySource(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return Object.keys(record).sort().join('\0') === 'kind\0path\0schemaVersion\0state'
+    && record.schemaVersion === 1
+    && record.kind === 'worker-image-dependency-source'
+    && record.path === WORKER_IMAGE_DEPENDENCY_SOURCE_PATH
+    && record.state === 'AVAILABLE';
 }
 
 /** Minimal child shape used by {@link checkWorkerImage} — mockable in tests. */
@@ -179,6 +244,8 @@ export async function checkWorkerImage(opts: CheckWorkerImageOptions): Promise<W
       state: 'missing',
       missingClis: [...binaries],
       missingCaCerts: true,
+      missingRuntimeAuthority: true,
+      missingDependencyAuthority: true,
       suggestedBuildCmd,
     };
   }
@@ -192,13 +259,43 @@ export async function checkWorkerImage(opts: CheckWorkerImageOptions): Promise<W
       state: 'stale',
       missingClis: [...binaries],
       missingCaCerts: true,
+      missingRuntimeAuthority: true,
+      missingDependencyAuthority: true,
       suggestedBuildCmd,
     };
   }
 
   const missingClis = binaries.filter((bin) => !probe.stdout.includes(`CLI:${bin}:ok`));
   const missingCaCerts = !probe.stdout.includes('CACERTS:ok');
-  const state: WorkerImageState = missingClis.length === 0 && !missingCaCerts ? 'ready' : 'stale';
+  const runtimeProbe = await runDocker(spawnImpl, [
+    'run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
+    '--security-opt', 'no-new-privileges',
+    '--memory', '256m', '--memory-swap', '256m', '--pids-limit', '64',
+    '--tmpfs', '/tmp:size=16m,mode=0700',
+    '-e', 'TMPDIR=/run/deckent-native-snapshot',
+    '--tmpfs', '/run/deckent-native-snapshot:rw,exec,nosuid,nodev,size=2m,mode=0700',
+    image,
+    'node', '--input-type=module', '-e', WORKER_IMAGE_RUNTIME_AUTHORITY_PROBE_SOURCE,
+  ]);
+  const runtimeAuthority = runtimeProbe.code === 0
+    ? parseRuntimeAuthorityProbe(runtimeProbe.stdout) : null;
+  const missingRuntimeAuthority = runtimeAuthority === null
+    || !runtimeAuthorityMatchesHost(runtimeAuthority.manifest);
+  const missingDependencyAuthority = runtimeAuthority === null
+    || !verifyWorkerImageDependencySource(runtimeAuthority.dependencySource);
+  const state: WorkerImageState = missingClis.length === 0
+    && !missingCaCerts
+    && !missingRuntimeAuthority
+    && !missingDependencyAuthority
+    ? 'ready'
+    : 'stale';
 
-  return { state, missingClis, missingCaCerts, suggestedBuildCmd };
+  return {
+    state,
+    missingClis,
+    missingCaCerts,
+    missingRuntimeAuthority,
+    missingDependencyAuthority,
+    suggestedBuildCmd,
+  };
 }

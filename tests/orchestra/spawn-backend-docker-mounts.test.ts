@@ -27,6 +27,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
 import { canonicalJson } from '../../src/core/audit-writer.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
@@ -73,6 +75,8 @@ vi.mock('../../src/core/file-lock.js', () => ({
   acquireSpawnLocks: vi.fn(),
   releaseAllSpawnLocks: vi.fn(() => 0),
   releaseStaleSpawnLocksForTask: vi.fn(() => 0),
+  inspectStaleSpawnLocks: vi.fn(() => []),
+  releaseInspectedSpawnLock: vi.fn(() => false),
   SpawnLockError: class extends Error {},
 }));
 
@@ -128,6 +132,7 @@ import {
   exactDockerCustodyNativeProbeSource,
   exactDockerEffectDependencyHelperSource,
   exactDockerEffectPopulationHelperSource,
+  exactDockerBoundedStdinReaderSource,
   buildExactDockerRunnerSource,
   isExactDockerEffectLandingPolicyAdmitted,
   verifyExactDockerEffectNativeManifestParity,
@@ -148,10 +153,12 @@ import {
   buildExactDockerNativeSnapshotArgs,
   parseExactDockerCustodyInspect,
   parseExactDockerWorkspaceInventory,
+  inspectExactDockerWorkspaceInventory,
   readExactDockerWorkspaceInventory,
   createExactDockerCustodyPolicy,
   ensureCatalogMaskDir,
   CATALOG_MASK_RELATIVE_PATHS,
+  EXACT_DOCKER_PRIVATE_OUTPUT_NAMESPACE,
 } from '../../src/orchestra/spawn-backend-docker.js';
 import { SpawnBackendFactory } from '../../src/orchestra/spawn-backend.js';
 import { DEFAULT_PROMPT_CONFIG, getConfigHelp } from '../../src/core/config.js';
@@ -160,7 +167,10 @@ import {
   budgetedDockerTaskJson,
 } from '../helpers/budgeted-docker-execution-fixture.js';
 import { createTaskResultSettlementV2TestPolicy } from '../helpers/task-result-settlement-v2-fixture.js';
-import { taskResultV2Digest } from '../../src/core/task-result-schema.js';
+import {
+  createProductionTaskResultV2,
+  taskResultV2Digest,
+} from '../../src/core/task-result-schema.js';
 import { assembleCanonicalIngressResultV2 } from '../../src/orchestra/result-ingress.js';
 import { parseExactDockerDispatchTaskSnapshotAuthority } from '../../src/orchestra/exact-docker-dispatch-task-authority.js';
 import { createExactNormalTaskApprovedMaterialV3 } from '../../src/orchestra/exact-evaluation-policy-authority.js';
@@ -168,7 +178,14 @@ import {
   createExecutionEffectResultProjectionV1,
   createTaskAttemptEffectLandingBindingV2,
 } from '../../src/core/execution-effect-persistence-contract.js';
+import {
+  buildExactExecutionLandingProposalPromptSegment,
+  EXECUTION_LANDING_PROPOSAL_MAX_BYTES,
+  parseExactExecutionLandingProposalV3,
+} from '../../src/core/execution-landing-proposal.js';
 import { createExecutionEffectLifecycleStoreAdmissionAdapterV1 } from '../../src/orchestra/execution-effect-store-adapter.js';
+import { executionEffectLandingPretransactionHoldDigestV1 } from '../../src/orchestra/execution-effect-landing-coordinator.js';
+import { createExactNormalDockerExecutionRegistry } from '../../src/orchestra/scheduler-effects.js';
 
 const mockSpawn = vi.mocked(spawn);
 const mockSpawnSync = vi.mocked(spawnSync);
@@ -185,6 +202,42 @@ const AGENTS_HOST = '/test/project/.claude/agents';
 
 function digest(character: string): `sha256:${string}` {
   return `sha256:${character.repeat(64)}`;
+}
+
+async function runExactDockerBoundedStdinReader(
+  payload: Buffer,
+  declaredByteLength: number,
+): Promise<Readonly<{ code: number | null; stdout: string; stderr: string }>> {
+  const { spawn: actualSpawn } = await vi.importActual<typeof import('node:child_process')>(
+    'node:child_process',
+  );
+  const authority = Buffer.from(JSON.stringify({
+    inventoryByteLength: declaredByteLength,
+  }), 'utf8').toString('base64url');
+  const source = [
+    "const authority = JSON.parse(Buffer.from(process.argv[1], 'base64url').toString('utf8'));",
+    exactDockerBoundedStdinReaderSource(),
+    "process.stdout.write(JSON.stringify({ byteLength: raw.byteLength, tail: raw.at(-1) }));",
+  ].join('\n');
+
+  return new Promise((resolve, reject) => {
+    const child = actualSpawn(
+      process.execPath,
+      ['--input-type=module', '-e', source, authority],
+      { stdio: ['pipe', 'pipe', 'pipe'] },
+    );
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    child.stdout.on('data', chunk => stdout.push(Buffer.from(chunk)));
+    child.stderr.on('data', chunk => stderr.push(Buffer.from(chunk)));
+    child.once('error', reject);
+    child.once('close', code => resolve(Object.freeze({
+      code,
+      stdout: Buffer.concat(stdout).toString('utf8'),
+      stderr: Buffer.concat(stderr).toString('utf8'),
+    })));
+    child.stdin.end(payload);
+  });
 }
 
 function promptDeliveryAuthorityFixture(
@@ -271,6 +324,12 @@ function releasedReplayFixture() {
     projectionFence: authority.projectionFence,
   };
   const store = {
+    readStartedFailedDispatch: vi.fn((): unknown => null),
+    readEffectCommittedReleasePendingDispatch: vi.fn((): unknown => null),
+    // No private seal-failure artifact exists in this normal monitor fixture.
+    // Make the new Store query explicit so a missing mock cannot masquerade as
+    // a durable EFFECT_PUBLICATION_HOLD.
+    hasAttemptOutputArtifact: vi.fn(() => false),
     readDispatchAuthority: vi.fn(() => ({ state: 'terminal' as const, authority })),
     readDispatchObservation: vi.fn((input: { observationClass: string }) => ({
       receipt: {
@@ -280,7 +339,7 @@ function releasedReplayFixture() {
         observedAt: '2026-09-01T00:00:01.000Z',
       },
     })),
-    readDispatchObservationByClass: vi.fn((input: { observationClass: string }) => ({
+    readDispatchObservationByClass: vi.fn((input: { observationClass: string }) => input.observationClass === 'EFFECT_DIAGNOSTIC' ? null : ({
       receipt: {
         evidenceDigest: input.observationClass === 'PROVIDER_EXECUTION'
           ? providerExecutionReceipt.digest
@@ -353,7 +412,8 @@ function custodyArtifactFixture(input: Readonly<{
 }
 
 function exactHostWorkMonitorFixture(
-  failure: 'measurement-hold' | 'publication-failure' | 'reread-failure',
+  failure: 'measurement-hold' | 'publication-failure' | 'reread-failure'
+    | 'success' | 'api-missing-billing' | 'missing-usage' | 'invalid-usage',
 ) {
   const replay = releasedReplayFixture();
   const policy = createTaskResultSettlementV2TestPolicy();
@@ -378,10 +438,27 @@ function exactHostWorkMonitorFixture(
     artifactClass: 'pristine-provider-stream',
     artifactKey: `provider-${replay.identity.attemptId}`,
     capturedAt: observedAt,
-    bytes: Buffer.from(JSON.stringify({
-      total_cost_usd: 0,
-      modelUsage: { 'fixture-model': { inputTokens: 1, outputTokens: 1 } },
-    })),
+    bytes: Buffer.from(failure === 'missing-usage' ? '{"type":"turn.completed"}'
+      : failure === 'invalid-usage' ? JSON.stringify({
+        type: 'turn.completed', usage: {
+          input_tokens: Number.MAX_SAFE_INTEGER + 1, cached_input_tokens: 0,
+          cache_write_input_tokens: 0, output_tokens: 1,
+        },
+      })
+      : failure === 'success' || failure === 'api-missing-billing' ? JSON.stringify({
+      type: 'turn.completed', usage: {
+        input_tokens: 113_286, cached_input_tokens: 92_928,
+        cache_write_input_tokens: 0, output_tokens: 4_209,
+        reasoning_output_tokens: 1_637,
+      },
+    }) : [
+      JSON.stringify({ type: 'turn.completed', usage: {
+        input_tokens: 2, cached_input_tokens: 1, output_tokens: 1, total_tokens: 3,
+      } }),
+      JSON.stringify({ total_cost_usd: 0, modelUsage: {
+        'gpt-5.6-terra': { inputTokens: 1, outputTokens: 1, cacheReadTokens: 1 },
+      } }),
+    ].join('\n')),
     receiptCharacter: '4',
   });
   const workerResult = custodyArtifactFixture({
@@ -435,8 +512,12 @@ function exactHostWorkMonitorFixture(
     ...replay.scope,
     store,
     policy,
-    provider: 'fixture-provider',
-    execution: { executionLandingPolicy: null },
+    provider: 'codex',
+    model: 'gpt-5.6-terra',
+    execution: {
+      executionLandingPolicy: null,
+      authMode: failure === 'success' || failure === 'missing-usage' ? 'subscription' : 'api',
+    },
     taskSnapshot: {
       material: { dispatch: { scope: { filesWrite: [] } } },
       dispatch: { scopeBaseline, scopeBaselineSha256 },
@@ -449,6 +530,7 @@ function coldExactDockerCompletionFixture(timestampOverrides: Readonly<{
   hostWork?: string;
   result?: string;
   landing?: string;
+  includeProviderBilling?: boolean;
 }> = {}) {
   const replay = releasedReplayFixture();
   const policy = createTaskResultSettlementV2TestPolicy();
@@ -516,10 +598,15 @@ function coldExactDockerCompletionFixture(timestampOverrides: Readonly<{
       artifactClass: 'pristine-provider-stream',
       artifactKey: `provider-${replay.identity.attemptId}`,
       capturedAt: observedAt,
-      bytes: Buffer.from(JSON.stringify({
-        total_cost_usd: 0,
-        modelUsage: { 'fixture-model': { inputTokens: 1, outputTokens: 1 } },
-      })),
+      bytes: Buffer.from([
+        JSON.stringify({ type: 'turn.completed', usage: {
+          input_tokens: 2, cached_input_tokens: 1, output_tokens: 1, total_tokens: 3,
+        } }),
+        ...(timestampOverrides.includeProviderBilling === false ? [] : [JSON.stringify({
+          total_cost_usd: 0,
+          modelUsage: { 'gpt-5.6-terra': { inputTokens: 1, outputTokens: 1, cacheReadTokens: 1 } },
+        })]),
+      ].join('\n')),
       receiptCharacter: '5',
     }),
     custodyArtifactFixture({
@@ -598,13 +685,107 @@ function coldExactDockerCompletionFixture(timestampOverrides: Readonly<{
       material: { dispatch: { scope: { filesWrite: [] } } },
       dispatch: { scopeBaseline, scopeBaselineSha256 },
     },
-    provider: 'fixture-provider',
-    execution: { executionLandingPolicy: Object.freeze({ state: 'required' }) },
+    provider: 'codex',
+    model: 'gpt-5.6-terra',
+    execution: { executionLandingPolicy: Object.freeze({ state: 'required' }), authMode: 'api' },
   };
   return Object.freeze({ replay, scope, store, providerExit, adapter, landingArtifactKey });
 }
 
 describe('exact Docker custody mounts', () => {
+  it('treats verified retained failure as resolved history, never accepted or zero-work', async () => {
+    const fixture = releasedReplayFixture();
+    const entry = { state: 'admitted', ref: fixture.admissionRef, admission: fixture.scope.admission, reservation: {} };
+    fixture.store.readStartedFailedDispatch.mockReturnValue({ state: 'STARTED_FAILED_RETAINED' });
+    const store = { ...fixture.store,
+      listDispatchAdmissionsForRecovery: vi.fn(() => ({ entries: [entry], heldAdmissions: [] })),
+    };
+    const backend = new DockerSpawnBackend('/test/project');
+    const internals = backend as unknown as {
+      openExactDockerRecoveryStore: ReturnType<typeof vi.fn>;
+      reconstructExactDockerRecoveryScope: ReturnType<typeof vi.fn>;
+      rehydrateExactDockerEffectLaunch: ReturnType<typeof vi.fn>;
+    };
+    internals.openExactDockerRecoveryStore = vi.fn(() => ({ store, policy: fixture.scope.policy }));
+    internals.reconstructExactDockerRecoveryScope = vi.fn(() => ({ ...fixture.scope, store }));
+    internals.rehydrateExactDockerEffectLaunch = vi.fn();
+    const report = await backend.reconcilePendingAttempts();
+    expect(report.closedStartedFailed).toEqual([fixture.identity.taskId]);
+    expect(report.closedNotDispatched).toEqual([]);
+    expect(report.adopted).toEqual([]);
+    expect(internals.rehydrateExactDockerEffectLaunch).not.toHaveBeenCalled();
+    expect(backend.inspectAdmissionResolvedForPlanning(store as never, fixture.scope.policy as never, entry as never)).toBe(true);
+  });
+
+  it('does not label an admitted but unsettled attempt ready or write its missing accepted chain', () => {
+    const fixture = releasedReplayFixture();
+    const backend = new DockerSpawnBackend('/test/project');
+    fixture.store.readDispatchAuthority.mockReturnValue({ state: 'transition-pending' } as never);
+    const entry = { state: 'admitted', ref: fixture.admissionRef, admission: fixture.scope.admission, reservation: {} };
+    expect(backend.inspectAdmissionResolvedForPlanning(fixture.store as never, fixture.scope.policy as never, entry as never)).toBe(false);
+    expect(fixture.store.readArtifactReceipt).not.toHaveBeenCalled();
+    fixture.store.readStartedFailedDispatch.mockImplementation(() => { throw new Error('tampered disposition'); });
+    expect(() => backend.inspectAdmissionResolvedForPlanning(fixture.store as never, fixture.scope.policy as never, entry as never)).toThrow('tampered disposition');
+  });
+
+  it('rejects non-exact recovery targets before Store or Docker access', async () => {
+    const runner = vi.fn();
+    const backend = new DockerSpawnBackend('/test/project', { exactWorkspaceCommandRunner: runner });
+    const beforePublish = vi.fn();
+    await expect(backend.retainStartedFailedAttempt({
+      projectRoot: '/test/project', sprintId: 'sprint-719', dispatchRequestId: '../719',
+      recoveryAuthority: { executionId: 'sprint-719', taskId: 'sprint-719', attemptId: 'recovery',
+        fenceToken: 'fence', approvalRef: 'owner', idempotencyKey: 'once' },
+      beforePublish,
+    })).rejects.toMatchObject({ safeStage: 'RECOVERY_SCOPE' });
+    expect(runner).not.toHaveBeenCalled();
+    expect(beforePublish).not.toHaveBeenCalled();
+  });
+
+  it.each(['pretransaction', 'missing', 'postlease', 'apply-stage', 'wrong-phase'] as const)(
+    'admits READY failure to stopped inspection only with verified pretransaction diagnostic: %s', async variant => {
+      const fixture = releasedReplayFixture();
+      fixture.identity.taskId = '720-001';
+      const entry = { state: 'admitted', ref: fixture.admissionRef, admission: fixture.scope.admission };
+      const store = {
+        ...fixture.store,
+        readDispatchAdmission: vi.fn(() => entry),
+        inspectStartedFailedDispatchCandidate: vi.fn(() => ({ evidenceDigest: digest('a') })),
+        retainStartedFailedDispatch: vi.fn(),
+      };
+      const runner = vi.fn(async () => ({ status: 1, signal: null, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), error: false, overflow: false }));
+      const backend = new DockerSpawnBackend('/test/project', { exactWorkspaceCommandRunner: runner });
+      const internals = backend as unknown as Record<string, unknown>;
+      internals.openExactDockerRecoveryStore = vi.fn(() => ({ store, policy: fixture.scope.policy }));
+      internals.reconstructExactDockerRecoveryScope = vi.fn(() => ({ ...fixture.scope, store }));
+      internals.rereadExactProviderStartObservation = vi.fn(() => ({}));
+      internals.readExactDockerRecoveryProviderExecution = vi.fn(() => ({}));
+      internals.readExactDockerRecoveryProviderExit = vi.fn(() => ({ containerId: fixture.authority.backendExecutionId }));
+      internals.readExactDockerEffectDiagnostic = vi.fn(() => variant === 'missing' ? null : {
+        observationReceiptDigest: digest('b'),
+        failure: {
+          phase: variant === 'wrong-phase' ? 'FINAL_CAPTURE' : 'LANDING',
+          stage: variant === 'apply-stage' ? 'LANDING_APPLY' : 'LANDING_PREPARE',
+          code: 'PREIMAGE_MISMATCH',
+          sourceEvidenceDigest: variant === 'postlease' ? digest('c')
+            : executionEffectLandingPretransactionHoldDigestV1('PREIMAGE_MISMATCH'),
+        },
+      });
+      mockLifecycleStoreAdmissionAdapter.mockReturnValueOnce({
+        readLatestLifecycleAuthority: () => ({ state: 'READY_FOR_LANDING', authorityDigest: digest('d') }),
+      } as never);
+      const beforePublish = vi.fn();
+      await expect(backend.retainStartedFailedAttempt({
+        projectRoot: '/test/project', sprintId: 'sprint-720', dispatchRequestId: fixture.admissionRef.dispatchRequestId,
+        dryRun: true, beforePublish,
+        recoveryAuthority: { executionId: 'sprint-720', taskId: 'sprint-720', attemptId: 'recovery', fenceToken: 'fence', approvalRef: 'owner', idempotencyKey: 'once' },
+      })).rejects.toMatchObject({ safeStage: variant === 'pretransaction' ? 'RECOVERY_DAEMON_UNAVAILABLE' : 'RECOVERY_LANDING_AMBIGUOUS' });
+      expect(runner).toHaveBeenCalledTimes(variant === 'pretransaction' ? 1 : 0);
+      expect(store.retainStartedFailedDispatch).not.toHaveBeenCalled();
+      expect(beforePublish).not.toHaveBeenCalled();
+    },
+  );
+
   it('keeps causal custody time ordered when the WSL2 wall clock steps backwards', () => {
     expect(exactDockerCausalObservedAt(
       () => '2026-09-03T06:12:26.740Z',
@@ -810,10 +991,10 @@ describe('exact Docker custody mounts', () => {
 
   it('reads inventory through the bounded async git seam and rejects stderr ambiguity', async () => {
     const bytes = Buffer.from('src/a.ts\0AGENTS.md\0', 'utf8');
-    const runner = vi.fn(async () => ({
+    const runner = vi.fn(async (input: { args: readonly string[] }) => ({
       status: 0,
       signal: null,
-      stdout: bytes,
+      stdout: input.args.includes('--deleted') ? Buffer.alloc(0) : bytes,
       stderr: Buffer.alloc(0),
       error: false,
       overflow: false,
@@ -823,7 +1004,7 @@ describe('exact Docker custody mounts', () => {
     expect(runner).toHaveBeenCalledWith(expect.objectContaining({
       command: 'git',
       args: ['-C', '/test/project', 'ls-files', '-z', '--cached', '--others',
-        '--exclude-standard', '--', '.',
+        '--exclude-standard', '--deduplicate', '--', '.',
         ':(top,exclude).brain', ':(top,exclude).brain/**',
         ':(top,exclude).deck', ':(top,exclude).deck/**',
         ':(top,exclude).deckent', ':(top,exclude).deckent/**',
@@ -839,6 +1020,52 @@ describe('exact Docker custody mounts', () => {
       error: false,
       overflow: false,
     }))).resolves.toBeNull();
+  });
+
+  it('names portable case-fold collisions before any mount or provider effect', async () => {
+    const result = await inspectExactDockerWorkspaceInventory('/test/project', async (input) => ({
+      status: 0,
+      signal: null,
+      stdout: input.args.includes('--deleted')
+        ? Buffer.alloc(0)
+        : Buffer.from(
+          '.github/PULL_REQUEST_TEMPLATE.md\0.github/pull_request_template.md\0',
+          'utf8',
+        ),
+      stderr: Buffer.alloc(0),
+      error: false,
+      overflow: false,
+    }));
+
+    expect(result).toEqual({
+      state: 'hold',
+      reasonCode: 'PORTABLE_PATH_COLLISION',
+      conflictingPaths: [
+        '.github/PULL_REQUEST_TEMPLATE.md',
+        '.github/pull_request_template.md',
+      ],
+    });
+  });
+
+  it('excludes tracked worktree deletions before portable collision validation', async () => {
+    const result = await inspectExactDockerWorkspaceInventory('/test/project', async (input) => ({
+      status: 0,
+      signal: null,
+      stdout: input.args.includes('--deleted')
+        ? Buffer.from('.github/pull_request_template.md\0', 'utf8')
+        : Buffer.from(
+          '.github/PULL_REQUEST_TEMPLATE.md\0.github/pull_request_template.md\0',
+          'utf8',
+        ),
+      stderr: Buffer.alloc(0),
+      error: false,
+      overflow: false,
+    }));
+
+    expect(result).toMatchObject({
+      state: 'ready',
+      inventory: { paths: ['.github/PULL_REQUEST_TEMPLATE.md'], pathCount: 1 },
+    });
   });
 
   it('mounts only the immutable snapshot RO and attempt-private output RW', () => {
@@ -1010,9 +1237,47 @@ describe('exact Docker custody mounts', () => {
     expect(source).toContain('dst=/source,readonly,bind-propagation=rprivate');
   });
 
+  it('creates the inert .deck readonly-mask target before baseline without copying protected authority', () => {
+    const source = exactDockerEffectPopulationHelperSource();
+    const placeholder = source.indexOf("const deckMaskTarget = join('/workspace', '.deck')");
+    const baseline = source.indexOf('native.effect.captureTree(root.handle');
+    expect(placeholder).toBeGreaterThan(source.indexOf('for (const relative of infrastructureMountPoints)'));
+    expect(baseline).toBeGreaterThan(placeholder);
+    expect(source).toContain('constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW');
+    expect(source).toContain('fchmodSync(deckMaskFd, 0o644)');
+    expect(source).toContain('fsyncSync(deckMaskFd)');
+    expect(source).toContain('deckMaskStat.size !== 0n');
+    expect(source).not.toContain("join('/source', '.deck')");
+  });
+
+  it('streams a population inventory larger than a non-blocking pipe buffer', async () => {
+    const payload = Buffer.alloc(512 * 1024, 0x61);
+    payload[payload.byteLength - 1] = 0;
+
+    await expect(runExactDockerBoundedStdinReader(payload, payload.byteLength)).resolves.toEqual({
+      code: 0,
+      stdout: JSON.stringify({ byteLength: payload.byteLength, tail: 0 }),
+      stderr: '',
+    });
+  });
+
+  it('fails population stdin closed when bytes exceed the declared authority', async () => {
+    const payload = Buffer.alloc(256 * 1024, 0x61);
+    const result = await runExactDockerBoundedStdinReader(payload, payload.byteLength - 1);
+
+    expect(result.code).toBe(78);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe('');
+  });
+
   it('runs exact provider auth phases asynchronously with bounded output and lifetime', () => {
     const source = buildExactDockerRunnerSource({
       taskId: '001',
+      dispatchRequestId: `dreq-${'1'.repeat(64)}`,
+      resultMaxBytes: 16 * 1024 * 1024,
+      landingMaxBytes: 4 * 1024 * 1024,
+      questionMaxBytes: 2 * 1024 * 1024,
+      landingRequired: false,
       model: 'model',
       provider: 'provider',
       invocation: { binary: 'provider-cli', args: [], promptFeed: 'stdin' },
@@ -1074,6 +1339,7 @@ describe('exact Docker custody mounts', () => {
     expect(verifyExactDockerEffectNativeManifestParity(accessor, nativeManifest)).toBe(false);
 
     const dispatch = DockerSpawnBackend.prototype.dispatchExactDockerCustody.toString();
+    expect(dispatch).toContain('verifyWorkerImageDependencySource');
     expect(dispatch.match(/\.\.\.providerAuth\.mountArgs/gu)).toHaveLength(1);
     expect(dispatch).toMatch(/providerSpec\.binary === ["']claude["']/u);
     expect(dispatch.match(/src=\/dev\/null,dst=/gu)).toHaveLength(1);
@@ -1113,6 +1379,102 @@ describe('exact Docker custody mounts', () => {
     expect(settle.indexOf('preMountCompensation')).toBeLessThan(
       settle.indexOf('publishAndRereadExactObservation'),
     );
+    expect(dispatch).toMatch(/preMountStage:\s*["']PROVIDER_START["']/u);
+    expect(dispatch).toMatch(/preMountFailureClass:\s*["']PROVIDER_START["']/u);
+    expect(dispatch).toContain('EXECUTION_EFFECT_PROVIDER_START_AUTHORIZATION_INVALID');
+    expect(dispatch).toContain('TASK_ATTEMPT_CUSTODY_HOLD:');
+    expect(createExactDockerEffectLifecycleAdapterV1.toString())
+      .toContain('rejectedPathCount: authority.plan.inventoryRejectedPathCount');
+  });
+
+  it('durably preserves typed pre-mount detail while keeping the public reason constrained', async () => {
+    const attemptId = 'attempt-sensitive-write-denied';
+    const commandResult = {
+      status: 1,
+      signal: null,
+      stdout: Buffer.alloc(0),
+      stderr: Buffer.from(`Error: No such object: deckent-x-${attemptId}`),
+      error: false,
+      overflow: false,
+    };
+    const backend = new DockerSpawnBackend('/test/project', {
+      custodyStateDir: '/test/state',
+      exactWorkspaceCommandRunner: vi.fn(async () => commandResult),
+    });
+    const settleNotDispatched = vi.fn((input: { reasonCode: string }) => ({
+      reasonCode: input.reasonCode,
+      receiptDigest: digest('1'),
+      noEffectEvidence: { evidenceDigest: digest('2') },
+      projectionFence: digest('3'),
+    }));
+    const scope = {
+      identity: { attemptId, generation: 1 },
+      admissionRef: {
+        dispatchRequestId: `dreq-${'4'.repeat(64)}`,
+        dispatchRequestMaterialDigest: digest('5'),
+        admissionReceiptDigest: digest('6'),
+        refDigest: digest('7'),
+      },
+      admission: { admittedAt: '2026-09-04T20:00:00.000Z' },
+      policy: { policyDigest: digest('8') },
+      store: { settleNotDispatched },
+      state: 'PREPARED',
+    };
+    const internals = backend as unknown as {
+      publishAndRereadExactObservation: ReturnType<typeof vi.fn>;
+      settleExactNoEffect(
+        scope: unknown,
+        reasonCode: string,
+        compensation: unknown,
+        failure: unknown,
+      ): Promise<unknown>;
+    };
+    internals.publishAndRereadExactObservation = vi.fn((
+      _scope: unknown,
+      _observationClass: string,
+      bundle: unknown,
+      observedAt: string,
+    ) => ({
+      receiptDigest: digest('9'),
+      evidenceDigest: digest('a'),
+      observedAt,
+      bytes: Buffer.from(canonicalJson(bundle), 'utf8'),
+    }));
+
+    const outcome = await internals.settleExactNoEffect(
+      scope,
+      'PRE_MOUNT_ABORTED',
+      null,
+      {
+        preMountStage: 'EFFECT_ALLOCATION',
+        preMountFailureCode: 'SENSITIVE_PATH_WRITE_DENIED',
+        preMountFailureClass: 'EFFECT_ALLOCATION',
+      },
+    );
+
+    expect(outcome).toMatchObject({
+      kind: 'not-dispatched',
+      reasonCode: 'PRE_MOUNT_ABORTED',
+      providerAttemptCount: 0,
+    });
+    expect(settleNotDispatched).toHaveBeenCalledWith(expect.objectContaining({
+      reasonCode: 'PRE_MOUNT_ABORTED',
+    }));
+    expect(internals.publishAndRereadExactObservation).toHaveBeenCalledWith(
+      scope,
+      'NO_EFFECT',
+      expect.objectContaining({
+        kind: 'exact-docker-no-effect',
+        reasonCode: 'PRE_MOUNT_ABORTED',
+        preMountStage: 'EFFECT_ALLOCATION',
+        preMountFailureCode: 'SENSITIVE_PATH_WRITE_DENIED',
+        preMountFailureClass: 'EFFECT_ALLOCATION',
+        compensationState: 'NOT_ATTEMPTED',
+      }),
+      expect.any(String),
+    );
+    expect(JSON.stringify(internals.publishAndRereadExactObservation.mock.calls))
+      .not.toContain('.npmrc');
   });
 
   it('contains only the durable-identity-matched pre-provider container before volume compensation', async () => {
@@ -2199,17 +2561,46 @@ describe('exact Docker custody mounts', () => {
     expect(mockSpawnSync).not.toHaveBeenCalled();
   });
 
-  it('retains exact resources when effect capture HOLDs and never enters release', async () => {
-    const fixture = releasedReplayFixture();
-    const providerExit = Object.freeze({
-      containerId: fixture.authority.backendExecutionId,
-      exitCode: 0,
-      observedAt: '2026-09-01T00:00:02.000Z',
-      waitEvidenceDigest: digest('1'),
-      observationReceiptDigest: digest('2'),
-      observationEvidenceDigest: digest('3'),
-    });
+  it.each([
+    ['FINAL_CAPTURE', 'FINAL_CAPTURE', 'CONTAINMENT_HOLD', 'EFFECT_FINAL_CAPTURE_HOLD'],
+    ['READY_PUBLICATION', 'READY_PUBLICATION', 'READY_AUTHORITY_REREAD_INVALID', 'EFFECT_PUBLICATION_HOLD'],
+    ['LANDING', 'LANDING_PREPARE', 'PREIMAGE_MISMATCH', 'EFFECT_LANDING_HOLD'],
+  ] as const)('durably preserves %s first-failure identity and never releases on HOLD', async (phase, stage, code, reasonCode) => {
+    // This assertion reaches the effect-commit boundary, so it must start from
+    // the same immutable stream/result/proposal trio that production rereads.
+    // Leaving those artifacts absent makes the monitor legitimately enter its
+    // live Docker-log capture branch, which is not the subject under test.
+    const durable = coldExactDockerCompletionFixture();
+    const fixture = durable.replay;
+    const providerExit = durable.providerExit;
     const backend = new DockerSpawnBackend('/test/project', { custodyStateDir: '/test/state' });
+    const observations = new Map<string, { receipt: Record<string, unknown>; bytes: Buffer }>();
+    const store = {
+      ...fixture.store,
+      ...durable.store,
+      readDispatchObservationByClass: vi.fn((input: { observationClass: string }) =>
+        observations.get(input.observationClass) ?? null),
+      publishDispatchObservation: vi.fn((input: {
+        observationClass: string; observedAt: string; bytes: Uint8Array;
+        admissionRef: { refDigest: string };
+      }) => {
+        const bytes = Buffer.from(input.bytes);
+        const evidenceDigest = `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+        const receipt = {
+          observationClass: input.observationClass,
+          admissionRefDigest: input.admissionRef.refDigest,
+          observedAt: input.observedAt,
+          evidenceDigest,
+          byteLength: bytes.byteLength,
+          receiptDigest: digest('a'),
+        };
+        observations.set(input.observationClass, { receipt, bytes });
+        return receipt;
+      }),
+      readDispatchObservation: vi.fn((input: { observationClass: string }) =>
+        observations.get(input.observationClass) ?? fixture.store.readDispatchObservation(input)),
+    };
+    const scope = { ...durable.scope, store };
     const internals = backend as unknown as {
       monitorExactDockerCustody: (...args: unknown[]) => Promise<Record<string, unknown>>;
       rereadExactProviderExitObservation: ReturnType<typeof vi.fn>;
@@ -2217,11 +2608,15 @@ describe('exact Docker custody mounts', () => {
       releaseExactDockerEffectLanding: ReturnType<typeof vi.fn>;
     };
     internals.rereadExactProviderExitObservation = vi.fn();
-    internals.commitExactDockerEffectLanding = vi.fn(async () => null);
+    internals.commitExactDockerEffectLanding = vi.fn(async () => ({
+      state: 'HOLD', phase, stage, code, sourceEvidenceDigest: digest('b'),
+      capture: phase === 'FINAL_CAPTURE'
+        ? { schemaVersion: 1, stage: 'CONTAINMENT', adapterStage: null } : null,
+    }));
     internals.releaseExactDockerEffectLanding = vi.fn(async () => null);
 
     const completion = await internals.monitorExactDockerCustody(
-      fixture.scope,
+      scope,
       fixture.authority.backendExecutionId,
       fixture.query,
       fixture.providerExecutionReceipt,
@@ -2229,10 +2624,54 @@ describe('exact Docker custody mounts', () => {
     );
     expect(completion).toMatchObject({
       kind: 'capture-hold',
-      reasonCode: 'EFFECT_LANDING_HOLD',
+      reasonCode,
       evidence: { kind: 'provider-exit-observation', providerExit },
+      effectDiagnostic: {
+        schemaVersion: 1,
+        identity: fixture.identity,
+        admissionRefDigest: fixture.admissionRef.refDigest,
+        providerExitObservationReceiptDigest: providerExit.observationReceiptDigest,
+        failure: { state: 'HOLD', phase, stage, code, sourceEvidenceDigest: digest('b') },
+      },
     });
+    expect(JSON.stringify(completion)).not.toMatch(/\/test\/state|\/workspace|FOREIGN_SECRET/u);
+    expect(store.publishDispatchObservation).toHaveBeenCalledTimes(1);
+    expect(store.publishDispatchObservation).toHaveBeenCalledWith(expect.objectContaining({
+      admissionRef: fixture.admissionRef,
+      observationClass: 'EFFECT_DIAGNOSTIC',
+    }));
+    const replay = await internals.monitorExactDockerCustody(
+      scope, fixture.authority.backendExecutionId, fixture.query,
+      fixture.providerExecutionReceipt, providerExit,
+    );
+    expect(replay).toEqual(completion);
+    expect(store.publishDispatchObservation).toHaveBeenCalledTimes(1);
     expect(internals.commitExactDockerEffectLanding).toHaveBeenCalledTimes(1);
+    expect(internals.releaseExactDockerEffectLanding).not.toHaveBeenCalled();
+
+    // Even validly rehashed bytes cannot make a sibling identity current.
+    const saved = observations.get('EFFECT_DIAGNOSTIC')!;
+    const sibling = JSON.parse(saved.bytes.toString('utf8'));
+    sibling.identity.generation += 1;
+    saved.bytes = Buffer.from(canonicalJson(sibling));
+    saved.receipt.evidenceDigest = `sha256:${createHash('sha256').update(saved.bytes).digest('hex')}`;
+    expect(await internals.monitorExactDockerCustody(
+      scope, fixture.authority.backendExecutionId, fixture.query,
+      fixture.providerExecutionReceipt, providerExit,
+    )).toMatchObject({ kind: 'capture-hold', reasonCode: 'EFFECT_PUBLICATION_HOLD' });
+    expect(internals.commitExactDockerEffectLanding).toHaveBeenCalledTimes(1);
+
+    observations.clear();
+    store.publishDispatchObservation.mockImplementationOnce(() => {
+      throw new Error('FOREIGN_SECRET /private/custody');
+    });
+    const unpublished = await internals.monitorExactDockerCustody(
+      scope, fixture.authority.backendExecutionId, fixture.query,
+      fixture.providerExecutionReceipt, providerExit,
+    );
+    expect(unpublished).toMatchObject({ kind: 'capture-hold', reasonCode: 'EFFECT_PUBLICATION_HOLD' });
+    expect(unpublished).not.toHaveProperty('effectDiagnostic');
+    expect(JSON.stringify(unpublished)).not.toMatch(/FOREIGN_SECRET|private\/custody/u);
     expect(internals.releaseExactDockerEffectLanding).not.toHaveBeenCalled();
   });
 
@@ -2275,6 +2714,138 @@ describe('exact Docker custody mounts', () => {
       );
     },
   );
+
+  it('captures genuine Codex terminal usage for subscription without inventing USD billing', async () => {
+    const fixture = exactHostWorkMonitorFixture('success');
+    const backend = new DockerSpawnBackend('/test/project', { custodyStateDir: '/test/state' });
+    const effectProjection = createExecutionEffectResultProjectionV1({
+      disposition: 'COMMITTED_NO_CHANGE',
+      effectDecisionDigest: digest('a'), transactionDigest: digest('b'),
+      decisionEffectCount: 0, effects: [],
+    });
+    const effectBinding = createTaskAttemptEffectLandingBindingV2({
+      identity: {
+        projectId: fixture.replay.identity.projectId,
+        taskId: fixture.replay.identity.taskId,
+        attemptId: fixture.replay.identity.attemptId,
+        generation: fixture.replay.identity.generation,
+      },
+      admissionReceiptDigest: fixture.replay.admissionRef.admissionReceiptDigest,
+      custodyPolicyDigest: fixture.scope.policy.policyDigest,
+      landingArtifactKey: 'landing-success',
+      landingArtifactReceiptDigest: digest('c'), landingReceiptDigest: digest('d'),
+      effectLandingChainDigest: digest('e'), readyLifecycleAuthorityDigest: digest('f'),
+      disposition: effectProjection.disposition,
+      effectDecisionDigest: effectProjection.effectDecisionDigest,
+      transactionDigest: effectProjection.transactionDigest,
+    });
+    const internals = backend as unknown as {
+      monitorExactDockerCustody: (...args: unknown[]) => Promise<Record<string, unknown>>;
+      rereadExactProviderExitObservation: ReturnType<typeof vi.fn>;
+      commitExactDockerEffectLanding: ReturnType<typeof vi.fn>;
+      releaseExactDockerEffectLanding: ReturnType<typeof vi.fn>;
+    };
+    internals.rereadExactProviderExitObservation = vi.fn();
+    internals.commitExactDockerEffectLanding = vi.fn(async () => ({ state: 'COMMITTED' }));
+    internals.releaseExactDockerEffectLanding = vi.fn(async () => ({
+      projection: effectProjection, binding: effectBinding,
+    }));
+
+    const completion = await internals.monitorExactDockerCustody(
+      fixture.scope,
+      fixture.replay.authority.backendExecutionId,
+      fixture.replay.query,
+      fixture.replay.providerExecutionReceipt,
+      fixture.providerExit,
+    );
+    expect(completion).toMatchObject({
+      kind: 'result-captured',
+      providerUsage: { evidence: {
+        provider: 'codex', model: 'gpt-5.6-terra', inputTokens: 20_358,
+        outputTokens: 4_209, cacheReadTokens: 92_928, cacheCreationTokens: 0,
+        totalTokens: 117_495, reasoningTokens: 1_637, source: 'provider-adapter',
+      } },
+      providerBilling: {
+        state: 'not-emitted', billingMode: 'subscription',
+        reasonCode: 'PROVIDER_PRICE_ENVELOPE_NOT_EMITTED',
+      },
+    });
+    expect(fixture.store.readVerifiedArtifact).toHaveBeenCalledWith(expect.objectContaining({
+      artifactClass: 'worker-result',
+    }));
+  });
+
+  it('captures immutable worker output but holds metered execution with no provider USD envelope', async () => {
+    const fixture = exactHostWorkMonitorFixture('api-missing-billing');
+    const backend = new DockerSpawnBackend('/test/project', { custodyStateDir: '/test/state' });
+    const internals = backend as unknown as {
+      monitorExactDockerCustody: (...args: unknown[]) => Promise<Record<string, unknown>>;
+      rereadExactProviderExitObservation: ReturnType<typeof vi.fn>;
+      commitExactDockerEffectLanding: ReturnType<typeof vi.fn>;
+      releaseExactDockerEffectLanding: ReturnType<typeof vi.fn>;
+    };
+    internals.rereadExactProviderExitObservation = vi.fn();
+    internals.commitExactDockerEffectLanding = vi.fn(async () => ({ state: 'COMMITTED' }));
+    internals.releaseExactDockerEffectLanding = vi.fn();
+    await expect(internals.monitorExactDockerCustody(
+      fixture.scope, fixture.replay.authority.backendExecutionId, fixture.replay.query,
+      fixture.replay.providerExecutionReceipt, fixture.providerExit,
+    )).resolves.toMatchObject({
+      kind: 'capture-hold', reasonCode: 'PROVIDER_BILLING_UNAVAILABLE',
+    });
+    expect(fixture.store.readVerifiedArtifact).toHaveBeenCalledWith(expect.objectContaining({
+      artifactClass: 'worker-result',
+    }));
+    expect(internals.releaseExactDockerEffectLanding).not.toHaveBeenCalled();
+  });
+
+  it('captures immutable worker output before holding a missing provider usage envelope', async () => {
+    const fixture = exactHostWorkMonitorFixture('missing-usage');
+    const backend = new DockerSpawnBackend('/test/project', { custodyStateDir: '/test/state' });
+    const internals = backend as unknown as {
+      monitorExactDockerCustody: (...args: unknown[]) => Promise<Record<string, unknown>>;
+      rereadExactProviderExitObservation: ReturnType<typeof vi.fn>;
+      commitExactDockerEffectLanding: ReturnType<typeof vi.fn>;
+      releaseExactDockerEffectLanding: ReturnType<typeof vi.fn>;
+    };
+    internals.rereadExactProviderExitObservation = vi.fn();
+    internals.commitExactDockerEffectLanding = vi.fn(async () => ({ state: 'COMMITTED' }));
+    internals.releaseExactDockerEffectLanding = vi.fn();
+    await expect(internals.monitorExactDockerCustody(
+      fixture.scope, fixture.replay.authority.backendExecutionId, fixture.replay.query,
+      fixture.replay.providerExecutionReceipt, fixture.providerExit,
+    )).resolves.toMatchObject({
+      kind: 'capture-hold', reasonCode: 'PROVIDER_USAGE_UNAVAILABLE',
+    });
+    expect(fixture.store.readVerifiedArtifact).toHaveBeenCalledWith(expect.objectContaining({
+      artifactClass: 'worker-result',
+    }));
+    expect(internals.releaseExactDockerEffectLanding).not.toHaveBeenCalled();
+  });
+
+  it('classifies malformed adapter usage before releasing the exact effect landing', async () => {
+    const fixture = exactHostWorkMonitorFixture('invalid-usage');
+    const backend = new DockerSpawnBackend('/test/project', { custodyStateDir: '/test/state' });
+    const internals = backend as unknown as {
+      monitorExactDockerCustody: (...args: unknown[]) => Promise<Record<string, unknown>>;
+      rereadExactProviderExitObservation: ReturnType<typeof vi.fn>;
+      commitExactDockerEffectLanding: ReturnType<typeof vi.fn>;
+      releaseExactDockerEffectLanding: ReturnType<typeof vi.fn>;
+    };
+    internals.rereadExactProviderExitObservation = vi.fn();
+    internals.commitExactDockerEffectLanding = vi.fn(async () => ({ state: 'COMMITTED' }));
+    internals.releaseExactDockerEffectLanding = vi.fn();
+    await expect(internals.monitorExactDockerCustody(
+      fixture.scope, fixture.replay.authority.backendExecutionId, fixture.replay.query,
+      fixture.replay.providerExecutionReceipt, fixture.providerExit,
+    )).resolves.toMatchObject({
+      kind: 'capture-hold', reasonCode: 'PROVIDER_USAGE_INVALID',
+    });
+    expect(fixture.store.readVerifiedArtifact).toHaveBeenCalledWith(expect.objectContaining({
+      artifactClass: 'worker-result',
+    }));
+    expect(internals.releaseExactDockerEffectLanding).not.toHaveBeenCalled();
+  });
 
   it('reconstructs cold exact completion only from durable post-cleanup artifacts', () => {
     const fixture = coldExactDockerCompletionFixture();
@@ -2331,6 +2902,29 @@ describe('exact Docker custody mounts', () => {
     expect(source).not.toContain('measureExactDockerHostWorkAttribution');
     expect(source).not.toContain('captureDockerLogs');
     expect(source).not.toContain('rehydrateExactDockerEffectLaunch');
+  });
+
+  it('HOLDs cold API reconciliation when the immutable provider stream lacks USD billing', () => {
+    const fixture = coldExactDockerCompletionFixture({ includeProviderBilling: false });
+    const backend = new DockerSpawnBackend('/test/project', { custodyStateDir: '/test/state' });
+    const readCold = (backend as unknown as {
+      readColdExactDockerCompletion: (...args: unknown[]) => Record<string, unknown> | null;
+      rehydrateExactDockerEffectLaunch: ReturnType<typeof vi.fn>;
+      releaseExactDockerEffectLanding: ReturnType<typeof vi.fn>;
+    });
+    readCold.rehydrateExactDockerEffectLaunch = vi.fn();
+    readCold.releaseExactDockerEffectLanding = vi.fn();
+    mockSpawn.mockClear();
+    mockSpawnSync.mockClear();
+
+    mockLifecycleStoreAdmissionAdapter.mockReturnValueOnce(fixture.adapter as never);
+    expect(() => readCold.readColdExactDockerCompletion(
+      fixture.scope, fixture.replay.query, fixture.providerExit,
+    )).toThrow(/EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED/u);
+    expect(readCold.rehydrateExactDockerEffectLaunch).not.toHaveBeenCalled();
+    expect(readCold.releaseExactDockerEffectLanding).not.toHaveBeenCalled();
+    expect(mockSpawn).not.toHaveBeenCalled();
+    expect(mockSpawnSync).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -2498,6 +3092,42 @@ describe('exact Docker custody mounts', () => {
     });
     expect(store.readDispatchAuthority).toHaveBeenCalledTimes(1);
     expect(internals.reconstructExactDockerRecoveryScope).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats an append-only retired-before-admission reservation as terminal history', async () => {
+    const fixture = releasedReplayFixture();
+    const retired = {
+      state: 'retired-before-admission' as const,
+      reservation: {
+        dispatchRequestId: `dreq-${'3'.repeat(64)}`,
+        identity: fixture.identity,
+      },
+      transition: { receiptDigest: digest('3') },
+    };
+    const store = {
+      ...fixture.store,
+      listDispatchAdmissionsForRecovery: vi.fn(() => ({
+        entries: [retired],
+        heldAdmissions: [],
+      })),
+    };
+    const backend = new DockerSpawnBackend('/test/project', { custodyStateDir: '/test/state' });
+    const internals = backend as unknown as {
+      openExactDockerRecoveryStore: ReturnType<typeof vi.fn>;
+      reconstructExactDockerRecoveryScope: ReturnType<typeof vi.fn>;
+    };
+    internals.openExactDockerRecoveryStore = vi.fn(() => ({
+      store,
+      policy: fixture.scope.policy,
+    }));
+    internals.reconstructExactDockerRecoveryScope = vi.fn();
+
+    await expect(backend.reconcilePendingAttempts()).resolves.toMatchObject({
+      adopted: [],
+      closedBeforeAdmission: [fixture.identity.taskId],
+      held: [],
+    });
+    expect(internals.reconstructExactDockerRecoveryScope).not.toHaveBeenCalled();
   });
 
   it('reports one identity-bound discovery HOLD and still reconciles its valid sibling', async () => {
@@ -2822,6 +3452,7 @@ describe('exact Docker custody mounts', () => {
       exactCustodyProviderStarts: Map<string, unknown>;
       exactCustodyProviderExecutions: Map<string, unknown>;
       exactCustodyCompletions: Map<string, unknown>;
+      exactRecoveredAcceptedResults: Map<string, unknown>;
     };
     const completed = {
       kind: 'result-captured',
@@ -2921,8 +3552,82 @@ describe('exact Docker custody mounts', () => {
     expect(held.acceptance).toHaveBeenCalledTimes(1);
   });
 
-  it('publishes accepted result from durable host authority, then evicts and rereads by opaque token', async () => {
+  it('reconstructs NO_GO accepted host-work authority in canonical scope order', () => {
+    const backend = new DockerSpawnBackend('/test/project', { custodyStateDir: '/test/state' });
+    const attemptId = '123e4567-e89b-42d3-a456-426614174728';
+    const providerExitObservationReceiptDigest = digest('f');
+    const baselineSha256 = 'b'.repeat(64);
+    const scopeFiles = ['tests/a.ts', 'tests/z.ts'];
+    const scopeDigest = createHash('sha256').update(canonicalJson(scopeFiles)).digest('hex');
+    const baselineRef = `task-attempt-custody-provider-exit:${providerExitObservationReceiptDigest}#scope-baseline:sha256:${baselineSha256}`;
+    const effectOrderedChanges = [
+      { path: 'tests/z.ts', status: 'modified', linesAdded: 1, linesRemoved: 1 },
+      { path: 'tests/a.ts', status: 'added', linesAdded: 2, linesRemoved: 0 },
+    ] as const;
+    const canonicalChanges = [effectOrderedChanges[1], effectOrderedChanges[0]];
+    const expectedBody = {
+      filesChanged: canonicalChanges,
+      totalLinesAdded: 3,
+      totalLinesRemoved: 1,
+      workAttribution: {
+        state: 'VERIFIED' as const,
+        attemptId,
+        baselineRef,
+        baselineSha256,
+        scopeDigest,
+      },
+      providerExitObservationReceiptDigest,
+    };
+    const internals = backend as unknown as {
+      exactCanonicalHostWorkAuthorityFromAccepted(
+        scope: unknown,
+        providerExit: unknown,
+        result: unknown,
+        prompt: unknown,
+      ): Record<string, unknown>;
+    };
+
+    expect(internals.exactCanonicalHostWorkAuthorityFromAccepted(
+      {
+        identity: { attemptId },
+        taskSnapshot: {
+          material: { dispatch: { scope: { filesWrite: scopeFiles } } },
+          dispatch: { scopeBaselineSha256: `sha256:${baselineSha256}` },
+        },
+      },
+      { observationReceiptDigest: providerExitObservationReceiptDigest },
+      {
+        selfAssessment: 'NO_GO',
+        diskVerified: true,
+        boundaryViolations: [],
+        promptDeliveryAttribution: { state: 'CURRENT' },
+        agent: 'backend-specialist',
+        skills: ['delivered-skill'],
+        filesChanged: effectOrderedChanges,
+        totalLinesAdded: 3,
+        totalLinesRemoved: 1,
+        workAttribution: {
+          state: 'VERIFIED', attemptId, baselineRef, baselineSha256, scopeDigest,
+        },
+      },
+      { agentId: 'backend-specialist', skillIds: ['delivered-skill'] },
+    )).toEqual({
+      ...expectedBody,
+      evidenceDigest: `sha256:${createHash('sha256')
+        .update(canonicalJson(expectedBody)).digest('hex')}`,
+    });
+  });
+
+  it('accepts subscription completion produced by hot and cold custody paths and durably reopens accepted authority after live eviction', async () => {
     const policy = createTaskResultSettlementV2TestPolicy();
+    const measuredFiles = Object.freeze([
+      Object.freeze({
+        path: 'tests/a.ts', status: 'added' as const, linesAdded: 2, linesRemoved: 0,
+      }),
+      Object.freeze({
+        path: 'tests/z.ts', status: 'modified' as const, linesAdded: 1, linesRemoved: 1,
+      }),
+    ]);
     const identity = {
       schemaVersion: 2 as const,
       backend: 'docker' as const,
@@ -2936,9 +3641,9 @@ describe('exact Docker custody mounts', () => {
     const providerExitObservedAt = '2026-09-01T00:00:00.500Z';
     const rawWorkerResultBytes = Buffer.from(JSON.stringify({
       taskId: identity.taskId,
-      selfAssessment: 'DONE',
-      testsPassed: true,
-      filesChanged: [],
+      selfAssessment: 'NO_GO',
+      testsPassed: false,
+      filesChanged: measuredFiles.map(change => change.path),
       tokenUsage: { inputTokens: 999999, outputTokens: 999999 },
       cost: { usd: 999999 },
       providerBilling: { providerReportedUsd: 999999 },
@@ -2953,7 +3658,7 @@ describe('exact Docker custody mounts', () => {
       admissionReceiptDigest,
       policyDigest: policy.policyDigest,
       artifactClass: 'worker-result',
-      artifactKey: 'primary',
+      artifactKey: `result-${identity.attemptId}`,
       capturedAt: providerExitObservedAt,
       receiptDigest: digest('e'),
       artifact: { sha256: sourceArtifactDigest, byteLength: rawWorkerResultBytes.byteLength },
@@ -2972,11 +3677,34 @@ describe('exact Docker custody mounts', () => {
       },
     };
     const effectProjection = createExecutionEffectResultProjectionV1({
-      disposition: 'COMMITTED_NO_CHANGE',
+      disposition: 'COMMITTED',
       effectDecisionDigest: digest('2'),
       transactionDigest: digest('3'),
-      decisionEffectCount: 0,
-      effects: [],
+      decisionEffectCount: 2,
+      effects: [
+        {
+          operationIndex: 0,
+          path: 'tests/z.ts',
+          status: 'modified',
+          operationKind: 'REPLACE',
+          entryKind: 'regular-file',
+          lineMetrics: 'REQUIRED',
+          operationDigest: digest('4'),
+          effectDigests: [digest('5')],
+          derivedParentProvenanceDigest: null,
+        },
+        {
+          operationIndex: 1,
+          path: 'tests/a.ts',
+          status: 'added',
+          operationKind: 'ADD',
+          entryKind: 'regular-file',
+          lineMetrics: 'REQUIRED',
+          operationDigest: digest('6'),
+          effectDigests: [digest('7')],
+          derivedParentProvenanceDigest: null,
+        },
+      ],
     });
     const effectLandingBinding = createTaskAttemptEffectLandingBindingV2({
       identity: {
@@ -3058,22 +3786,48 @@ describe('exact Docker custody mounts', () => {
     const providerStreamReceiptDigest = digest('8');
     const billingEvidence = {
       source: 'provider-envelope' as const,
-      provider: 'fixture-provider',
+      provider: 'codex',
       currency: 'USD' as const,
       providerReportedUsd: 2.5,
       modelUsage: {
-        'fixture-model': { inputTokens: 20, outputTokens: 10, cacheReadTokens: 3 },
+        'gpt-5.6-terra': { inputTokens: 20_358, outputTokens: 4_209, cacheReadTokens: 92_928 },
       },
       capturedAt: providerExitObservedAt,
     };
-    let providerStreamBytes = Buffer.from(JSON.stringify({
-      total_cost_usd: billingEvidence.providerReportedUsd,
-      modelUsage: billingEvidence.modelUsage,
-    }));
+    let providerStreamBytes = Buffer.from([
+      JSON.stringify({
+        type: 'turn.completed',
+        usage: {
+          input_tokens: 113_286,
+          cached_input_tokens: 92_928,
+          cache_write_input_tokens: 0,
+          output_tokens: 4_209,
+          reasoning_output_tokens: 1_637,
+        },
+      }),
+      JSON.stringify({
+        total_cost_usd: billingEvidence.providerReportedUsd,
+        modelUsage: billingEvidence.modelUsage,
+      }),
+    ].join('\n'));
     const providerStreamDigest = `sha256:${createHash('sha256')
       .update(providerStreamBytes).digest('hex')}` as const;
     const billingEvidenceDigest = `sha256:${createHash('sha256')
       .update(canonicalJson(billingEvidence)).digest('hex')}` as const;
+    const usageEvidence = {
+      source: 'provider-adapter' as const,
+      provider: 'codex',
+      model: 'gpt-5.6-terra',
+      inputTokens: 20_358,
+      outputTokens: 4_209,
+      cacheReadTokens: 92_928,
+      cacheCreationTokens: 0,
+      totalTokens: 117_495,
+      reasoningTokens: 1_637,
+      capturedAt: providerExitObservedAt,
+    };
+    const usageEvidenceDigest = `sha256:${createHash('sha256')
+      .update(canonicalJson(usageEvidence)).digest('hex')}` as const;
     const durableProviderStreamArtifact = custodyArtifactFixture({
       identity,
       admissionReceiptDigest,
@@ -3084,13 +3838,18 @@ describe('exact Docker custody mounts', () => {
       bytes: providerStreamBytes,
       receiptCharacter: '8',
     });
+    let activeProviderStreamArtifact = durableProviderStreamArtifact;
     const task = JSON.parse(budgetedDockerTaskJson('/test/project/.tasks/task-fixture-001.json'));
     task.assignedWorker = 'worker-fixture-001';
-    task.provider = 'fixture-provider';
-    task.model = 'fixture-model';
+    task.provider = 'codex';
+    task.model = 'gpt-5.6-terra';
     task.assignedAgent = 'backend-specialist';
     task.assignedSkills = ['delivered-skill', 'assigned-only-skill'];
     task.forceSkills = ['delivered-skill'];
+    task.scope.filesWrite = measuredFiles.map(change => change.path);
+    task.productionWiringApplicability = {
+      state: 'not-applicable', reasonCode: 'test-only-scope',
+    };
     const promptDelivery = promptDeliveryAuthorityFixture(task, [
       { tier: 'T1', kind: 'skills', content: '--- delivered-skill ---\nbody' },
       { tier: 'T0', kind: 'worker-contract', content: 'worker contract' },
@@ -3105,8 +3864,10 @@ describe('exact Docker custody mounts', () => {
       executionAdmissionMode: null, executionApprovalEvidenceRef: null,
       finalOnlyUsageContainment: null,
     };
-    const scopeDigest = createHash('sha256').update(canonicalJson([])).digest('hex');
-    const scopeBaseline = `#deckent-scope-attribution-v1\t${query.custodyRef.dispatchRequestId}\t${scopeDigest}\n`;
+    const scopeDigest = createHash('sha256')
+      .update(canonicalJson(measuredFiles.map(change => change.path))).digest('hex');
+    const priorZHash = '1'.repeat(40);
+    const scopeBaseline = `#deckent-scope-attribution-v1\t${query.custodyRef.dispatchRequestId}\t${scopeDigest}\ntests/z.ts\t${priorZHash}\n`;
     const scopeBaselineSha256 = `sha256:${createHash('sha256')
       .update(scopeBaseline).digest('hex')}` as const;
     const dispatchTaskMaterialDigest = `sha256:${createHash('sha256')
@@ -3136,7 +3897,7 @@ describe('exact Docker custody mounts', () => {
           .update(canonicalJson(lineage)).digest('hex')}` as const,
       },
       dispatch: {
-        model: 'fixture-model', provider: 'fixture-provider', execution: exactExecution,
+        model: 'gpt-5.6-terra', provider: 'codex', execution: exactExecution,
         prompt: promptDelivery.prompt,
         promptSha256: `sha256:${createHash('sha256')
           .update(promptDelivery.prompt).digest('hex')}` as const,
@@ -3179,8 +3940,12 @@ describe('exact Docker custody mounts', () => {
         lineage: persistedTaskAuthority.lineage,
         lineageSha256: persistedTaskAuthority.lineageDigest,
       },
-      dispatch: persistedTaskAuthority.dispatch,
+      // The admission producer retains the parser-normalized in-memory snapshot.
+      // Preserve legacy wire bytes without this field; the trusted projection
+      // represents that absence as null, just like parseExactDockerDispatchSnapshot.
+      dispatch: { ...persistedTaskAuthority.dispatch, privateOutputLayout: null },
     };
+    expect(Object.hasOwn(JSON.parse(taskSnapshotBytes.toString()).dispatch, 'privateOutputLayout')).toBe(false);
     const providerExecutionAttempt = {
       providerExecutionAttemptId: 'provider-attempt-fixture-001',
       identityDigest: digest('e'),
@@ -3209,11 +3974,38 @@ describe('exact Docker custody mounts', () => {
       providerState: 'NOT_STARTED',
       observedAt: '2026-09-01T00:00:00.250Z',
     }));
+    const durableLandingProposal = parseExactExecutionLandingProposalV3({
+      version: 3,
+      taskId: identity.taskId,
+      dispatchRequestId: query.custodyRef.dispatchRequestId,
+      sequence: 2,
+      summary: 'Exact custody result and project effects are ready for host landing.',
+      completedWork: ['captured scoped project effects', 'wrote final worker result'],
+      remainingWork: [],
+      nextAction: 'host validates and accepts the exact completion',
+      unresolvedRisks: [],
+      updatedAt: providerExitObservedAt,
+    }, {
+      taskId: identity.taskId,
+      dispatchRequestId: query.custodyRef.dispatchRequestId,
+    });
+    const durableLandingProposalArtifact = custodyArtifactFixture({
+      identity,
+      admissionReceiptDigest,
+      policyDigest: policy.policyDigest,
+      artifactClass: 'worker-landing-proposal',
+      artifactKey: `landing-${identity.attemptId}`,
+      capturedAt: providerExitObservedAt,
+      bytes: Buffer.from(canonicalJson(durableLandingProposal)),
+      receiptCharacter: '9',
+    });
     let acceptedBytes: Uint8Array | null = null;
     let acceptedReceipt: Record<string, unknown> | null = null;
     let acceptedChain: Record<string, unknown> | null = null;
     let durableHostWorkArtifact: ReturnType<typeof custodyArtifactFixture> | null = null;
     const store = {
+      hasAttemptOutputArtifact: vi.fn(() => false),
+      readDispatchObservationByClass: vi.fn(() => null),
       readDispatchAuthority: vi.fn(() => ({
         state: 'terminal',
         authority: {
@@ -3274,7 +4066,11 @@ describe('exact Docker custody mounts', () => {
           return durableHostWorkArtifact?.receipt ?? null;
         }
         if (input.artifactClass === 'pristine-provider-stream') {
-          return durableProviderStreamArtifact.receipt;
+          return activeProviderStreamArtifact.receipt;
+        }
+        if (input.artifactClass === 'worker-result') return sourceReceipt;
+        if (input.artifactClass === 'worker-landing-proposal') {
+          return durableLandingProposalArtifact.receipt;
         }
         if (input.artifactClass === 'canonical-accepted-result') return acceptedReceipt;
         return null;
@@ -3286,8 +4082,13 @@ describe('exact Docker custody mounts', () => {
         if (input.artifactClass === 'worker-result') {
           return { receipt: sourceReceipt, bytes: rawWorkerResultBytes };
         }
+        if (input.artifactClass === 'worker-landing-proposal') {
+          return durableLandingProposalArtifact;
+        }
         if (input.artifactClass === 'pristine-provider-stream') {
-          return { ...durableProviderStreamArtifact, bytes: providerStreamBytes };
+          return activeProviderStreamArtifact === durableProviderStreamArtifact
+            ? { ...activeProviderStreamArtifact, bytes: providerStreamBytes }
+            : activeProviderStreamArtifact;
         }
         return acceptedBytes && acceptedReceipt
           ? { receipt: acceptedReceipt, bytes: acceptedBytes }
@@ -3343,9 +4144,9 @@ describe('exact Docker custody mounts', () => {
       baselineRef: `task-attempt-custody-provider-exit:${providerExitReceiptDigest}#scope-baseline:sha256:${scopeBaselineSha256.slice('sha256:'.length)}`,
       baselineSha256: scopeBaselineSha256.slice('sha256:'.length),
       scopeDigest,
-      filesChanged: [],
-      totalLinesAdded: 0,
-      totalLinesRemoved: 0,
+      filesChanged: measuredFiles,
+      totalLinesAdded: 3,
+      totalLinesRemoved: 1,
       reasonCode: 'NONE' as const,
     };
     const hostWorkAttribution = {
@@ -3371,9 +4172,9 @@ describe('exact Docker custody mounts', () => {
       byteLength: durableHostWorkArtifact.receipt.artifact.byteLength,
     };
     const hostWorkAuthorityBody = {
-      filesChanged: [],
-      totalLinesAdded: 0,
-      totalLinesRemoved: 0,
+      filesChanged: measuredFiles,
+      totalLinesAdded: 3,
+      totalLinesRemoved: 1,
       workAttribution: {
         state: 'VERIFIED' as const,
         attemptId: identity.attemptId,
@@ -3420,8 +4221,8 @@ describe('exact Docker custody mounts', () => {
         refDigest: admissionRefDigest,
       },
       taskSnapshot: persistedTaskSnapshot,
-      provider: 'fixture-provider',
-      model: 'fixture-model',
+      provider: 'codex',
+      model: 'gpt-5.6-terra',
       execution: exactExecution,
     };
     const completion = {
@@ -3447,7 +4248,13 @@ describe('exact Docker custody mounts', () => {
         byteLength: providerStreamBytes.byteLength,
         capturedAt: billingEvidence.capturedAt,
       },
+      providerUsage: {
+        evidence: usageEvidence,
+        evidenceDigest: usageEvidenceDigest,
+        providerStreamReceiptDigest,
+      },
       providerBilling: {
+        state: 'available',
         evidence: billingEvidence,
         evidenceDigest: billingEvidenceDigest,
         providerStreamReceiptDigest,
@@ -3458,7 +4265,17 @@ describe('exact Docker custody mounts', () => {
       exactCustodyProviderStarts: Map<string, unknown>;
       exactCustodyProviderExecutions: Map<string, unknown>;
       exactCustodyCompletions: Map<string, unknown>;
+      exactRecoveredAcceptedResults: Map<string, unknown>;
+      monitorExactDockerCustody: (...args: unknown[]) => Promise<Record<string, unknown>>;
+      readColdExactDockerCompletion: (...args: unknown[]) => Record<string, unknown> | null;
+      commitExactDockerEffectLanding: ReturnType<typeof vi.fn>;
+      releaseExactDockerEffectLanding: ReturnType<typeof vi.fn>;
     };
+    internals.commitExactDockerEffectLanding = vi.fn(async () => ({ state: 'COMMITTED' }));
+    internals.releaseExactDockerEffectLanding = vi.fn(async () => ({
+      projection: effectProjection,
+      binding: effectLandingBinding,
+    }));
     internals.exactCustodyProviderStarts.set(admissionRefDigest, providerStartReceipt);
     internals.exactCustodyProviderExecutions.set(
       admissionRefDigest, providerExecutionReceipt,
@@ -3476,8 +4293,8 @@ describe('exact Docker custody mounts', () => {
       authority: {
         taskId: identity.taskId,
         workerId: 'forged-worker',
-        provider: 'fixture-provider',
-        model: 'fixture-model',
+        provider: 'codex',
+        model: 'gpt-5.6-terra',
         promptCompilePlanId: task.promptCompilePlanId,
         isPriorityFix: false,
         fixForTaskId: null,
@@ -3507,8 +4324,8 @@ describe('exact Docker custody mounts', () => {
       authority: {
         taskId: identity.taskId,
         workerId: 'worker-fixture-001',
-        provider: 'fixture-provider',
-        model: 'fixture-model',
+        provider: 'codex',
+        model: 'gpt-5.6-terra',
         promptCompilePlanId: task.promptCompilePlanId,
         isPriorityFix: false,
         fixForTaskId: null,
@@ -3522,13 +4339,382 @@ describe('exact Docker custody mounts', () => {
       promise: Promise.resolve(completion),
     });
 
+    const measuredGitSpawn = ((command: string, args?: readonly string[]) => {
+      const child = new EventEmitter() as ChildProcess;
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
+      Object.assign(child, { stdout, stderr, kill: vi.fn(() => true) });
+      queueMicrotask(() => {
+        const argv = [...(args ?? [])];
+        let output: string | null = null;
+        if (command === 'git' && argv[0] === 'hash-object') {
+          output = `${argv.at(-1) === 'tests/a.ts' ? '2' : '3'}${'0'.repeat(39)}\n`;
+        } else if (command === 'git' && argv[0] === 'diff') {
+          output = '1\t1\n';
+        }
+        if (output === null) {
+          child.emit('error', new Error(`unexpected measured git command:${command} ${argv.join(' ')}`));
+          return;
+        }
+        stdout.end(output);
+        stderr.end();
+        queueMicrotask(() => child.emit('close', 0, null));
+      });
+      return child;
+    }) as unknown as typeof spawn;
+    const measuredReadFile = ((path: unknown) => (
+      String(path).endsWith('/tests/a.ts') ? Buffer.from('first\nsecond\n') : Buffer.from('{}')
+    )) as typeof readFileSync;
+    const monitorWithMeasuredWork = async (...args: unknown[]) => {
+      let observed: Record<string, unknown> | undefined;
+      await mockSpawn.withImplementation(measuredGitSpawn, async () => {
+        await mockReadFileSync.withImplementation(measuredReadFile, async () => {
+          observed = await internals.monitorExactDockerCustody(...args);
+        });
+      });
+      if (!observed) throw new Error('measured monitor did not return completion');
+      return observed;
+    };
+
+    const hotApiCompletion = await monitorWithMeasuredWork(
+      scope, providerExit.containerId, query, providerExecutionReceipt, providerExit,
+    );
+    expect(hotApiCompletion, canonicalJson(hotApiCompletion)).toMatchObject({
+      kind: 'result-captured',
+      providerBilling: {
+        state: 'available',
+        evidence: billingEvidence,
+        evidenceDigest: billingEvidenceDigest,
+        providerStreamReceiptDigest,
+      },
+    });
+
+    const subscriptionStreamArtifact = custodyArtifactFixture({
+      identity,
+      admissionReceiptDigest,
+      policyDigest: policy.policyDigest,
+      artifactClass: 'pristine-provider-stream',
+      artifactKey: `provider-${identity.attemptId}`,
+      capturedAt: providerExitObservedAt,
+      bytes: Buffer.from(JSON.stringify({ type: 'turn.completed', usage: {
+        input_tokens: 113_286,
+        cached_input_tokens: 92_928,
+        cache_write_input_tokens: 0,
+        output_tokens: 4_209,
+        reasoning_output_tokens: 1_637,
+      } })),
+      receiptCharacter: 'd',
+    });
+    const subscriptionPrivateOutputLayout = Object.freeze({
+      schemaVersion: 2 as const,
+      kind: 'exact-docker-private-output-layout' as const,
+      namespace: EXACT_DOCKER_PRIVATE_OUTPUT_NAMESPACE,
+      dispatchRequestId: query.custodyRef.dispatchRequestId,
+      resultChildRelativePath: [
+        EXACT_DOCKER_PRIVATE_OUTPUT_NAMESPACE,
+        query.custodyRef.dispatchRequestId,
+        'result.bin',
+      ].join('/'),
+      landingChildRelativePath: [
+        EXACT_DOCKER_PRIVATE_OUTPUT_NAMESPACE,
+        query.custodyRef.dispatchRequestId,
+        'landing.bin',
+      ].join('/'),
+      resultMaxBytes: policy.artifactLimits['worker-result'].maxBytes,
+      landingMaxBytes: Math.min(
+        policy.artifactLimits['worker-landing-proposal'].maxBytes,
+        EXECUTION_LANDING_PROPOSAL_MAX_BYTES,
+      ),
+      questionMaxBytes: policy.artifactLimits['worker-ipc-question'].maxBytes,
+    });
+    const subscriptionPrompt = [
+      taskSnapshot.dispatch.prompt,
+      buildExactExecutionLandingProposalPromptSegment(
+        identity.taskId,
+        query.custodyRef.dispatchRequestId,
+        'private-draft-v2',
+      ),
+    ].join('\n\n');
+    const subscriptionTaskSnapshot = {
+      ...taskSnapshot,
+      dispatch: {
+        ...taskSnapshot.dispatch,
+        prompt: subscriptionPrompt,
+        promptSha256: `sha256:${createHash('sha256')
+          .update(subscriptionPrompt).digest('hex')}` as const,
+        privateOutputLayout: subscriptionPrivateOutputLayout,
+        execution: {
+          ...taskSnapshot.dispatch.execution,
+          authMode: 'subscription' as const,
+          executionLandingPolicy: TEST_EXECUTION_OPTIONS.executionLandingPolicy,
+        },
+      },
+    };
+    const subscriptionTaskSnapshotBytes = Buffer.from(canonicalJson(subscriptionTaskSnapshot));
+    const subscriptionTaskSnapshotSha256 = `sha256:${createHash('sha256')
+      .update(subscriptionTaskSnapshotBytes).digest('hex')}` as const;
+    const subscriptionTaskAuthority = parseExactDockerDispatchTaskSnapshotAuthority(
+      subscriptionTaskSnapshotBytes,
+      policy,
+    );
+    if (subscriptionTaskAuthority === null) {
+      throw new Error('subscription exact task snapshot fixture is invalid');
+    }
+    const subscriptionPersistedTaskSnapshot = {
+      schemaVersion: 2 as const,
+      kind: 'exact-docker-dispatch-snapshot' as const,
+      dispatchRequestId: subscriptionTaskAuthority.dispatchRequestId,
+      projectId: subscriptionTaskAuthority.projectId,
+      taskId: subscriptionTaskAuthority.taskId,
+      material: {
+        approved: subscriptionTaskAuthority.approved,
+        approvedSha256: subscriptionTaskAuthority.approvedDigest,
+        dispatch: subscriptionTaskAuthority.task,
+        dispatchSha256: subscriptionTaskAuthority.taskDigest,
+        lineage: subscriptionTaskAuthority.lineage,
+        lineageSha256: subscriptionTaskAuthority.lineageDigest,
+      },
+      // Match parseExactDockerDispatchSnapshot's normalized V2 private-output shape.
+      dispatch: {
+        ...subscriptionTaskAuthority.dispatch,
+        privateOutputLayout: subscriptionPrivateOutputLayout,
+      },
+    };
+    const subscriptionProviderStartBytes = Buffer.from(canonicalJson({
+      ...JSON.parse(providerStartBytes.toString('utf8')),
+      taskSnapshotSha256: subscriptionTaskSnapshotSha256,
+    }));
+    const subscriptionStore = {
+      ...store,
+      readTaskSnapshot: vi.fn(() => ({
+        admission: { receiptDigest: admissionReceiptDigest },
+        proof: {
+          sha256: subscriptionTaskSnapshotSha256,
+          byteLength: subscriptionTaskSnapshotBytes.byteLength,
+        },
+        bytes: subscriptionTaskSnapshotBytes,
+      })),
+      readDispatchObservation: vi.fn((input: { observationClass: string }) => (
+        input.observationClass === 'PROVIDER_START'
+          ? {
+              receipt: {
+                receiptDigest: providerStartReceipt.ref,
+                evidenceDigest: providerStartReceipt.digest,
+                observedAt: '2026-09-01T00:00:00.250Z',
+              },
+              bytes: subscriptionProviderStartBytes,
+            }
+          : store.readDispatchObservation(input)
+      )),
+    };
+    const subscriptionScope = {
+      ...scope,
+      store: subscriptionStore,
+      admission: { taskSnapshot: { sha256: subscriptionTaskSnapshotSha256 } },
+      taskSnapshot: subscriptionPersistedTaskSnapshot,
+      execution: {
+        ...scope.execution,
+        authMode: 'subscription' as const,
+        executionLandingPolicy: TEST_EXECUTION_OPTIONS.executionLandingPolicy,
+      },
+    };
+    const validSubscriptionBilling = {
+      state: 'not-emitted' as const,
+      billingMode: 'subscription' as const,
+      reasonCode: 'PROVIDER_PRICE_ENVELOPE_NOT_EMITTED' as const,
+      evidenceDigest: null,
+      providerStreamReceiptDigest: subscriptionStreamArtifact.receipt.receiptDigest,
+    };
+    const subscriptionCompletion = {
+      ...completion,
+      providerStream: {
+        artifactKey: subscriptionStreamArtifact.receipt.artifactKey,
+        receiptDigest: subscriptionStreamArtifact.receipt.receiptDigest,
+        contentDigest: subscriptionStreamArtifact.receipt.artifact.sha256,
+        byteLength: subscriptionStreamArtifact.receipt.artifact.byteLength,
+        capturedAt: providerExitObservedAt,
+      },
+      providerUsage: {
+        ...completion.providerUsage,
+        providerStreamReceiptDigest: subscriptionStreamArtifact.receipt.receiptDigest,
+      },
+      providerBilling: validSubscriptionBilling,
+    };
+    activeProviderStreamArtifact = subscriptionStreamArtifact;
+    const hotSubscriptionCompletion = await monitorWithMeasuredWork(
+      subscriptionScope, providerExit.containerId, query, providerExecutionReceipt, providerExit,
+    );
+    mockLifecycleStoreAdmissionAdapter.mockReturnValueOnce({
+      readLandingRecoveryAnchor: vi.fn(() => ({ transactionDigest: digest('3') })),
+      readAcceptedAuthority: vi.fn(() => ({
+        projection: effectProjection,
+        binding: effectLandingBinding,
+      })),
+    } as never);
+    const coldSubscriptionCompletion = internals.readColdExactDockerCompletion(
+      subscriptionScope,
+      query,
+      providerExit,
+    );
+    expect(hotSubscriptionCompletion).toMatchObject({
+      kind: 'landing-captured',
+      landingProposal: {
+        artifact: {
+          artifactKey: durableLandingProposalArtifact.receipt.artifactKey,
+          receiptDigest: durableLandingProposalArtifact.receipt.receiptDigest,
+          contentDigest: durableLandingProposalArtifact.receipt.artifact.sha256,
+        },
+        proposal: durableLandingProposal,
+        verifiedAt: providerExitObservedAt,
+      },
+      providerBilling: {
+        state: 'not-emitted',
+        billingMode: 'subscription',
+        reasonCode: 'PROVIDER_PRICE_ENVELOPE_NOT_EMITTED',
+      },
+    });
+    const hotSubscriptionBilling = (hotSubscriptionCompletion as {
+      providerBilling: unknown;
+    }).providerBilling;
+    expect(coldSubscriptionCompletion).not.toBeNull();
+    expect(coldSubscriptionCompletion).toMatchObject({
+      kind: 'landing-captured',
+      landingProposal: {
+        artifact: {
+          artifactKey: durableLandingProposalArtifact.receipt.artifactKey,
+          receiptDigest: durableLandingProposalArtifact.receipt.receiptDigest,
+          contentDigest: durableLandingProposalArtifact.receipt.artifact.sha256,
+        },
+        proposal: durableLandingProposal,
+        verifiedAt: providerExitObservedAt,
+      },
+      providerBilling: hotSubscriptionBilling,
+    });
+    const acceptSubscriptionCompletion = async (candidateCompletion: unknown) => {
+      internals.exactCustodyCompletions.set(admissionRefDigest, {
+        scope: subscriptionScope, query, providerStartReceipt, providerExecutionReceipt,
+        promise: Promise.resolve(candidateCompletion),
+      });
+      return await backend.acceptExactDockerCustodyResult({
+        query,
+        authority: {
+          taskId: identity.taskId,
+          workerId: 'worker-fixture-001',
+          provider: 'codex',
+          model: 'gpt-5.6-terra',
+          promptCompilePlanId: task.promptCompilePlanId,
+          isPriorityFix: false,
+          fixForTaskId: null,
+        },
+      } as never);
+    };
+    for (const [tamper, providerBilling] of [
+      ['billing mode', { ...validSubscriptionBilling, billingMode: 'api' }],
+      ['reason code', { ...validSubscriptionBilling, reasonCode: 'FOREIGN_REASON' }],
+      ['state', { ...validSubscriptionBilling, state: 'foreign' }],
+      ['evidence digest', { ...validSubscriptionBilling, evidenceDigest: digest('e') }],
+      ['evidence injection', { ...validSubscriptionBilling, evidence: billingEvidence }],
+    ] as const) {
+      const rejection = await acceptSubscriptionCompletion({
+        ...subscriptionCompletion,
+        providerBilling,
+      }).then(
+        () => null,
+        error => error,
+      );
+      const rejectionDiagnostic = rejection instanceof Error
+        ? `${tamper}: ${rejection.stack ?? rejection.message}`
+        : `${tamper}: ${String(rejection)}`;
+      expect(rejection, rejectionDiagnostic).toBeInstanceOf(Error);
+      expect((rejection as Error).message, rejectionDiagnostic)
+        .toMatch(/COMPLETION_IDENTITY_MISMATCH/);
+      expect(store.publishHostArtifact).not.toHaveBeenCalled();
+      expect(store.appendChain).not.toHaveBeenCalled();
+    }
+    await expect(acceptSubscriptionCompletion(hotSubscriptionCompletion)).resolves.toMatchObject({
+      kind: 'accepted-result',
+      result: {
+        selfAssessment: 'NO_GO',
+        cost: { usd: 0, billingMode: 'subscription' },
+        filesChanged: [
+          { path: 'tests/z.ts', status: 'modified', linesAdded: 1, linesRemoved: 1 },
+          { path: 'tests/a.ts', status: 'added', linesAdded: 2, linesRemoved: 0 },
+        ],
+      },
+    });
+    acceptedBytes = null;
+    acceptedReceipt = null;
+    acceptedChain = null;
+    store.publishHostArtifact.mockClear();
+    store.appendChain.mockClear();
+    internals.exactRecoveredAcceptedResults.delete(admissionRefDigest);
+    internals.exactCustodyProviderStarts.set(admissionRefDigest, providerStartReceipt);
+    internals.exactCustodyProviderExecutions.set(admissionRefDigest, providerExecutionReceipt);
+    await expect(acceptSubscriptionCompletion(coldSubscriptionCompletion)).resolves.toMatchObject({
+      kind: 'accepted-result',
+      result: {
+        selfAssessment: 'NO_GO',
+        cost: { usd: 0, billingMode: 'subscription' },
+        filesChanged: [
+          { path: 'tests/z.ts', status: 'modified', linesAdded: 1, linesRemoved: 1 },
+          { path: 'tests/a.ts', status: 'added', linesAdded: 2, linesRemoved: 0 },
+        ],
+      },
+    });
+    acceptedBytes = null;
+    acceptedReceipt = null;
+    acceptedChain = null;
+    store.publishHostArtifact.mockClear();
+    store.appendChain.mockClear();
+    internals.exactRecoveredAcceptedResults.delete(admissionRefDigest);
+    activeProviderStreamArtifact = durableProviderStreamArtifact;
+    internals.exactCustodyCompletions.set(admissionRefDigest, {
+      scope, query, providerStartReceipt, providerExecutionReceipt,
+      promise: Promise.resolve(completion),
+    });
+
+    const reboundUsageEvidence = {
+      ...usageEvidence,
+      capturedAt: '2026-09-01T00:00:00.999Z',
+    };
+    const reboundUsageCompletion = {
+      ...completion,
+      providerUsage: {
+        ...completion.providerUsage,
+        evidence: reboundUsageEvidence,
+        evidenceDigest: `sha256:${createHash('sha256')
+          .update(canonicalJson(reboundUsageEvidence)).digest('hex')}` as const,
+      },
+    };
+    internals.exactCustodyCompletions.set(admissionRefDigest, {
+      scope, query, providerStartReceipt, providerExecutionReceipt,
+      promise: Promise.resolve(reboundUsageCompletion),
+    });
+    await expect(backend.acceptExactDockerCustodyResult({
+      query,
+      authority: {
+        taskId: identity.taskId,
+        workerId: 'worker-fixture-001',
+        provider: 'codex',
+        model: 'gpt-5.6-terra',
+        promptCompilePlanId: task.promptCompilePlanId,
+        isPriorityFix: false,
+        fixForTaskId: null,
+      },
+    } as never)).rejects.toThrow(/COMPLETION_IDENTITY_MISMATCH/);
+    expect(store.publishHostArtifact).not.toHaveBeenCalled();
+    internals.exactCustodyCompletions.set(admissionRefDigest, {
+      scope, query, providerStartReceipt, providerExecutionReceipt,
+      promise: Promise.resolve(hotApiCompletion),
+    });
+
     const accepted = await backend.acceptExactDockerCustodyResult({
       query,
       authority: {
         taskId: identity.taskId,
         workerId: 'worker-fixture-001',
-        provider: 'fixture-provider',
-        model: 'fixture-model',
+        provider: 'codex',
+        model: 'gpt-5.6-terra',
         promptCompilePlanId: task.promptCompilePlanId,
         isPriorityFix: false,
         fixForTaskId: null,
@@ -3552,12 +4738,25 @@ describe('exact Docker custody mounts', () => {
       kind: 'accepted-result',
       result: {
         workerId: 'worker-fixture-001',
-        tokenUsage: { inputTokens: 20, outputTokens: 10, cacheReadTokens: 3 },
+        tokenUsage: {
+          inputTokens: 20_358, outputTokens: 4_209, cacheReadTokens: 92_928,
+          reasoningTokens: 1_637, totalTokens: 117_495,
+        },
         cost: { usd: 2.5, billingMode: 'api' },
         providerBilling: billingEvidence,
+        terminalUsageEvidence: {
+          evidenceDigest: usageEvidenceDigest,
+          providerStreamReceiptDigest,
+          normalizationContract: 'provider-adapter-normalized-v1',
+        },
         promptDeliveryAttribution: { state: 'CURRENT' },
         agent: 'backend-specialist',
         skills: ['delivered-skill'],
+        selfAssessment: 'NO_GO',
+        filesChanged: [
+          { path: 'tests/z.ts', status: 'modified', linesAdded: 1, linesRemoved: 1 },
+          { path: 'tests/a.ts', status: 'added', linesAdded: 2, linesRemoved: 0 },
+        ],
       },
     });
     expect(internals.exactCustodyProviderStarts.size).toBe(0);
@@ -3570,6 +4769,56 @@ describe('exact Docker custody mounts', () => {
     }).toThrow();
     expect(backend.readExactDockerAcceptedResult(accepted.reader).resultDigest)
       .toBe(accepted.resultDigest);
+    expect(backend.readExactDockerAcceptedResult(accepted.reader)).toMatchObject({
+      hostUsageAuthority: {
+        evidenceDigest: usageEvidenceDigest,
+        providerStreamReceiptDigest,
+      },
+    });
+
+    await expect(backend.awaitExactDockerAcceptedResult(query as never)).resolves.toMatchObject({
+      kind: 'accepted-result',
+      resultDigest: accepted.resultDigest,
+      acceptedResultChainDigest: accepted.acceptedResultChainDigest,
+      result: {
+        taskId: identity.taskId,
+        attemptCustody: { identity },
+      },
+    });
+
+    const exactRegistry = createExactNormalDockerExecutionRegistry('/test/project');
+    exactRegistry.registerReleased(identity.taskId, backend, query as never);
+    await expect(exactRegistry.awaitTaskResultAuthority(identity.taskId)).resolves.toMatchObject({
+      state: 'exact-accepted',
+      result: {
+        taskId: identity.taskId,
+        workerId: 'worker-fixture-001',
+      },
+      exactAcceptedAuthority: {
+        identity,
+        admissionReceiptDigest,
+        acceptedResultRef: accepted.acceptedResultRef,
+        acceptedResultChainDigest: accepted.acceptedResultChainDigest,
+        resultDigest: accepted.resultDigest,
+      },
+    });
+
+    const siblingTaskId = `${identity.taskId}-sibling`;
+    const siblingQuery = {
+      ...query,
+      custodyRef: {
+        ...query.custodyRef,
+        identity: { ...identity, taskId: siblingTaskId },
+      },
+    };
+    await expect(backend.awaitExactDockerAcceptedResult(siblingQuery as never))
+      .rejects.toThrow(/EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH/);
+    const siblingRegistry = createExactNormalDockerExecutionRegistry('/test/project');
+    siblingRegistry.registerReleased(siblingTaskId, backend, siblingQuery as never);
+    await expect(siblingRegistry.awaitTaskResultAuthority(siblingTaskId)).resolves.toMatchObject({
+      state: 'authority-hold',
+      holdReason: 'EXACT_ACCEPTANCE_FAILED',
+    });
 
     const acceptedEffectAuthority = {
       projection: effectProjection,
@@ -3584,17 +4833,38 @@ describe('exact Docker custody mounts', () => {
         scope: unknown,
         query: unknown,
         providerExit: unknown,
+        readOnly?: boolean,
       ): Record<string, unknown> | null;
     }).readColdExactDockerAcceptedResult.bind(coldBackend);
     const pristineAcceptedChain = acceptedChain;
+    const pristineAcceptedArtifact = acceptedBytes;
+    const pristineAcceptedReceiptForReadOnly = acceptedReceipt;
     acceptedChain = null;
     store.appendChain.mockClear();
+    store.publishHostArtifact.mockClear();
+    mockLifecycleStoreAdmissionAdapter.mockReturnValueOnce({
+      readAcceptedAuthority: vi.fn(() => acceptedEffectAuthority),
+    } as never);
+    expect(readColdAccepted(scope, query, providerExit, true)).toBeNull();
+    expect(acceptedBytes).toBe(pristineAcceptedArtifact);
+    expect(acceptedReceipt).toBe(pristineAcceptedReceiptForReadOnly);
+    expect(acceptedChain).toBeNull();
+    expect(store.appendChain).not.toHaveBeenCalled();
+    expect(store.publishHostArtifact).not.toHaveBeenCalled();
+
     mockLifecycleStoreAdmissionAdapter.mockReturnValueOnce({
       readAcceptedAuthority: vi.fn(() => acceptedEffectAuthority),
     } as never);
     expect(readColdAccepted(scope, query, providerExit)).toMatchObject({
       kind: 'accepted-result',
       acceptedResultChainDigest: digest('b'),
+      result: {
+        terminalUsageEvidence: {
+          evidenceDigest: usageEvidenceDigest,
+          providerStreamReceiptDigest,
+          normalizationContract: 'provider-adapter-normalized-v1',
+        },
+      },
     });
     expect(store.appendChain).toHaveBeenCalledTimes(1);
     expect(store.appendChain).toHaveBeenCalledWith(expect.objectContaining({
@@ -3603,6 +4873,16 @@ describe('exact Docker custody mounts', () => {
     }));
 
     store.appendChain.mockClear();
+    mockLifecycleStoreAdmissionAdapter.mockReturnValueOnce({
+      readAcceptedAuthority: vi.fn(() => acceptedEffectAuthority),
+    } as never);
+    expect(readColdAccepted(scope, query, providerExit, true)).toMatchObject({
+      kind: 'accepted-result',
+      acceptedResultChainDigest: digest('b'),
+    });
+    expect(store.appendChain).not.toHaveBeenCalled();
+    expect(store.publishHostArtifact).not.toHaveBeenCalled();
+
     mockLifecycleStoreAdmissionAdapter.mockReturnValueOnce({
       readAcceptedAuthority: vi.fn(() => acceptedEffectAuthority),
     } as never);
@@ -3633,13 +4913,53 @@ describe('exact Docker custody mounts', () => {
       .get(accepted.reader as object)!;
     const pristineAcceptedBytes = acceptedBytes!;
     const pristineAcceptedReceipt = acceptedReceipt!;
+    const {
+      attemptCustody: acceptedAttemptCustody,
+      schemaVersion: _acceptedSchemaVersion,
+      ...acceptedV1
+    } = accepted.result;
+    const {
+      hostPromotion: _acceptedHostPromotion,
+      ...acceptedSourceBinding
+    } = acceptedAttemptCustody;
+    const markerTamperedResult = createProductionTaskResultV2({
+      result: {
+        ...acceptedV1,
+        schemaVersion: '1.0',
+        terminalUsageEvidence: {
+          ...accepted.result.terminalUsageEvidence!,
+          providerStreamReceiptDigest: digest('f'),
+        },
+      },
+      attemptCustody: acceptedSourceBinding,
+      jsonBounds: policy.jsonBounds,
+    });
+    acceptedBytes = Buffer.from(canonicalJson(markerTamperedResult));
+    acceptedReceipt = {
+      ...pristineAcceptedReceipt,
+      artifact: {
+        sha256: `sha256:${createHash('sha256').update(acceptedBytes).digest('hex')}`,
+        byteLength: acceptedBytes.byteLength,
+      },
+    };
+    acceptedReaderInternals.exactAcceptedResultReaders.set(accepted.reader as object, {
+      ...pristineReaderEntry,
+      resultDigest: taskResultV2Digest(markerTamperedResult, policy.jsonBounds),
+    });
+    expect(() => backend.readExactDockerAcceptedResult(accepted.reader))
+      .toThrow(/ACCEPTED_RESULT_READER_INVALID/);
+    acceptedBytes = pristineAcceptedBytes;
+    acceptedReceipt = pristineAcceptedReceipt;
+    acceptedReaderInternals.exactAcceptedResultReaders.set(
+      accepted.reader as object, pristineReaderEntry,
+    );
     const forgedAcceptedResult = assembleCanonicalIngressResultV2(
       JSON.parse(Buffer.from(rawWorkerResultBytes).toString('utf8')),
       {
         taskId: identity.taskId,
         workerId: 'forged-semantic-worker',
-        provider: 'fixture-provider',
-        model: 'fixture-model',
+        provider: 'codex',
+        model: 'gpt-5.6-terra',
         promptCompilePlanId: task.promptCompilePlanId,
         isPriorityFix: false,
         fixForTaskId: null,
@@ -3648,7 +4968,13 @@ describe('exact Docker custody mounts', () => {
         attemptCustody: sourceBinding,
         hostWorkArtifact: hostWorkArtifactBinding,
         jsonBounds: policy.jsonBounds,
+        hostTerminalUsage: {
+          evidence: usageEvidence,
+          evidenceDigest: usageEvidenceDigest,
+          providerStreamReceiptDigest,
+        },
         hostTerminalBilling: {
+          state: 'available',
           evidence: billingEvidence,
           evidenceDigest: billingEvidenceDigest,
           providerStreamReceiptDigest,

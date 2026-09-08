@@ -61,6 +61,7 @@ import type {
   TaskAttemptCustodyArtifactReceiptV2,
   TaskAttemptCustodyIdentityV2,
 } from '../../src/core/task-attempt-custody-store.js';
+import { taskAttemptCustodyArtifactDataRelativePath } from '../../src/core/task-attempt-custody-store.js';
 
 // Backward compat: these should also be importable from worker-ipc.ts
 import {
@@ -421,15 +422,22 @@ describe('result-collector.ts re-export shim backward compat', () => {
 const digest = (char: string): Sha256Digest => `sha256:${char.repeat(64)}` as Sha256Digest;
 
 function exactIdentity(overrides: Partial<TaskAttemptCustodyIdentityV2> = {}): TaskAttemptCustodyIdentityV2 {
+  const attemptLabel = overrides.attemptId ?? 'attempt-a';
+  const hex = createHash('sha256').update(attemptLabel).digest('hex');
+  const attemptId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+    .test(attemptLabel)
+    ? attemptLabel
+    : `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+  const { attemptId: _attemptId, ...rest } = overrides;
   return {
     schemaVersion: 2,
     backend: 'docker',
     projectRootSha256: 'a'.repeat(64),
     projectId: 'project-a',
     taskId: 'ipc-exact-001',
-    attemptId: 'attempt-a',
+    attemptId,
     generation: 3,
-    ...overrides,
+    ...rest,
   };
 }
 
@@ -449,7 +457,11 @@ function questionReceipt(
     capturedAt: '2026-09-01T08:00:00.000Z',
     policyDigest: digest('c'),
     artifact: {
-      relativePath: `projects/project-a/tasks/${identity.taskId}/attempts/${identity.attemptId}/worker-output/task-${identity.taskId}.question` as never,
+      relativePath: taskAttemptCustodyArtifactDataRelativePath({
+        identity,
+        artifactClass: 'worker-ipc-question',
+        artifactKey: `ipc-question-${sequence}`,
+      }),
       sha256: `sha256:${createHash('sha256').update(privateQuestionBytes).digest('hex')}`,
       byteLength: privateQuestionBytes.byteLength,
       volumeId: 'volume-a',
@@ -459,6 +471,34 @@ function questionReceipt(
       durabilityEvidenceDigest: digest('f'),
     },
     receiptDigest: digest('1'),
+  };
+}
+
+function questionCursor(
+  identity: TaskAttemptCustodyIdentityV2,
+  receipt: TaskAttemptCustodyArtifactReceiptV2,
+  sequence: number,
+  admissionReceiptDigest: Sha256Digest = receipt.admissionReceiptDigest,
+) {
+  return {
+    schemaVersion: 2 as const,
+    kind: 'task-attempt-custody-worker-ipc-conversation-cursor' as const,
+    state: 'question-open' as const,
+    identity,
+    admissionReceiptDigest,
+    policyDigest: digest('c'),
+    dispatchRequestId: `dreq-${'d'.repeat(64)}`,
+    sequence,
+    nextSequence: null,
+    predecessorCursorReceiptDigest: sequence === 1 ? null : digest('0'),
+    sealedSourceReceiptDigest: digest('4'),
+    sourceFileIdentityDigest: digest('5'),
+    sourceEpoch: sequence,
+    questionArtifactKey: `ipc-question-${sequence}`,
+    questionReceiptDigest: receipt.receiptDigest,
+    questionArtifactSha256: receipt.artifact.sha256,
+    recordedAt: receipt.capturedAt,
+    cursorReceiptDigest: digest('6'),
   };
 }
 
@@ -483,11 +523,13 @@ function exactQuestionAuthority(
     ...questionReceipt(identity, privateQuestionBytes, sequence),
     admissionReceiptDigest,
   };
+  const conversationCursor = questionCursor(identity, receipt, sequence, admissionReceiptDigest);
   return createExactAttemptIpcQuestionAuthority({
     expectedIdentity: identity,
     admissionReceiptDigest,
     fenceDigest: bindings.fenceDigest ?? digest('2'),
     sequence,
+    conversationCursor,
     privateQuestionBytes,
     privateQuestionReceipt: receipt,
   });
@@ -501,6 +543,8 @@ function answerPublisher(): ExactAttemptIpcPrivateAnswerPublisher {
         kind: 'task-attempt-ipc-private-answer-receipt' as const,
         identity: input.identity,
         admissionReceiptDigest: input.admissionReceiptDigest,
+        dispatchRequestId: input.dispatchRequestId,
+        questionCursorReceiptDigest: input.expectedCursorReceiptDigest,
         fenceDigest: input.fenceDigest,
         sequence: input.sequence,
         questionReceiptDigest: input.questionReceiptDigest,
@@ -561,14 +605,16 @@ describe('normal Docker exact-attempt IPC authority', () => {
       question: 'spoof?',
       timestamp: '2026-09-01T08:00:00.000Z',
     }), 'utf8');
+    const siblingReceipt = questionReceipt(sibling, expectedBytes);
 
     expect(() => createExactAttemptIpcQuestionAuthority({
       expectedIdentity: expected,
       admissionReceiptDigest: digest('b'),
       fenceDigest: digest('2'),
       sequence: 1,
+      conversationCursor: questionCursor(sibling, siblingReceipt, 1),
       privateQuestionBytes: expectedBytes,
-      privateQuestionReceipt: questionReceipt(sibling, expectedBytes),
+      privateQuestionReceipt: siblingReceipt,
     })).toThrowError(ExactAttemptIpcHold);
 
     const spoofedTaskBytes = Buffer.from(JSON.stringify({
@@ -577,14 +623,16 @@ describe('normal Docker exact-attempt IPC authority', () => {
       question: 'spoof?',
       timestamp: '2026-09-01T08:00:00.000Z',
     }), 'utf8');
+    const spoofedReceipt = questionReceipt(expected, spoofedTaskBytes);
 
     expect(() => createExactAttemptIpcQuestionAuthority({
       expectedIdentity: expected,
       admissionReceiptDigest: digest('b'),
       fenceDigest: digest('2'),
       sequence: 1,
+      conversationCursor: questionCursor(expected, spoofedReceipt, 1),
       privateQuestionBytes: spoofedTaskBytes,
-      privateQuestionReceipt: questionReceipt(expected, spoofedTaskBytes),
+      privateQuestionReceipt: spoofedReceipt,
     })).toThrowError(ExactAttemptIpcHold);
   });
 
@@ -602,14 +650,16 @@ describe('normal Docker exact-attempt IPC authority', () => {
       question: 'Swapped public content',
       timestamp: '2026-09-01T08:00:00.000Z',
     }), 'utf8');
+    const originalReceipt = questionReceipt(expected, originalBytes);
 
     expect(() => createExactAttemptIpcQuestionAuthority({
       expectedIdentity: expected,
       admissionReceiptDigest: digest('b'),
       fenceDigest: digest('2'),
       sequence: 1,
+      conversationCursor: questionCursor(expected, originalReceipt, 1),
       privateQuestionBytes: swappedBytes,
-      privateQuestionReceipt: questionReceipt(expected, originalBytes),
+      privateQuestionReceipt: originalReceipt,
     })).toThrowError(ExactAttemptIpcHold);
   });
 
@@ -622,14 +672,16 @@ describe('normal Docker exact-attempt IPC authority', () => {
       context: 'x'.repeat(128 * 1024 + 1),
       timestamp: '2026-09-01T08:00:00.000Z',
     }), 'utf8');
+    const oversizedContextReceipt = questionReceipt(identity, privateQuestionBytes);
 
     expect(() => createExactAttemptIpcQuestionAuthority({
       expectedIdentity: identity,
       admissionReceiptDigest: digest('b'),
       fenceDigest: digest('2'),
       sequence: 1,
+      conversationCursor: questionCursor(identity, oversizedContextReceipt, 1),
       privateQuestionBytes,
-      privateQuestionReceipt: questionReceipt(identity, privateQuestionBytes),
+      privateQuestionReceipt: oversizedContextReceipt,
     })).toThrowError(ExactAttemptIpcHold);
 
     const oversizedQuestionBytes = Buffer.from(JSON.stringify({
@@ -638,13 +690,15 @@ describe('normal Docker exact-attempt IPC authority', () => {
       question: 'x'.repeat(128 * 1024 + 1),
       timestamp: '2026-09-01T08:00:00.000Z',
     }), 'utf8');
+    const oversizedQuestionReceipt = questionReceipt(identity, oversizedQuestionBytes);
     expect(() => createExactAttemptIpcQuestionAuthority({
       expectedIdentity: identity,
       admissionReceiptDigest: digest('b'),
       fenceDigest: digest('2'),
       sequence: 1,
+      conversationCursor: questionCursor(identity, oversizedQuestionReceipt, 1),
       privateQuestionBytes: oversizedQuestionBytes,
-      privateQuestionReceipt: questionReceipt(identity, oversizedQuestionBytes),
+      privateQuestionReceipt: oversizedQuestionReceipt,
     })).toThrowError(ExactAttemptIpcHold);
 
     const oversizedIdentity = exactIdentity({ projectId: 'x'.repeat(129) });
@@ -700,6 +754,8 @@ describe('normal Docker exact-attempt IPC authority', () => {
     expect(publisher.publishAnswerFirstWriter).toHaveBeenCalledTimes(1);
     const privatePublication = vi.mocked(publisher.publishAnswerFirstWriter).mock.calls[0]?.[0];
     expect(privatePublication?.artifactKey).toBe('ipc-answer-1');
+    expect(privatePublication?.dispatchRequestId).toBe(authority.dispatchRequestId);
+    expect(privatePublication?.expectedCursorReceiptDigest).toBe(authority.cursorReceiptDigest);
     expect(privatePublication?.destinationChildRelativePath)
       .toBe(`task-${authority.identity.taskId}.answer`);
     const workerMount = mkdtempSync(join(tmpdir(), 'ipc-exact-worker-mount-'));
@@ -717,14 +773,14 @@ describe('normal Docker exact-attempt IPC authority', () => {
       kind: 'task-attempt-ipc-compatibility-projection',
       authority: 'private-receipt-only',
       generation: 3,
-      attemptId: 'attempt-a',
+      attemptId: authority.identity.attemptId,
       question: 'May I continue with the exact attempt?',
     });
     expect(JSON.parse(readFileSync(getAnswerPath(tmpDir, authority.identity.taskId), 'utf8'))).toMatchObject({
       kind: 'task-attempt-ipc-compatibility-projection',
       authority: 'private-receipt-only',
       generation: 3,
-      attemptId: 'attempt-a',
+      attemptId: authority.identity.attemptId,
       action: 'continue',
     });
     expect(readQuestionFile(tmpDir, authority.identity.taskId)?.question)

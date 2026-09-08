@@ -9,6 +9,7 @@ import {
 } from '../../src/orchestra/codex-spawn-readiness.js';
 import { DEFAULT_WORKER_IMAGE, type SpawnImpl, type SpawnedProcessLike } from '../../src/core/worker-image-check.js';
 import { CODEX_USAGE_EMIT_ARGS } from '../../src/providers/codex.js';
+import { loadExecAuthorityNative } from '../../src/core/exec-authority-native.js';
 
 // ─── Hermetic fake spawn helpers (no real `codex`/`docker` binary, no network) ─
 
@@ -47,7 +48,19 @@ function makeCodexHostSpawn(routes: { version?: CannedResult; auth?: CannedResul
 /** Routes `docker image inspect` vs `docker run` calls to canned results (mirrors worker-image-check.test.ts). */
 function makeDockerSpawn(routes: { inspect?: CannedResult; run?: CannedResult }): ReturnType<typeof vi.fn<SpawnImpl>> {
   return vi.fn<SpawnImpl>((_command, args) => {
-    const result: CannedResult = args[0] === 'image' ? routes.inspect ?? {} : routes.run ?? {};
+    const result: CannedResult = args[0] === 'image'
+      ? routes.inspect ?? {}
+      : args.includes('node')
+        ? { code: 0, stdout: JSON.stringify({
+            manifest: loadExecAuthorityNative().manifest,
+            dependencySource: {
+              schemaVersion: 1,
+              kind: 'worker-image-dependency-source',
+              path: '/app/node_modules',
+              state: 'AVAILABLE',
+            },
+          }) }
+        : routes.run ?? {};
     return makeChild(result);
   });
 }

@@ -136,12 +136,14 @@ describe('formatWorkerImageLines — unchanged output, now sourced from doctorSt
     state: 'ready',
     missingClis: [],
     missingCaCerts: false,
+    missingRuntimeAuthority: false,
     suggestedBuildCmd: 'docker build .',
   };
   const missingReport: WorkerImageReport = {
     state: 'missing',
     missingClis: ['codex'],
     missingCaCerts: false,
+    missingRuntimeAuthority: true,
     suggestedBuildCmd: 'docker build --build-arg WITH_CODEX=1 .',
   };
 

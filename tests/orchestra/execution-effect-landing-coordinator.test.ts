@@ -25,6 +25,7 @@ import {
   createExecutionEffectLandingStagedChunkV1,
   createExecutionEffectLandingStagedSourceV1,
   executionEffectLandingIntentDigestV1,
+  executionEffectLandingPretransactionHoldDigestV1,
   executionEffectLandingWorkspaceIdentityDigestV1,
   prepareExecutionEffectLandingV1,
   readExecutionEffectLandingLocatorV1,
@@ -597,6 +598,107 @@ describe('execution effect landing coordinator', () => {
       expect(() => executionEffectLandingIntentDigestV1(
         candidate as Parameters<typeof executionEffectLandingIntentDigestV1>[0],
       )).toThrow(TypeError);
+    }
+  });
+
+  it.each([
+    ['capture', 'STAGED_SOURCE_CAPTURE_FAILED'],
+    ['authority', 'STAGED_SOURCE_AUTHORITY_MISMATCH'],
+  ] as const)('distinguishes staged-source %s failure from project preimage mismatch', async (failure, code) => {
+    const change = basicChange();
+    const environment = fakeEnvironment(change.baseline);
+    let acquired = false;
+    const outcome = await prepareExecutionEffectLandingV1({
+      planId: 'plan-stage-failure', ...change,
+      adapters: {
+        ...environment.adapters,
+        native: {
+          ...environment.adapters.native,
+          async stageSource() {
+            if (failure === 'capture') throw new Error('FOREIGN_SECRET /private/staging');
+            return null as never;
+          },
+        },
+        lease: {
+          ...environment.adapters.lease,
+          acquire(transactionDigest) {
+            acquired = true;
+            return environment.adapters.lease.acquire(transactionDigest);
+          },
+        },
+      },
+    });
+    expect(outcome).toMatchObject({ state: 'HOLD', code, stage: 'prepare', transactionDigest: null });
+    if (outcome.state === 'HOLD') expect(outcome.holdDigest).toBe(executionEffectLandingPretransactionHoldDigestV1(code));
+    expect(JSON.stringify(outcome)).not.toMatch(/FOREIGN_SECRET|private\/staging/u);
+    expect(acquired).toBe(false);
+    expect(environment.journalEntries.size).toBe(0);
+  });
+
+  it.each([
+    ['staged', 'mismatch', 'STAGED_SOURCE_AUTHORITY_MISMATCH'],
+    ['staged', 'exception', 'STAGED_SOURCE_REVALIDATION_FAILED'],
+    ['entry', 'mismatch', 'PREIMAGE_MISMATCH'],
+    ['entry', 'exception', 'PREIMAGE_REVALIDATION_FAILED'],
+    ['parent', 'mismatch', 'PARENT_AUTHORITY_MISMATCH'],
+    ['parent', 'exception', 'PARENT_AUTHORITY_REVALIDATION_FAILED'],
+  ] as const)('preserves post-lease %s %s leaf and context even if quarantine publication throws', async (boundary, failure, code) => {
+    const change = basicChange();
+    let priorContext: string | undefined;
+    for (const quarantineThrows of [false, true]) {
+      const environment = fakeEnvironment(change.baseline);
+      let acquired = false;
+      const native = environment.adapters.native;
+      const outcome = await prepareExecutionEffectLandingV1({
+        planId: 'plan-post-lease-revalidation', ...change,
+        adapters: {
+          ...environment.adapters,
+          native: {
+            ...native,
+            verifyStagedSource(source) {
+              if (acquired && boundary === 'staged') {
+                if (failure === 'exception') throw new Error('FOREIGN_SECRET /private/staged-bytes');
+                return false;
+              }
+              return native.verifyStagedSource(source);
+            },
+            inspectProjectEntry(path) {
+              if (acquired && ((boundary === 'entry' && path === 'source.ts') || (boundary === 'parent' && path === '.'))) {
+                if (failure === 'exception') throw new Error('FOREIGN_SECRET /private/project');
+                return createExecutionEffectLandingEntryStateV1({ entry: null });
+              }
+              return native.inspectProjectEntry(path);
+            },
+          },
+          lease: {
+            ...environment.adapters.lease,
+            acquire(transactionDigest) {
+              acquired = true;
+              return environment.adapters.lease.acquire(transactionDigest);
+            },
+            quarantine(candidate, boundaryState, evidence) {
+              if (quarantineThrows) throw new Error('FOREIGN_SECRET /private/quarantine');
+              return environment.adapters.lease.quarantine(candidate, boundaryState, evidence);
+            },
+          },
+        },
+      });
+      expect(outcome).toMatchObject({ state: 'HOLD', code, stage: 'prepare' });
+      if (outcome.state !== 'HOLD') throw new Error('Expected post-lease hold');
+      expect(outcome.transactionDigest).toMatch(/^sha256:[a-f0-9]{64}$/u);
+      expect(outcome.holdDigest).not.toBe(executionEffectLandingPretransactionHoldDigestV1(code));
+      expect(outcome.evidenceDigests).toContain(outcome.transactionDigest);
+      expect(outcome.evidenceDigests).toHaveLength(quarantineThrows ? 2 : 3);
+      const context = quarantineThrows
+        ? outcome.evidenceDigests.find(value => value !== outcome.transactionDigest)!
+        : environment.quarantineEvidence[0]![1]!;
+      expect(context).toMatch(/^sha256:[a-f0-9]{64}$/u);
+      expect(outcome.evidenceDigests).toContain(context);
+      if (priorContext !== undefined) expect(context).toBe(priorContext);
+      priorContext = context;
+      expect(JSON.stringify(outcome)).not.toMatch(/FOREIGN_SECRET|private\/|source\.ts|staged-bytes/u);
+      expect(environment.journalEntries.size).toBe(0);
+      expect(environment.projectEntries.get('source.ts')?.state).toBe('PRESENT');
     }
   });
 

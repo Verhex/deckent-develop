@@ -165,6 +165,7 @@ export type TaskAttemptCustodyHoldCode =
   | 'DISPATCH_REQUEST_INVALID'
   | 'DISPATCH_REQUEST_CONFLICT'
   | 'DISPATCH_RESERVATION_RECONCILIATION_REQUIRED'
+  | 'DISPATCH_RESERVATION_RETIRED'
   | 'DISPATCH_AUTHORITY_INVALID'
   | 'DISPATCH_AUTHORITY_CONFLICT'
   | 'DISPATCH_TRANSITION_INVALID'
@@ -924,6 +925,31 @@ export interface TaskAttemptCustodyDispatchReservationV2 {
   readonly receiptDigest: Sha256Digest;
 }
 
+/** Host-authored recovery authority already verified by the canonical Sprint
+ * recovery boundary. The Store binds it to one reservation but never derives
+ * approval or coordinator-death truth itself. */
+export interface TaskAttemptCustodyDispatchRecoveryAuthorityV2 {
+  readonly executionId: string;
+  readonly taskId: string;
+  readonly attemptId: string;
+  readonly fenceToken: string;
+  readonly approvalRef: string;
+  readonly idempotencyKey: string;
+}
+
+export interface TaskAttemptCustodyDispatchReservationTransitionV2 {
+  readonly schemaVersion: typeof TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION;
+  readonly kind: 'task-attempt-custody-dispatch-reservation-transition';
+  readonly state: 'ADMISSION_CLAIMED' | 'RETIRED_BEFORE_ADMISSION';
+  readonly reservationReceiptDigest: Sha256Digest;
+  readonly taskSnapshotDigest: Sha256Digest;
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly recoveryAuthority: TaskAttemptCustodyDispatchRecoveryAuthorityV2 | null;
+  readonly recoveryAuthorityDigest: Sha256Digest | null;
+  readonly recordedAt: string;
+  readonly receiptDigest: Sha256Digest;
+}
+
 /** Durable ref handed to physical custody. It contains no source/absolute path. */
 export interface TaskAttemptCustodyDispatchAdmissionRefV2 {
   readonly schemaVersion: typeof TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION;
@@ -945,6 +971,11 @@ export type TaskAttemptCustodyDispatchAdmissionReadV2 =
       readonly reconciliationRef: Sha256Digest;
     }>
   | Readonly<{
+      readonly state: 'retired-before-admission';
+      readonly reservation: TaskAttemptCustodyDispatchReservationV2;
+      readonly transition: TaskAttemptCustodyDispatchReservationTransitionV2;
+    }>
+  | Readonly<{
       readonly state: 'admitted';
       readonly reservation: TaskAttemptCustodyDispatchReservationV2;
       readonly admission: TaskAttemptCustodyAdmissionV2;
@@ -958,11 +989,45 @@ export type TaskAttemptCustodyDispatchDiscoveryEntryV2 =
       readonly reconciliationRef: Sha256Digest;
     }>
   | Readonly<{
+      readonly state: 'retired-before-admission';
+      readonly reservation: TaskAttemptCustodyDispatchReservationV2;
+      readonly transition: TaskAttemptCustodyDispatchReservationTransitionV2;
+    }>
+  | Readonly<{
       readonly state: 'admitted';
       readonly reservation: TaskAttemptCustodyDispatchReservationV2;
       readonly admission: TaskAttemptCustodyAdmissionV2;
       readonly ref: TaskAttemptCustodyDispatchAdmissionRefV2;
-    }>;
+    }>
+  | TaskAttemptCustodyDispatchQuarantinedHistoryV2;
+
+export interface TaskAttemptCustodyHistoricalAdmissionQuarantineV2 {
+  readonly schemaVersion: typeof TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION;
+  readonly kind: 'task-attempt-custody-historical-admission-quarantine';
+  readonly state: 'QUARANTINED_NO_EFFECT_CUSTODY_EPOCH';
+  readonly dispatchRequestId: string;
+  readonly reservationReceiptDigest: Sha256Digest;
+  readonly historicalAdmissionReceiptDigest: Sha256Digest;
+  readonly historicalTerminalReceiptDigest: Sha256Digest;
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly observedCustodyHoldCode: TaskAttemptCustodyHoldCode;
+  readonly previousCustodyRootId: Sha256Digest;
+  readonly previousCustodyCapabilityEvidenceDigest: Sha256Digest;
+  readonly currentCustodyRootId: Sha256Digest;
+  readonly currentCustodyCapabilityEvidenceDigest: Sha256Digest;
+  readonly recoveryAuthority: TaskAttemptCustodyDispatchRecoveryAuthorityV2;
+  readonly recoveryAuthorityDigest: Sha256Digest;
+  readonly recordedAt: string;
+  readonly receiptDigest: Sha256Digest;
+}
+
+export interface TaskAttemptCustodyDispatchQuarantinedHistoryV2 {
+  readonly state: 'quarantined-historical-admission';
+  readonly reservation: TaskAttemptCustodyDispatchReservationV2;
+  readonly historicalAdmission: TaskAttemptCustodyAdmissionV2;
+  readonly historicalTerminal: TaskAttemptCustodyDispatchNotDispatchedAuthorityV2;
+  readonly quarantine: TaskAttemptCustodyHistoricalAdmissionQuarantineV2;
+}
 
 /**
  * An identity-bound admission that recovery discovered but could not reread.
@@ -970,7 +1035,7 @@ export type TaskAttemptCustodyDispatchDiscoveryEntryV2 =
  * no admission or terminal authority is inferred from this diagnostic.
  */
 export interface TaskAttemptCustodyDispatchRecoveryHoldV2 {
-  readonly state: 'admission-hold';
+  readonly state: 'admission-graph-hold';
   readonly reservation: TaskAttemptCustodyDispatchReservationV2;
   readonly candidateLocatorDigest: Sha256Digest;
   readonly custodyHoldCode: TaskAttemptCustodyHoldCode;
@@ -987,6 +1052,8 @@ export interface TaskAttemptCustodyDispatchAdmissionListV2 {
   readonly candidateCount: number;
   readonly admittedCount: number;
   readonly pendingAdmissionCount: number;
+  readonly retiredBeforeAdmissionCount: number;
+  readonly quarantinedHistoricalAdmissionCount: number;
   readonly maxEntries: number;
   readonly maxNameBytes: number;
   readonly deadlineAt: string;
@@ -1006,6 +1073,8 @@ export interface TaskAttemptCustodyDispatchRecoveryListV2 {
   readonly candidateCount: number;
   readonly admittedCount: number;
   readonly pendingAdmissionCount: number;
+  readonly retiredBeforeAdmissionCount: number;
+  readonly quarantinedHistoricalAdmissionCount: number;
   readonly heldAdmissionCount: number;
   readonly maxEntries: number;
   readonly maxNameBytes: number;
@@ -1017,10 +1086,12 @@ export interface TaskAttemptCustodyDispatchRecoveryListV2 {
 export const TASK_ATTEMPT_CUSTODY_NOT_DISPATCHED_REASON_CODES = intrinsicObjectFreeze([
   'PLATFORM_UNSUPPORTED',
   'PROVIDER_UNAVAILABLE',
+  'DEPENDENCY_AUTHORITY_UNAVAILABLE',
   'PROVIDER_AUTH_UNAVAILABLE',
   'EXECUTION_POLICY_REJECTED',
   'DAEMON_ABSENT',
   'PRE_MOUNT_ABORTED',
+  'PORTABLE_PATH_COLLISION',
 ] as const);
 
 export type TaskAttemptCustodyNotDispatchedReasonCode =
@@ -1165,6 +1236,7 @@ export const TASK_ATTEMPT_CUSTODY_DISPATCH_OBSERVATION_CLASSES = intrinsicObject
   'PROVIDER_START',
   'PROVIDER_EXECUTION',
   'PROVIDER_EXIT',
+  'EFFECT_DIAGNOSTIC',
 ] as const);
 
 export type TaskAttemptCustodyDispatchObservationClass =
@@ -1180,6 +1252,7 @@ const TASK_ATTEMPT_CUSTODY_DISPATCH_OBSERVATION_PATH_SEGMENTS: Readonly<Record<
   PROVIDER_START: 'provider-start',
   PROVIDER_EXECUTION: 'provider-execution',
   PROVIDER_EXIT: 'provider-exit',
+  EFFECT_DIAGNOSTIC: 'effect-diagnostic',
 });
 
 /** Path-free durable ref for one exact physical dispatch observation. */
@@ -1197,6 +1270,101 @@ export interface TaskAttemptCustodyDispatchObservationReceiptV2 {
 export interface TaskAttemptCustodyVerifiedDispatchObservationV2 {
   readonly receipt: TaskAttemptCustodyDispatchObservationReceiptV2;
   readonly bytes: Uint8Array;
+}
+
+export interface TaskAttemptCustodyStartedFailedCandidateV2 {
+  readonly state: 'STARTED_FAILED_CANDIDATE';
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly admissionRefDigest: Sha256Digest;
+  readonly admissionReceiptDigest: Sha256Digest;
+  readonly releasedDispatchReceiptDigest: Sha256Digest;
+  readonly providerStartObservationReceiptDigest: Sha256Digest;
+  readonly providerExecutionObservationReceiptDigest: Sha256Digest;
+  readonly providerExitObservationReceiptDigest: Sha256Digest;
+  readonly providerExitObservedAt: string;
+  readonly preservationManifestDigest: Sha256Digest;
+  readonly preservedArtifacts: readonly Readonly<{
+    artifactClass: TaskAttemptCustodyArtifactClass;
+    artifactKey: string;
+    receiptDigest: Sha256Digest;
+    contentDigest: Sha256Digest;
+    byteLength: number;
+  }>[];
+  readonly evidenceDigest: Sha256Digest;
+}
+
+/** Retained failed execution, never NOT_DISPATCHED or successful settlement.
+ * The caller proves fresh coordinator fencing, exact stopped container identity,
+ * and exclusive mutation ownership before passing its stopped-evidence digest.
+ * Store validates durable custody only; it never infers process death from a hash. */
+export interface TaskAttemptCustodyStartedFailedDispatchV2 extends Omit<
+  TaskAttemptCustodyStartedFailedCandidateV2, 'state'
+> {
+  readonly schemaVersion: typeof TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION;
+  readonly kind: 'task-attempt-custody-started-failed-dispatch';
+  readonly state: 'STARTED_FAILED_RETAINED';
+  readonly custodyRootId: Sha256Digest;
+  readonly custodyCapabilityEvidenceDigest: Sha256Digest;
+  readonly recoveryAuthority: TaskAttemptCustodyDispatchRecoveryAuthorityV2;
+  readonly recoveryAuthorityDigest: Sha256Digest;
+  readonly stoppedExecutionEvidenceDigest: Sha256Digest;
+  readonly recordedAt: string;
+  readonly receiptDigest: Sha256Digest;
+}
+
+/**
+ * Core-owned structural projection of evidence whose journal semantics are
+ * verified by the orchestra adapter. Core never imports that adapter: it
+ * rereads every referenced immutable artifact and records the binding.
+ */
+export interface TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2 {
+  readonly phase: 'COMMITTED_JOURNAL_RELEASE_PENDING';
+  readonly landingRecoveryAnchor: TaskAttemptCustodyPreservedArtifactRefV2;
+  readonly readyLifecycle: TaskAttemptCustodyPreservedArtifactRefV2;
+  readonly committedJournal: TaskAttemptCustodyPreservedArtifactRefV2;
+  readonly leaseEvidence: TaskAttemptCustodyPreservedArtifactRefV2;
+  readonly finalEvidence: TaskAttemptCustodyPreservedArtifactRefV2;
+  readonly finalManifest: TaskAttemptCustodyPreservedArtifactRefV2;
+  readonly semanticVerifier: 'orchestra-required-v1';
+  readonly semanticEvidenceDigest: Sha256Digest;
+}
+
+export interface TaskAttemptCustodyPreservedArtifactRefV2 {
+  readonly artifactClass: TaskAttemptCustodyArtifactClass;
+  readonly artifactKey: string;
+  readonly receiptDigest: Sha256Digest;
+  readonly contentDigest: Sha256Digest;
+  readonly byteLength: number;
+}
+
+export interface TaskAttemptCustodyEffectCommittedReleasePendingCandidateV2 {
+  readonly state: 'EFFECT_COMMITTED_RELEASE_PENDING_CANDIDATE';
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly admissionRefDigest: Sha256Digest;
+  readonly admissionReceiptDigest: Sha256Digest;
+  readonly releasedDispatchReceiptDigest: Sha256Digest;
+  readonly providerExitObservationReceiptDigest: Sha256Digest;
+  readonly providerExitObservedAt: string;
+  readonly evidence: TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2;
+  readonly preservedArtifacts: readonly TaskAttemptCustodyPreservedArtifactRefV2[];
+  readonly preservationManifestDigest: Sha256Digest;
+  readonly evidenceDigest: Sha256Digest;
+}
+
+export interface TaskAttemptCustodyEffectCommittedReleasePendingDispatchV2 extends Omit<
+  TaskAttemptCustodyEffectCommittedReleasePendingCandidateV2, 'state'
+> {
+  readonly schemaVersion: typeof TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION;
+  readonly kind: 'task-attempt-custody-effect-committed-release-pending-dispatch';
+  readonly state: 'COMMITTED_JOURNAL_RELEASE_PENDING';
+  readonly custodyRootId: Sha256Digest;
+  readonly custodyCapabilityEvidenceDigest: Sha256Digest;
+  readonly recoveryAuthority: TaskAttemptCustodyDispatchRecoveryAuthorityV2;
+  readonly recoveryAuthorityDigest: Sha256Digest;
+  readonly stoppedResourceEvidenceDigest: Sha256Digest;
+  readonly hostObservationDigest: Sha256Digest;
+  readonly recordedAt: string;
+  readonly receiptDigest: Sha256Digest;
 }
 
 export interface TaskAttemptCustodyDispatchReconciliationV2 {
@@ -1324,6 +1492,96 @@ export interface TaskAttemptCustodyWorkerIpcAnswerDeliveryReceiptV2 {
   readonly destinationProofDigest: Sha256Digest;
   readonly deliveredAt: string;
   readonly receiptDigest: Sha256Digest;
+}
+
+/** Hard protocol bound: a single attempt cannot grow an unbounded IPC journal. */
+export const TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS = 256 as const;
+
+/**
+ * Backend observation of a byte-identical private question seal. This record is not question
+ * authority by itself: `captureNextWorkerIpcQuestion` additionally requires a Store-issued path
+ * capability and binds the captured immutable artifact proof to these bytes.
+ */
+export interface TaskAttemptCustodyWorkerIpcSealedQuestionSourceV2 {
+  readonly schemaVersion: typeof TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION;
+  readonly kind: 'task-attempt-custody-worker-ipc-sealed-question-source';
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly admissionReceiptDigest: Sha256Digest;
+  readonly dispatchRequestId: string;
+  readonly sequence: number;
+  readonly sourceFileIdentityDigest: Sha256Digest;
+  readonly sourceEpoch: number;
+  readonly sealedChildRelativePath: string;
+  readonly contentSha256: Sha256Digest;
+  readonly byteLength: number;
+  readonly capturedAt: string;
+  readonly receiptDigest: Sha256Digest;
+}
+
+export type TaskAttemptCustodyWorkerIpcConversationCursorV2 =
+  | Readonly<{
+      readonly state: 'empty';
+      readonly identity: TaskAttemptCustodyIdentityV2;
+      readonly admissionReceiptDigest: Sha256Digest;
+      readonly dispatchRequestId: string;
+      readonly nextSequence: 1;
+      readonly cursorReceiptDigest: null;
+    }>
+  | Readonly<{
+      readonly schemaVersion: typeof TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION;
+      readonly kind: 'task-attempt-custody-worker-ipc-conversation-cursor';
+      readonly state: 'question-open';
+      readonly identity: TaskAttemptCustodyIdentityV2;
+      readonly admissionReceiptDigest: Sha256Digest;
+      readonly policyDigest: Sha256Digest;
+      readonly dispatchRequestId: string;
+      readonly sequence: number;
+      readonly nextSequence: null;
+      readonly predecessorCursorReceiptDigest: Sha256Digest | null;
+      readonly sealedSourceReceiptDigest: Sha256Digest;
+      readonly sourceFileIdentityDigest: Sha256Digest;
+      readonly sourceEpoch: number;
+      readonly questionArtifactKey: string;
+      readonly questionReceiptDigest: Sha256Digest;
+      readonly questionArtifactSha256: Sha256Digest;
+      readonly recordedAt: string;
+      readonly cursorReceiptDigest: Sha256Digest;
+    }>
+  | Readonly<{
+      readonly schemaVersion: typeof TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION;
+      readonly kind: 'task-attempt-custody-worker-ipc-conversation-cursor';
+      readonly state: 'answered';
+      readonly identity: TaskAttemptCustodyIdentityV2;
+      readonly admissionReceiptDigest: Sha256Digest;
+      readonly policyDigest: Sha256Digest;
+      readonly dispatchRequestId: string;
+      readonly sequence: number;
+      readonly nextSequence: number | null;
+      readonly predecessorCursorReceiptDigest: Sha256Digest | null;
+      readonly questionCursorReceiptDigest: Sha256Digest;
+      readonly sealedSourceReceiptDigest: Sha256Digest;
+      readonly sourceFileIdentityDigest: Sha256Digest;
+      readonly sourceEpoch: number;
+      readonly questionReceiptDigest: Sha256Digest;
+      readonly answerDeliveryReceiptDigest: Sha256Digest;
+      readonly answeredAt: string;
+      readonly cursorReceiptDigest: Sha256Digest;
+    }>;
+
+export interface TaskAttemptCustodyWorkerIpcQuestionCaptureV2 {
+  readonly question: TaskAttemptCustodyArtifactReceiptV2;
+  readonly cursor: Extract<
+    TaskAttemptCustodyWorkerIpcConversationCursorV2,
+    { readonly state: 'question-open' }
+  >;
+}
+
+export interface TaskAttemptCustodyWorkerIpcAnswerPublicationV2 {
+  readonly delivery: TaskAttemptCustodyWorkerIpcAnswerDeliveryReceiptV2;
+  readonly cursor: Extract<
+    TaskAttemptCustodyWorkerIpcConversationCursorV2,
+    { readonly state: 'answered' }
+  >;
 }
 
 export const TASK_ATTEMPT_CUSTODY_CHAIN_STAGES = [
@@ -1821,6 +2079,219 @@ function dispatchReservationReceiptDigest(
   bounds: CanonicalJsonBounds,
 ): Sha256Digest {
   return taskAttemptCustodyDigest('dispatch-reservation-receipt', value, bounds);
+}
+
+function snapshotDispatchRecoveryAuthority(
+  value: unknown,
+): TaskAttemptCustodyDispatchRecoveryAuthorityV2 | null {
+  const record = snapshotExactDataRecord(value, [
+    'executionId',
+    'taskId',
+    'attemptId',
+    'fenceToken',
+    'approvalRef',
+    'idempotencyKey',
+  ]);
+  if (
+    record === null
+    || typeof record.executionId !== 'string'
+    || !matchesPattern(/^sprint-[0-9]+$/u, record.executionId)
+    || record.taskId !== record.executionId
+    || typeof record.attemptId !== 'string'
+    || typeof record.fenceToken !== 'string'
+    || typeof record.approvalRef !== 'string'
+    || typeof record.idempotencyKey !== 'string'
+    || intrinsicArraySome([
+      record.attemptId,
+      record.fenceToken,
+      record.approvalRef,
+      record.idempotencyKey,
+    ], entry => typeof entry !== 'string'
+      || entry.length === 0
+      || entry !== entry.trim()
+      || utf8Length(entry) > 1024
+      || matchesPattern(/[\r\n\0]/u, entry))
+  ) return null;
+  return freezeObject({
+    executionId: record.executionId,
+    taskId: record.taskId as string,
+    attemptId: record.attemptId,
+    fenceToken: record.fenceToken,
+    approvalRef: record.approvalRef,
+    idempotencyKey: record.idempotencyKey,
+  });
+}
+
+function dispatchRecoveryAuthorityDigest(
+  authority: TaskAttemptCustodyDispatchRecoveryAuthorityV2,
+  bounds: CanonicalJsonBounds,
+): Sha256Digest {
+  return taskAttemptCustodyDigest('dispatch-recovery-authority', authority, bounds);
+}
+
+function isHistoricalAdmissionQuarantineHoldCode(
+  value: TaskAttemptCustodyHoldCode,
+): value is 'ARTIFACT_CHANGED' | 'CORRUPT_CUSTODY_RECORD' {
+  return value === 'ARTIFACT_CHANGED' || value === 'CORRUPT_CUSTODY_RECORD';
+}
+
+function historicalAdmissionQuarantineReceiptDigest(
+  value: Omit<TaskAttemptCustodyHistoricalAdmissionQuarantineV2, 'receiptDigest'>,
+  bounds: CanonicalJsonBounds,
+): Sha256Digest {
+  return taskAttemptCustodyDigest('historical-admission-quarantine', value, bounds);
+}
+
+function parseHistoricalAdmissionQuarantine(
+  value: unknown,
+  reservation: TaskAttemptCustodyDispatchReservationV2,
+  historicalAdmission: TaskAttemptCustodyAdmissionV2,
+  historicalTerminal: TaskAttemptCustodyDispatchNotDispatchedAuthorityV2,
+  observedCustodyHoldCode: TaskAttemptCustodyHoldCode,
+  currentRoot: TaskAttemptCustodyRootProof,
+  policy: TaskAttemptCustodyPolicyV2,
+): TaskAttemptCustodyHistoricalAdmissionQuarantineV2 | null {
+  const record = snapshotExactDataRecord(value, [
+    'schemaVersion',
+    'kind',
+    'state',
+    'dispatchRequestId',
+    'reservationReceiptDigest',
+    'historicalAdmissionReceiptDigest',
+    'historicalTerminalReceiptDigest',
+    'identity',
+    'observedCustodyHoldCode',
+    'previousCustodyRootId',
+    'previousCustodyCapabilityEvidenceDigest',
+    'currentCustodyRootId',
+    'currentCustodyCapabilityEvidenceDigest',
+    'recoveryAuthority',
+    'recoveryAuthorityDigest',
+    'recordedAt',
+    'receiptDigest',
+  ]);
+  const identity = record === null ? null : snapshotIdentity(record.identity);
+  const recoveryAuthority = record === null
+    ? null
+    : snapshotDispatchRecoveryAuthority(record.recoveryAuthority);
+  if (
+    record === null
+    || record.schemaVersion !== TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION
+    || record.kind !== 'task-attempt-custody-historical-admission-quarantine'
+    || record.state !== 'QUARANTINED_NO_EFFECT_CUSTODY_EPOCH'
+    || record.dispatchRequestId !== reservation.dispatchRequestId
+    || record.reservationReceiptDigest !== reservation.receiptDigest
+    || record.historicalAdmissionReceiptDigest !== historicalAdmission.receiptDigest
+    || record.historicalTerminalReceiptDigest !== historicalTerminal.receiptDigest
+    || identity === null
+    || !sameIdentity(identity, reservation.identity)
+    || record.observedCustodyHoldCode !== observedCustodyHoldCode
+    || !isHistoricalAdmissionQuarantineHoldCode(
+      record.observedCustodyHoldCode as TaskAttemptCustodyHoldCode,
+    )
+    || record.previousCustodyRootId !== historicalAdmission.custodyRootId
+    || record.previousCustodyCapabilityEvidenceDigest
+      !== historicalAdmission.custodyCapabilityEvidenceDigest
+    || record.currentCustodyRootId !== currentRoot.rootId
+    || record.currentCustodyCapabilityEvidenceDigest !== currentRoot.capabilityEvidenceDigest
+    || recoveryAuthority === null
+    || !isDigest(record.recoveryAuthorityDigest)
+    || record.recoveryAuthorityDigest
+      !== dispatchRecoveryAuthorityDigest(recoveryAuthority, policy.jsonBounds)
+    || !isTimestamp(record.recordedAt)
+    || Date.parse(record.recordedAt) < Date.parse(historicalTerminal.recordedAt)
+    || !isDigest(record.receiptDigest)
+  ) return null;
+  const body: Omit<TaskAttemptCustodyHistoricalAdmissionQuarantineV2, 'receiptDigest'> = {
+    schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+    kind: 'task-attempt-custody-historical-admission-quarantine',
+    state: 'QUARANTINED_NO_EFFECT_CUSTODY_EPOCH',
+    dispatchRequestId: reservation.dispatchRequestId,
+    reservationReceiptDigest: reservation.receiptDigest,
+    historicalAdmissionReceiptDigest: historicalAdmission.receiptDigest,
+    historicalTerminalReceiptDigest: historicalTerminal.receiptDigest,
+    identity,
+    observedCustodyHoldCode,
+    previousCustodyRootId: historicalAdmission.custodyRootId,
+    previousCustodyCapabilityEvidenceDigest:
+      historicalAdmission.custodyCapabilityEvidenceDigest,
+    currentCustodyRootId: currentRoot.rootId,
+    currentCustodyCapabilityEvidenceDigest: currentRoot.capabilityEvidenceDigest,
+    recoveryAuthority,
+    recoveryAuthorityDigest: record.recoveryAuthorityDigest as Sha256Digest,
+    recordedAt: record.recordedAt,
+  };
+  if (record.receiptDigest !== historicalAdmissionQuarantineReceiptDigest(
+    body,
+    policy.jsonBounds,
+  )) return null;
+  return freezeObject({ ...body, receiptDigest: record.receiptDigest });
+}
+
+function dispatchReservationTransitionReceiptDigest(
+  value: Omit<TaskAttemptCustodyDispatchReservationTransitionV2, 'receiptDigest'>,
+  bounds: CanonicalJsonBounds,
+): Sha256Digest {
+  return taskAttemptCustodyDigest('dispatch-reservation-transition', value, bounds);
+}
+
+function parseDispatchReservationTransition(
+  value: unknown,
+  reservation: TaskAttemptCustodyDispatchReservationV2,
+  policy: TaskAttemptCustodyPolicyV2,
+): TaskAttemptCustodyDispatchReservationTransitionV2 | null {
+  const record = snapshotExactDataRecord(value, [
+    'schemaVersion',
+    'kind',
+    'state',
+    'reservationReceiptDigest',
+    'taskSnapshotDigest',
+    'identity',
+    'recoveryAuthority',
+    'recoveryAuthorityDigest',
+    'recordedAt',
+    'receiptDigest',
+  ]);
+  const identity = record === null ? null : snapshotIdentity(record.identity);
+  const recoveryAuthority = record?.recoveryAuthority === null
+    ? null
+    : snapshotDispatchRecoveryAuthority(record?.recoveryAuthority);
+  if (
+    record === null
+    || record.schemaVersion !== TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION
+    || record.kind !== 'task-attempt-custody-dispatch-reservation-transition'
+    || (record.state !== 'ADMISSION_CLAIMED'
+      && record.state !== 'RETIRED_BEFORE_ADMISSION')
+    || record.reservationReceiptDigest !== reservation.receiptDigest
+    || record.taskSnapshotDigest !== reservation.taskSnapshotDigest
+    || identity === null
+    || !sameIdentity(identity, reservation.identity)
+    || !isTimestamp(record.recordedAt)
+    || !isDigest(record.receiptDigest)
+    || (
+      record.state === 'ADMISSION_CLAIMED'
+        ? recoveryAuthority !== null || record.recoveryAuthorityDigest !== null
+        : recoveryAuthority === null
+          || !isDigest(record.recoveryAuthorityDigest)
+          || record.recoveryAuthorityDigest
+            !== dispatchRecoveryAuthorityDigest(recoveryAuthority, policy.jsonBounds)
+    )
+  ) return null;
+  const body = {
+    schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+    kind: 'task-attempt-custody-dispatch-reservation-transition' as const,
+    state: record.state as TaskAttemptCustodyDispatchReservationTransitionV2['state'],
+    reservationReceiptDigest: reservation.receiptDigest,
+    taskSnapshotDigest: reservation.taskSnapshotDigest,
+    identity,
+    recoveryAuthority,
+    recoveryAuthorityDigest: record.recoveryAuthorityDigest as Sha256Digest | null,
+    recordedAt: record.recordedAt,
+  };
+  if (record.receiptDigest !== dispatchReservationTransitionReceiptDigest(body, policy.jsonBounds)) {
+    return null;
+  }
+  return freezeObject({ ...body, receiptDigest: record.receiptDigest });
 }
 
 function dispatchAdmissionRefDigest(
@@ -3289,6 +3760,39 @@ function dispatchReservationPath(
   );
 }
 
+function dispatchPendingTaskSnapshotPath(
+  projectId: string,
+  projectRootSha256: string,
+  dispatchRequestId: string,
+): TaskAttemptCustodyRelativePath {
+  return childPath(
+    dispatchRequestPrefix(projectId, projectRootSha256, dispatchRequestId),
+    'task-snapshot-pending.json',
+  );
+}
+
+function dispatchReservationTransitionPath(
+  projectId: string,
+  projectRootSha256: string,
+  dispatchRequestId: string,
+): TaskAttemptCustodyRelativePath {
+  return childPath(
+    dispatchRequestPrefix(projectId, projectRootSha256, dispatchRequestId),
+    'reservation-transition.json',
+  );
+}
+
+function dispatchHistoricalAdmissionQuarantinePath(
+  projectId: string,
+  projectRootSha256: string,
+  dispatchRequestId: string,
+): TaskAttemptCustodyRelativePath {
+  return childPath(
+    dispatchRequestPrefix(projectId, projectRootSha256, dispatchRequestId),
+    'historical-admission-quarantine.json',
+  );
+}
+
 function dispatchGenerationSlotPath(
   predecessor: TaskAttemptCustodyIdentityV2,
 ): TaskAttemptCustodyRelativePath {
@@ -3831,6 +4335,66 @@ function workerIpcAnswerDeliveryReceiptDigest(
   );
 }
 
+function workerIpcQuestionArtifactKey(sequence: number): string {
+  if (!assertPositiveSafeInteger(sequence)) hold('ARTIFACT_REPLAY_MISMATCH', 'capture');
+  return `ipc-question-${sequence}`;
+}
+
+function workerIpcQuestionSealedChild(
+  dispatchRequestId: string,
+  sequence: number,
+): TaskAttemptCustodyRelativePath {
+  if (!isDispatchRequestId(dispatchRequestId)
+    || !assertPositiveSafeInteger(sequence)
+    || sequence > TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS) {
+    hold('DISPATCH_REQUEST_INVALID', 'capture');
+  }
+  return taskAttemptCustodyRelativePath(
+    `sealed-output-v1/${dispatchRequestId}/ipc/question-${String(sequence).padStart(6, '0')}.bin`,
+  );
+}
+
+function workerIpcSealedQuestionSourceReceiptDigest(
+  value: Omit<TaskAttemptCustodyWorkerIpcSealedQuestionSourceV2, 'receiptDigest'>,
+  bounds: CanonicalJsonBounds,
+): Sha256Digest {
+  return taskAttemptCustodyDigest('worker-ipc-sealed-question-source', value, bounds);
+}
+
+function workerIpcCursorPath(
+  identity: TaskAttemptCustodyIdentityV2,
+  sequence: number,
+  state: 'question-open' | 'answered',
+): TaskAttemptCustodyRelativePath {
+  if (!assertPositiveSafeInteger(sequence)
+    || sequence > TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS) {
+    hold('ARTIFACT_REPLAY_MISMATCH', 'read');
+  }
+  return childPath(
+    identityPrefix(identity),
+    'ipc-conversation',
+    `${String(sequence).padStart(6, '0')}.${state}.json`,
+  );
+}
+
+function workerIpcCursorDirectory(
+  identity: TaskAttemptCustodyIdentityV2,
+): TaskAttemptCustodyRelativePath {
+  return childPath(identityPrefix(identity), 'ipc-conversation');
+}
+
+type PersistedWorkerIpcCursor = Exclude<
+  TaskAttemptCustodyWorkerIpcConversationCursorV2,
+  { readonly state: 'empty' }
+>;
+
+function workerIpcCursorReceiptDigest(
+  value: Omit<PersistedWorkerIpcCursor, 'cursorReceiptDigest'>,
+  bounds: CanonicalJsonBounds,
+): Sha256Digest {
+  return taskAttemptCustodyDigest('worker-ipc-conversation-cursor', value, bounds);
+}
+
 function chainReceiptDigest(
   receipt: Omit<TaskAttemptCustodyChainReceiptV2, 'receiptDigest'>,
   bounds: CanonicalJsonBounds,
@@ -4260,6 +4824,146 @@ export function parseTaskAttemptCustodyWorkerIpcAnswerDeliveryReceiptV2(
   return Object.freeze({ ...withoutDigest, receiptDigest: record.receiptDigest });
 }
 
+export function createTaskAttemptCustodyWorkerIpcSealedQuestionSourceV2(
+  input: Omit<TaskAttemptCustodyWorkerIpcSealedQuestionSourceV2, 'schemaVersion' | 'kind' | 'receiptDigest'>,
+  policy: TaskAttemptCustodyPolicyV2,
+): TaskAttemptCustodyWorkerIpcSealedQuestionSourceV2 {
+  assertPolicy(policy);
+  const identity = cloneIdentity(input.identity);
+  const expectedPath = workerIpcQuestionSealedChild(input.dispatchRequestId, input.sequence);
+  if (
+    !isDigest(input.admissionReceiptDigest)
+    || !isDigest(input.sourceFileIdentityDigest)
+    || !assertPositiveSafeInteger(input.sourceEpoch)
+    || input.sealedChildRelativePath !== expectedPath
+    || !isDigest(input.contentSha256)
+    || !Number.isSafeInteger(input.byteLength)
+    || input.byteLength < policy.artifactLimits['worker-ipc-question'].minBytes
+    || input.byteLength > policy.artifactLimits['worker-ipc-question'].maxBytes
+    || !isTimestamp(input.capturedAt)
+  ) hold('ARTIFACT_REPLAY_MISMATCH', 'capture');
+  const withoutDigest = {
+    schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+    kind: 'task-attempt-custody-worker-ipc-sealed-question-source' as const,
+    identity,
+    admissionReceiptDigest: input.admissionReceiptDigest,
+    dispatchRequestId: input.dispatchRequestId,
+    sequence: input.sequence,
+    sourceFileIdentityDigest: input.sourceFileIdentityDigest,
+    sourceEpoch: input.sourceEpoch,
+    sealedChildRelativePath: input.sealedChildRelativePath,
+    contentSha256: input.contentSha256,
+    byteLength: input.byteLength,
+    capturedAt: input.capturedAt,
+  };
+  return freezeObject({
+    ...withoutDigest,
+    receiptDigest: workerIpcSealedQuestionSourceReceiptDigest(withoutDigest, policy.jsonBounds),
+  });
+}
+
+export function parseTaskAttemptCustodyWorkerIpcSealedQuestionSourceV2(
+  value: unknown,
+  policy: TaskAttemptCustodyPolicyV2,
+): TaskAttemptCustodyWorkerIpcSealedQuestionSourceV2 | null {
+  const record = snapshotExactDataRecord(value, [
+    'schemaVersion', 'kind', 'identity', 'admissionReceiptDigest', 'dispatchRequestId',
+    'sequence', 'sourceFileIdentityDigest', 'sourceEpoch', 'sealedChildRelativePath',
+    'contentSha256', 'byteLength', 'capturedAt', 'receiptDigest',
+  ]);
+  if (record === null || !isDigest(record.receiptDigest)) return null;
+  try {
+    const created = createTaskAttemptCustodyWorkerIpcSealedQuestionSourceV2({
+      identity: record.identity as TaskAttemptCustodyIdentityV2,
+      admissionReceiptDigest: record.admissionReceiptDigest as Sha256Digest,
+      dispatchRequestId: record.dispatchRequestId as string,
+      sequence: record.sequence as number,
+      sourceFileIdentityDigest: record.sourceFileIdentityDigest as Sha256Digest,
+      sourceEpoch: record.sourceEpoch as number,
+      sealedChildRelativePath: record.sealedChildRelativePath as string,
+      contentSha256: record.contentSha256 as Sha256Digest,
+      byteLength: record.byteLength as number,
+      capturedAt: record.capturedAt as string,
+    }, policy);
+    return created.receiptDigest === record.receiptDigest ? created : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseWorkerIpcCursor(
+  value: unknown,
+  policy: TaskAttemptCustodyPolicyV2,
+): PersistedWorkerIpcCursor | null {
+  if (!isPlainRecord(value) || value.state === 'empty') return null;
+  const state = value.state;
+  const keys = state === 'question-open'
+    ? [
+        'schemaVersion', 'kind', 'state', 'identity', 'admissionReceiptDigest', 'policyDigest',
+        'dispatchRequestId', 'sequence', 'nextSequence', 'predecessorCursorReceiptDigest',
+        'sealedSourceReceiptDigest', 'sourceFileIdentityDigest', 'sourceEpoch',
+        'questionArtifactKey', 'questionReceiptDigest', 'questionArtifactSha256', 'recordedAt',
+        'cursorReceiptDigest',
+      ]
+    : state === 'answered'
+      ? [
+          'schemaVersion', 'kind', 'state', 'identity', 'admissionReceiptDigest', 'policyDigest',
+          'dispatchRequestId', 'sequence', 'nextSequence', 'predecessorCursorReceiptDigest',
+          'questionCursorReceiptDigest', 'sealedSourceReceiptDigest', 'sourceFileIdentityDigest',
+          'sourceEpoch', 'questionReceiptDigest', 'answerDeliveryReceiptDigest', 'answeredAt',
+          'cursorReceiptDigest',
+        ]
+      : null;
+  const record = keys === null ? null : snapshotExactDataRecord(value, keys);
+  const identity = record === null ? null : parseIdentity(record.identity);
+  if (
+    record === null
+    || identity === null
+    || record.schemaVersion !== TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION
+    || record.kind !== 'task-attempt-custody-worker-ipc-conversation-cursor'
+    || !isDigest(record.admissionReceiptDigest)
+    || record.policyDigest !== policy.policyDigest
+    || !isDispatchRequestId(record.dispatchRequestId)
+    || !assertPositiveSafeInteger(record.sequence)
+    || record.sequence > TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS
+    || !isDigest(record.cursorReceiptDigest)
+    || (record.predecessorCursorReceiptDigest !== null
+      && !isDigest(record.predecessorCursorReceiptDigest))
+  ) return null;
+  if (state === 'question-open') {
+    if (
+      record.nextSequence !== null
+      || !isDigest(record.sealedSourceReceiptDigest)
+      || !isDigest(record.sourceFileIdentityDigest)
+      || !assertPositiveSafeInteger(record.sourceEpoch)
+      || record.questionArtifactKey !== workerIpcQuestionArtifactKey(record.sequence)
+      || !isDigest(record.questionReceiptDigest)
+      || !isDigest(record.questionArtifactSha256)
+      || !isTimestamp(record.recordedAt)
+    ) return null;
+  } else if (
+    record.nextSequence !== (
+      record.sequence === TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS
+        ? null
+        : record.sequence + 1
+    )
+    || !isDigest(record.questionCursorReceiptDigest)
+    || !isDigest(record.sealedSourceReceiptDigest)
+    || !isDigest(record.sourceFileIdentityDigest)
+    || !assertPositiveSafeInteger(record.sourceEpoch)
+    || !isDigest(record.questionReceiptDigest)
+    || !isDigest(record.answerDeliveryReceiptDigest)
+    || !isTimestamp(record.answeredAt)
+  ) return null;
+  const withoutDigest = { ...record } as Record<string, unknown>;
+  delete withoutDigest.cursorReceiptDigest;
+  if (workerIpcCursorReceiptDigest(
+    withoutDigest as Omit<PersistedWorkerIpcCursor, 'cursorReceiptDigest'>,
+    policy.jsonBounds,
+  ) !== record.cursorReceiptDigest) return null;
+  return freezeObject(record as unknown as PersistedWorkerIpcCursor);
+}
+
 export function parseTaskAttemptCustodyChainReceiptV2(
   value: unknown,
   policy: TaskAttemptCustodyPolicyV2,
@@ -4376,6 +5080,33 @@ function isSafeArtifactKey(value: string): boolean {
     && !value.endsWith(' ')
     && !value.includes(':')
     && !matchesPattern(WINDOWS_RESERVED_COMPONENT_PATTERN, value);
+}
+
+/**
+ * Canonical immutable Store location for one admitted attempt artifact.
+ * Receipt consumers bind to this authority path, never to the mutable
+ * worker-output source path from which an artifact was captured.
+ */
+export function taskAttemptCustodyArtifactDataRelativePath(input: {
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly artifactClass: Exclude<
+    TaskAttemptCustodyArtifactClass,
+    'task-admission-snapshot'
+  >;
+  readonly artifactKey: string;
+}): TaskAttemptCustodyRelativePath {
+  assertIdentity(input.identity);
+  if (
+    !isTaskAttemptCustodyArtifactClass(input.artifactClass)
+    || input.artifactClass === ('task-admission-snapshot' as TaskAttemptCustodyArtifactClass)
+    || !isSafeArtifactKey(input.artifactKey)
+  ) hold('UNSAFE_RELATIVE_PATH', 'canonicalize');
+  return childPath(
+    identityPrefix(input.identity),
+    'artifacts',
+    input.artifactClass,
+    `${input.artifactKey}.bin`,
+  );
 }
 
 function artifactCaptureModeForClass(
@@ -5116,6 +5847,10 @@ export class TaskAttemptCustodyStore {
   private readonly issuedPublicationTokens = new WeakMap<object, IssuedPublicationTokenScope>();
   private readonly revokedPublicationTokens = new WeakSet<object>();
   private readonly activeDurableEffects = new Set<Sha256Digest>();
+  private readonly verifiedWorkerIpcAnsweredPrefix = new Map<
+    string,
+    Extract<TaskAttemptCustodyWorkerIpcConversationCursorV2, { readonly state: 'answered' }>
+  >();
 
   private constructor(
     private readonly adapter: TaskAttemptCustodyAdapter,
@@ -5215,6 +5950,7 @@ export class TaskAttemptCustodyStore {
     descriptor: DurableEffectDescriptor,
     policy: TaskAttemptCustodyPolicyV2,
   ): 'EXECUTE' | 'CONFIRMED' {
+    this.assertAttemptNotRetained(descriptor.identity, policy, 'publish');
     const intent = durableEffectMarker(
       'INTENT',
       descriptor.opDigest,
@@ -5558,6 +6294,88 @@ export class TaskAttemptCustodyStore {
     return reservation;
   }
 
+  private readDispatchReservationTransitionRecord(
+    reservation: TaskAttemptCustodyDispatchReservationV2,
+    policy: TaskAttemptCustodyPolicyV2,
+  ): TaskAttemptCustodyDispatchReservationTransitionV2 | null {
+    const path = dispatchReservationTransitionPath(
+      this.expectedProjectId,
+      this.expectedProjectRootSha256,
+      reservation.dispatchRequestId,
+    );
+    const observed = this.readFirstWriterSnapshot(
+      path,
+      metadataLimit(policy),
+      'read-dispatch',
+      'DISPATCH_RESERVATION_RECONCILIATION_REQUIRED',
+    );
+    if (observed === null) return null;
+    let value: unknown;
+    try { value = JSON.parse(Buffer.from(observed.bytes).toString('utf8')); } catch {
+      return hold('DISPATCH_RESERVATION_RECONCILIATION_REQUIRED', 'read-dispatch');
+    }
+    const transition = parseDispatchReservationTransition(value, reservation, policy);
+    if (
+      transition === null
+      || !sameBytes(
+        observed.bytes,
+        canonicalTaskAttemptCustodyJson(transition, policy.jsonBounds),
+      )
+    ) hold('DISPATCH_RESERVATION_RECONCILIATION_REQUIRED', 'read-dispatch');
+    return transition;
+  }
+
+  private claimDispatchReservationTransition(
+    reservation: TaskAttemptCustodyDispatchReservationV2,
+    policy: TaskAttemptCustodyPolicyV2,
+    state: TaskAttemptCustodyDispatchReservationTransitionV2['state'],
+    recoveryAuthority: TaskAttemptCustodyDispatchRecoveryAuthorityV2 | null,
+    recordedAt: string,
+  ): TaskAttemptCustodyDispatchReservationTransitionV2 {
+    const recoveryAuthorityDigest = recoveryAuthority === null
+      ? null
+      : dispatchRecoveryAuthorityDigest(recoveryAuthority, policy.jsonBounds);
+    const body = {
+      schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      kind: 'task-attempt-custody-dispatch-reservation-transition' as const,
+      state,
+      reservationReceiptDigest: reservation.receiptDigest,
+      taskSnapshotDigest: reservation.taskSnapshotDigest,
+      identity: cloneIdentity(reservation.identity),
+      recoveryAuthority,
+      recoveryAuthorityDigest,
+      recordedAt,
+    };
+    const candidate: TaskAttemptCustodyDispatchReservationTransitionV2 = freezeObject({
+      ...body,
+      receiptDigest: dispatchReservationTransitionReceiptDigest(body, policy.jsonBounds),
+    });
+    const observed = this.publishDispatchFirstWriter(
+      dispatchReservationTransitionPath(
+        this.expectedProjectId,
+        this.expectedProjectRootSha256,
+        reservation.dispatchRequestId,
+      ),
+      canonicalTaskAttemptCustodyJson(candidate, policy.jsonBounds),
+      metadataLimit(policy),
+      state === 'ADMISSION_CLAIMED' ? 'reserve-dispatch' : 'settle-dispatch',
+    );
+    let value: unknown;
+    try { value = JSON.parse(Buffer.from(observed.bytes).toString('utf8')); } catch {
+      return hold('DISPATCH_RESERVATION_RECONCILIATION_REQUIRED', 'settle-dispatch');
+    }
+    const persisted = parseDispatchReservationTransition(value, reservation, policy);
+    if (persisted === null || persisted.receiptDigest !== candidate.receiptDigest) {
+      hold(
+        state === 'ADMISSION_CLAIMED'
+          ? 'DISPATCH_RESERVATION_RETIRED'
+          : 'DISPATCH_RESERVATION_RECONCILIATION_REQUIRED',
+        state === 'ADMISSION_CLAIMED' ? 'reserve-dispatch' : 'settle-dispatch',
+      );
+    }
+    return persisted;
+  }
+
   static open(input: {
     readonly adapter: TaskAttemptCustodyAdapter;
     readonly absoluteRoot: string;
@@ -5705,6 +6523,18 @@ export class TaskAttemptCustodyStore {
     if (!sameBytes(material.bytes, materialBytes)) {
       hold('DISPATCH_REQUEST_CONFLICT', 'reserve-dispatch');
     }
+    const pendingSnapshot = this.publishDispatchFirstWriter(
+      dispatchPendingTaskSnapshotPath(
+        this.expectedProjectId,
+        this.expectedProjectRootSha256,
+        dispatchRequestId,
+      ),
+      snapshotBytes,
+      policy.artifactLimits['task-admission-snapshot'],
+    );
+    if (!sameBytes(pendingSnapshot.bytes, snapshotBytes)) {
+      hold('DISPATCH_REQUEST_CONFLICT', 'reserve-dispatch');
+    }
 
     const identitySeed = taskAttemptCustodyDigest(
       'dispatch-identity-seed',
@@ -5820,6 +6650,16 @@ export class TaskAttemptCustodyStore {
 
     const existingRead = this.readDispatchAdmission({ dispatchRequestId, policy });
     if (existingRead.state === 'admitted') return existingRead;
+    if (existingRead.state === 'retired-before-admission') {
+      hold('DISPATCH_RESERVATION_RETIRED', 'reserve-dispatch');
+    }
+    this.claimDispatchReservationTransition(
+      reservation,
+      policy,
+      'ADMISSION_CLAIMED',
+      null,
+      reservation.reservedAt,
+    );
     this.createAdmission({
       identity,
       policy,
@@ -5859,6 +6699,14 @@ export class TaskAttemptCustodyStore {
     }
     const admission = this.readAdmission(reservation.identity, policy);
     if (admission === null) {
+      const transition = this.readDispatchReservationTransitionRecord(reservation, policy);
+      if (transition?.state === 'RETIRED_BEFORE_ADMISSION') {
+        return freezeObject({
+          state: 'retired-before-admission' as const,
+          reservation,
+          transition,
+        });
+      }
       return freezeObject({
         state: 'reserved-pending-admission' as const,
         reservation,
@@ -5871,6 +6719,10 @@ export class TaskAttemptCustodyStore {
           policy.jsonBounds,
         ),
       });
+    }
+    const transition = this.readDispatchReservationTransitionRecord(reservation, policy);
+    if (transition?.state === 'RETIRED_BEFORE_ADMISSION') {
+      hold('DISPATCH_RESERVATION_RECONCILIATION_REQUIRED', 'read-dispatch');
     }
     if (
       admission.admittedAt !== reservation.reservedAt
@@ -5892,6 +6744,397 @@ export class TaskAttemptCustodyStore {
       reservation,
       admission,
       ref: createDispatchAdmissionRef(reservation, admission, policy.jsonBounds),
+    });
+  }
+
+  /**
+   * Reconcile exactly one reservation after canonical Sprint recovery has
+   * proved coordinator death and bound an owner approval. A current
+   * reservation carries a host-staged canonical task snapshot and is completed
+   * as an admission. A legacy reservation without that material can only be
+   * retired before admission. Both paths are append-only and first-writer
+   * fenced against a concurrent admission.
+   */
+  reconcilePendingDispatchReservation(input: {
+    readonly dispatchRequestId: string;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly recoveryAuthority: TaskAttemptCustodyDispatchRecoveryAuthorityV2;
+    readonly reconciledAt: string;
+  }): Extract<TaskAttemptCustodyDispatchAdmissionReadV2, {
+    readonly state: 'admitted' | 'retired-before-admission';
+  }> {
+    const inputRecord = requireExactDataRecord(input, [
+      'dispatchRequestId',
+      'policy',
+      'recoveryAuthority',
+      'reconciledAt',
+    ], 'DISPATCH_REQUEST_INVALID', 'settle-dispatch');
+    if (!isDispatchRequestId(inputRecord.dispatchRequestId)
+      || !isTimestamp(inputRecord.reconciledAt)) {
+      hold('DISPATCH_REQUEST_INVALID', 'settle-dispatch');
+    }
+    const policy = snapshotPolicy(inputRecord.policy);
+    const recoveryAuthority = snapshotDispatchRecoveryAuthority(
+      inputRecord.recoveryAuthority,
+    );
+    if (recoveryAuthority === null) {
+      hold('DISPATCH_REQUEST_INVALID', 'settle-dispatch');
+    }
+    const sprintNumber = recoveryAuthority.executionId.slice('sprint-'.length);
+    const current = this.readDispatchAdmission({
+      dispatchRequestId: inputRecord.dispatchRequestId,
+      policy,
+    });
+    if (current.state === 'absent'
+      || !current.reservation.identity.taskId.startsWith(`${sprintNumber}-`)
+      || Date.parse(inputRecord.reconciledAt) < Date.parse(current.reservation.reservedAt)) {
+      hold('DISPATCH_REQUEST_CONFLICT', 'settle-dispatch');
+    }
+    if (current.state === 'admitted') return current;
+    if (current.state === 'retired-before-admission') {
+      const expectedDigest = dispatchRecoveryAuthorityDigest(
+        recoveryAuthority,
+        policy.jsonBounds,
+      );
+      if (
+        current.transition.recoveryAuthorityDigest !== expectedDigest
+        || current.transition.recordedAt !== inputRecord.reconciledAt
+      ) hold('DISPATCH_REQUEST_CONFLICT', 'settle-dispatch');
+      return current;
+    }
+
+    const pendingSnapshotPath = dispatchPendingTaskSnapshotPath(
+      this.expectedProjectId,
+      this.expectedProjectRootSha256,
+      current.reservation.dispatchRequestId,
+    );
+    const pendingSnapshot = this.readFirstWriterSnapshot(
+      pendingSnapshotPath,
+      policy.artifactLimits['task-admission-snapshot'],
+      'read-dispatch',
+      'DISPATCH_RESERVATION_RECONCILIATION_REQUIRED',
+    );
+    const existingTransition = this.readDispatchReservationTransitionRecord(
+      current.reservation,
+      policy,
+    );
+    if (pendingSnapshot === null) {
+      if (existingTransition !== null) {
+        hold('DISPATCH_RESERVATION_RECONCILIATION_REQUIRED', 'settle-dispatch');
+      }
+      this.claimDispatchReservationTransition(
+        current.reservation,
+        policy,
+        'RETIRED_BEFORE_ADMISSION',
+        recoveryAuthority,
+        inputRecord.reconciledAt,
+      );
+      const retired = this.readDispatchAdmission({
+        dispatchRequestId: current.reservation.dispatchRequestId,
+        policy,
+      });
+      if (retired.state !== 'retired-before-admission') {
+        hold('DISPATCH_RESERVATION_RECONCILIATION_REQUIRED', 'settle-dispatch');
+      }
+      return retired;
+    }
+    if (rawSha256(pendingSnapshot.bytes) !== current.reservation.taskSnapshotDigest) {
+      hold('DISPATCH_RESERVATION_RECONCILIATION_REQUIRED', 'settle-dispatch');
+    }
+    let taskSnapshot: unknown;
+    try { taskSnapshot = JSON.parse(Buffer.from(pendingSnapshot.bytes).toString('utf8')); } catch {
+      return hold('DISPATCH_RESERVATION_RECONCILIATION_REQUIRED', 'settle-dispatch');
+    }
+    if (!sameBytes(
+      pendingSnapshot.bytes,
+      canonicalTaskAttemptCustodyJson(taskSnapshot, policy.jsonBounds),
+    )) hold('DISPATCH_RESERVATION_RECONCILIATION_REQUIRED', 'settle-dispatch');
+    this.claimDispatchReservationTransition(
+      current.reservation,
+      policy,
+      'ADMISSION_CLAIMED',
+      null,
+      current.reservation.reservedAt,
+    );
+    const predecessorAdmission = current.reservation.predecessor === null
+      ? null
+      : this.readAdmission(current.reservation.predecessor.identity, policy);
+    if (
+      current.reservation.predecessor !== null
+      && (predecessorAdmission === null
+        || predecessorAdmission.receiptDigest
+          !== current.reservation.predecessor.admissionReceiptDigest)
+    ) hold('CHAIN_PREDECESSOR_MISMATCH', 'settle-dispatch');
+    this.createAdmission({
+      identity: current.reservation.identity,
+      policy,
+      admittedAt: current.reservation.reservedAt,
+      predecessorDigest: predecessorAdmission?.receiptDigest ?? null,
+      predecessorIdentity: current.reservation.predecessor?.identity ?? null,
+      taskSnapshot,
+    });
+    const admitted = this.readDispatchAdmission({
+      dispatchRequestId: current.reservation.dispatchRequestId,
+      policy,
+    });
+    if (admitted.state !== 'admitted') {
+      hold('DISPATCH_RESERVATION_RECONCILIATION_REQUIRED', 'settle-dispatch');
+    }
+    return admitted;
+  }
+
+  private readHistoricalNoEffectAdmission(
+    reservation: TaskAttemptCustodyDispatchReservationV2,
+    policy: TaskAttemptCustodyPolicyV2,
+  ): Readonly<{
+    historicalAdmission: TaskAttemptCustodyAdmissionV2;
+    historicalTerminal: TaskAttemptCustodyDispatchNotDispatchedAuthorityV2;
+  }> {
+    const admissionPath = childPath(identityPrefix(reservation.identity), 'admission.json');
+    const observedAdmission = this.readFirstWriterSnapshot(
+      admissionPath,
+      metadataLimit(policy),
+      'settle-dispatch',
+      'DISPATCH_RESERVATION_RECONCILIATION_REQUIRED',
+    );
+    if (observedAdmission === null) {
+      hold('DISPATCH_RESERVATION_RECONCILIATION_REQUIRED', 'settle-dispatch');
+    }
+    let admissionValue: unknown;
+    try {
+      admissionValue = JSON.parse(Buffer.from(observedAdmission.bytes).toString('utf8'));
+    } catch {
+      return hold('DISPATCH_RESERVATION_RECONCILIATION_REQUIRED', 'settle-dispatch');
+    }
+    const historicalAdmission = parseTaskAttemptCustodyAdmissionV2(admissionValue, policy);
+    if (
+      historicalAdmission === null
+      || !sameIdentity(historicalAdmission.identity, reservation.identity)
+      || historicalAdmission.admittedAt !== reservation.reservedAt
+      || historicalAdmission.policyDigest !== reservation.policyDigest
+      || historicalAdmission.taskSnapshot.sha256 !== reservation.taskSnapshotDigest
+      || !sameBytes(
+        observedAdmission.bytes,
+        canonicalTaskAttemptCustodyJson(historicalAdmission, policy.jsonBounds),
+      )
+      || (
+        historicalAdmission.custodyRootId === this.root.rootId
+        && historicalAdmission.custodyCapabilityEvidenceDigest
+          === this.root.capabilityEvidenceDigest
+      )
+    ) hold('DISPATCH_RESERVATION_RECONCILIATION_REQUIRED', 'settle-dispatch');
+
+    const observedTerminal = this.readFirstWriterSnapshot(
+      dispatchTerminalPath(reservation.identity),
+      metadataLimit(policy),
+      'settle-dispatch',
+      'DISPATCH_RESERVATION_RECONCILIATION_REQUIRED',
+    );
+    if (observedTerminal === null) {
+      hold('DISPATCH_RESERVATION_RECONCILIATION_REQUIRED', 'settle-dispatch');
+    }
+    let terminalValue: unknown;
+    try {
+      terminalValue = JSON.parse(Buffer.from(observedTerminal.bytes).toString('utf8'));
+    } catch {
+      return hold('DISPATCH_RESERVATION_RECONCILIATION_REQUIRED', 'settle-dispatch');
+    }
+    const historicalTerminal = parseDispatchTerminalAuthority(terminalValue, policy);
+    const expectedRef = createDispatchAdmissionRef(
+      reservation,
+      historicalAdmission,
+      policy.jsonBounds,
+    );
+    if (
+      historicalTerminal === null
+      || historicalTerminal.state !== 'NOT_DISPATCHED'
+      || historicalTerminal.attemptCount !== 0
+      || historicalTerminal.admissionRef.refDigest !== expectedRef.refDigest
+      || historicalTerminal.admissionRef.admissionReceiptDigest
+        !== historicalAdmission.receiptDigest
+      || !sameIdentity(historicalTerminal.admissionRef.identity, reservation.identity)
+      || !sameBytes(
+        observedTerminal.bytes,
+        canonicalTaskAttemptCustodyJson(historicalTerminal, policy.jsonBounds),
+      )
+    ) hold('DISPATCH_RESERVATION_RECONCILIATION_REQUIRED', 'settle-dispatch');
+    return freezeObject({ historicalAdmission, historicalTerminal });
+  }
+
+  private readHistoricalAdmissionQuarantine(
+    reservation: TaskAttemptCustodyDispatchReservationV2,
+    policy: TaskAttemptCustodyPolicyV2,
+    observedCustodyHoldCode: TaskAttemptCustodyHoldCode,
+  ): TaskAttemptCustodyDispatchQuarantinedHistoryV2 | null {
+    const observed = this.readFirstWriterSnapshot(
+      dispatchHistoricalAdmissionQuarantinePath(
+        this.expectedProjectId,
+        this.expectedProjectRootSha256,
+        reservation.dispatchRequestId,
+      ),
+      metadataLimit(policy),
+      'list-dispatch',
+      'DISPATCH_DISCOVERY_TAMPERED_CANDIDATE',
+    );
+    if (observed === null) return null;
+    const history = this.readHistoricalNoEffectAdmission(reservation, policy);
+    let value: unknown;
+    try { value = JSON.parse(Buffer.from(observed.bytes).toString('utf8')); } catch {
+      return hold('DISPATCH_DISCOVERY_TAMPERED_CANDIDATE', 'list-dispatch');
+    }
+    const quarantine = parseHistoricalAdmissionQuarantine(
+      value,
+      reservation,
+      history.historicalAdmission,
+      history.historicalTerminal,
+      observedCustodyHoldCode,
+      this.root,
+      policy,
+    );
+    if (
+      quarantine === null
+      || !sameBytes(
+        observed.bytes,
+        canonicalTaskAttemptCustodyJson(quarantine, policy.jsonBounds),
+      )
+    ) hold('DISPATCH_DISCOVERY_TAMPERED_CANDIDATE', 'list-dispatch');
+    return freezeObject({
+      state: 'quarantined-historical-admission' as const,
+      reservation,
+      historicalAdmission: history.historicalAdmission,
+      historicalTerminal: history.historicalTerminal,
+      quarantine,
+    });
+  }
+
+  /**
+   * Append one recovery-authorized quarantine receipt for an identity-bound
+   * old-epoch admission that already proves zero provider attempts. Historical
+   * bytes remain immutable and never become current execution authority.
+   */
+  quarantineHistoricalNoEffectDispatchAdmission(input: {
+    readonly dispatchRequestId: string;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly recoveryAuthority: TaskAttemptCustodyDispatchRecoveryAuthorityV2;
+    readonly quarantinedAt: string;
+    readonly maxEntries: number;
+    readonly maxNameBytes: number;
+    readonly deadlineAt: string;
+  }): TaskAttemptCustodyDispatchQuarantinedHistoryV2 {
+    const inputRecord = requireExactDataRecord(input, [
+      'dispatchRequestId',
+      'policy',
+      'recoveryAuthority',
+      'quarantinedAt',
+      'maxEntries',
+      'maxNameBytes',
+      'deadlineAt',
+    ], 'DISPATCH_REQUEST_INVALID', 'settle-dispatch');
+    if (!isDispatchRequestId(inputRecord.dispatchRequestId)
+      || !isTimestamp(inputRecord.quarantinedAt)) {
+      hold('DISPATCH_REQUEST_INVALID', 'settle-dispatch');
+    }
+    const policy = snapshotPolicy(inputRecord.policy);
+    const recoveryAuthority = snapshotDispatchRecoveryAuthority(
+      inputRecord.recoveryAuthority,
+    );
+    if (recoveryAuthority === null) {
+      hold('DISPATCH_REQUEST_INVALID', 'settle-dispatch');
+    }
+    const scanned = this.listDispatchAdmissionsForRecovery({
+      policy,
+      maxEntries: inputRecord.maxEntries as number,
+      maxNameBytes: inputRecord.maxNameBytes as number,
+      deadlineAt: inputRecord.deadlineAt as string,
+    });
+    const existing = scanned.entries.find(entry => (
+      entry.state === 'quarantined-historical-admission'
+      && entry.reservation.dispatchRequestId === inputRecord.dispatchRequestId
+    ));
+    if (existing?.state === 'quarantined-historical-admission') {
+      const expectedAuthorityDigest = dispatchRecoveryAuthorityDigest(
+        recoveryAuthority,
+        policy.jsonBounds,
+      );
+      if (
+        existing.quarantine.recoveryAuthorityDigest !== expectedAuthorityDigest
+        || existing.quarantine.recordedAt !== inputRecord.quarantinedAt
+      ) hold('DISPATCH_REQUEST_CONFLICT', 'settle-dispatch');
+      return existing;
+    }
+    const held = scanned.heldAdmissions.find(entry => (
+      entry.reservation.dispatchRequestId === inputRecord.dispatchRequestId
+    ));
+    if (held === undefined
+      || !isHistoricalAdmissionQuarantineHoldCode(held.custodyHoldCode)
+    ) hold('DISPATCH_REQUEST_CONFLICT', 'settle-dispatch');
+    const sprintNumber = recoveryAuthority.executionId.slice('sprint-'.length);
+    if (!held.reservation.identity.taskId.startsWith(`${sprintNumber}-`)) {
+      hold('DISPATCH_REQUEST_CONFLICT', 'settle-dispatch');
+    }
+    const history = this.readHistoricalNoEffectAdmission(held.reservation, policy);
+    if (Date.parse(inputRecord.quarantinedAt) < Date.parse(
+      history.historicalTerminal.recordedAt,
+    )) hold('DISPATCH_REQUEST_CONFLICT', 'settle-dispatch');
+    const recoveryAuthorityDigest = dispatchRecoveryAuthorityDigest(
+      recoveryAuthority,
+      policy.jsonBounds,
+    );
+    const body: Omit<TaskAttemptCustodyHistoricalAdmissionQuarantineV2, 'receiptDigest'> = {
+      schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      kind: 'task-attempt-custody-historical-admission-quarantine',
+      state: 'QUARANTINED_NO_EFFECT_CUSTODY_EPOCH',
+      dispatchRequestId: held.reservation.dispatchRequestId,
+      reservationReceiptDigest: held.reservation.receiptDigest,
+      historicalAdmissionReceiptDigest: history.historicalAdmission.receiptDigest,
+      historicalTerminalReceiptDigest: history.historicalTerminal.receiptDigest,
+      identity: cloneIdentity(held.reservation.identity),
+      observedCustodyHoldCode: held.custodyHoldCode,
+      previousCustodyRootId: history.historicalAdmission.custodyRootId,
+      previousCustodyCapabilityEvidenceDigest:
+        history.historicalAdmission.custodyCapabilityEvidenceDigest,
+      currentCustodyRootId: this.root.rootId,
+      currentCustodyCapabilityEvidenceDigest: this.root.capabilityEvidenceDigest,
+      recoveryAuthority,
+      recoveryAuthorityDigest,
+      recordedAt: inputRecord.quarantinedAt as string,
+    };
+    const candidate: TaskAttemptCustodyHistoricalAdmissionQuarantineV2 = freezeObject({
+      ...body,
+      receiptDigest: historicalAdmissionQuarantineReceiptDigest(body, policy.jsonBounds),
+    });
+    const observed = this.publishDispatchFirstWriter(
+      dispatchHistoricalAdmissionQuarantinePath(
+        this.expectedProjectId,
+        this.expectedProjectRootSha256,
+        held.reservation.dispatchRequestId,
+      ),
+      canonicalTaskAttemptCustodyJson(candidate, policy.jsonBounds),
+      metadataLimit(policy),
+      'settle-dispatch',
+    );
+    let persistedValue: unknown;
+    try { persistedValue = JSON.parse(Buffer.from(observed.bytes).toString('utf8')); } catch {
+      return hold('DISPATCH_RESERVATION_RECONCILIATION_REQUIRED', 'settle-dispatch');
+    }
+    const persisted = parseHistoricalAdmissionQuarantine(
+      persistedValue,
+      held.reservation,
+      history.historicalAdmission,
+      history.historicalTerminal,
+      held.custodyHoldCode,
+      this.root,
+      policy,
+    );
+    if (persisted === null || persisted.receiptDigest !== candidate.receiptDigest) {
+      hold('DISPATCH_RESERVATION_RECONCILIATION_REQUIRED', 'settle-dispatch');
+    }
+    return freezeObject({
+      state: 'quarantined-historical-admission' as const,
+      reservation: held.reservation,
+      historicalAdmission: history.historicalAdmission,
+      historicalTerminal: history.historicalTerminal,
+      quarantine: persisted,
     });
   }
 
@@ -6044,6 +7287,8 @@ export class TaskAttemptCustodyStore {
     const heldAdmissions: TaskAttemptCustodyDispatchRecoveryHoldV2[] = [];
     let admittedCount = 0;
     let pendingAdmissionCount = 0;
+    let retiredBeforeAdmissionCount = 0;
+    let quarantinedHistoricalAdmissionCount = 0;
     for (let index = 0; index < names.length; index += 1) {
       if ((intrinsicReflectApply(intrinsicDateNow, Date, []) as number) > deadlineUnixMs) {
         hold('DISPATCH_DISCOVERY_DEADLINE_EXCEEDED', 'list-dispatch');
@@ -6099,9 +7344,19 @@ export class TaskAttemptCustodyStore {
         });
       } catch (error) {
         if (error instanceof TaskAttemptCustodyHold) {
+          const quarantined = this.readHistoricalAdmissionQuarantine(
+            reservation,
+            policy,
+            error.code,
+          );
+          if (quarantined !== null) {
+            entries.push(quarantined);
+            quarantinedHistoricalAdmissionCount += 1;
+            continue;
+          }
           if (isolateAdmissionHolds) {
             heldAdmissions.push(freezeObject({
-              state: 'admission-hold' as const,
+              state: 'admission-graph-hold' as const,
               reservation,
               candidateLocatorDigest: taskAttemptCustodyDigest(
                 'dispatch-recovery-candidate-locator',
@@ -6121,7 +7376,8 @@ export class TaskAttemptCustodyStore {
       }
       entries.push(admitted);
       if (admitted.state === 'admitted') admittedCount += 1;
-      else pendingAdmissionCount += 1;
+      else if (admitted.state === 'reserved-pending-admission') pendingAdmissionCount += 1;
+      else retiredBeforeAdmissionCount += 1;
     }
     const frozenEntries = freezeObject(entries);
     if (isolateAdmissionHolds) {
@@ -6138,6 +7394,8 @@ export class TaskAttemptCustodyStore {
         candidateCount: names.length,
         admittedCount,
         pendingAdmissionCount,
+        retiredBeforeAdmissionCount,
+        quarantinedHistoricalAdmissionCount,
         heldAdmissionCount: frozenHeldAdmissions.length,
         maxEntries,
         maxNameBytes,
@@ -6164,6 +7422,8 @@ export class TaskAttemptCustodyStore {
       candidateCount: names.length,
       admittedCount,
       pendingAdmissionCount,
+      retiredBeforeAdmissionCount,
+      quarantinedHistoricalAdmissionCount,
       maxEntries,
       maxNameBytes,
       deadlineAt,
@@ -6177,6 +7437,581 @@ export class TaskAttemptCustodyStore {
         policy.jsonBounds,
       ),
     });
+  }
+
+  private startedFailedDispatchPath(identity: TaskAttemptCustodyIdentityV2): TaskAttemptCustodyRelativePath {
+    return childPath(dispatchAuthorityDirectory(identity), 'started-failed-retained.json');
+  }
+
+  private effectCommittedReleasePendingDispatchPath(
+    identity: TaskAttemptCustodyIdentityV2,
+  ): TaskAttemptCustodyRelativePath {
+    return childPath(dispatchAuthorityDirectory(identity), 'effect-committed-release-pending.json');
+  }
+
+  private assertAttemptNotRetained(
+    identity: TaskAttemptCustodyIdentityV2,
+    policy: TaskAttemptCustodyPolicyV2,
+    operation: TaskAttemptCustodyOperation,
+  ): void {
+    // Any marker, including corrupt/incomplete authority, prevents resurrection.
+    // This raw read deliberately does not call requireDispatchAdmissionRef.
+    if (this.readFirstWriterSnapshot(this.startedFailedDispatchPath(identity),
+      metadataLimit(policy), operation, 'DISPATCH_AUTHORITY_INVALID') !== null
+      || this.readFirstWriterSnapshot(this.effectCommittedReleasePendingDispatchPath(identity),
+        metadataLimit(policy), operation, 'DISPATCH_AUTHORITY_INVALID') !== null) {
+      hold('DISPATCH_TRANSITION_INVALID', operation);
+    }
+  }
+
+  private assertNoConflictingRetainedDisposition(
+    policy: TaskAttemptCustodyPolicyV2,
+    conflictingPath: TaskAttemptCustodyRelativePath,
+  ): void {
+    if (this.readFirstWriterSnapshot(conflictingPath, metadataLimit(policy),
+      'settle-dispatch', 'DISPATCH_AUTHORITY_INVALID') !== null) {
+      hold('DISPATCH_TRANSITION_INVALID', 'settle-dispatch');
+    }
+  }
+
+  private startedFailedDirectoryNames(
+    relativeDirectory: TaskAttemptCustodyRelativePath,
+  ): readonly string[] {
+    if (this.readPrivateDirectorySnapshot(relativeDirectory, 'read', 'ARTIFACT_CHANGED') === null) {
+      return freezeObject([] as string[]);
+    }
+    const scan = this.adapter.scanPrivateDirectoryBounded;
+    if (typeof scan !== 'function' || isUntrustedProxy(scan)) hold('NATIVE_CAPABILITY_UNAVAILABLE', 'read');
+    const deadlineUnixMs = (intrinsicReflectApply(intrinsicDateNow, Date, []) as number) + 10_000;
+    const maxEntries = 100_000;
+    const maxNameBytes = 128;
+    let value: TaskAttemptCustodyDirectoryScanReceiptV2;
+    try {
+      value = scan({ root: this.root, relativeDirectory, maxEntries, maxNameBytes, deadlineUnixMs });
+    } catch (cause) { return hold(mappedAdapterHoldCode(cause, 'ARTIFACT_CHANGED'), 'read'); }
+    const parsed = createTaskAttemptCustodyDirectoryScanReceiptV2({
+      rootId: value.rootId, relativeDirectory: value.relativeDirectory,
+      names: value.names, entryCount: value.entryCount, maxEntries: value.maxEntries,
+      maxNameBytes: value.maxNameBytes, deadlineUnixMs: value.deadlineUnixMs,
+      nativeMutationEvidence: value.nativeMutationEvidence,
+      nativeDirectoryIdentityBeforeDigest: value.nativeDirectoryIdentityBeforeDigest,
+      nativeDirectoryIdentityAfterDigest: value.nativeDirectoryIdentityAfterDigest,
+    });
+    if (value.receiptDigest !== parsed.receiptDigest || parsed.rootId !== this.root.rootId
+      || parsed.relativeDirectory !== relativeDirectory || parsed.maxEntries !== maxEntries
+      || parsed.maxNameBytes !== maxNameBytes || parsed.deadlineUnixMs !== deadlineUnixMs
+      || parsed.nativeDirectoryIdentityBeforeDigest !== parsed.nativeDirectoryIdentityAfterDigest
+      || (intrinsicReflectApply(intrinsicDateNow, Date, []) as number) > deadlineUnixMs) {
+      hold('ARTIFACT_CHANGED', 'read');
+    }
+    return parsed.names;
+  }
+
+  private inspectExactReleasedProviderLifecycle(
+    admitted: Extract<TaskAttemptCustodyDispatchAdmissionReadV2, { readonly state: 'admitted' }>,
+    policy: TaskAttemptCustodyPolicyV2,
+  ): Readonly<{
+    terminal: TaskAttemptCustodyDispatchReleasedAuthorityV2;
+    observations: readonly (TaskAttemptCustodyVerifiedDispatchObservationV2 | null)[];
+    start: TaskAttemptCustodyVerifiedDispatchObservationV2;
+    execution: TaskAttemptCustodyVerifiedDispatchObservationV2;
+    exit: TaskAttemptCustodyVerifiedDispatchObservationV2;
+  }> {
+    const terminal = this.readDispatchAuthority({ admissionRef: admitted.ref, policy });
+    if (terminal.state !== 'terminal' || terminal.authority.state !== 'RELEASED') {
+      hold('DISPATCH_TRANSITION_INVALID', 'read');
+    }
+    const observations = TASK_ATTEMPT_CUSTODY_DISPATCH_OBSERVATION_CLASSES.map(observationClass => (
+      this.readOptionalDispatchObservation(admitted, policy, observationClass)
+    ));
+    const observation = (kind: TaskAttemptCustodyDispatchObservationClass) => observations.find(
+      entry => entry?.receipt.observationClass === kind,
+    );
+    const start = observation('PROVIDER_START');
+    const execution = observation('PROVIDER_EXECUTION');
+    const exit = observation('PROVIDER_EXIT');
+    if (!start || !execution || !exit
+      || Date.parse(start.receipt.observedAt) < Date.parse(terminal.authority.recordedAt)
+      || Date.parse(execution.receipt.observedAt) < Date.parse(start.receipt.observedAt)
+      || Date.parse(exit.receipt.observedAt) < Date.parse(execution.receipt.observedAt)) {
+      hold('DISPATCH_TRANSITION_INVALID', 'read');
+    }
+    const decode = (entry: TaskAttemptCustodyVerifiedDispatchObservationV2, keys: readonly string[]) => {
+      let value: unknown;
+      try { value = JSON.parse(Buffer.from(entry.bytes).toString('utf8')); }
+      catch { return hold('DISPATCH_AUTHORITY_INVALID', 'read'); }
+      const parsed = snapshotExactDataRecord(value, keys);
+      if (!parsed || parsed.schemaVersion !== 2 || parsed.admissionRefDigest !== admitted.ref.refDigest
+        || parsed.containerId !== terminal.authority.backendExecutionId
+        || parsed.observedAt !== entry.receipt.observedAt) hold('DISPATCH_AUTHORITY_INVALID', 'read');
+      return parsed;
+    };
+    const sharedKeys = ['schemaVersion', 'kind', 'admissionRefDigest', 'containerId', 'taskSnapshotSha256',
+      'providerInvocationDigest', 'authorityLabelsDigest', 'executionCommitNonceSha256',
+      'providerExecutionAttemptId', 'providerExecutionAttemptIdentityDigest', 'dispatchReceiptDigest',
+      'releaseReceiptRef', 'releaseReceiptDigest', 'projectionFence', 'startAuthorizationDigest',
+      'state', 'providerState', 'observedAt'];
+    const started = decode(start, [...sharedKeys, 'providerStartNonceSha256', 'pid1StartAckDigest']);
+    const executed = decode(execution, [...sharedKeys, 'providerStartAckBytesSha256',
+      'childPid', 'providerExecutionAckBytesSha256']);
+    const exited = decode(exit, ['schemaVersion', 'kind', 'admissionRefDigest', 'containerId', 'exitCode',
+      'dockerWaitProcessExitCode', 'dockerWaitSignal', 'stdoutSha256', 'stderrSha256', 'waitEvidenceDigest', 'observedAt']);
+    const released = terminal.authority;
+    for (const entry of [started, executed]) {
+      if (entry.taskSnapshotSha256 !== admitted.admission.taskSnapshot.sha256
+        || entry.providerInvocationDigest !== released.releaseEvidence.providerInvocationDigest
+        || entry.authorityLabelsDigest !== released.releaseEvidence.daemonAuthorityLabelDigest
+        || entry.providerExecutionAttemptId !== released.providerExecutionAttempt.providerExecutionAttemptId
+        || entry.providerExecutionAttemptIdentityDigest !== released.providerExecutionAttempt.identityDigest
+        || entry.dispatchReceiptDigest !== released.receiptDigest
+        || entry.releaseReceiptRef !== released.releaseReceiptDigest
+        || entry.releaseReceiptDigest !== released.releaseEvidenceDigest
+        || entry.projectionFence !== released.projectionFence
+        || !isDigest(entry.startAuthorizationDigest) || !isDigest(entry.executionCommitNonceSha256)) {
+        hold('DISPATCH_AUTHORITY_INVALID', 'read');
+      }
+    }
+    const waitEvidence = { admissionRefDigest: exited.admissionRefDigest, containerId: exited.containerId,
+      exitCode: exited.exitCode, dockerWaitProcessExitCode: exited.dockerWaitProcessExitCode,
+      dockerWaitSignal: exited.dockerWaitSignal, stdoutSha256: exited.stdoutSha256,
+      stderrSha256: exited.stderrSha256, observedAt: exited.observedAt };
+    if (started.kind !== 'exact-docker-provider-start' || started.state !== 'START_AUTHORIZATION_ACCEPTED'
+      || started.providerState !== 'NOT_STARTED' || !isDigest(started.providerStartNonceSha256)
+      || !isDigest(started.pid1StartAckDigest)
+      || executed.kind !== 'exact-docker-pid1-provider-execution-ack'
+      || executed.state !== 'PROVIDER_PROCESS_SPAWNED' || executed.providerState !== 'STARTED'
+      || !assertPositiveSafeInteger(executed.childPid) || !isDigest(executed.providerStartAckBytesSha256)
+      || !isDigest(executed.providerExecutionAckBytesSha256)
+      || executed.executionCommitNonceSha256 !== started.executionCommitNonceSha256
+      || executed.startAuthorizationDigest !== started.startAuthorizationDigest
+      || exited.kind !== 'exact-docker-provider-exit' || !assertNonnegativeSafeInteger(exited.exitCode)
+      || exited.exitCode > 255 || exited.dockerWaitProcessExitCode !== 0 || exited.dockerWaitSignal !== null
+      || !isDigest(exited.stdoutSha256) || !isDigest(exited.stderrSha256)
+      || exited.waitEvidenceDigest !== rawSha256(canonicalTaskAttemptCustodyJson(waitEvidence, policy.jsonBounds))) {
+      hold('DISPATCH_AUTHORITY_INVALID', 'read');
+    }
+    return freezeObject({ terminal: released, observations: freezeObject(observations), start, execution, exit });
+  }
+
+  private inspectPreservedArtifactInventory(
+    admitted: Extract<TaskAttemptCustodyDispatchAdmissionReadV2, { readonly state: 'admitted' }>,
+    policy: TaskAttemptCustodyPolicyV2,
+    forbidden: ReadonlySet<string>,
+  ): Readonly<{
+    artifacts: readonly TaskAttemptCustodyPreservedArtifactRefV2[];
+    capturedAtByRef: ReadonlyMap<string, string>;
+  }> {
+    const artifactRoot = childPath(identityPrefix(admitted.ref.identity), 'artifacts');
+    const classes = this.startedFailedDirectoryNames(artifactRoot);
+    const artifacts: TaskAttemptCustodyPreservedArtifactRefV2[] = [];
+    const capturedAtByRef = new Map<string, string>();
+    for (const artifactClass of classes) {
+      if (!isTaskAttemptCustodyArtifactClass(artifactClass)
+        || artifactClass === 'task-admission-snapshot'
+        || forbidden.has(artifactClass)) hold('DISPATCH_TRANSITION_INVALID', 'read');
+      const names = this.startedFailedDirectoryNames(childPath(artifactRoot, artifactClass));
+      const receipts = names.filter(name => name.endsWith('.receipt.json'));
+      const binaries = names.filter(name => name.endsWith('.bin'));
+      if (names.length !== receipts.length + binaries.length || receipts.length !== binaries.length) {
+        hold('INCOMPLETE_PUBLICATION', 'read');
+      }
+      for (const name of receipts) {
+        const artifactKey = name.slice(0, -'.receipt.json'.length);
+        if (!isSafeArtifactKey(artifactKey) || !names.includes(`${artifactKey}.bin`)) {
+          hold('INCOMPLETE_PUBLICATION', 'read');
+        }
+        const receipt = this.readArtifactReceipt({
+          identity: admitted.ref.identity,
+          policy,
+          artifactClass,
+          artifactKey,
+        });
+        const artifact = receipt ? this.readVerifiedSnapshot(
+          receipt.artifact,
+          policy.artifactLimits[artifactClass],
+          'read',
+        ) : null;
+        if (!receipt || !artifact
+          || receipt.admissionReceiptDigest !== admitted.admission.receiptDigest
+          || receipt.policyDigest !== policy.policyDigest
+          || !sameIdentity(receipt.identity, admitted.ref.identity)
+          || !sameProof(artifact.proof, receipt.artifact)) {
+          hold('ARTIFACT_REPLAY_MISMATCH', 'read');
+        }
+        const reference = freezeObject({
+          artifactClass,
+          artifactKey,
+          receiptDigest: receipt.receiptDigest,
+          contentDigest: receipt.artifact.sha256,
+          byteLength: receipt.artifact.byteLength,
+        });
+        artifacts.push(reference);
+        capturedAtByRef.set(`${artifactClass}\0${artifactKey}\0${receipt.receiptDigest}`, receipt.capturedAt);
+      }
+    }
+    return freezeObject({ artifacts: freezeObject(artifacts), capturedAtByRef });
+  }
+
+  private latestEffectCommittedEvidenceTimestamp(
+    admitted: Extract<TaskAttemptCustodyDispatchAdmissionReadV2, { readonly state: 'admitted' }>,
+    policy: TaskAttemptCustodyPolicyV2,
+    evidence: TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2,
+  ): number {
+    const references = [
+      evidence.landingRecoveryAnchor,
+      evidence.readyLifecycle,
+      evidence.committedJournal,
+      evidence.leaseEvidence,
+      evidence.finalEvidence,
+      evidence.finalManifest,
+    ];
+    let latest = Number.NEGATIVE_INFINITY;
+    for (const reference of references) {
+      const receipt = this.readArtifactReceipt({
+        identity: admitted.ref.identity,
+        policy,
+        artifactClass: reference.artifactClass as Exclude<
+          TaskAttemptCustodyArtifactClass,
+          'task-admission-snapshot'
+        >,
+        artifactKey: reference.artifactKey,
+      });
+      if (!receipt || receipt.receiptDigest !== reference.receiptDigest) {
+        hold('ARTIFACT_REPLAY_MISMATCH', 'read');
+      }
+      const capturedAt = Date.parse(receipt.capturedAt);
+      if (capturedAt > latest) latest = capturedAt;
+    }
+    return latest;
+  }
+
+  private assertRecoveryAuthorityBoundToCandidate(
+    authority: TaskAttemptCustodyDispatchRecoveryAuthorityV2,
+    identity: TaskAttemptCustodyIdentityV2,
+    recordedAt: string,
+    earliestRecordedAt: number,
+    operation: TaskAttemptCustodyOperation,
+  ): void {
+    const sprintOrdinal = authority.executionId.slice('sprint-'.length);
+    if (!identity.taskId.startsWith(`${sprintOrdinal}-`)
+      || Date.parse(recordedAt) < earliestRecordedAt) {
+      hold(operation === 'read' ? 'DISPATCH_AUTHORITY_INVALID' : 'DISPATCH_REQUEST_INVALID', operation);
+    }
+  }
+
+  inspectStartedFailedDispatchCandidate(input: {
+    readonly admissionRef: TaskAttemptCustodyDispatchAdmissionRefV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+  }): TaskAttemptCustodyStartedFailedCandidateV2 {
+    const record = requireExactDataRecord(input, ['admissionRef', 'policy'], 'DISPATCH_AUTHORITY_INVALID', 'read');
+    const policy = snapshotPolicy(record.policy);
+    const admitted = this.requireDispatchAdmissionRef(record.admissionRef, policy, 'read');
+    const lifecycle = this.inspectExactReleasedProviderLifecycle(admitted, policy);
+    const { terminal, observations, start, execution, exit } = lifecycle;
+    const prefix = identityPrefix(admitted.ref.identity);
+    // Even an empty directory means publication may have begun. Never infer
+    // unlanded state from a missing final receipt after APPLYING/COMMITTED.
+    const forbidden = new Set<TaskAttemptCustodyArtifactClass>([
+      'execution-workspace-release', 'execution-effect-landing-journal',
+      'execution-effect-landing-receipt-evidence', 'execution-effect-landing-receipt',
+      'canonical-accepted-result', 'production-wiring-host-settlement',
+      'evaluation-receipt', 'finalizer-receipt', 'settlement-receipt', 'archive-receipt',
+    ]);
+    // Admission preallocates the chain directory; only a verified empty scan
+    // is inert. In contrast, forbidden artifact-class directories are lazy.
+    if (this.startedFailedDirectoryNames(childPath(prefix, 'chain')).length !== 0) {
+      hold('DISPATCH_TRANSITION_INVALID', 'read');
+    }
+    const preserved = this.inspectPreservedArtifactInventory(admitted, policy, forbidden).artifacts;
+    const preservationManifestDigest = taskAttemptCustodyDigest('started-failed-preservation', {
+      taskSnapshotDigest: admitted.admission.taskSnapshot.sha256,
+      observations: observations.filter(entry => entry !== null).map(entry => entry!.receipt),
+      artifacts: preserved,
+    }, policy.jsonBounds);
+    const body = freezeObject({
+      state: 'STARTED_FAILED_CANDIDATE' as const, identity: cloneIdentity(admitted.ref.identity),
+      admissionRefDigest: admitted.ref.refDigest, admissionReceiptDigest: admitted.admission.receiptDigest,
+      releasedDispatchReceiptDigest: terminal.receiptDigest,
+      providerStartObservationReceiptDigest: start.receipt.receiptDigest,
+      providerExecutionObservationReceiptDigest: execution.receipt.receiptDigest,
+      providerExitObservationReceiptDigest: exit.receipt.receiptDigest,
+      providerExitObservedAt: exit.receipt.observedAt, preservationManifestDigest, preservedArtifacts: preserved,
+    });
+    return freezeObject({ ...body, evidenceDigest: taskAttemptCustodyDigest('started-failed-candidate', body, policy.jsonBounds) });
+  }
+
+  readStartedFailedDispatch(input: {
+    readonly admissionRef: TaskAttemptCustodyDispatchAdmissionRefV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+  }): TaskAttemptCustodyStartedFailedDispatchV2 | null {
+    const record = requireExactDataRecord(input, ['admissionRef', 'policy'], 'DISPATCH_AUTHORITY_INVALID', 'read');
+    const policy = snapshotPolicy(record.policy);
+    const admitted = this.requireDispatchAdmissionRef(record.admissionRef, policy, 'read');
+    const observed = this.readFirstWriterSnapshot(this.startedFailedDispatchPath(admitted.ref.identity),
+      metadataLimit(policy), 'read', 'DISPATCH_AUTHORITY_INVALID');
+    if (observed === null) return null;
+    let decoded: unknown;
+    try { decoded = JSON.parse(Buffer.from(observed.bytes).toString('utf8')); }
+    catch { return hold('DISPATCH_AUTHORITY_INVALID', 'read'); }
+    const row = snapshotExactDataRecord(decoded, [
+      'schemaVersion', 'kind', 'state', 'identity', 'admissionRefDigest', 'admissionReceiptDigest',
+      'releasedDispatchReceiptDigest', 'providerStartObservationReceiptDigest',
+      'providerExecutionObservationReceiptDigest', 'providerExitObservationReceiptDigest',
+      'providerExitObservedAt', 'preservationManifestDigest', 'preservedArtifacts', 'evidenceDigest',
+      'custodyRootId', 'custodyCapabilityEvidenceDigest', 'recoveryAuthority', 'recoveryAuthorityDigest',
+      'stoppedExecutionEvidenceDigest', 'recordedAt', 'receiptDigest',
+    ]);
+    const authority = row ? snapshotDispatchRecoveryAuthority(row.recoveryAuthority) : null;
+    if (!row || !authority || row.schemaVersion !== TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION
+      || row.kind !== 'task-attempt-custody-started-failed-dispatch' || row.state !== 'STARTED_FAILED_RETAINED'
+      || row.custodyRootId !== this.root.rootId || row.custodyCapabilityEvidenceDigest !== this.root.capabilityEvidenceDigest
+      || !isDigest(row.stoppedExecutionEvidenceDigest) || !isTimestamp(row.recordedAt)
+      || !isDigest(row.receiptDigest)) hold('DISPATCH_AUTHORITY_INVALID', 'read');
+    const candidate = this.inspectStartedFailedDispatchCandidate({ admissionRef: admitted.ref, policy });
+    this.assertRecoveryAuthorityBoundToCandidate(authority, candidate.identity, row.recordedAt,
+      Date.parse(candidate.providerExitObservedAt), 'read');
+    const body = freezeObject({ ...candidate, schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      kind: 'task-attempt-custody-started-failed-dispatch' as const, state: 'STARTED_FAILED_RETAINED' as const,
+      custodyRootId: this.root.rootId, custodyCapabilityEvidenceDigest: this.root.capabilityEvidenceDigest,
+      recoveryAuthority: authority, recoveryAuthorityDigest: dispatchRecoveryAuthorityDigest(authority, policy.jsonBounds),
+      stoppedExecutionEvidenceDigest: row.stoppedExecutionEvidenceDigest as Sha256Digest, recordedAt: row.recordedAt,
+    });
+    const disposition = freezeObject({ ...body, receiptDigest: taskAttemptCustodyDigest('started-failed-dispatch', body, policy.jsonBounds) });
+    if (!sameBytes(observed.bytes, canonicalTaskAttemptCustodyJson(disposition, policy.jsonBounds))) {
+      hold('DISPATCH_AUTHORITY_INVALID', 'read');
+    }
+    return disposition;
+  }
+
+  retainStartedFailedDispatch(input: {
+    readonly admissionRef: TaskAttemptCustodyDispatchAdmissionRefV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly recoveryAuthority: TaskAttemptCustodyDispatchRecoveryAuthorityV2;
+    readonly recordedAt: string;
+    readonly stoppedExecutionEvidenceDigest: Sha256Digest;
+  }): TaskAttemptCustodyStartedFailedDispatchV2 {
+    const row = requireExactDataRecord(input, ['admissionRef', 'policy', 'recoveryAuthority',
+      'recordedAt', 'stoppedExecutionEvidenceDigest'], 'DISPATCH_REQUEST_INVALID', 'settle-dispatch');
+    const policy = snapshotPolicy(row.policy);
+    const admitted = this.requireDispatchAdmissionRef(row.admissionRef, policy, 'settle-dispatch');
+    const authority = snapshotDispatchRecoveryAuthority(row.recoveryAuthority);
+    if (!authority || !isTimestamp(row.recordedAt) || !isDigest(row.stoppedExecutionEvidenceDigest)
+      || !admitted.ref.identity.taskId.startsWith(`${authority.executionId.slice('sprint-'.length)}-`)) {
+      hold('DISPATCH_REQUEST_INVALID', 'settle-dispatch');
+    }
+    this.assertNoConflictingRetainedDisposition(policy,
+      this.effectCommittedReleasePendingDispatchPath(admitted.ref.identity));
+    const candidate = this.inspectStartedFailedDispatchCandidate({ admissionRef: admitted.ref, policy });
+    this.assertRecoveryAuthorityBoundToCandidate(authority, candidate.identity, row.recordedAt,
+      Date.parse(candidate.providerExitObservedAt), 'settle-dispatch');
+    const body = freezeObject({ ...candidate, schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      kind: 'task-attempt-custody-started-failed-dispatch' as const, state: 'STARTED_FAILED_RETAINED' as const,
+      custodyRootId: this.root.rootId, custodyCapabilityEvidenceDigest: this.root.capabilityEvidenceDigest,
+      recoveryAuthority: authority, recoveryAuthorityDigest: dispatchRecoveryAuthorityDigest(authority, policy.jsonBounds),
+      stoppedExecutionEvidenceDigest: row.stoppedExecutionEvidenceDigest as Sha256Digest, recordedAt: row.recordedAt,
+    });
+    const disposition = freezeObject({ ...body, receiptDigest: taskAttemptCustodyDigest('started-failed-dispatch', body, policy.jsonBounds) });
+    this.publishDispatchFirstWriter(this.startedFailedDispatchPath(admitted.ref.identity),
+      canonicalTaskAttemptCustodyJson(disposition, policy.jsonBounds), metadataLimit(policy), 'settle-dispatch');
+    const reread = this.readStartedFailedDispatch({ admissionRef: admitted.ref, policy });
+    if (!reread || reread.receiptDigest !== disposition.receiptDigest) hold('DISPATCH_REQUEST_CONFLICT', 'settle-dispatch');
+    return reread;
+  }
+
+  /** Structural-only half of the committed-journal recovery contract. The
+   * orchestra adapter must verify journal/lease semantics before every call. */
+  inspectEffectCommittedReleasePendingCandidate(input: {
+    readonly admissionRef: TaskAttemptCustodyDispatchAdmissionRefV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly evidence: TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2;
+  }): TaskAttemptCustodyEffectCommittedReleasePendingCandidateV2 {
+    const row = requireExactDataRecord(input, ['admissionRef', 'policy', 'evidence'], 'DISPATCH_AUTHORITY_INVALID', 'read');
+    const policy = snapshotPolicy(row.policy);
+    const admitted = this.requireDispatchAdmissionRef(row.admissionRef, policy, 'read');
+    const lifecycle = this.inspectExactReleasedProviderLifecycle(admitted, policy);
+    const { terminal, exit } = lifecycle;
+    const evidenceRecord = snapshotExactDataRecord(row.evidence, [
+      'phase', 'landingRecoveryAnchor', 'readyLifecycle', 'committedJournal', 'leaseEvidence',
+      'finalEvidence', 'finalManifest', 'semanticVerifier', 'semanticEvidenceDigest',
+    ]);
+    if (!evidenceRecord || evidenceRecord.phase !== 'COMMITTED_JOURNAL_RELEASE_PENDING'
+      || evidenceRecord.semanticVerifier !== 'orchestra-required-v1'
+      || !isDigest(evidenceRecord.semanticEvidenceDigest)) hold('DISPATCH_AUTHORITY_INVALID', 'read');
+    const expected: ReadonlyArray<readonly [string, Exclude<
+      TaskAttemptCustodyArtifactClass,
+      'task-admission-snapshot'
+    >]> = [
+      ['landingRecoveryAnchor', 'execution-effect-lifecycle-authority'],
+      ['readyLifecycle', 'execution-effect-lifecycle-authority'],
+      ['committedJournal', 'execution-effect-landing-journal'],
+      ['leaseEvidence', 'execution-effect-landing-receipt-evidence'],
+      ['finalEvidence', 'execution-effect-landing-receipt-evidence'],
+      ['finalManifest', 'execution-effect-manifest'],
+    ];
+    const refs: Record<string, TaskAttemptCustodyPreservedArtifactRefV2> = Object.create(null);
+    const requiredRefs: TaskAttemptCustodyPreservedArtifactRefV2[] = [];
+    for (const [key, artifactClass] of expected) {
+      const ref = snapshotExactDataRecord(evidenceRecord[key], [
+        'artifactClass', 'artifactKey', 'receiptDigest', 'contentDigest', 'byteLength',
+      ]);
+      if (!ref || ref.artifactClass !== artifactClass || typeof ref.artifactKey !== 'string'
+        || !isSafeArtifactKey(ref.artifactKey) || !isDigest(ref.receiptDigest)
+        || !isDigest(ref.contentDigest) || !assertNonnegativeSafeInteger(ref.byteLength)) {
+        hold('DISPATCH_AUTHORITY_INVALID', 'read');
+      }
+      const receipt = this.readArtifactReceipt({ identity: admitted.ref.identity, policy,
+        artifactClass, artifactKey: ref.artifactKey as string });
+      const artifact = receipt ? this.readVerifiedSnapshot(receipt.artifact,
+        policy.artifactLimits[artifactClass], 'read') : null;
+      if (!receipt || !artifact || receipt.receiptDigest !== ref.receiptDigest
+        || receipt.artifact.sha256 !== ref.contentDigest || receipt.artifact.byteLength !== ref.byteLength
+        || receipt.admissionReceiptDigest !== admitted.admission.receiptDigest
+        || receipt.policyDigest !== policy.policyDigest || !sameProof(artifact.proof, receipt.artifact)) {
+        hold('ARTIFACT_REPLAY_MISMATCH', 'read');
+      }
+      refs[key] = freezeObject({ artifactClass, artifactKey: ref.artifactKey as string,
+        receiptDigest: ref.receiptDigest as Sha256Digest, contentDigest: ref.contentDigest as Sha256Digest,
+        byteLength: ref.byteLength as number });
+      requiredRefs.push(refs[key]!);
+    }
+    const forbidden = new Set<string>([
+      'execution-workspace-release', 'execution-effect-landing-receipt', 'canonical-accepted-result',
+      'production-wiring-host-settlement', 'evaluation-receipt', 'finalizer-receipt',
+      'settlement-receipt', 'archive-receipt',
+    ]);
+    const prefix = identityPrefix(admitted.ref.identity);
+    const inventory = this.inspectPreservedArtifactInventory(admitted, policy, forbidden);
+    const preservedArtifacts = inventory.artifacts;
+    for (const reference of requiredRefs) {
+      const inventoryReferenceExists = intrinsicArraySome(preservedArtifacts, candidate => (
+        candidate.artifactClass === reference.artifactClass
+        && candidate.artifactKey === reference.artifactKey
+        && candidate.receiptDigest === reference.receiptDigest
+        && candidate.contentDigest === reference.contentDigest
+        && candidate.byteLength === reference.byteLength
+      ));
+      const capturedAt = inventory.capturedAtByRef.get(
+        `${reference.artifactClass}\0${reference.artifactKey}\0${reference.receiptDigest}`,
+      );
+      if (!inventoryReferenceExists || !capturedAt
+        || Date.parse(capturedAt) < Date.parse(exit.receipt.observedAt)) {
+        hold('ARTIFACT_REPLAY_MISMATCH', 'read');
+      }
+    }
+    // Release-pending has no chain authority at all. A nonempty directory is
+    // publication evidence, including an unknown future stage.
+    if (this.startedFailedDirectoryNames(childPath(prefix, 'chain')).length !== 0) {
+      hold('DISPATCH_TRANSITION_INVALID', 'read');
+    }
+    const evidence = freezeObject({ phase: 'COMMITTED_JOURNAL_RELEASE_PENDING' as const,
+      landingRecoveryAnchor: refs['landingRecoveryAnchor']!, readyLifecycle: refs['readyLifecycle']!,
+      committedJournal: refs['committedJournal']!, leaseEvidence: refs['leaseEvidence']!,
+      finalEvidence: refs['finalEvidence']!, finalManifest: refs['finalManifest']!,
+      semanticVerifier: 'orchestra-required-v1' as const,
+      semanticEvidenceDigest: evidenceRecord.semanticEvidenceDigest as Sha256Digest });
+    const preservationManifestDigest = taskAttemptCustodyDigest('effect-committed-release-pending-preservation', {
+      taskSnapshotDigest: admitted.admission.taskSnapshot.sha256, evidence,
+      providerObservations: lifecycle.observations
+        .filter(entry => entry !== null)
+        .map(entry => entry!.receipt),
+      artifacts: preservedArtifacts,
+    }, policy.jsonBounds);
+    const body = freezeObject({ state: 'EFFECT_COMMITTED_RELEASE_PENDING_CANDIDATE' as const,
+      identity: cloneIdentity(admitted.ref.identity), admissionRefDigest: admitted.ref.refDigest,
+      admissionReceiptDigest: admitted.admission.receiptDigest,
+      releasedDispatchReceiptDigest: terminal.receiptDigest,
+      providerExitObservationReceiptDigest: exit.receipt.receiptDigest,
+      providerExitObservedAt: exit.receipt.observedAt, evidence, preservedArtifacts,
+      preservationManifestDigest });
+    return freezeObject({ ...body, evidenceDigest: taskAttemptCustodyDigest(
+      'effect-committed-release-pending-candidate', body, policy.jsonBounds) });
+  }
+
+  readEffectCommittedReleasePendingDispatch(input: {
+    readonly admissionRef: TaskAttemptCustodyDispatchAdmissionRefV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+  }): TaskAttemptCustodyEffectCommittedReleasePendingDispatchV2 | null {
+    const row = requireExactDataRecord(input, ['admissionRef', 'policy'], 'DISPATCH_AUTHORITY_INVALID', 'read');
+    const policy = snapshotPolicy(row.policy);
+    const admitted = this.requireDispatchAdmissionRef(row.admissionRef, policy, 'read');
+    const observed = this.readFirstWriterSnapshot(this.effectCommittedReleasePendingDispatchPath(admitted.ref.identity),
+      metadataLimit(policy), 'read', 'DISPATCH_AUTHORITY_INVALID');
+    if (!observed) return null;
+    let decoded: unknown; try { decoded = JSON.parse(Buffer.from(observed.bytes).toString('utf8')); }
+    catch { return hold('DISPATCH_AUTHORITY_INVALID', 'read'); }
+    const record = snapshotExactDataRecord(decoded, [
+      'schemaVersion', 'kind', 'state', 'identity', 'admissionRefDigest', 'admissionReceiptDigest',
+      'releasedDispatchReceiptDigest', 'providerExitObservationReceiptDigest', 'providerExitObservedAt',
+      'evidence', 'preservedArtifacts', 'preservationManifestDigest', 'evidenceDigest', 'custodyRootId',
+      'custodyCapabilityEvidenceDigest', 'recoveryAuthority', 'recoveryAuthorityDigest',
+      'stoppedResourceEvidenceDigest', 'hostObservationDigest', 'recordedAt', 'receiptDigest',
+    ]);
+    const authority = record ? snapshotDispatchRecoveryAuthority(record.recoveryAuthority) : null;
+    if (!record || !authority || record.schemaVersion !== TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION
+      || record.kind !== 'task-attempt-custody-effect-committed-release-pending-dispatch'
+      || record.state !== 'COMMITTED_JOURNAL_RELEASE_PENDING' || record.custodyRootId !== this.root.rootId
+      || record.custodyCapabilityEvidenceDigest !== this.root.capabilityEvidenceDigest
+      || !isDigest(record.stoppedResourceEvidenceDigest) || !isDigest(record.hostObservationDigest)
+      || !isTimestamp(record.recordedAt) || !isDigest(record.receiptDigest)) hold('DISPATCH_AUTHORITY_INVALID', 'read');
+    const candidate = this.inspectEffectCommittedReleasePendingCandidate({ admissionRef: admitted.ref, policy,
+      evidence: record.evidence as TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2 });
+    const latestCommittedAt = this.latestEffectCommittedEvidenceTimestamp(admitted, policy, candidate.evidence);
+    this.assertRecoveryAuthorityBoundToCandidate(authority, candidate.identity, record.recordedAt,
+      latestCommittedAt > Date.parse(candidate.providerExitObservedAt)
+        ? latestCommittedAt
+        : Date.parse(candidate.providerExitObservedAt), 'read');
+    const body = freezeObject({ ...candidate, schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      kind: 'task-attempt-custody-effect-committed-release-pending-dispatch' as const,
+      state: 'COMMITTED_JOURNAL_RELEASE_PENDING' as const, custodyRootId: this.root.rootId,
+      custodyCapabilityEvidenceDigest: this.root.capabilityEvidenceDigest, recoveryAuthority: authority,
+      recoveryAuthorityDigest: dispatchRecoveryAuthorityDigest(authority, policy.jsonBounds),
+      stoppedResourceEvidenceDigest: record.stoppedResourceEvidenceDigest as Sha256Digest,
+      hostObservationDigest: record.hostObservationDigest as Sha256Digest, recordedAt: record.recordedAt });
+    const result = freezeObject({ ...body, receiptDigest: taskAttemptCustodyDigest(
+      'effect-committed-release-pending-dispatch', body, policy.jsonBounds) });
+    if (!sameBytes(observed.bytes, canonicalTaskAttemptCustodyJson(result, policy.jsonBounds))) hold('DISPATCH_AUTHORITY_INVALID', 'read');
+    return result;
+  }
+
+  retainEffectCommittedReleasePendingDispatch(input: {
+    readonly admissionRef: TaskAttemptCustodyDispatchAdmissionRefV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly evidence: TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2;
+    readonly recoveryAuthority: TaskAttemptCustodyDispatchRecoveryAuthorityV2;
+    readonly recordedAt: string;
+    readonly stoppedResourceEvidenceDigest: Sha256Digest;
+    readonly hostObservationDigest: Sha256Digest;
+  }): TaskAttemptCustodyEffectCommittedReleasePendingDispatchV2 {
+    const row = requireExactDataRecord(input, ['admissionRef', 'policy', 'evidence', 'recoveryAuthority',
+      'recordedAt', 'stoppedResourceEvidenceDigest', 'hostObservationDigest'], 'DISPATCH_REQUEST_INVALID', 'settle-dispatch');
+    const policy = snapshotPolicy(row.policy);
+    const admitted = this.requireDispatchAdmissionRef(row.admissionRef, policy, 'settle-dispatch');
+    const authority = snapshotDispatchRecoveryAuthority(row.recoveryAuthority);
+    if (!authority || !isTimestamp(row.recordedAt) || !isDigest(row.stoppedResourceEvidenceDigest)
+      || !isDigest(row.hostObservationDigest)) hold('DISPATCH_REQUEST_INVALID', 'settle-dispatch');
+    this.assertNoConflictingRetainedDisposition(policy,
+      this.startedFailedDispatchPath(admitted.ref.identity));
+    const candidate = this.inspectEffectCommittedReleasePendingCandidate({ admissionRef: admitted.ref, policy,
+      evidence: row.evidence as TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2 });
+    const latestCommittedAt = this.latestEffectCommittedEvidenceTimestamp(admitted, policy, candidate.evidence);
+    this.assertRecoveryAuthorityBoundToCandidate(authority, candidate.identity, row.recordedAt,
+      latestCommittedAt > Date.parse(candidate.providerExitObservedAt)
+        ? latestCommittedAt
+        : Date.parse(candidate.providerExitObservedAt), 'settle-dispatch');
+    const body = freezeObject({ ...candidate, schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      kind: 'task-attempt-custody-effect-committed-release-pending-dispatch' as const,
+      state: 'COMMITTED_JOURNAL_RELEASE_PENDING' as const, custodyRootId: this.root.rootId,
+      custodyCapabilityEvidenceDigest: this.root.capabilityEvidenceDigest, recoveryAuthority: authority,
+      recoveryAuthorityDigest: dispatchRecoveryAuthorityDigest(authority, policy.jsonBounds),
+      stoppedResourceEvidenceDigest: row.stoppedResourceEvidenceDigest as Sha256Digest,
+      hostObservationDigest: row.hostObservationDigest as Sha256Digest, recordedAt: row.recordedAt });
+    const disposition = freezeObject({ ...body, receiptDigest: taskAttemptCustodyDigest(
+      'effect-committed-release-pending-dispatch', body, policy.jsonBounds) });
+    this.publishDispatchFirstWriter(this.effectCommittedReleasePendingDispatchPath(admitted.ref.identity),
+      canonicalTaskAttemptCustodyJson(disposition, policy.jsonBounds), metadataLimit(policy), 'settle-dispatch');
+    const reread = this.readEffectCommittedReleasePendingDispatch({ admissionRef: admitted.ref, policy });
+    if (!reread || reread.receiptDigest !== disposition.receiptDigest) hold('DISPATCH_REQUEST_CONFLICT', 'settle-dispatch');
+    return reread;
   }
 
   private requireDispatchAdmissionRef(
@@ -6317,10 +8152,12 @@ export class TaskAttemptCustodyStore {
       hold('DISPATCH_AUTHORITY_INVALID', 'settle-dispatch');
     }
     const observationClass = inputRecord.observationClass;
+    this.assertAttemptNotRetained(admitted.ref.identity, policy, 'settle-dispatch');
     if (
       observationClass === 'PROVIDER_START'
       || observationClass === 'PROVIDER_EXECUTION'
       || observationClass === 'PROVIDER_EXIT'
+      || observationClass === 'EFFECT_DIAGNOSTIC'
     ) {
       // Provider lifecycle observations are downstream of release. readDispatchAuthority
       // deliberately consumes neither class, so this gate cannot recurse through them.
@@ -6366,6 +8203,8 @@ export class TaskAttemptCustodyStore {
             && (providerStart === null || providerExit !== null))
           || (observationClass === 'PROVIDER_EXIT'
             && (providerStart === null || providerExecution === null))
+          || (observationClass === 'EFFECT_DIAGNOSTIC'
+            && (providerStart === null || providerExecution === null || providerExit === null))
         ) {
           hold('DISPATCH_TRANSITION_INVALID', 'settle-dispatch');
         }
@@ -6381,6 +8220,12 @@ export class TaskAttemptCustodyStore {
               intrinsicDateParse,
               Date,
               [providerExecution.receipt.observedAt],
+            ) as number))
+          || (providerExit !== null
+            && observedUnixMs < (intrinsicReflectApply(
+              intrinsicDateParse,
+              Date,
+              [providerExit.receipt.observedAt],
             ) as number))
         ) {
           hold('DISPATCH_AUTHORITY_INVALID', 'settle-dispatch');
@@ -8041,6 +9886,60 @@ export class TaskAttemptCustodyStore {
     return capability;
   }
 
+  /**
+   * Presence-only read of one attempt-private output path. The returned bit is
+   * not execution authority: callers must still issue a capture capability and
+   * persist a verified artifact before consuming any bytes. A missing file is
+   * the only false result; unsafe paths, policy drift and adapter ambiguity
+   * remain typed HOLDs.
+   */
+  hasAttemptOutputArtifact(input: {
+    readonly access: TaskAttemptCustodyAttemptAccess;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly childRelativePath: string;
+    readonly artifactClass: TaskAttemptCustodyAttemptOutputArtifactClass;
+  }): boolean {
+    const inputRecord = requireExactDataRecord(
+      input,
+      ['access', 'policy', 'childRelativePath', 'artifactClass'],
+      'CAPABILITY_UNVERIFIED',
+      'probe',
+    );
+    const accessRecord = requireExactDataRecord(inputRecord.access, [
+      'identity',
+      'admissionReceiptDigest',
+      'scopeDigest',
+      'taskSnapshotRead',
+      'workerOutputWrite',
+    ], 'CAPABILITY_UNVERIFIED', 'probe');
+    const policy = snapshotPolicy(inputRecord.policy);
+    if (
+      typeof inputRecord.childRelativePath !== 'string'
+      || artifactCaptureModeForClass(inputRecord.artifactClass) !== 'attempt-output-capture'
+      || !isDigest(accessRecord.admissionReceiptDigest)
+      || !isDigest(accessRecord.scopeDigest)
+    ) hold('CAPABILITY_UNVERIFIED', 'probe');
+    const identity = cloneIdentity(accessRecord.identity as TaskAttemptCustodyIdentityV2);
+    const workerOutputScope = this.requireIssuedPathCapability(
+      accessRecord.workerOutputWrite as TaskAttemptCustodyPathCapability,
+      identity,
+      accessRecord.admissionReceiptDigest as Sha256Digest,
+      'read-write-directory',
+    );
+    if (workerOutputScope.scopeDigest !== accessRecord.scopeDigest) {
+      hold('CAPABILITY_UNVERIFIED', 'probe');
+    }
+    const child = taskAttemptCustodyRelativePath(inputRecord.childRelativePath);
+    const relativePath = childPath(workerOutputScope.relativePath, child);
+    return this.adapter.readFirstWriter({
+      root: this.root,
+      relativePath,
+      policy: policy.artifactLimits[
+        inputRecord.artifactClass as TaskAttemptCustodyAttemptOutputArtifactClass
+      ],
+    }) !== null;
+  }
+
   readTaskSnapshot(input: {
     readonly identity: TaskAttemptCustodyIdentityV2;
     readonly policy: TaskAttemptCustodyPolicyV2;
@@ -8129,6 +10028,535 @@ export class TaskAttemptCustodyStore {
       bytes: observed.bytes,
       proof: observed.proof,
     });
+  }
+
+  private requireWorkerIpcDispatchBinding(
+    dispatchRequestId: string,
+    identity: TaskAttemptCustodyIdentityV2,
+    admissionReceiptDigest: Sha256Digest,
+    policy: TaskAttemptCustodyPolicyV2,
+    operation: TaskAttemptCustodyOperation,
+  ): void {
+    const dispatch = this.readDispatchAdmission({ dispatchRequestId, policy });
+    if (
+      dispatch.state !== 'admitted'
+      || !sameIdentity(dispatch.ref.identity, identity)
+      || dispatch.ref.admissionReceiptDigest !== admissionReceiptDigest
+    ) hold('DISPATCH_REQUEST_CONFLICT', operation);
+  }
+
+  private readWorkerIpcCursorInventory(
+    identity: TaskAttemptCustodyIdentityV2,
+  ): ReadonlySet<string> {
+    const directoryPath = workerIpcCursorDirectory(identity);
+    const directory = this.readPrivateDirectorySnapshot(
+      directoryPath,
+      'read',
+      'CORRUPT_CUSTODY_RECORD',
+    );
+    if (directory === null) return new Set<string>();
+    const scan = this.adapter.scanPrivateDirectoryBounded;
+    if (typeof scan !== 'function' || isUntrustedProxy(scan)) {
+      hold('NATIVE_CAPABILITY_UNAVAILABLE', 'read');
+    }
+    const maxEntries = TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS * 2;
+    const maxNameBytes = 64;
+    const deadlineUnixMs = (intrinsicReflectApply(intrinsicDateNow, Date, []) as number) + 1_000;
+    let value: TaskAttemptCustodyDirectoryScanReceiptV2;
+    try {
+      value = scan({
+        root: this.root,
+        relativeDirectory: directoryPath,
+        maxEntries,
+        maxNameBytes,
+        deadlineUnixMs,
+      });
+    } catch (cause) {
+      hold(mappedAdapterHoldCode(cause, 'CORRUPT_CUSTODY_RECORD'), 'read');
+    }
+    const receipt = createTaskAttemptCustodyDirectoryScanReceiptV2({
+      rootId: value.rootId,
+      relativeDirectory: value.relativeDirectory,
+      names: value.names,
+      entryCount: value.entryCount,
+      maxEntries: value.maxEntries,
+      maxNameBytes: value.maxNameBytes,
+      deadlineUnixMs: value.deadlineUnixMs,
+      nativeMutationEvidence: value.nativeMutationEvidence,
+      nativeDirectoryIdentityBeforeDigest: value.nativeDirectoryIdentityBeforeDigest,
+      nativeDirectoryIdentityAfterDigest: value.nativeDirectoryIdentityAfterDigest,
+    });
+    if (
+      value.receiptDigest !== receipt.receiptDigest
+      || receipt.rootId !== this.root.rootId
+      || receipt.relativeDirectory !== directoryPath
+      || receipt.maxEntries !== maxEntries
+      || receipt.maxNameBytes !== maxNameBytes
+      || receipt.deadlineUnixMs !== deadlineUnixMs
+      || receipt.nativeDirectoryIdentityBeforeDigest
+        !== receipt.nativeDirectoryIdentityAfterDigest
+    ) hold('CORRUPT_CUSTODY_RECORD', 'read');
+    const names = new Set<string>();
+    let maximumSequence = 0;
+    for (const name of receipt.names) {
+      const match = /^(\d{6})\.(question-open|answered)\.json$/u.exec(name);
+      if (match === null) hold('CORRUPT_CUSTODY_RECORD', 'read');
+      const sequence = Number(match[1]);
+      if (
+        !assertPositiveSafeInteger(sequence)
+        || sequence > TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS
+        || String(sequence).padStart(6, '0') !== match[1]
+      ) hold('CORRUPT_CUSTODY_RECORD', 'read');
+      maximumSequence = Math.max(maximumSequence, sequence);
+      names.add(name);
+    }
+    for (let sequence = 1; sequence <= maximumSequence; sequence += 1) {
+      const prefix = String(sequence).padStart(6, '0');
+      const hasOpen = names.has(`${prefix}.question-open.json`);
+      const hasAnswered = names.has(`${prefix}.answered.json`);
+      if (!hasOpen || (sequence < maximumSequence && !hasAnswered)) {
+        hold('CORRUPT_CUSTODY_RECORD', 'read');
+      }
+      if (hasAnswered && !hasOpen) hold('CORRUPT_CUSTODY_RECORD', 'read');
+    }
+    return names;
+  }
+
+  private requireWorkerIpcCursorPublication(
+    identity: TaskAttemptCustodyIdentityV2,
+    admissionReceiptDigest: Sha256Digest,
+    policy: TaskAttemptCustodyPolicyV2,
+    relativePath: TaskAttemptCustodyRelativePath,
+    bytes: Uint8Array,
+  ): void {
+    this.requireCompletedDurableEffect(this.durableEffectDescriptor({
+      ...attemptEffectContext(identity, admissionReceiptDigest, policy),
+      operation: 'PUBLISH',
+      target: relativePath,
+      contentDigest: rawSha256(bytes),
+      sequence: 0,
+    }), policy, 'read');
+  }
+
+  private publishWorkerIpcCursorAndVerify(
+    identity: TaskAttemptCustodyIdentityV2,
+    admissionReceiptDigest: Sha256Digest,
+    policy: TaskAttemptCustodyPolicyV2,
+    relativePath: TaskAttemptCustodyRelativePath,
+    bytes: Uint8Array,
+  ): void {
+    const authorityBytes = snapshotAuthorityBytes(bytes, 'CAPABILITY_UNVERIFIED', 'publish');
+    const limit = metadataLimit(policy);
+    assertBytesWithinLimit(authorityBytes, limit);
+    const effect = attemptEffectContext(identity, admissionReceiptDigest, policy);
+    const descriptor = this.durableEffectDescriptor({
+      ...effect,
+      operation: 'PUBLISH',
+      target: relativePath,
+      contentDigest: rawSha256(authorityBytes),
+      sequence: 0,
+    });
+    const intent = this.readDurableEffectMarker(descriptor, 'INTENT', policy);
+    const outcome = this.readDurableEffectMarker(descriptor, 'OUTCOME', policy);
+    if (intent === null || outcome !== null) {
+      this.publishAndVerify(relativePath, authorityBytes, limit, effect);
+      return;
+    }
+
+    let observed = this.readFirstWriterSnapshot(
+      relativePath,
+      limit,
+      'publish',
+      'PUBLISHED_UNCONFIRMED',
+    );
+    if (observed === null) {
+      let publicationValue: TaskAttemptCustodyPublication;
+      try {
+        publicationValue = this.adapter.publishBytesFirstWriter({
+          root: this.root,
+          relativePath,
+          bytes: Uint8Array.from(authorityBytes),
+          policy: limit,
+        });
+      } catch (error) {
+        hold(mappedAdapterHoldCode(error, 'PUBLISHED_UNCONFIRMED'), 'publish');
+      }
+      const publication = snapshotAdapterPublication(publicationValue, 'publish');
+      const proof = assertFileProof(
+        publication.proof,
+        relativePath,
+        authorityBytes,
+        this.root,
+        limit,
+      );
+      observed = this.readVerifiedSnapshot(
+        proof,
+        limit,
+        'publish',
+        'PUBLISHED_UNCONFIRMED',
+      );
+    }
+    if (
+      observed === null
+      || !sameBytes(observed.bytes, authorityBytes)
+      || observed.proof.sha256 !== descriptor.contentDigest
+    ) hold('RECONCILIATION_REQUIRED', 'publish');
+    this.activeDurableEffects.add(descriptor.opDigest);
+    this.completeDurableEffect(descriptor, policy);
+  }
+
+  readWorkerIpcConversationCursor(input: {
+    readonly identity: TaskAttemptCustodyIdentityV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly admissionReceiptDigest: Sha256Digest;
+    readonly dispatchRequestId: string;
+  }): TaskAttemptCustodyWorkerIpcConversationCursorV2 {
+    const record = requireExactDataRecord(input, [
+      'identity', 'policy', 'admissionReceiptDigest', 'dispatchRequestId',
+    ], 'ARTIFACT_REPLAY_MISMATCH', 'read');
+    const identity = cloneIdentity(record.identity as TaskAttemptCustodyIdentityV2);
+    const policy = snapshotPolicy(record.policy);
+    const admissionReceiptDigest = record.admissionReceiptDigest as Sha256Digest;
+    const dispatchRequestId = record.dispatchRequestId as string;
+    this.assertStoreIdentity(identity, 'read');
+    if (!isDigest(admissionReceiptDigest) || !isDispatchRequestId(dispatchRequestId)) {
+      hold('ARTIFACT_REPLAY_MISMATCH', 'read');
+    }
+    this.requireWorkerIpcDispatchBinding(
+      dispatchRequestId,
+      identity,
+      admissionReceiptDigest,
+      policy,
+      'read',
+    );
+
+    const inventory = this.readWorkerIpcCursorInventory(identity);
+    if (inventory.size === 0) {
+      return freezeObject({
+        state: 'empty' as const,
+        identity,
+        admissionReceiptDigest,
+        dispatchRequestId,
+        nextSequence: 1 as const,
+        cursorReceiptDigest: null,
+      });
+    }
+
+    const maximumSequence = Math.max(...[...inventory].map(name => Number(name.slice(0, 6))));
+    const cachedPrefix = this.verifiedWorkerIpcAnsweredPrefix.get(dispatchRequestId);
+    let predecessor: PersistedWorkerIpcCursor | null = cachedPrefix !== undefined
+      && cachedPrefix.sequence <= maximumSequence
+      && inventory.has(`${String(cachedPrefix.sequence).padStart(6, '0')}.question-open.json`)
+      && inventory.has(`${String(cachedPrefix.sequence).padStart(6, '0')}.answered.json`)
+      ? cachedPrefix
+      : null;
+    const firstSequence = predecessor === null ? 1 : predecessor.sequence + 1;
+    for (let sequence = firstSequence;
+      sequence <= TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS;
+      sequence += 1) {
+      const openPath = workerIpcCursorPath(identity, sequence, 'question-open');
+      const prefix = String(sequence).padStart(6, '0');
+      if (!inventory.has(`${prefix}.question-open.json`)) {
+        if (predecessor === null || predecessor.state !== 'answered') {
+          hold('CORRUPT_CUSTODY_RECORD', 'read');
+        }
+        return predecessor;
+      }
+      const openObserved = this.readFirstWriterSnapshot(
+        openPath,
+        metadataLimit(policy),
+        'read',
+        'RECONCILIATION_REQUIRED',
+      );
+      if (openObserved === null) {
+        hold('CORRUPT_CUSTODY_RECORD', 'read');
+      }
+      this.requireWorkerIpcCursorPublication(
+        identity,
+        admissionReceiptDigest,
+        policy,
+        openPath,
+        openObserved.bytes,
+      );
+      let openValue: unknown;
+      try { openValue = JSON.parse(Buffer.from(openObserved.bytes).toString('utf8')); } catch {
+        return hold('CORRUPT_CUSTODY_RECORD', 'read');
+      }
+      const open = parseWorkerIpcCursor(openValue, policy);
+      const expectedPredecessor = predecessor?.cursorReceiptDigest ?? null;
+      if (
+        open === null
+        || open.state !== 'question-open'
+        || !sameIdentity(open.identity, identity)
+        || open.admissionReceiptDigest !== admissionReceiptDigest
+        || open.dispatchRequestId !== dispatchRequestId
+        || open.sequence !== sequence
+        || open.predecessorCursorReceiptDigest !== expectedPredecessor
+        || !sameBytes(openObserved.bytes, canonicalTaskAttemptCustodyJson(open, policy.jsonBounds))
+      ) hold('CORRUPT_CUSTODY_RECORD', 'read');
+      const question = this.readVerifiedArtifact({
+        identity,
+        policy,
+        artifactClass: 'worker-ipc-question',
+        artifactKey: open.questionArtifactKey,
+        receiptDigest: open.questionReceiptDigest,
+      });
+      if (question === null || question.proof.sha256 !== open.questionArtifactSha256) {
+        hold('RECONCILIATION_REQUIRED', 'read');
+      }
+
+      const answeredPath = workerIpcCursorPath(identity, sequence, 'answered');
+      const answeredObserved = this.readFirstWriterSnapshot(
+        answeredPath,
+        metadataLimit(policy),
+        'read',
+        'RECONCILIATION_REQUIRED',
+      );
+      const hasAnswered = inventory.has(`${prefix}.answered.json`);
+      if (!hasAnswered) return open;
+      if (answeredObserved === null) hold('CORRUPT_CUSTODY_RECORD', 'read');
+      this.requireWorkerIpcCursorPublication(
+        identity,
+        admissionReceiptDigest,
+        policy,
+        answeredPath,
+        answeredObserved.bytes,
+      );
+      let answeredValue: unknown;
+      try { answeredValue = JSON.parse(Buffer.from(answeredObserved.bytes).toString('utf8')); } catch {
+        return hold('CORRUPT_CUSTODY_RECORD', 'read');
+      }
+      const answered = parseWorkerIpcCursor(answeredValue, policy);
+      if (
+        answered === null
+        || answered.state !== 'answered'
+        || !sameIdentity(answered.identity, identity)
+        || answered.admissionReceiptDigest !== admissionReceiptDigest
+        || answered.dispatchRequestId !== dispatchRequestId
+        || answered.sequence !== sequence
+        || answered.predecessorCursorReceiptDigest !== open.predecessorCursorReceiptDigest
+        || answered.questionCursorReceiptDigest !== open.cursorReceiptDigest
+        || answered.sealedSourceReceiptDigest !== open.sealedSourceReceiptDigest
+        || answered.sourceFileIdentityDigest !== open.sourceFileIdentityDigest
+        || answered.sourceEpoch !== open.sourceEpoch
+        || answered.questionReceiptDigest !== open.questionReceiptDigest
+        || !sameBytes(
+          answeredObserved.bytes,
+          canonicalTaskAttemptCustodyJson(answered, policy.jsonBounds),
+        )
+      ) hold('CORRUPT_CUSTODY_RECORD', 'read');
+      const delivery = this.readWorkerIpcAnswerDelivery({
+        identity,
+        policy,
+        admissionReceiptDigest,
+        sequence,
+        artifactKey: workerIpcAnswerArtifactKey(sequence),
+      });
+      if (delivery === null || delivery.receiptDigest !== answered.answerDeliveryReceiptDigest) {
+        hold('RECONCILIATION_REQUIRED', 'read');
+      }
+      predecessor = answered;
+      this.verifiedWorkerIpcAnsweredPrefix.set(dispatchRequestId, answered);
+    }
+    if (predecessor === null) hold('CORRUPT_CUSTODY_RECORD', 'read');
+    return predecessor;
+  }
+
+  readWorkerIpcQuestionOpenCursor(input: {
+    readonly identity: TaskAttemptCustodyIdentityV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly admissionReceiptDigest: Sha256Digest;
+    readonly dispatchRequestId: string;
+    readonly sequence: number;
+    readonly cursorReceiptDigest: Sha256Digest;
+  }): Extract<TaskAttemptCustodyWorkerIpcConversationCursorV2, { state: 'question-open' }> {
+    const record = requireExactDataRecord(input, [
+      'identity', 'policy', 'admissionReceiptDigest', 'dispatchRequestId', 'sequence',
+      'cursorReceiptDigest',
+    ], 'ARTIFACT_REPLAY_MISMATCH', 'read');
+    const identity = cloneIdentity(record.identity as TaskAttemptCustodyIdentityV2);
+    const policy = snapshotPolicy(record.policy);
+    const admissionReceiptDigest = record.admissionReceiptDigest as Sha256Digest;
+    const dispatchRequestId = record.dispatchRequestId as string;
+    const sequence = record.sequence as number;
+    const cursorReceiptDigest = record.cursorReceiptDigest as Sha256Digest;
+    if (!assertPositiveSafeInteger(sequence) || !isDigest(cursorReceiptDigest)) {
+      hold('ARTIFACT_REPLAY_MISMATCH', 'read');
+    }
+    const head = this.readWorkerIpcConversationCursor({
+      identity, policy, admissionReceiptDigest, dispatchRequestId,
+    });
+    if (head.state === 'empty' || sequence > head.sequence) {
+      hold('ARTIFACT_REPLAY_MISMATCH', 'read');
+    }
+    const observed = this.readFirstWriterSnapshot(
+      workerIpcCursorPath(identity, sequence, 'question-open'),
+      metadataLimit(policy),
+      'read',
+      'RECONCILIATION_REQUIRED',
+    );
+    if (observed === null) hold('CORRUPT_CUSTODY_RECORD', 'read');
+    this.requireWorkerIpcCursorPublication(
+      identity,
+      admissionReceiptDigest,
+      policy,
+      workerIpcCursorPath(identity, sequence, 'question-open'),
+      observed.bytes,
+    );
+    let value: unknown;
+    try { value = JSON.parse(Buffer.from(observed.bytes).toString('utf8')); } catch {
+      return hold('CORRUPT_CUSTODY_RECORD', 'read');
+    }
+    const cursor = parseWorkerIpcCursor(value, policy);
+    if (
+      cursor === null
+      || cursor.state !== 'question-open'
+      || !sameIdentity(cursor.identity, identity)
+      || cursor.admissionReceiptDigest !== admissionReceiptDigest
+      || cursor.dispatchRequestId !== dispatchRequestId
+      || cursor.sequence !== sequence
+      || cursor.cursorReceiptDigest !== cursorReceiptDigest
+      || !sameBytes(observed.bytes, canonicalTaskAttemptCustodyJson(cursor, policy.jsonBounds))
+    ) hold('CORRUPT_CUSTODY_RECORD', 'read');
+    const question = this.readVerifiedArtifact({
+      identity,
+      policy,
+      artifactClass: 'worker-ipc-question',
+      artifactKey: cursor.questionArtifactKey,
+      receiptDigest: cursor.questionReceiptDigest,
+    });
+    if (question === null || question.proof.sha256 !== cursor.questionArtifactSha256) {
+      hold('RECONCILIATION_REQUIRED', 'read');
+    }
+    return cursor;
+  }
+
+  captureNextWorkerIpcQuestion(input: {
+    readonly identity: TaskAttemptCustodyIdentityV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly admissionReceiptDigest: Sha256Digest;
+    readonly dispatchRequestId: string;
+    readonly access: TaskAttemptCustodyAttemptAccess;
+    readonly expectedCursorReceiptDigest: Sha256Digest | null;
+    readonly sequence: number;
+    readonly sealedSourceReceipt: TaskAttemptCustodyWorkerIpcSealedQuestionSourceV2;
+    readonly source: TaskAttemptCustodyPathCapability;
+  }): TaskAttemptCustodyWorkerIpcQuestionCaptureV2 {
+    const record = requireExactDataRecord(input, [
+      'identity', 'policy', 'admissionReceiptDigest', 'dispatchRequestId', 'access',
+      'expectedCursorReceiptDigest', 'sequence', 'sealedSourceReceipt', 'source',
+    ], 'ARTIFACT_REPLAY_MISMATCH', 'capture');
+    const identity = cloneIdentity(record.identity as TaskAttemptCustodyIdentityV2);
+    const policy = snapshotPolicy(record.policy);
+    const admissionReceiptDigest = record.admissionReceiptDigest as Sha256Digest;
+    const dispatchRequestId = record.dispatchRequestId as string;
+    const expectedCursorReceiptDigest = record.expectedCursorReceiptDigest as Sha256Digest | null;
+    const sequence = record.sequence as number;
+    const sealed = parseTaskAttemptCustodyWorkerIpcSealedQuestionSourceV2(
+      record.sealedSourceReceipt,
+      policy,
+    );
+    if (
+      sealed === null
+      || !sameIdentity(sealed.identity, identity)
+      || sealed.admissionReceiptDigest !== admissionReceiptDigest
+      || sealed.dispatchRequestId !== dispatchRequestId
+      || sealed.sequence !== sequence
+      || (expectedCursorReceiptDigest !== null && !isDigest(expectedCursorReceiptDigest))
+    ) hold('ARTIFACT_REPLAY_MISMATCH', 'capture');
+    const current = this.readWorkerIpcConversationCursor({
+      identity, policy, admissionReceiptDigest, dispatchRequestId,
+    });
+    const expectedSequence = current.state === 'empty' ? 1 : current.nextSequence;
+    if (
+      current.state === 'question-open'
+      || expectedSequence === null
+      || sequence !== expectedSequence
+      || sequence > TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS
+      || current.cursorReceiptDigest !== expectedCursorReceiptDigest
+      || (current.state === 'answered' && (
+        current.sourceFileIdentityDigest === sealed.sourceFileIdentityDigest
+        || current.sourceEpoch === sealed.sourceEpoch
+      ))
+    ) hold('ARTIFACT_REPLAY_MISMATCH', 'capture');
+    const sourceScope = this.requireIssuedPathCapability(
+      record.source as TaskAttemptCustodyPathCapability,
+      identity,
+      admissionReceiptDigest,
+      'capture-read-file',
+    );
+    const accessRecord = requireExactDataRecord(record.access, [
+      'identity', 'admissionReceiptDigest', 'scopeDigest', 'taskSnapshotRead', 'workerOutputWrite',
+    ], 'CAPABILITY_UNVERIFIED', 'capture');
+    const workerOutputScope = this.requireIssuedPathCapability(
+      accessRecord.workerOutputWrite as TaskAttemptCustodyPathCapability,
+      identity,
+      admissionReceiptDigest,
+      'read-write-directory',
+    );
+    const expectedSourcePath = childPath(
+      workerOutputScope.relativePath,
+      workerIpcQuestionSealedChild(dispatchRequestId, sequence),
+    );
+    if (sourceScope.relativePath !== expectedSourcePath) hold('CAPABILITY_UNVERIFIED', 'capture');
+    const question = this.captureAttemptOutputArtifact({
+      identity,
+      policy,
+      admissionReceiptDigest,
+      artifactClass: 'worker-ipc-question',
+      artifactKey: workerIpcQuestionArtifactKey(sequence),
+      capturedAt: sealed.capturedAt,
+      source: record.source as TaskAttemptCustodyPathCapability,
+    });
+    if (
+      question.artifact.sha256 !== sealed.contentSha256
+      || question.artifact.byteLength !== sealed.byteLength
+    ) hold('ARTIFACT_CHANGED', 'capture');
+    const withoutDigest: Omit<
+      Extract<TaskAttemptCustodyWorkerIpcConversationCursorV2, { state: 'question-open' }>,
+      'cursorReceiptDigest'
+    > = {
+      schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      kind: 'task-attempt-custody-worker-ipc-conversation-cursor',
+      state: 'question-open',
+      identity,
+      admissionReceiptDigest,
+      policyDigest: policy.policyDigest,
+      dispatchRequestId,
+      sequence,
+      nextSequence: null,
+      predecessorCursorReceiptDigest: current.cursorReceiptDigest,
+      sealedSourceReceiptDigest: sealed.receiptDigest,
+      sourceFileIdentityDigest: sealed.sourceFileIdentityDigest,
+      sourceEpoch: sealed.sourceEpoch,
+      questionArtifactKey: question.artifactKey,
+      questionReceiptDigest: question.receiptDigest,
+      questionArtifactSha256: question.artifact.sha256,
+      recordedAt: sealed.capturedAt,
+    };
+    const cursor = freezeObject({
+      ...withoutDigest,
+      cursorReceiptDigest: workerIpcCursorReceiptDigest(withoutDigest, policy.jsonBounds),
+    });
+    this.ensureAndVerifyPrivateDirectory(
+      workerIpcCursorDirectory(identity),
+      attemptEffectContext(identity, admissionReceiptDigest, policy),
+    );
+    this.publishWorkerIpcCursorAndVerify(
+      identity,
+      admissionReceiptDigest,
+      policy,
+      workerIpcCursorPath(identity, sequence, 'question-open'),
+      canonicalTaskAttemptCustodyJson(cursor, policy.jsonBounds),
+    );
+    const persisted = this.readWorkerIpcConversationCursor({
+      identity, policy, admissionReceiptDigest, dispatchRequestId,
+    });
+    if (persisted.state !== 'question-open'
+      || persisted.cursorReceiptDigest !== cursor.cursorReceiptDigest) {
+      hold('RECONCILIATION_REQUIRED', 'capture');
+    }
+    return freezeObject({ question, cursor: persisted });
   }
 
   readWorkerIpcAnswerDelivery(input: {
@@ -8440,6 +10868,171 @@ export class TaskAttemptCustodyStore {
       hold('RECONCILIATION_REQUIRED', 'publish');
     }
     return persisted;
+  }
+
+  publishNextWorkerIpcAnswerDelivery(input: {
+    readonly identity: TaskAttemptCustodyIdentityV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly admissionReceiptDigest: Sha256Digest;
+    readonly dispatchRequestId: string;
+    readonly access: TaskAttemptCustodyAttemptAccess;
+    readonly expectedCursorReceiptDigest: Sha256Digest;
+    readonly questionReceiptDigest: Sha256Digest;
+    readonly sequence: number;
+    readonly artifactKey: string;
+    readonly destinationChildRelativePath: string;
+    readonly deliveredAt: string;
+    readonly authorityEnvelopeBytes: Uint8Array;
+    readonly deliveryBytes: Uint8Array;
+  }): TaskAttemptCustodyWorkerIpcAnswerPublicationV2 {
+    const record = requireExactDataRecord(input, [
+      'identity', 'policy', 'admissionReceiptDigest', 'dispatchRequestId', 'access',
+      'expectedCursorReceiptDigest', 'questionReceiptDigest', 'sequence', 'artifactKey',
+      'destinationChildRelativePath', 'deliveredAt', 'authorityEnvelopeBytes', 'deliveryBytes',
+    ], 'ARTIFACT_REPLAY_MISMATCH', 'publish');
+    const identity = cloneIdentity(record.identity as TaskAttemptCustodyIdentityV2);
+    const policy = snapshotPolicy(record.policy);
+    const admissionReceiptDigest = record.admissionReceiptDigest as Sha256Digest;
+    const dispatchRequestId = record.dispatchRequestId as string;
+    const expectedCursorReceiptDigest = record.expectedCursorReceiptDigest as Sha256Digest;
+    const questionReceiptDigest = record.questionReceiptDigest as Sha256Digest;
+    const sequence = record.sequence as number;
+    if (!isDigest(expectedCursorReceiptDigest) || !isDigest(questionReceiptDigest)) {
+      hold('ARTIFACT_REPLAY_MISMATCH', 'publish');
+    }
+    const accessRecord = requireExactDataRecord(record.access, [
+      'identity', 'admissionReceiptDigest', 'scopeDigest', 'taskSnapshotRead', 'workerOutputWrite',
+    ], 'CAPABILITY_UNVERIFIED', 'publish');
+    const accessIdentity = cloneIdentity(accessRecord.identity as TaskAttemptCustodyIdentityV2);
+    const expectedScopeDigest = attemptAccessScopeDigest(
+      identity,
+      admissionReceiptDigest,
+      policy,
+    );
+    if (
+      !sameIdentity(accessIdentity, identity)
+      || accessRecord.admissionReceiptDigest !== admissionReceiptDigest
+      || accessRecord.scopeDigest !== expectedScopeDigest
+    ) hold('CAPABILITY_UNVERIFIED', 'publish');
+    const taskSnapshotScope = this.requireIssuedPathCapability(
+      accessRecord.taskSnapshotRead as TaskAttemptCustodyPathCapability,
+      identity,
+      admissionReceiptDigest,
+      'read-only-file',
+    );
+    const workerOutputScope = this.requireIssuedPathCapability(
+      accessRecord.workerOutputWrite as TaskAttemptCustodyPathCapability,
+      identity,
+      admissionReceiptDigest,
+      'read-write-directory',
+    );
+    const admission = this.readAdmission(identity, policy);
+    if (
+      admission === null
+      || admission.receiptDigest !== admissionReceiptDigest
+      || taskSnapshotScope.scopeDigest !== expectedScopeDigest
+      || workerOutputScope.scopeDigest !== expectedScopeDigest
+      || taskSnapshotScope.relativePath !== admission.taskSnapshot.relativePath
+      || workerOutputScope.relativePath !== admission.workerOutputDirectory.relativePath
+    ) hold('CAPABILITY_UNVERIFIED', 'publish');
+    const current = this.readWorkerIpcConversationCursor({
+      identity, policy, admissionReceiptDigest, dispatchRequestId,
+    });
+    if (current.state === 'answered') {
+      if (
+        current.sequence !== sequence
+        || current.questionCursorReceiptDigest !== expectedCursorReceiptDigest
+        || current.questionReceiptDigest !== questionReceiptDigest
+        || record.artifactKey !== workerIpcAnswerArtifactKey(sequence)
+        || record.destinationChildRelativePath !== workerIpcAnswerDestinationChild(identity)
+      ) hold('ARTIFACT_REPLAY_MISMATCH', 'publish');
+      const authorityEnvelopeBytes = snapshotAuthorityBytes(
+        record.authorityEnvelopeBytes,
+        'CAPABILITY_UNVERIFIED',
+        'publish',
+      );
+      const deliveryBytes = snapshotAuthorityBytes(
+        record.deliveryBytes,
+        'CAPABILITY_UNVERIFIED',
+        'publish',
+      );
+      const existing = this.readWorkerIpcAnswerDelivery({
+        identity,
+        policy,
+        admissionReceiptDigest,
+        sequence,
+        artifactKey: record.artifactKey as string,
+      });
+      if (
+        existing === null
+        || current.answerDeliveryReceiptDigest !== existing.receiptDigest
+        || existing.deliveredAt !== record.deliveredAt
+        || existing.authorityArtifactSha256 !== rawSha256(authorityEnvelopeBytes)
+        || existing.deliverySha256 !== rawSha256(deliveryBytes)
+      ) hold('ARTIFACT_REPLAY_MISMATCH', 'publish');
+      return freezeObject({ delivery: existing, cursor: current });
+    }
+    if (
+      current.state !== 'question-open'
+      || current.sequence !== sequence
+      || current.cursorReceiptDigest !== expectedCursorReceiptDigest
+      || current.questionReceiptDigest !== questionReceiptDigest
+    ) hold('ARTIFACT_REPLAY_MISMATCH', 'publish');
+    const delivery = this.publishWorkerIpcAnswerDelivery({
+      identity,
+      policy,
+      admissionReceiptDigest,
+      access: record.access as TaskAttemptCustodyAttemptAccess,
+      sequence,
+      artifactKey: record.artifactKey as string,
+      destinationChildRelativePath: record.destinationChildRelativePath as string,
+      deliveredAt: record.deliveredAt as string,
+      authorityEnvelopeBytes: record.authorityEnvelopeBytes as Uint8Array,
+      deliveryBytes: record.deliveryBytes as Uint8Array,
+    });
+    const withoutDigest: Omit<
+      Extract<TaskAttemptCustodyWorkerIpcConversationCursorV2, { state: 'answered' }>,
+      'cursorReceiptDigest'
+    > = {
+      schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      kind: 'task-attempt-custody-worker-ipc-conversation-cursor',
+      state: 'answered',
+      identity,
+      admissionReceiptDigest,
+      policyDigest: policy.policyDigest,
+      dispatchRequestId,
+      sequence,
+      nextSequence: sequence === TASK_ATTEMPT_CUSTODY_MAX_WORKER_IPC_QUESTIONS
+        ? null
+        : sequence + 1,
+      predecessorCursorReceiptDigest: current.predecessorCursorReceiptDigest,
+      questionCursorReceiptDigest: current.cursorReceiptDigest,
+      sealedSourceReceiptDigest: current.sealedSourceReceiptDigest,
+      sourceFileIdentityDigest: current.sourceFileIdentityDigest,
+      sourceEpoch: current.sourceEpoch,
+      questionReceiptDigest,
+      answerDeliveryReceiptDigest: delivery.receiptDigest,
+      answeredAt: delivery.deliveredAt,
+    };
+    const cursor = freezeObject({
+      ...withoutDigest,
+      cursorReceiptDigest: workerIpcCursorReceiptDigest(withoutDigest, policy.jsonBounds),
+    });
+    this.publishWorkerIpcCursorAndVerify(
+      identity,
+      admissionReceiptDigest,
+      policy,
+      workerIpcCursorPath(identity, sequence, 'answered'),
+      canonicalTaskAttemptCustodyJson(cursor, policy.jsonBounds),
+    );
+    const persisted = this.readWorkerIpcConversationCursor({
+      identity, policy, admissionReceiptDigest, dispatchRequestId,
+    });
+    if (persisted.state !== 'answered'
+      || persisted.cursorReceiptDigest !== cursor.cursorReceiptDigest) {
+      hold('RECONCILIATION_REQUIRED', 'publish');
+    }
+    return freezeObject({ delivery, cursor: persisted });
   }
 
   publishHostArtifact(input: {
@@ -9292,12 +11885,7 @@ export class TaskAttemptCustodyStore {
       input.artifactClass,
       `${input.artifactKey}.receipt.json`,
     );
-    const expectedArtifactPath = childPath(
-      prefix,
-      'artifacts',
-      input.artifactClass,
-      `${input.artifactKey}.bin`,
-    );
+    const expectedArtifactPath = taskAttemptCustodyArtifactDataRelativePath(input);
     const observed = this.readFirstWriterSnapshot(
       receiptPath,
       metadataLimit(input.policy),
@@ -9614,14 +12202,7 @@ export class TaskAttemptCustodyStore {
       sequence: 0,
     }), policy, 'read');
     const stageIndex = TASK_ATTEMPT_CUSTODY_CHAIN_STAGES.indexOf(stage);
-    const expectedPredecessor = stageIndex === 0
-      ? admission.receiptDigest
-      : this.readChain(
-        identity,
-        policy,
-        TASK_ATTEMPT_CUSTODY_CHAIN_STAGES[stageIndex - 1] as TaskAttemptCustodyChainStage,
-      )?.receiptDigest;
-    if (!expectedPredecessor || receipt.predecessorDigest !== expectedPredecessor) {
+    if (stageIndex === 0 && receipt.predecessorDigest !== admission.receiptDigest) {
       hold('CHAIN_PREDECESSOR_MISMATCH', 'read');
     }
     const artifact = this.readArtifactReceipt({
@@ -9672,6 +12253,7 @@ export class TaskAttemptCustodyStore {
       const previous = this.readChain(identity, policy, previousStage);
       if (
         !previous
+        || receipt.predecessorDigest !== previous.receiptDigest
         || Date.parse(artifact.capturedAt) < Date.parse(previous.occurredAt)
         || Date.parse(receipt.occurredAt) < Date.parse(previous.occurredAt)
       ) {
@@ -10025,7 +12607,7 @@ export class TaskAttemptCustodyStore {
     ) hold('ARTIFACT_REPLAY_MISMATCH', operation);
     const prefix = identityPrefix(input.identity);
     const artifactDirectory = childPath(prefix, 'artifacts', input.artifactClass);
-    const artifactPath = childPath(artifactDirectory, `${input.artifactKey}.bin`);
+    const artifactPath = taskAttemptCustodyArtifactDataRelativePath(input);
     const receiptPath = childPath(artifactDirectory, `${input.artifactKey}.receipt.json`);
     this.ensureAndVerifyPrivateDirectory(
       artifactDirectory,

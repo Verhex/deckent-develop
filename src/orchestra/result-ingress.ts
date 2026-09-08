@@ -26,6 +26,10 @@ import { canonicalJson } from '../core/audit-writer.js';
 import { createHash } from 'node:crypto';
 import { types as nodeTypes } from 'node:util';
 import type { ProviderBillingEvidence } from '../core/provider-billing-evidence.js';
+import {
+  createProviderTerminalUsageEvidence,
+  type ProviderTerminalUsageEvidence,
+} from '../core/provider-terminal-usage-evidence.js';
 
 export interface CanonicalIngressAuthority {
   readonly taskId: string;
@@ -45,11 +49,22 @@ export interface CanonicalIngressCustodyAuthority {
   readonly hostWorkArtifact: TaskResultAttemptCustodyBindingV2['hostWorkAttribution'];
   readonly jsonBounds: CanonicalJsonBounds;
   readonly hostEffectAuthority: CanonicalIngressEffectAuthorityV1;
+  readonly hostTerminalUsage: Readonly<{
+    readonly evidence: ProviderTerminalUsageEvidence;
+    readonly evidenceDigest: `sha256:${string}`;
+    readonly providerStreamReceiptDigest: `sha256:${string}`;
+  }>;
   readonly hostTerminalBilling: Readonly<{
+    readonly state: 'available';
     readonly evidence: ProviderBillingEvidence;
     readonly evidenceDigest: `sha256:${string}`;
     readonly providerStreamReceiptDigest: `sha256:${string}`;
     readonly billingMode: 'api' | 'subscription';
+  }> | Readonly<{
+    readonly state: 'not-emitted';
+    readonly billingMode: 'subscription';
+    readonly reasonCode: 'PROVIDER_PRICE_ENVELOPE_NOT_EMITTED';
+    readonly providerStreamReceiptDigest: `sha256:${string}`;
   }>;
   readonly hostWorkAuthority: Readonly<{
     readonly filesChanged: readonly FileChange[];
@@ -171,6 +186,8 @@ export function assembleCanonicalIngressResult(
       inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens,
       totalTokens: nonnegativeInteger(usage['totalTokens'])
         ?? inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens,
+      ...(nonnegativeInteger(usage['reasoningTokens']) === undefined
+        ? {} : { reasoningTokens: nonnegativeInteger(usage['reasoningTokens']) }),
       source,
     },
     cost: ingress['cost'] && typeof ingress['cost'] === 'object'
@@ -271,14 +288,50 @@ export function assembleCanonicalIngressResultV2(
       'effect projection/binding identity, admission, policy or terminal mismatch',
     ]);
   }
-  const billingDigest = `sha256:${createHash('sha256')
-    .update(canonicalJson(custody.hostTerminalBilling.evidence)).digest('hex')}`;
-  if (billingDigest !== custody.hostTerminalBilling.evidenceDigest
-    || custody.hostTerminalBilling.evidence.provider !== authority.provider
-    || !/^sha256:[a-f0-9]{64}$/u.test(custody.hostTerminalBilling.providerStreamReceiptDigest)) {
-    throw new AssemblerError('Host terminal billing authority is invalid', [], [
-      'provider billing evidence/stream binding mismatch',
+  let validatedUsage: ProviderTerminalUsageEvidence;
+  try {
+    validatedUsage = createProviderTerminalUsageEvidence({
+      provider: custody.hostTerminalUsage.evidence.provider,
+      model: custody.hostTerminalUsage.evidence.model,
+      capturedAt: custody.hostTerminalUsage.evidence.capturedAt,
+      usage: custody.hostTerminalUsage.evidence,
+    });
+  } catch {
+    throw new AssemblerError('Host terminal usage authority is invalid', [], [
+      'provider usage evidence shape is invalid',
     ]);
+  }
+  const usageDigest = `sha256:${createHash('sha256')
+    .update(canonicalJson(custody.hostTerminalUsage.evidence)).digest('hex')}`;
+  if (usageDigest !== custody.hostTerminalUsage.evidenceDigest
+    || custody.hostTerminalUsage.evidence.provider !== authority.provider
+    || custody.hostTerminalUsage.evidence.model !== authority.model
+    || !/^sha256:[a-f0-9]{64}$/u.test(custody.hostTerminalUsage.providerStreamReceiptDigest)) {
+    throw new AssemblerError('Host terminal usage authority is invalid', [], [
+      'provider usage evidence/stream binding mismatch',
+    ]);
+  }
+  const billingStateValid = custody.hostTerminalBilling.state === 'available'
+    ? (custody.hostTerminalBilling.billingMode === 'api'
+      || custody.hostTerminalBilling.billingMode === 'subscription')
+    : custody.hostTerminalBilling.state === 'not-emitted'
+      && custody.hostTerminalBilling.billingMode === 'subscription'
+      && custody.hostTerminalBilling.reasonCode === 'PROVIDER_PRICE_ENVELOPE_NOT_EMITTED';
+  if (!billingStateValid || custody.hostTerminalBilling.providerStreamReceiptDigest
+      !== custody.hostTerminalUsage.providerStreamReceiptDigest) {
+    throw new AssemblerError('Host terminal billing authority is invalid', [], [
+      'provider billing and usage stream bindings differ',
+    ]);
+  }
+  if (custody.hostTerminalBilling.state === 'available') {
+    const billingDigest = `sha256:${createHash('sha256')
+      .update(canonicalJson(custody.hostTerminalBilling.evidence)).digest('hex')}`;
+    if (billingDigest !== custody.hostTerminalBilling.evidenceDigest
+      || custody.hostTerminalBilling.evidence.provider !== authority.provider) {
+      throw new AssemblerError('Host terminal billing authority is invalid', [], [
+        'provider billing evidence/stream binding mismatch',
+      ]);
+    }
   }
   const {
     evidenceDigest: hostWorkEvidenceDigest,
@@ -411,22 +464,10 @@ export function assembleCanonicalIngressResultV2(
     effectLandingBinding: _workerEffectLandingBinding,
     tokenUsage: _workerTokenUsage,
     cost: _workerCost,
+    terminalUsageEvidence: _workerTerminalUsageEvidence,
     ...workerObservedIngress
   } = ingress;
-  const usage = Object.values(custody.hostTerminalBilling.evidence.modelUsage).reduce<{
-    inputTokens: number;
-    outputTokens: number;
-    cacheReadTokens: number;
-    cacheCreationTokens: number;
-  }>(
-    (total, model) => ({
-      inputTokens: total.inputTokens + (model.inputTokens ?? 0),
-      outputTokens: total.outputTokens + (model.outputTokens ?? 0),
-      cacheReadTokens: total.cacheReadTokens + (model.cacheReadTokens ?? 0),
-      cacheCreationTokens: total.cacheCreationTokens + (model.cacheCreationTokens ?? 0),
-    }),
-    { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 },
-  );
+  const usage = validatedUsage;
   const authoritativeIngress = Object.freeze({
     ...workerObservedIngress,
     filesChanged: projection.effects.map(effect => {
@@ -465,12 +506,16 @@ export function assembleCanonicalIngressResultV2(
     agentId: custody.hostPromptDeliveryAuthority.agentId,
     skillIds: custody.hostPromptDeliveryAuthority.skillIds,
     tokenUsage: Object.freeze({
-      ...usage,
-      totalTokens: usage.inputTokens + usage.outputTokens
-        + usage.cacheReadTokens + usage.cacheCreationTokens,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      cacheReadTokens: usage.cacheReadTokens,
+      cacheCreationTokens: usage.cacheCreationTokens,
+      totalTokens: usage.totalTokens,
+      ...(usage.reasoningTokens === undefined ? {} : { reasoningTokens: usage.reasoningTokens }),
       source: 'provider-adapter',
     }),
-    cost: custody.hostTerminalBilling.billingMode === 'api'
+    cost: custody.hostTerminalBilling.state === 'available'
+      && custody.hostTerminalBilling.billingMode === 'api'
       ? Object.freeze({
           usd: custody.hostTerminalBilling.evidence.providerReportedUsd,
           currency: 'USD',
@@ -478,12 +523,20 @@ export function assembleCanonicalIngressResultV2(
           pricingSource: 'provider-envelope',
           isLocal: false,
         })
-      : Object.freeze({
+      : custody.hostTerminalBilling.state === 'available'
+        ? Object.freeze({
           usd: 0,
           currency: 'USD',
           referenceUsd: custody.hostTerminalBilling.evidence.providerReportedUsd,
           billingMode: 'subscription',
           pricingSource: 'provider-envelope-reference',
+          isLocal: false,
+        })
+        : Object.freeze({
+          usd: 0,
+          currency: 'USD',
+          billingMode: 'subscription',
+          pricingSource: 'subscription-no-provider-price-envelope',
           isLocal: false,
         }),
   });
@@ -500,7 +553,14 @@ export function assembleCanonicalIngressResultV2(
   return createProductionTaskResultV2({
     result: {
       ...(canonical as unknown as Record<string, unknown>),
-      providerBilling: custody.hostTerminalBilling.evidence,
+      terminalUsageEvidence: Object.freeze({
+        evidenceDigest: custody.hostTerminalUsage.evidenceDigest,
+        providerStreamReceiptDigest: custody.hostTerminalUsage.providerStreamReceiptDigest,
+        normalizationContract: 'provider-adapter-normalized-v1' as const,
+      }),
+      ...(custody.hostTerminalBilling.state === 'available'
+        ? { providerBilling: custody.hostTerminalBilling.evidence }
+        : {}),
     },
     attemptCustody: Object.freeze({
       ...sourceAttemptCustody,
