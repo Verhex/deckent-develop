@@ -3110,10 +3110,102 @@ Kalıcı arşiv: `/home/alperen/deckent-recovery-20260904/terminal-7099-active-c
 Manifest SHA `1c507ef1a463fa28a20f94a322ca13003978bda70394dc03253036cf866b3183`;
 SUMS SHA `b4818a0c44b79ee7e355e8d44341f1559f94bdf9cfeb0fb15a84b380f4ca1f9e`.
 İki container durmuş: v3 exit1/v4 exit0; networknone/read-only/nonroot/pids64/2GB.
-Root LOCAL_VERIFIED; ENTRY969 ile Fable'a scoped review isteği gönderildi, yanıt henüz yok;
-formal XVerify receipt veya authenticated MASTER settlement üretilmedi. 7099 VERIFY.
+Root LOCAL_VERIFIED; Fable ENTRY970 (`804740675145`) bağımsız destekleyici GO verdi:
+iki case15/15 ve current main17pin doğrulandı. Review raw kopyası prepared helper
+dizinindeki `fable-review-970.txt`; immutable arşivden SONRA geldiği için arşive
+eklenmedi. Formal XVerify receipt/authenticated MASTER settlement yok. 7099 VERIFY.
 Sonraki L3: sync/audit typed capture/card + action picker; write eylemleri existing
 classifyTool/askConfirm yolunda kalır, read-only capture'a izinsiz taşınmaz.
+
+### L3 structured actions — candidate / 2026-09-08T01:42Z
+
+Candidate `/tmp/deckent-7099-structured-actions-36tads`, base1f1df1a4e.
+Producer/capture, typed model ve authorization disjoint agent hatlarında;
+root App/picker/card fan-in. Read-only dispatchRead genişletilmedi: sync ve
+audit gate ayrı structured action → canonical confirmation → tek captured CLI
+child zincirinde. Invalid/denied zero-dispatch, immutable confirmation snapshot,
+pending ikinci write engeli ve EN/TR labels hedefli testlerle doğrulandı.
+13 dosya206/206 PASS (`/tmp/deckent-7099-structured-actions-fanin-v1.json`);
+son resolver wiring sonrası3dosya50/50 PASS (fanin-v2). Signed baseline delta
+ve dört audit bölüm başlığı korunur; TS18046 narrow fix sonrası tsc-v3 exit0.
+
+İki candidate build exit0; ikinci build'in root preflight kaydı yeşil DEĞİL:
+main reader HOLD sonucuna rağmen orchestration koşulsuz npm build başlattı.
+Read-only RCA: main inherited clean script meta v4; committed candidate v3.
+main→candidate SCHEMA_MISMATCH/HOLD, candidate→candidate ALLOW; main→main yalnız
+canlı bot HOLD. Bu operational kusur saklanmaz; main build/restart/cleanup yok,
+authority DB'ye elle müdahale yok. Cross-version build admission kapanışı iddia
+edilmez. Bağımsız fixture proof mevcut compiled baytları RO tüketir; repo
+authority/runtime/brain/auth dizinlerini mount etmez ve build çalıştırmaz.
+
+Yeni freeze v2:24source `c24742f028353b33eda4718fe3d1cc54d3c7575607f2757826008d1755604b84`,
+25compiled `933a10d2d629fa423196229545f8a778aacf0ccb322b4062c36be153d77a093b`.
+Manifestler candidate/proof/root-*-manifest-v2.json; v1 korunur ama stale.
+Gerçek CLI proof henüz UNRUN; source main'e alınmadı, L3/7099 DONE değil.
+
+### L3 main precommit proof — 2026-09-08T02:15Z
+
+Root main üzerinde20 exact source/test path'i precommit birleştirdi. İki inherited
+hot file (`run.tsx`, `sprint-finalizer.ts`) kayıpsız korundu: before→reviewed hunk→
+expected hash doğrulaması20/20. Kayıt candidate/proof/main-fanin-v1/manifest.json;
+patch SHA `1f6a3eec0561b10cd421e0b4bf0a9a80a29ffccb897b5c0b16f1aa6849aaf33b`.
+Main hedefli14dosya219/219 PASS + tsc exit0. Test raporu
+`/tmp/deckent-7099-structured-actions-main-v1.json`, SHA
+`5a8fa8f35576537d133cbc13d18105a6297286378407e5ab7203976dc0eac9a3`.
+Whole-tree diff-check yalnız inherited memory export whitespace gösterdi;
+20path scoped diff-check PASS. Memory export değiştirilmedi.
+
+Actual candidate probe yeni production kusurunu kanıtladı: gerçek Vitest exit1,
+outer audit exit0/artifactPASS. Full audit, unparseable sonucu `fail ?? 0` ile
+sentetik sıfır-failure sayıyordu. Bounded producer düzeltmesi nonzero/null +
+unparseable sonucu FAIL yapar; geçerli baseline-delta politikası korunur.
+Dedicated suite13/13 ve tsc PASS; model/result şeması veya authority genişletilmedi.
+
+Build sırası yeni kanıtla revize edildi: candidate v3 reader ile main v4 HOLD
+aşılmadı; foreign-root transactional API/test-only allowFixtureRoot kullanılmadı.
+Precommit integration sonrasında main bot3150519 canonical stop, fresh own
+inspector ALLOW, **package'ın gerçek `npm run build` pipeline'ı** session81227 exit0
+(`clean`→native clean/build→tsc→copy-assets). Bu transactional build iddiası DEĞİL.
+Generated core dist yeniden üretildi, dashboard korundu; retained runtime/task/
+memory silinmedi. Bot canonical start3269967 ve status/liveness doğrulandı.
+Eski MCP processlerinin freshness'ı iddia edilmez; documented session reconnect sürer.
+
+Actual main PASS: `/tmp/deckent-l3-actions-main-r2t27b/deckent-7099-structured-actions-VS9dO1/result.json`.
+SHA `83d61f9ed7db6294de9f18f1703acac58a3e32e8d05628b7989876a8d1812d20`.
+Helper `8af5c9e7e5246aae673a025c5d8279a2412137eff58f0a6a1b47b7cc249a73f0`.
+EN100-column card + TR36-column numbered/ASCII-configured,32/32 kontrol/case:
+cancel/invalid/denied zero-child; confirm→exact sync apply/private effect;
+query/compliance/gate→typed card; gerçek TypeScript + tek Vitest testi exit0;
+ardından gerçekten bozuk Vitest config→binary exit1→CLI exit1→GATE_FAILURE artifact
+ve görünen failure. Beş CLI child/case, provider model-call0, temiz REPL exit0,
+observed processler terminally observed/reaped. Tinypool SIGTERM kapanışları
+parent ChildProcess gerçek exit event'i + exact child/parent PID ile kaydedildi.
+26source+27compiled pin önce/sonra sabit. networknone/readonly/nonroot/pids128/
+2GB/2CPU container terminal exit0, noOOM. Main/auth/runtime mount edilmedi.
+
+Başarısız kanıtlar korunur: Docker logging config nedeniyle NOT_STARTED uyQlgs;
+CI=1 yüzünden pre-interaction FAIL `1793bbb9…`; wrapped TR confirmation + gerçek
+audit fail-open `8df1426c…`; işlevsel31/32 fakat self-exit-only observer eksikliği
+`a584b239…`. History farkı yalnız InputBar'ın iki exact node'u; tüm snapshot
+saklandı ve history içeriği ayrıca doğrulandı. Önceki helper7393 terminal LF'si
+apply_patch Move'da kayboldu; tek LF restorasyonu bilinen pre-run hash'i yeniden
+verdi. Hiçbir eski FAIL, PASS'a çevrilmedi.
+
+Kalıcı arşiv: `/home/alperen/deckent-recovery-20260904/terminal-7099-structured-actions-jGha9C`.
+163payload/164checksum PASS, files0600/dirs0700; source/compiled snapshot,
+scope before/after, dört actual result, helper versiyonları, test ve container
+kanıtları. Manifest `dbd43e7775b7bf9e468f02cbbb396e20b669a597c18385da72a0a29ae2326045`;
+SUMS `9bbcc037f5cdc50d3bf452ab9623b970d2e5278e7512b33cac0d390320b4bff3`.
+Root LOCAL_VERIFIED; Fable ENTRY975 (81a9a3ff0c3f) bağımsız scoped GO verdi.
+Source commit `f6c9b9eda086122e4a691891bb59994388a58f09`: exact20path,
++1154/-25; committed blobs20/20 candidate ile eşit, worktree20/20 expected ile
+eşit, index boş. run.tsx committed ea0f3e88/worktree4e6792e7 ve finalizer
+committed a8df32d0/worktreec37fd8de: inherited hunk'lar commit dışında korundu.
+Review raw candidate/fable-review-975.txt; immutable precommit archive değişmedi.
+L5 regression/test ve sonraki L4/L5 kanıtları bu source commit'e alınmadı.
+Git otomatik bakımında unreachable-loose-object/gc.log uyarısı verdi; prune veya
+gc.log silme yapılmadı (ilgili olmayan bakım bulgusu). Formal XVerify/settlement/
+Windows-native/macOS/SSH/whole-L3/7099 closure iddiası yok. MASTER VERIFY korunur.
 
 ## Yürütme
 
