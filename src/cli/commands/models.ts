@@ -66,7 +66,7 @@ function colorTier(tier: string): string {
 /** The provider names quoted in `--provider` help come from the registry —
  *  the presentation can never drift from what the catalog actually knows. */
 function knownProviderNames(): string {
-  return modelRegistry.getAllProviders().join(', ');
+  return [...modelRegistry.getAllProviders()].sort().join(', ');
 }
 
 /** Provider ids are code-like identifiers → the code role (primary contrast). */
