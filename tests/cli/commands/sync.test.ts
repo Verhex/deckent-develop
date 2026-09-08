@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Command } from 'commander';
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
 
 vi.mock('node:fs', async (importOriginal) => ({
   ...await importOriginal<typeof import('node:fs')>(),
@@ -18,8 +17,14 @@ vi.mock('node:fs', async (importOriginal) => ({
 
 const mkdirSyncMock = mkdirSync as ReturnType<typeof vi.fn>;
 
-vi.mock('node:child_process', () => ({
-  spawnSync: vi.fn(),
+// 7104 SYNC-ASYNC-GIT-CLOSURE: sync.ts no longer imports node:child_process at
+// all — every Git call goes through the single `runSyncGitProcess` adapter.
+// sync.ts also imports the real `SYNC_GIT_PROBE_TIMEOUT_MS` constant from
+// this module, so the mock keeps every other export via importOriginal and
+// overrides only the function under test.
+vi.mock('../../../src/cli/helpers/sync-git-process.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../src/cli/helpers/sync-git-process.js')>(),
+  runSyncGitProcess: vi.fn(),
 }));
 
 vi.mock('../../../src/core/utils.js', () => ({
@@ -44,6 +49,8 @@ vi.mock('../../../src/core/memory-store.js', () => ({
 import { ensureDeckentImport } from '../../../src/core/utils.js';
 import { ensureCursorRules } from '../../../src/cli/helpers/cursor-config.js';
 import { getMessage } from '../../../src/cli/helpers/messages.js';
+import { runSyncGitProcess } from '../../../src/cli/helpers/sync-git-process.js';
+import type { SyncGitProcessResult, SyncGitFailureKind } from '../../../src/cli/helpers/sync-git-process.js';
 import {
   getLastSprintTimestamp,
   isGitRepo,
@@ -63,27 +70,60 @@ import {
 } from '../../../src/cli/commands/sync.js';
 import type { SyncResult } from '../../../src/cli/commands/sync.js';
 
+// ─── Typed helpers for the runSyncGitProcess adapter mock ────────────
+// (7104) Every git-touching test dispatches on `options.args[0]` the way
+// sync.ts's real call sequence does, and returns one of these two shapes —
+// never a bare spawnSync-style return — so the mock matches the adapter's
+// actual discriminated-union contract.
+
+function ok(stdout: string): SyncGitProcessResult {
+  return { ok: true, stdout, stderr: '', stderrBytesDropped: 0, exitCode: 0, durationMs: 1, pid: 1 };
+}
+
+function fail(kind: SyncGitFailureKind, detail: string, exitCode: number | null = 1): SyncGitProcessResult {
+  return {
+    ok: false,
+    kind,
+    detail,
+    exitCode,
+    signal: null,
+    stdoutBytes: 0,
+    stdoutTruncated: false,
+    childExited: true,
+    streamsClosed: true,
+    treeTerminated: null,
+    durationMs: 1,
+    pid: 1,
+  };
+}
+
 // ─── Unit Tests: getLastSprintTimestamp ──────────────────────────────
 
 describe('getLastSprintTimestamp', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Every sprint file now asks the git adapter for its author date before
+    // falling back to statSync mtime — default that lookup to a failure so
+    // these mtime-focused tests exercise the pre-existing fallback exactly
+    // as before 7104 (per-test overrides below still take precedence).
+    vi.mocked(runSyncGitProcess).mockImplementation(async () =>
+      fail('nonzero_exit', 'nonzero_exit: fatal: not a git repository', 128));
   });
 
-  it('returns null when sprints directory does not exist', () => {
+  it('returns null when sprints directory does not exist', async () => {
     vi.mocked(existsSync).mockReturnValue(false);
-    const result = getLastSprintTimestamp('/project');
+    const result = await getLastSprintTimestamp('/project');
     expect(result).toBeNull();
   });
 
-  it('returns null when sprints directory is empty', () => {
+  it('returns null when sprints directory is empty', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([]);
-    const result = getLastSprintTimestamp('/project');
+    const result = await getLastSprintTimestamp('/project');
     expect(result).toBeNull();
   });
 
-  it('returns the latest sprint file by mtime', () => {
+  it('returns the latest sprint file by mtime', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue(['sprint-040.md', 'sprint-042.md', 'sprint-041.md'] as unknown as ReturnType<typeof readdirSync>);
 
@@ -95,18 +135,18 @@ describe('getLastSprintTimestamp', () => {
       return { mtimeMs: 0 } as ReturnType<typeof statSync>;
     });
 
-    const result = getLastSprintTimestamp('/project');
+    const result = await getLastSprintTimestamp('/project');
     expect(result).not.toBeNull();
     expect(result!.sprintId).toBe('sprint-042');
     expect(result!.timestamp).toBeTruthy();
   });
 
-  it('ignores non-sprint files', () => {
+  it('ignores non-sprint files', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue(['README.md', 'sprint-040.md', 'notes.txt'] as unknown as ReturnType<typeof readdirSync>);
     vi.mocked(statSync).mockReturnValue({ mtimeMs: 5000 } as ReturnType<typeof statSync>);
 
-    const result = getLastSprintTimestamp('/project');
+    const result = await getLastSprintTimestamp('/project');
     expect(result).not.toBeNull();
     expect(result!.sprintId).toBe('sprint-040');
   });
@@ -119,28 +159,15 @@ describe('isGitRepo', () => {
     vi.clearAllMocks();
   });
 
-  it('returns true when inside a git repository', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: 'true\n',
-      stderr: '',
-      pid: 1,
-      output: [],
-      signal: null,
-    });
-    expect(isGitRepo('/project')).toBe(true);
+  it('returns true when inside a git repository', async () => {
+    vi.mocked(runSyncGitProcess).mockImplementation(async () => ok('true\n'));
+    expect(await isGitRepo('/project')).toBe(true);
   });
 
-  it('returns false when not a git repository', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 128,
-      stdout: '',
-      stderr: 'fatal: not a git repository',
-      pid: 1,
-      output: [],
-      signal: null,
-    });
-    expect(isGitRepo('/project')).toBe(false);
+  it('returns false when not a git repository', async () => {
+    vi.mocked(runSyncGitProcess).mockImplementation(async () =>
+      fail('nonzero_exit', 'nonzero_exit: fatal: not a git repository', 128));
+    expect(await isGitRepo('/project')).toBe(false);
   });
 });
 
@@ -151,63 +178,38 @@ describe('getCommitsSince', () => {
     vi.clearAllMocks();
   });
 
-  it('returns commit lines from git log', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: 'abc1234 Fix auth\ndef5678 Add crypto\n',
-      stderr: '',
-      pid: 1,
-      output: [],
-      signal: null,
-    });
+  it('returns commit lines from git log', async () => {
+    vi.mocked(runSyncGitProcess).mockImplementation(async () =>
+      ok('abc1234 Fix auth\ndef5678 Add crypto\n'));
 
-    const commits = getCommitsSince('/project', '2026-03-20T00:00:00Z');
+    const commits = await getCommitsSince('/project', '2026-03-20T00:00:00Z');
     expect(commits).toHaveLength(2);
     expect(commits[0]).toBe('abc1234 Fix auth');
   });
 
-  it('returns empty array when git log fails', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 1,
-      stdout: '',
-      stderr: 'error',
-      pid: 1,
-      output: [],
-      signal: null,
-    });
+  it('returns empty array when git log fails', async () => {
+    vi.mocked(runSyncGitProcess).mockImplementation(async () =>
+      fail('nonzero_exit', 'nonzero_exit: error', 1));
 
-    const commits = getCommitsSince('/project', '2026-03-20T00:00:00Z');
+    const commits = await getCommitsSince('/project', '2026-03-20T00:00:00Z');
     expect(commits).toHaveLength(0);
   });
 
-  it('returns empty array when no commits found', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: '',
-      stderr: '',
-      pid: 1,
-      output: [],
-      signal: null,
-    });
+  it('returns empty array when no commits found', async () => {
+    vi.mocked(runSyncGitProcess).mockImplementation(async () => ok(''));
 
-    const commits = getCommitsSince('/project', '2026-03-20T00:00:00Z');
+    const commits = await getCommitsSince('/project', '2026-03-20T00:00:00Z');
     expect(commits).toHaveLength(0);
   });
 
-  it('legacy-compat: matches probeCommitsSince(...).commits ([]) on a git log failure', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 128,
-      stdout: '',
-      stderr: "fatal: your current branch 'main' does not have any commits yet\n",
-      pid: 1,
-      output: [],
-      signal: null,
-    });
+  it('legacy-compat: matches probeCommitsSince(...).commits ([]) on a git log failure', async () => {
+    vi.mocked(runSyncGitProcess).mockImplementation(async () =>
+      fail('nonzero_exit', "nonzero_exit: fatal: your current branch 'main' does not have any commits yet", 128));
 
-    expect(getCommitsSince('/project', '2026-03-20T00:00:00Z')).toEqual(
-      probeCommitsSince('/project', '2026-03-20T00:00:00Z').commits,
+    expect(await getCommitsSince('/project', '2026-03-20T00:00:00Z')).toEqual(
+      (await probeCommitsSince('/project', '2026-03-20T00:00:00Z')).commits,
     );
-    expect(getCommitsSince('/project', '2026-03-20T00:00:00Z')).toEqual([]);
+    expect(await getCommitsSince('/project', '2026-03-20T00:00:00Z')).toEqual([]);
   });
 });
 
@@ -220,72 +222,61 @@ describe('getChangedFiles', () => {
 
   /**
    * Stub both git calls getChangedFiles makes: `rev-list --count HEAD`
-   * (history depth) then `diff --name-status` (the actual comparison).
-   * Dispatches on args[0] the way the real two-call sequence does (7104).
+   * (history depth) then `diff --name-status -M -z HEAD~N HEAD` (the actual
+   * comparison). Dispatches on args[0] the way the real two-call sequence
+   * does (7104).
    */
   function mockGitCalls(historyDepth: number, diffStdout: string): void {
-    vi.mocked(spawnSync).mockImplementation((_cmd, args) => {
-      const argv = (args ?? []) as string[];
-      if (argv[0] === 'rev-list') {
-        return { status: 0, stdout: `${historyDepth}\n`, stderr: '', pid: 1, output: [], signal: null };
-      }
-      return { status: 0, stdout: diffStdout, stderr: '', pid: 1, output: [], signal: null };
+    vi.mocked(runSyncGitProcess).mockImplementation(async (options) => {
+      if (options.args[0] === 'rev-list') return ok(`${historyDepth}\n`);
+      return ok(diffStdout);
     });
   }
 
-  it('categorizes modified, added, deleted, and renamed files', () => {
-    mockGitCalls(10, 'M\tsrc/auth/jwt.ts\nA\tsrc/utils/crypto.ts\nD\tsrc/old-auth.ts\nR100\tsrc/foo.ts\tsrc/bar.ts\n');
+  it('categorizes modified, added, deleted, and renamed files', async () => {
+    mockGitCalls(10, 'M\0src/auth/jwt.ts\0A\0src/utils/crypto.ts\0D\0src/old-auth.ts\0R100\0src/foo.ts\0src/bar.ts\0');
 
-    const changes = getChangedFiles('/project', 3);
+    const changes = await getChangedFiles('/project', 3);
     expect(changes.modified).toEqual(['src/auth/jwt.ts']);
     expect(changes.added).toEqual(['src/utils/crypto.ts']);
     expect(changes.deleted).toEqual(['src/old-auth.ts']);
     expect(changes.renamed).toEqual(['src/bar.ts']);
     expect(changes.detection).toEqual({ mode: 'range', issue: null });
 
-    const diffCall = vi.mocked(spawnSync).mock.calls.find(call => (call[1] as string[])[0] === 'diff');
-    expect(diffCall?.[1]).toEqual(['diff', '--name-status', '-M', 'HEAD~3', 'HEAD']);
+    const diffCall = vi.mocked(runSyncGitProcess).mock.calls.find(call => call[0].args[0] === 'diff');
+    expect(diffCall?.[0].args).toEqual(['diff', '--name-status', '-M', '-z', 'HEAD~3', 'HEAD']);
   });
 
-  it('returns empty arrays when commitCount is 0', () => {
-    const changes = getChangedFiles('/project', 0);
+  it('returns empty arrays when commitCount is 0', async () => {
+    const changes = await getChangedFiles('/project', 0);
     expect(changes.modified).toEqual([]);
     expect(changes.added).toEqual([]);
     expect(changes.deleted).toEqual([]);
     expect(changes.renamed).toEqual([]);
     expect(changes.detection).toEqual({ mode: 'range', issue: null });
-    expect(spawnSync).not.toHaveBeenCalled();
+    expect(runSyncGitProcess).not.toHaveBeenCalled();
   });
 
-  it('returns empty arrays and reports GIT_DIFF_FAILED when git diff fails', () => {
-    vi.mocked(spawnSync).mockImplementation((_cmd, args) => {
-      const argv = (args ?? []) as string[];
-      if (argv[0] === 'rev-list') {
-        return { status: 0, stdout: '10\n', stderr: '', pid: 1, output: [], signal: null };
-      }
-      return { status: 1, stdout: '', stderr: 'error\n', pid: 1, output: [], signal: null };
+  it('returns empty arrays and reports GIT_DIFF_FAILED when git diff fails', async () => {
+    vi.mocked(runSyncGitProcess).mockImplementation(async (options) => {
+      if (options.args[0] === 'rev-list') return ok('10\n');
+      return fail('nonzero_exit', 'nonzero_exit: error', 1);
     });
 
-    const changes = getChangedFiles('/project', 2);
+    const changes = await getChangedFiles('/project', 2);
     expect(changes.modified).toEqual([]);
     expect(changes.added).toEqual([]);
     expect(changes.deleted).toEqual([]);
     expect(changes.renamed).toEqual([]);
     expect(changes.detection.mode).toBe('unavailable');
-    expect(changes.detection.issue).toEqual({ code: 'GIT_DIFF_FAILED', detail: 'error' });
+    expect(changes.detection.issue).toEqual({ code: 'GIT_DIFF_FAILED', detail: 'nonzero_exit: error' });
   });
 
-  it('returns empty arrays and reports GIT_REV_LIST_FAILED when the history-depth probe fails', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 128,
-      stdout: '',
-      stderr: 'fatal: not a git repository\n',
-      pid: 1,
-      output: [],
-      signal: null,
-    });
+  it('returns empty arrays and reports GIT_REV_LIST_FAILED when the history-depth probe fails', async () => {
+    vi.mocked(runSyncGitProcess).mockImplementation(async () =>
+      fail('nonzero_exit', 'nonzero_exit: fatal: not a git repository', 128));
 
-    const changes = getChangedFiles('/project', 2);
+    const changes = await getChangedFiles('/project', 2);
     expect(changes.modified).toEqual([]);
     expect(changes.added).toEqual([]);
     expect(changes.deleted).toEqual([]);
@@ -293,57 +284,50 @@ describe('getChangedFiles', () => {
     expect(changes.detection.mode).toBe('unavailable');
     expect(changes.detection.issue).toEqual({
       code: 'GIT_REV_LIST_FAILED',
-      detail: 'fatal: not a git repository',
+      detail: 'nonzero_exit: fatal: not a git repository',
     });
   });
 
-  it('uses ls-tree root enumeration (not a fixed empty-tree diff id) when commitCount reaches history depth', () => {
-    vi.mocked(spawnSync).mockImplementation((_cmd, args) => {
-      const argv = (args ?? []) as string[];
-      if (argv[0] === 'rev-list') {
-        return { status: 0, stdout: '2\n', stderr: '', pid: 1, output: [], signal: null };
-      }
-      if (argv[0] === 'ls-tree') {
-        return { status: 0, stdout: 'src/root-file.ts\nREADME.md\n', stderr: '', pid: 1, output: [], signal: null };
-      }
-      throw new Error(`unexpected spawnSync call: ${argv.join(' ')}`);
+  it('uses ls-tree root enumeration (not a fixed empty-tree diff id) when commitCount reaches history depth', async () => {
+    vi.mocked(runSyncGitProcess).mockImplementation(async (options) => {
+      const argv = options.args;
+      if (argv[0] === 'rev-list') return ok('2\n');
+      if (argv[0] === 'ls-tree') return ok('src/root-file.ts\0README.md\0');
+      throw new Error(`unexpected runSyncGitProcess call: ${argv.join(' ')}`);
     });
 
-    const changes = getChangedFiles('/project', 2);
+    const changes = await getChangedFiles('/project', 2);
     expect(changes.detection).toEqual({ mode: 'root-fallback', issue: null });
     expect(changes.added).toEqual(['src/root-file.ts', 'README.md']);
     expect(changes.modified).toEqual([]);
     expect(changes.deleted).toEqual([]);
     expect(changes.renamed).toEqual([]);
 
-    const lsTreeCall = vi.mocked(spawnSync).mock.calls.find(call => (call[1] as string[])[0] === 'ls-tree');
-    expect(lsTreeCall?.[1]).toEqual(['ls-tree', '-r', '--name-only', 'HEAD']);
+    const lsTreeCall = vi.mocked(runSyncGitProcess).mock.calls.find(call => call[0].args[0] === 'ls-tree');
+    expect(lsTreeCall?.[0].args).toEqual(['ls-tree', '-r', '--name-only', '-z', 'HEAD']);
 
-    const diffCall = vi.mocked(spawnSync).mock.calls.find(call => (call[1] as string[])[0] === 'diff');
+    const diffCall = vi.mocked(runSyncGitProcess).mock.calls.find(call => call[0].args[0] === 'diff');
     expect(diffCall).toBeUndefined();
   });
 
-  it('returns empty arrays and reports GIT_LS_TREE_FAILED when the root-fallback ls-tree enumeration fails', () => {
-    vi.mocked(spawnSync).mockImplementation((_cmd, args) => {
-      const argv = (args ?? []) as string[];
-      if (argv[0] === 'rev-list') {
-        return { status: 0, stdout: '2\n', stderr: '', pid: 1, output: [], signal: null };
-      }
-      return { status: 128, stdout: '', stderr: 'fatal: not a tree\n', pid: 1, output: [], signal: null };
+  it('returns empty arrays and reports GIT_LS_TREE_FAILED when the root-fallback ls-tree enumeration fails', async () => {
+    vi.mocked(runSyncGitProcess).mockImplementation(async (options) => {
+      if (options.args[0] === 'rev-list') return ok('2\n');
+      return fail('nonzero_exit', 'nonzero_exit: fatal: not a tree', 128);
     });
 
-    const changes = getChangedFiles('/project', 2);
+    const changes = await getChangedFiles('/project', 2);
     expect(changes.modified).toEqual([]);
     expect(changes.added).toEqual([]);
     expect(changes.deleted).toEqual([]);
     expect(changes.renamed).toEqual([]);
     expect(changes.detection.mode).toBe('unavailable');
-    expect(changes.detection.issue).toEqual({ code: 'GIT_LS_TREE_FAILED', detail: 'fatal: not a tree' });
+    expect(changes.detection.issue).toEqual({ code: 'GIT_LS_TREE_FAILED', detail: 'nonzero_exit: fatal: not a tree' });
   });
 
-  it.each([NaN, 1.5, -1, Infinity])('throws RangeError for commitCount=%p without calling spawnSync', (value) => {
-    expect(() => getChangedFiles('/project', value)).toThrow(RangeError);
-    expect(spawnSync).not.toHaveBeenCalled();
+  it.each([NaN, 1.5, -1, Infinity])('throws RangeError for commitCount=%p without calling the git adapter', async (value) => {
+    await expect(getChangedFiles('/project', value)).rejects.toThrow(RangeError);
+    expect(runSyncGitProcess).not.toHaveBeenCalled();
   });
 });
 
@@ -354,52 +338,38 @@ describe('probeCommitsSince', () => {
     vi.clearAllMocks();
   });
 
-  it('returns commit lines and issue null on success', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: 'abc1 one\nabc2 two\n',
-      stderr: '',
-      pid: 1,
-      output: [],
-      signal: null,
-    });
+  it('returns commit lines and issue null on success', async () => {
+    vi.mocked(runSyncGitProcess).mockImplementation(async () => ok('abc1 one\nabc2 two\n'));
 
-    const probe = probeCommitsSince('/project', '2026-03-20T00:00:00Z');
+    const probe = await probeCommitsSince('/project', '2026-03-20T00:00:00Z');
     expect(probe.commits).toEqual(['abc1 one', 'abc2 two']);
     expect(probe.issue).toBeNull();
   });
 
-  it('returns commits [] and a typed GIT_LOG_FAILED issue with the first stderr line as detail on failure', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 128,
-      stdout: '',
-      stderr: "fatal: your current branch 'main' does not have any commits yet\n",
-      pid: 1,
-      output: [],
-      signal: null,
-    });
+  it('returns commits [] and a typed GIT_LOG_FAILED issue with the adapter detail verbatim on failure', async () => {
+    vi.mocked(runSyncGitProcess).mockImplementation(async () =>
+      fail('nonzero_exit', "nonzero_exit: fatal: your current branch 'main' does not have any commits yet", 128));
 
-    const probe = probeCommitsSince('/project', '2026-03-20T00:00:00Z');
+    const probe = await probeCommitsSince('/project', '2026-03-20T00:00:00Z');
     expect(probe.commits).toEqual([]);
     expect(probe.issue).toEqual({
       code: 'GIT_LOG_FAILED',
-      detail: "fatal: your current branch 'main' does not have any commits yet",
+      detail: "nonzero_exit: fatal: your current branch 'main' does not have any commits yet",
     });
   });
 
-  it('falls back to "exit <status>" as detail when stderr is empty', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 1,
-      stdout: '',
-      stderr: '',
-      pid: 1,
-      output: [],
-      signal: null,
-    });
+  it('forwards the adapter-supplied "<kind>: exit <status>" detail verbatim when stderr was empty', async () => {
+    // The "exit <status>" fallback text is now produced INSIDE the adapter
+    // (sync-git-process.ts) when stderr carries no usable line; probeCommitsSince's
+    // own job is only to forward `result.detail` verbatim as `issue.detail`
+    // (7104) — this asserts exactly that forwarding, independent of how the
+    // adapter itself derives the fallback text (covered by its own test file).
+    vi.mocked(runSyncGitProcess).mockImplementation(async () =>
+      fail('nonzero_exit', 'nonzero_exit: exit 1', 1));
 
-    const probe = probeCommitsSince('/project', '2026-03-20T00:00:00Z');
+    const probe = await probeCommitsSince('/project', '2026-03-20T00:00:00Z');
     expect(probe.commits).toEqual([]);
-    expect(probe.issue).toEqual({ code: 'GIT_LOG_FAILED', detail: 'exit 1' });
+    expect(probe.issue).toEqual({ code: 'GIT_LOG_FAILED', detail: 'nonzero_exit: exit 1' });
   });
 });
 
@@ -410,17 +380,11 @@ describe('collectGitChanges', () => {
     vi.clearAllMocks();
   });
 
-  it('short-circuits on a git log failure: commits 0, detection unavailable/GIT_LOG_FAILED, spawnSync called exactly once (never reaches getChangedFiles)', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 128,
-      stdout: '',
-      stderr: "fatal: your current branch 'main' does not have any commits yet\n",
-      pid: 1,
-      output: [],
-      signal: null,
-    });
+  it('short-circuits on a git log failure: commits 0, detection unavailable/GIT_LOG_FAILED, adapter called exactly once (never reaches getChangedFiles)', async () => {
+    vi.mocked(runSyncGitProcess).mockImplementation(async () =>
+      fail('nonzero_exit', "nonzero_exit: fatal: your current branch 'main' does not have any commits yet", 128));
 
-    const result = collectGitChanges('/project', '2026-03-20T00:00:00Z');
+    const result = await collectGitChanges('/project', '2026-03-20T00:00:00Z');
     expect(result.commits).toBe(0);
     expect(result.modified).toEqual([]);
     expect(result.added).toEqual([]);
@@ -430,28 +394,24 @@ describe('collectGitChanges', () => {
       mode: 'unavailable',
       issue: {
         code: 'GIT_LOG_FAILED',
-        detail: "fatal: your current branch 'main' does not have any commits yet",
+        detail: "nonzero_exit: fatal: your current branch 'main' does not have any commits yet",
       },
     });
 
-    expect(spawnSync).toHaveBeenCalledTimes(1);
-    const call = vi.mocked(spawnSync).mock.calls[0];
-    expect((call?.[1] as string[])[0]).toBe('log');
+    expect(runSyncGitProcess).toHaveBeenCalledTimes(1);
+    const call = vi.mocked(runSyncGitProcess).mock.calls[0];
+    expect(call?.[0].args[0]).toBe('log');
   });
 
-  it('collects commit count + changed files on success (log, rev-list, diff)', () => {
-    vi.mocked(spawnSync).mockImplementation((_cmd, args) => {
-      const argv = (args ?? []) as string[];
-      if (argv[0] === 'log') {
-        return { status: 0, stdout: 'a1 c1\na2 c2\na3 c3\n', stderr: '', pid: 1, output: [], signal: null };
-      }
-      if (argv[0] === 'rev-list') {
-        return { status: 0, stdout: '10\n', stderr: '', pid: 1, output: [], signal: null };
-      }
-      return { status: 0, stdout: 'M\ta.ts\n', stderr: '', pid: 1, output: [], signal: null };
+  it('collects commit count + changed files on success (log, rev-list, diff)', async () => {
+    vi.mocked(runSyncGitProcess).mockImplementation(async (options) => {
+      const argv = options.args;
+      if (argv[0] === 'log') return ok('a1 c1\na2 c2\na3 c3\n');
+      if (argv[0] === 'rev-list') return ok('10\n');
+      return ok('M\0a.ts\0');
     });
 
-    const result = collectGitChanges('/project', '2026-03-20T00:00:00Z');
+    const result = await collectGitChanges('/project', '2026-03-20T00:00:00Z');
     expect(result.commits).toBe(3);
     expect(result.modified).toEqual(['a.ts']);
     expect(result.added).toEqual([]);
@@ -587,33 +547,20 @@ describe('runSync', () => {
     vi.clearAllMocks();
   });
 
-  it('returns null when not a git repo', () => {
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 128,
-      stdout: '',
-      stderr: 'fatal',
-      pid: 1,
-      output: [],
-      signal: null,
-    });
+  it('returns null when not a git repo', async () => {
+    vi.mocked(runSyncGitProcess).mockImplementation(async () =>
+      fail('nonzero_exit', 'nonzero_exit: fatal', 128));
 
-    const result = runSync('/project');
+    const result = await runSync('/project');
     expect(result).toBeNull();
   });
 
-  it('returns null when no sprint files exist', () => {
+  it('returns null when no sprint files exist', async () => {
     // First call: isGitRepo
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: 'true\n',
-      stderr: '',
-      pid: 1,
-      output: [],
-      signal: null,
-    });
+    vi.mocked(runSyncGitProcess).mockImplementation(async () => ok('true\n'));
     vi.mocked(existsSync).mockReturnValue(false);
 
-    const result = runSync('/project');
+    const result = await runSync('/project');
     expect(result).toBeNull();
   });
 });
@@ -647,14 +594,7 @@ describe('CLI: deckent sync', () => {
     // existsSync: DECKENT.md=true, sprints dir for git detection
     vi.mocked(existsSync).mockReturnValue(true);
     // git rev-parse (isGitRepo) → true
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: 'true\n',
-      stderr: '',
-      pid: 1,
-      output: [],
-      signal: null,
-    });
+    vi.mocked(runSyncGitProcess).mockImplementation(async () => ok('true\n'));
     vi.mocked(readdirSync).mockReturnValue([]);
 
     await program.parseAsync(['node', 'deckent', 'sync']);
@@ -665,14 +605,8 @@ describe('CLI: deckent sync', () => {
 
   it('skips adapter sync with --git-only flag', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 128,
-      stdout: '',
-      stderr: 'fatal',
-      pid: 1,
-      output: [],
-      signal: null,
-    });
+    vi.mocked(runSyncGitProcess).mockImplementation(async () =>
+      fail('nonzero_exit', 'nonzero_exit: fatal', 128));
 
     await program.parseAsync(['node', 'deckent', 'sync', '--git-only']);
 
@@ -686,9 +620,10 @@ describe('CLI: deckent sync', () => {
 
     expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('CLAUDE.md'));
     expect(ensureDeckentImport).toHaveBeenCalledWith(expect.stringContaining('AGENTS.md'));
-    // spawnSync should NOT be called for git commands (mkdirSync may be called for .cursor)
+    // runSyncGitProcess should NOT be called for git commands (mkdirSync may be called for .cursor)
     // We just verify ensureDeckentImport was called for each adapter
     expect(ensureDeckentImport.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(runSyncGitProcess).not.toHaveBeenCalled();
   });
 });
 

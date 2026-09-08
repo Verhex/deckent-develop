@@ -21,6 +21,22 @@ vi.mock('node:fs', async (importOriginal) => ({
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
+  // 7104 SYNC-ASYNC-GIT-CLOSURE: sync-git-process's default spawnImpl is
+  // node:child_process's `spawn` — without an export here the adapter throws
+  // "No 'spawn' export is defined on the 'node:child_process' mock" the
+  // instant sync.ts's isGitRepo/getLastSprintTimestamp run. The adapter
+  // itself is separately mocked below, so this export is never actually
+  // invoked; it exists only so the module shape resolves.
+  spawn: vi.fn(),
+}));
+
+// 7104 SYNC-ASYNC-GIT-CLOSURE: sync.ts's Git chain now goes exclusively
+// through this adapter (no more node:child_process spawnSync calls) — mock
+// it the same way tests/cli/commands/sync.test.ts does, keeping every other
+// export (e.g. SYNC_GIT_PROBE_TIMEOUT_MS) real via importOriginal.
+vi.mock('../../../src/cli/helpers/sync-git-process.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../src/cli/helpers/sync-git-process.js')>(),
+  runSyncGitProcess: vi.fn(),
 }));
 
 vi.mock('../../../src/core/utils.js', () => ({
@@ -78,6 +94,8 @@ import { ensureDeckentImport } from '../../../src/core/utils.js';
 import { print, printError } from '../../../src/cli/helpers/output.js';
 import { runWizard } from '../../../src/cli/helpers/wizard.js';
 import { detectProjectStack } from '../../../src/core/stack-detector.js';
+import { runSyncGitProcess } from '../../../src/cli/helpers/sync-git-process.js';
+import type { SyncGitProcessResult, SyncGitFailureKind } from '../../../src/cli/helpers/sync-git-process.js';
 
 import {
   truncateFileList,
@@ -87,6 +105,29 @@ import {
   getLastSprintTimestamp,
 } from '../../../src/cli/commands/sync.js';
 import type { SyncResult } from '../../../src/cli/commands/sync.js';
+
+// ─── Typed helpers for the runSyncGitProcess adapter mock (7104) ─────
+
+function ok(stdout: string): SyncGitProcessResult {
+  return { ok: true, stdout, stderr: '', stderrBytesDropped: 0, exitCode: 0, durationMs: 1, pid: 1 };
+}
+
+function fail(kind: SyncGitFailureKind, detail: string, exitCode: number | null = 1): SyncGitProcessResult {
+  return {
+    ok: false,
+    kind,
+    detail,
+    exitCode,
+    signal: null,
+    stdoutBytes: 0,
+    stdoutTruncated: false,
+    childExited: true,
+    streamsClosed: true,
+    treeTerminated: null,
+    durationMs: 1,
+    pid: 1,
+  };
+}
 
 import {
   detectProjectInfo,
@@ -220,8 +261,9 @@ describe('sync: --json and --dry-run flags via registerSync', () => {
 
   it('--dry-run does not call ensureDeckentImport', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0, stdout: 'true\n', stderr: '', pid: 1, output: [], signal: null,
+    vi.mocked(runSyncGitProcess).mockImplementation(async (options) => {
+      if (options.args[0] === 'rev-parse') return ok('true\n');
+      return fail('nonzero_exit', 'nonzero_exit: fatal: no sprints', 128);
     });
     vi.mocked(readdirSync).mockReturnValue([]);
 
@@ -235,34 +277,25 @@ describe('sync: getLastSprintTimestamp uses git date when available', () => {
     vi.clearAllMocks();
   });
 
-  it('uses git commit date when git log succeeds', () => {
+  it('uses git commit date when git log succeeds', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue(['sprint-040.md'] as unknown as ReturnType<typeof readdirSync>);
 
     const gitDate = '2026-03-20T10:00:00.000Z';
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0,
-      stdout: gitDate + '\n',
-      stderr: '',
-      pid: 1,
-      output: [],
-      signal: null,
-    });
+    vi.mocked(runSyncGitProcess).mockImplementation(async () => ok(gitDate + '\n'));
 
-    const result = getLastSprintTimestamp('/project');
+    const result = await getLastSprintTimestamp('/project');
     expect(result).not.toBeNull();
     expect(result!.timestamp).toBe(new Date(gitDate).toISOString());
   });
 
-  it('falls back to mtime when git log returns empty', () => {
+  it('falls back to mtime when git log returns empty', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue(['sprint-040.md'] as unknown as ReturnType<typeof readdirSync>);
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0, stdout: '', stderr: '', pid: 1, output: [], signal: null,
-    });
+    vi.mocked(runSyncGitProcess).mockImplementation(async () => ok(''));
     vi.mocked(statSync).mockReturnValue({ mtimeMs: 9000000 } as ReturnType<typeof statSync>);
 
-    const result = getLastSprintTimestamp('/project');
+    const result = await getLastSprintTimestamp('/project');
     expect(result).not.toBeNull();
     expect(result!.timestamp).toBe(new Date(9000000).toISOString());
   });

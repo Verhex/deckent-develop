@@ -5,12 +5,14 @@
 // requested commit window reaches (or exceeds) the repository's actual
 // history. Exercised against a REAL git binary in a REAL tmpdir repo — the
 // only honest proof for a bug that was a silent git failure in the first
-// place. Async spawn only in test setup (hermeticity); the function under
-// test itself calls spawnSync (pre-existing production pattern, unchanged
-// here — see src/cli/commands/sync.ts).
+// place. Async spawn only in test setup (hermeticity); the functions under
+// test now run git through the async `runSyncGitProcess` adapter
+// (src/cli/helpers/sync-git-process.ts) — never `spawnSync` — so every one
+// of them is awaited here: the event loop stays live for the whole
+// probe → rev-list → ls-tree/diff chain (7104 SYNC-ASYNC-GIT-CLOSURE).
 
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -90,7 +92,7 @@ describe('getChangedFiles — real git (7104)', () => {
     await initRepo(root);
     await commitFile(root, 'first.txt', 'first\n', 'first commit');
 
-    const changes = getChangedFiles(root, 1);
+    const changes = await getChangedFiles(root, 1);
 
     expect(changes.detection).toEqual({ mode: 'root-fallback', issue: null });
     expect(changes.added).toEqual(['first.txt']);
@@ -104,7 +106,7 @@ describe('getChangedFiles — real git (7104)', () => {
     await commitFile(root, 'a.txt', 'a\n', 'commit a');
     await commitFile(root, 'b.txt', 'b\n', 'commit b');
 
-    const changes = getChangedFiles(root, 2);
+    const changes = await getChangedFiles(root, 2);
 
     expect(changes.detection).toEqual({ mode: 'root-fallback', issue: null });
     expect([...changes.added].sort()).toEqual(['a.txt', 'b.txt']);
@@ -117,7 +119,7 @@ describe('getChangedFiles — real git (7104)', () => {
     await commitFile(root, 'a.txt', 'a v2\n', 'modify a');     // HEAD~1
     await commitFile(root, 'c.txt', 'c\n', 'add c');           // HEAD
 
-    const changes = getChangedFiles(root, 2);
+    const changes = await getChangedFiles(root, 2);
 
     expect(changes.detection).toEqual({ mode: 'range', issue: null });
     expect(changes.modified).toEqual(['a.txt']);
@@ -132,7 +134,7 @@ describe('getChangedFiles — real git (7104)', () => {
     expect((await gitRun(root, ['mv', 'old-name.txt', 'new-name.txt'])).code).toBe(0);
     await commit(root, 'rename old-name.txt to new-name.txt');
 
-    const changes = getChangedFiles(root, 1);
+    const changes = await getChangedFiles(root, 1);
 
     expect(changes.detection.mode).toBe('range');
     expect(changes.renamed).toEqual(['new-name.txt']);
@@ -140,14 +142,18 @@ describe('getChangedFiles — real git (7104)', () => {
     expect(changes.added).not.toContain('new-name.txt');
   });
 
-  it('(e) non-repository directory, count 1 → unavailable / GIT_REV_LIST_FAILED, lists empty', () => {
-    // `root` is a plain tmpdir — never git-initialized.
-    const changes = getChangedFiles(root, 1);
+  it('(e) non-repository directory, count 1 → unavailable / GIT_REV_LIST_FAILED, lists empty', async () => {
+    // `root` is a plain tmpdir — never git-initialized. `rev-list --count
+    // HEAD` fails with git's "not a git repository" message via a non-zero
+    // exit — the adapter's detail therefore carries the `nonzero_exit: `
+    // prefix (never a bare stderr line).
+    const changes = await getChangedFiles(root, 1);
 
     expect(changes.detection.mode).toBe('unavailable');
     expect(changes.detection.issue?.code).toBe('GIT_REV_LIST_FAILED');
-    expect(typeof changes.detection.issue?.detail).toBe('string');
-    expect(changes.detection.issue?.detail.length).toBeGreaterThan(0);
+    const detail = changes.detection.issue?.detail ?? '';
+    expect(detail.startsWith('nonzero_exit: ')).toBe(true);
+    expect(detail).toMatch(/not a git repository/);
     expect(changes.modified).toEqual([]);
     expect(changes.added).toEqual([]);
     expect(changes.deleted).toEqual([]);
@@ -156,14 +162,17 @@ describe('getChangedFiles — real git (7104)', () => {
 
   it('(f) empty repository (git init, no commits), count 1 → unavailable / GIT_REV_LIST_FAILED', async () => {
     await initRepo(root);
-    // No commits — HEAD is unborn, so `git rev-list --count HEAD` fails.
+    // No commits — HEAD is unborn, so `git rev-list --count HEAD` fails
+    // with an "ambiguous argument 'HEAD'" message (distinct from (e)'s
+    // "not a git repository" — still `nonzero_exit: `-prefixed).
 
-    const changes = getChangedFiles(root, 1);
+    const changes = await getChangedFiles(root, 1);
 
     expect(changes.detection.mode).toBe('unavailable');
     expect(changes.detection.issue?.code).toBe('GIT_REV_LIST_FAILED');
-    expect(typeof changes.detection.issue?.detail).toBe('string');
-    expect(changes.detection.issue?.detail.length).toBeGreaterThan(0);
+    const detail = changes.detection.issue?.detail ?? '';
+    expect(detail.startsWith('nonzero_exit: ')).toBe(true);
+    expect(detail.slice('nonzero_exit: '.length).length).toBeGreaterThan(0);
     expect(changes.modified).toEqual([]);
     expect(changes.added).toEqual([]);
     expect(changes.deleted).toEqual([]);
@@ -241,7 +250,7 @@ describe('getChangedFiles — SHA-256 object-format repository (7104 correction,
       await commitFileSha256(sha256Repo, 'a.txt', 'a\n', 'commit a');
       await commitFileSha256(sha256Repo, 'b.txt', 'b\n', 'commit b');
 
-      const changes = getChangedFiles(sha256Repo, 2);
+      const changes = await getChangedFiles(sha256Repo, 2);
       expect(changes.detection).toEqual({ mode: 'root-fallback', issue: null });
       expect([...changes.added].sort()).toEqual(['a.txt', 'b.txt']);
       expect(changes.modified).toEqual([]);
@@ -256,7 +265,7 @@ describe('getChangedFiles — SHA-256 object-format repository (7104 correction,
       expect(sha256Repo).not.toBeNull();
       await commitFileSha256(sha256Repo as string, 'a.txt', 'a v2\n', 'modify a');
 
-      const changes = getChangedFiles(sha256Repo as string, 1);
+      const changes = await getChangedFiles(sha256Repo as string, 1);
       expect(changes.detection).toEqual({ mode: 'range', issue: null });
       expect(changes.modified).toEqual(['a.txt']);
     },
@@ -275,7 +284,7 @@ describe('getChangedFiles — explicit SHA-1 object-format repository (7104 corr
     await commitFile(root, 'a.txt', 'a\n', 'commit a');
     await commitFile(root, 'b.txt', 'b\n', 'commit b');
 
-    const changes = getChangedFiles(root, 2);
+    const changes = await getChangedFiles(root, 2);
     expect(changes.detection).toEqual({ mode: 'root-fallback', issue: null });
     expect([...changes.added].sort()).toEqual(['a.txt', 'b.txt']);
     expect(changes.modified).toEqual([]);
@@ -292,7 +301,7 @@ describe('probeCommitsSince — real git (7104)', () => {
     await commitFile(root, 'a.txt', 'a\n', 'commit a');
     await commitFile(root, 'b.txt', 'b\n', 'commit b');
 
-    const probe = probeCommitsSince(root, '2020-01-01T00:00:00Z');
+    const probe = await probeCommitsSince(root, '2020-01-01T00:00:00Z');
     expect(probe.commits.length).toBe(2);
     expect(probe.issue).toBeNull();
   });
@@ -312,27 +321,33 @@ describe('probeCommitsSince — real git (7104)', () => {
     // date (fixed at 2026-01-01 + offset) and reproduces the intended
     // successful-zero semantics without depending on undefined git-version
     // behavior at extreme dates.
-    const probe = probeCommitsSince(root, '2099-01-01T00:00:00Z');
+    const probe = await probeCommitsSince(root, '2099-01-01T00:00:00Z');
     expect(probe.commits).toEqual([]);
     expect(probe.issue).toBeNull();
   });
 
-  it('(i3) non-repository directory → commits [], issue.code GIT_LOG_FAILED, detail a non-empty string', () => {
+  it('(i3) non-repository directory → commits [], issue.code GIT_LOG_FAILED, detail nonzero_exit-prefixed', async () => {
     // `root` is a plain tmpdir — never git-initialized.
-    const probe = probeCommitsSince(root, '2020-01-01T00:00:00Z');
+    const probe = await probeCommitsSince(root, '2020-01-01T00:00:00Z');
     expect(probe.commits).toEqual([]);
     expect(probe.issue?.code).toBe('GIT_LOG_FAILED');
-    expect(typeof probe.issue?.detail).toBe('string');
-    expect(probe.issue?.detail.length).toBeGreaterThan(0);
+    const detail = probe.issue?.detail ?? '';
+    expect(detail.startsWith('nonzero_exit: ')).toBe(true);
+    expect(detail).toMatch(/not a git repository/);
   });
 
-  it('(i4) unborn branch (git init, no commits) → issue.code GIT_LOG_FAILED', async () => {
+  it('(i4) unborn branch (git init, no commits) → issue.code GIT_LOG_FAILED, detail nonzero_exit-prefixed', async () => {
     await initRepo(root);
-    // No commits — HEAD is unborn, so `git log --since=...` fails.
+    // No commits — HEAD is unborn, so `git log --since=...` fails. The
+    // failing branch name (e.g. 'master') is host `init.defaultBranch`
+    // config, not something this suite pins — assert the prefix only.
 
-    const probe = probeCommitsSince(root, '2020-01-01T00:00:00Z');
+    const probe = await probeCommitsSince(root, '2020-01-01T00:00:00Z');
     expect(probe.commits).toEqual([]);
     expect(probe.issue?.code).toBe('GIT_LOG_FAILED');
+    const detail = probe.issue?.detail ?? '';
+    expect(detail.startsWith('nonzero_exit: ')).toBe(true);
+    expect(detail.slice('nonzero_exit: '.length).length).toBeGreaterThan(0);
   });
 });
 
@@ -345,20 +360,20 @@ describe('getCommitsSince — legacy wrapper compatibility (7104)', () => {
     await commitFile(root, 'b.txt', 'b\n', 'commit b');
 
     const since = '2020-01-01T00:00:00Z';
-    expect(getCommitsSince(root, since)).toEqual(probeCommitsSince(root, since).commits);
+    expect(await getCommitsSince(root, since)).toEqual((await probeCommitsSince(root, since)).commits);
   });
 
-  it('(j2) returns [] on the non-repository failure (explicit compat: cannot tell a failure from zero)', () => {
+  it('(j2) returns [] on the non-repository failure (explicit compat: cannot tell a failure from zero)', async () => {
     // `root` is a plain tmpdir — never git-initialized.
-    expect(getCommitsSince(root, '2020-01-01T00:00:00Z')).toEqual([]);
+    expect(await getCommitsSince(root, '2020-01-01T00:00:00Z')).toEqual([]);
   });
 });
 
 // ═══ (k) collectGitChanges — real git (7104) ═══════════════════════════════
 
 describe('collectGitChanges — real git (7104)', () => {
-  it('(k1) non-repository directory → commits 0, lists empty, detection unavailable/GIT_LOG_FAILED', () => {
-    const result = collectGitChanges(root, '2020-01-01T00:00:00Z');
+  it('(k1) non-repository directory → commits 0, lists empty, detection unavailable/GIT_LOG_FAILED', async () => {
+    const result = await collectGitChanges(root, '2020-01-01T00:00:00Z');
     expect(result.commits).toBe(0);
     expect(result.modified).toEqual([]);
     expect(result.added).toEqual([]);
@@ -376,7 +391,7 @@ describe('collectGitChanges — real git (7104)', () => {
 
     // See the (i2) note above re: '2099-01-01T00:00:00Z' vs. the literal
     // 2999 spec date — same real `git --since` overflow avoidance.
-    const result = collectGitChanges(root, '2099-01-01T00:00:00Z');
+    const result = await collectGitChanges(root, '2099-01-01T00:00:00Z');
     expect(result.commits).toBe(0);
     expect(result.detection).toEqual({ mode: 'range', issue: null });
   });
@@ -387,7 +402,7 @@ describe('collectGitChanges — real git (7104)', () => {
     await commitFile(root, 'b.txt', 'b\n', 'commit b');
     await commitFile(root, 'c.txt', 'c\n', 'commit c');
 
-    const result = collectGitChanges(root, '2020-01-01T00:00:00Z');
+    const result = await collectGitChanges(root, '2020-01-01T00:00:00Z');
     expect(result.commits).toBe(3);
     expect(result.detection.mode).toBe('root-fallback');
     expect([...result.added].sort()).toEqual(['a.txt', 'b.txt', 'c.txt']);
@@ -399,17 +414,177 @@ describe('collectGitChanges — real git (7104)', () => {
 describe('getChangedFiles — invalid commitCount validation (7104)', () => {
   const invalidCommitCounts = [NaN, 1.5, Infinity, -Infinity, -1];
 
-  it.each(invalidCommitCounts)('(l1) throws RangeError for commitCount=%p in a real repo', async (value) => {
+  it.each(invalidCommitCounts)('(l1) rejects with RangeError for commitCount=%p in a real repo', async (value) => {
     await initRepo(root);
     await commitFile(root, 'a.txt', 'a\n', 'commit a');
 
-    expect(() => getChangedFiles(root, value)).toThrow(RangeError);
+    await expect(getChangedFiles(root, value)).rejects.toThrow(RangeError);
   });
 
-  it('(l2) throws RangeError before any git call on a non-repository path (validation precedes git)', () => {
+  it('(l2) rejects with RangeError before any git call on a non-repository path (validation precedes git)', async () => {
     // `root` is a plain tmpdir — never git-initialized. If validation ran
     // AFTER a git call, this would surface as a git-failure detection
-    // (e.g. GIT_REV_LIST_FAILED) rather than a RangeError thrown synchronously.
-    expect(() => getChangedFiles(root, NaN)).toThrow(RangeError);
+    // (e.g. GIT_REV_LIST_FAILED) rather than a RangeError rejection.
+    await expect(getChangedFiles(root, NaN)).rejects.toThrow(RangeError);
+  });
+});
+
+// ═══ (m) Unicode + space paths — root-fallback AND range (7104) ═══════════
+//
+// `-z` (NUL-separated) output on both `ls-tree` and `diff --name-status`
+// means paths with spaces/Unicode arrive as their exact raw bytes — never
+// Git's default C-style quoting (`core.quotePath`, e.g. `"caf\303\251..."`).
+
+describe('getChangedFiles — Unicode/space paths, real git (7104)', () => {
+  it('(m) unicode+space paths (incl. a nested unicode+space directory) list exact raw paths in BOTH root-fallback and range mode', async () => {
+    await initRepo(root);
+    // commit 1 (ONE commit, both files): a top-level unicode+space file and
+    // a plain-space file — historyDepth after this test's two commits is 2,
+    // so commitCount 2 below triggers root-fallback exactly.
+    writeFileSync(join(root, 'café ürün.txt'), 'café content v1\n', 'utf-8');
+    writeFileSync(join(root, 'space name.md'), 'space content\n', 'utf-8');
+    expect((await gitRun(root, ['add', '-A'])).code).toBe(0);
+    await commit(root, 'add café ürün.txt, space name.md');
+
+    // commit 2: modify the unicode+space file, add a NEW file nested under
+    // a unicode+space directory (commitFile does not create directories).
+    mkdirSync(join(root, 'dir ü'), { recursive: true });
+    writeFileSync(join(root, 'dir ü', 'x y.txt'), 'nested content\n', 'utf-8');
+    writeFileSync(join(root, 'café ürün.txt'), 'café content v2\n', 'utf-8');
+    expect((await gitRun(root, ['add', '-A'])).code).toBe(0);
+    await commit(root, 'modify café ürün.txt, add dir ü/x y.txt');
+
+    // root-fallback (commitCount == historyDepth == 2): every path present
+    // at HEAD, exact raw bytes, no C-style quoting.
+    const rootFallback = await getChangedFiles(root, 2);
+    expect(rootFallback.detection).toEqual({ mode: 'root-fallback', issue: null });
+    expect([...rootFallback.added].sort()).toEqual(
+      ['café ürün.txt', 'dir ü/x y.txt', 'space name.md'].sort(),
+    );
+    expect(rootFallback.modified).toEqual([]);
+    expect(rootFallback.deleted).toEqual([]);
+    expect(rootFallback.renamed).toEqual([]);
+
+    // range (commitCount 1 < historyDepth 2): exact modified/added from the
+    // second commit only.
+    const range = await getChangedFiles(root, 1);
+    expect(range.detection).toEqual({ mode: 'range', issue: null });
+    expect(range.modified).toEqual(['café ürün.txt']);
+    expect(range.added).toEqual(['dir ü/x y.txt']);
+    expect(range.deleted).toEqual([]);
+    expect(range.renamed).toEqual([]);
+  });
+});
+
+// ═══ (n) rename of a Unicode/space path — range mode (7104) ═══════════════
+
+describe('getChangedFiles — rename of a Unicode/space path (7104)', () => {
+  it('(n) git mv of a unicode+space path in range mode → renamed has the exact new path; modified/added/deleted do not contain it', async () => {
+    await initRepo(root);
+    await commitFile(
+      root,
+      'café antiguo ü.txt',
+      'stable content that survives the move across a unicode rename\n',
+      'add café antiguo ü.txt',
+    );
+
+    expect((await gitRun(root, ['mv', 'café antiguo ü.txt', 'nuevo ü café.txt'])).code).toBe(0);
+    await commit(root, 'rename café antiguo ü.txt to nuevo ü café.txt');
+
+    const changes = await getChangedFiles(root, 1);
+
+    expect(changes.detection.mode).toBe('range');
+    expect(changes.renamed).toEqual(['nuevo ü café.txt']);
+    expect(changes.modified).not.toContain('nuevo ü café.txt');
+    expect(changes.added).not.toContain('nuevo ü café.txt');
+    expect(changes.deleted).not.toContain('nuevo ü café.txt');
+  });
+});
+
+// ═══ (o) probeCommitsSince — invalid / empty `since` (7104) ═══════════════
+//
+// `--since=<value>` is interpolated directly into the git argv (never shell
+// text), so a bad `since` reaches git itself; this suite does not assume
+// whether a given git build treats it as "filter nothing" (`issue: null`)
+// or "fail the log" (`GIT_LOG_FAILED`) — it asserts the closed disjunction
+// the contract promises (a resolved promise, never a rejection) and records
+// which branch this host's git took.
+
+describe('probeCommitsSince — invalid/empty since value, real git (7104)', () => {
+  it("(o1) since='not-a-date' on a real 2-commit repo → resolves (never throws); observed on git 2.43.0: issue null, commits [] (git silently matches nothing rather than failing the log)", async () => {
+    await initRepo(root);
+    await commitFile(root, 'a.txt', 'a\n', 'commit a');
+    await commitFile(root, 'b.txt', 'b\n', 'commit b');
+
+    const probe = await probeCommitsSince(root, 'not-a-date');
+
+    if (probe.issue === null) {
+      expect(Array.isArray(probe.commits)).toBe(true);
+      expect(probe.commits.every((line) => typeof line === 'string')).toBe(true);
+    } else {
+      expect(probe.issue.code).toBe('GIT_LOG_FAILED');
+      expect(probe.issue.detail.startsWith('nonzero_exit: ')).toBe(true);
+      expect(probe.commits).toEqual([]);
+    }
+  });
+
+  it("(o2) since='' (empty) on a real 2-commit repo → resolves (never throws); observed on git 2.43.0: issue null, commits [] (same silent-no-match behavior as (o1))", async () => {
+    await initRepo(root);
+    await commitFile(root, 'a.txt', 'a\n', 'commit a');
+    await commitFile(root, 'b.txt', 'b\n', 'commit b');
+
+    const probe = await probeCommitsSince(root, '');
+
+    if (probe.issue === null) {
+      expect(Array.isArray(probe.commits)).toBe(true);
+      expect(probe.commits.every((line) => typeof line === 'string')).toBe(true);
+    } else {
+      expect(probe.issue.code).toBe('GIT_LOG_FAILED');
+      expect(probe.issue.detail.startsWith('nonzero_exit: ')).toBe(true);
+      expect(probe.commits).toEqual([]);
+    }
+  });
+});
+
+// ═══ (p) getChangedFiles — deletion in range mode (7104) ═══════════════════
+
+describe('getChangedFiles — deletion, real git (7104)', () => {
+  it('(p) git rm + commit, count 1 → deleted exact', async () => {
+    await initRepo(root);
+    await commitFile(root, 'doomed.txt', 'doomed\n', 'add doomed.txt');
+
+    expect((await gitRun(root, ['rm', '-q', 'doomed.txt'])).code).toBe(0);
+    await commit(root, 'delete doomed.txt');
+
+    const changes = await getChangedFiles(root, 1);
+
+    expect(changes.detection.mode).toBe('range');
+    expect(changes.deleted).toEqual(['doomed.txt']);
+    expect(changes.modified).toEqual([]);
+    expect(changes.added).toEqual([]);
+    expect(changes.renamed).toEqual([]);
+  });
+});
+
+// ═══ (q) collectGitChanges — nonexistent working directory (7104) ══════════
+
+describe('collectGitChanges — nonexistent working directory (7104)', () => {
+  it('(q) a directory that does not exist at all → resolves to commits 0, detection unavailable/GIT_LOG_FAILED, detail spawn_error-prefixed', async () => {
+    // `missingDir` is a subdirectory of the per-test tmpdir that is
+    // deliberately never created — the child process itself fails to start
+    // (cwd chdir ENOENT) before git ever runs, so this must surface as
+    // spawn_error, not any git-level failure.
+    const missingDir = join(root, 'missing-subdir');
+
+    const result = await collectGitChanges(missingDir, '2020-01-01T00:00:00Z');
+
+    expect(result.commits).toBe(0);
+    expect(result.modified).toEqual([]);
+    expect(result.added).toEqual([]);
+    expect(result.deleted).toEqual([]);
+    expect(result.renamed).toEqual([]);
+    expect(result.detection.mode).toBe('unavailable');
+    expect(result.detection.issue?.code).toBe('GIT_LOG_FAILED');
+    expect(result.detection.issue?.detail).toMatch(/^spawn_error: /);
   });
 });

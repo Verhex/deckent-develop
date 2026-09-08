@@ -1,7 +1,6 @@
 import { existsSync, readdirSync, statSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import type { Dirent } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
 import type { Command } from 'commander';
 import { DECKENT_FILE, DECKENT_DIR, CLAUDE_FILE, AGENTS_FILE, BRAIN_DIR, SPRINTS_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { ensureDeckentImport, debugLog } from '../../core/utils.js';
@@ -29,6 +28,7 @@ import { getWorkspaceArtifactDescriptor } from '../../core/workspace-artifact-co
 import { buildSyncAggregate } from '../helpers/sync-aggregate.js';
 import type { SyncCommandOutput, SyncAggregateSummary } from '../helpers/sync-aggregate.js';
 import type { SyncChangeDetectionMode, SyncChangeDetectionIssue, SyncChangeDetection } from '../helpers/sync-change-detection.js';
+import { runSyncGitProcess, SYNC_GIT_PROBE_TIMEOUT_MS } from '../helpers/sync-git-process.js';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -95,22 +95,18 @@ export interface WorkspaceSyncReport {
 // ─── Helpers ────────────────────────────────────────────────────────
 
 /**
- * Get git commit date for a file using `git log -1 --format=%aI`.
- * Falls back to mtime if git unavailable.
+ * Author date of a file's last commit (ms since epoch), falling back to the
+ * file mtime when Git cannot answer. Awaited: never blocks the event loop.
  */
-export function getFileGitDate(root: string, filePath: string): number {
-  try {
-    const result = spawnSync('git', ['log', '-1', '--format=%aI', '--', filePath], {
-      cwd: root,
-      encoding: 'utf-8',
-      timeout: 5000,
-    });
-    if (result.status === 0 && result.stdout.trim()) {
-      const ts = new Date(result.stdout.trim()).getTime();
-      if (!isNaN(ts)) return ts;
-    }
-  } catch {
-    // fall through to mtime
+export async function getFileGitDate(root: string, filePath: string): Promise<number> {
+  const result = await runSyncGitProcess({
+    cwd: root,
+    args: ['log', '-1', '--format=%aI', '--', filePath],
+    timeoutMs: SYNC_GIT_PROBE_TIMEOUT_MS,
+  });
+  if (result.ok && result.stdout.trim()) {
+    const ts = new Date(result.stdout.trim()).getTime();
+    if (!isNaN(ts)) return ts;
   }
   try {
     return statSync(join(root, filePath)).mtimeMs;
@@ -120,11 +116,11 @@ export function getFileGitDate(root: string, filePath: string): number {
 }
 
 /**
- * Detect the latest sprint file's commit date from .brain/sprints/.
- * Uses `git log -1 --format=%aI` for accuracy, falls back to mtime.
- * Returns ISO timestamp string or null if no sprint files exist.
+ * Latest recorded sprint (by Git author date of its record, else file mtime).
+ * Git is asked ONE file at a time, sequentially — a controlled await chain,
+ * never a parallel Git storm.
  */
-export function getLastSprintTimestamp(root: string): { timestamp: string; sprintId: string } | null {
+export async function getLastSprintTimestamp(root: string): Promise<{ timestamp: string; sprintId: string } | null> {
   const sprintsPath = join(root, BRAIN_DIR, SPRINTS_DIR);
   if (!existsSync(sprintsPath)) return null;
 
@@ -133,28 +129,22 @@ export function getLastSprintTimestamp(root: string): { timestamp: string; sprin
 
   let latestMs = 0;
   let latestFile = '';
+
   for (const f of files) {
     let ms = 0;
-    // Try git commit date first
-    try {
-      const gitResult = spawnSync('git', ['log', '-1', '--format=%aI', '--', join(BRAIN_DIR, SPRINTS_DIR, f)], {
-        cwd: root,
-        encoding: 'utf-8',
-        timeout: 5000,
-      });
-      if (gitResult && gitResult.status === 0 && gitResult.stdout?.trim()) {
-        const ts = new Date(gitResult.stdout.trim()).getTime();
-        if (!isNaN(ts)) ms = ts;
-      }
-    } catch {
-      // ignore git errors
+    const gitResult = await runSyncGitProcess({
+      cwd: root,
+      args: ['log', '-1', '--format=%aI', '--', join(BRAIN_DIR, SPRINTS_DIR, f)],
+      timeoutMs: SYNC_GIT_PROBE_TIMEOUT_MS,
+    });
+    if (gitResult.ok && gitResult.stdout.trim()) {
+      const ts = new Date(gitResult.stdout.trim()).getTime();
+      if (!isNaN(ts)) ms = ts;
     }
-    // Fall back to mtime
     if (!ms) {
       try {
         ms = statSync(join(sprintsPath, f)).mtimeMs;
       } catch {
-        // skip unreadable files
         continue;
       }
     }
@@ -165,22 +155,19 @@ export function getLastSprintTimestamp(root: string): { timestamp: string; sprin
   }
 
   if (!latestFile) return null;
-
   const sprintId = latestFile.replace('.md', '');
   const timestamp = new Date(latestMs).toISOString();
   return { timestamp, sprintId };
 }
 
-/**
- * Check if the current directory is inside a git repository.
- */
-export function isGitRepo(root: string): boolean {
-  const result = spawnSync('git', ['rev-parse', '--is-inside-work-tree'], {
+/** Whether `root` is inside a Git work tree. Any Git failure (timeout, ENOENT, non-zero) is `false`. */
+export async function isGitRepo(root: string): Promise<boolean> {
+  const result = await runSyncGitProcess({
     cwd: root,
-    encoding: 'utf-8',
-    timeout: 5000,
+    args: ['rev-parse', '--is-inside-work-tree'],
+    timeoutMs: SYNC_GIT_PROBE_TIMEOUT_MS,
   });
-  return result.status === 0 && result.stdout.trim() === 'true';
+  return result.ok && result.stdout.trim() === 'true';
 }
 
 /** Typed result of `probeCommitsSince`: the commit list, or WHY it is unknown. */
@@ -193,20 +180,15 @@ export interface SyncCommitProbe {
 
 /**
  * Get git commits since a given ISO timestamp, distinguishing a successful
- * empty result from a failed `git log` (7104): a failure is reported as a
- * typed `GIT_LOG_FAILED` issue and MUST NOT be read as "0 commits" —
- * e.g. an unborn branch (repository with no commits yet) makes `git log`
- * exit 128, and a caller that fed that `0` into `getChangedFiles` would
- * otherwise print a clean "no changes" over an unverified working tree.
+ * empty result from a failed `git log` (7104): every failure — non-zero exit
+ * (e.g. an unborn branch), timeout, output overflow, signal, spawn error — is a
+ * typed `GIT_LOG_FAILED` issue whose detail names the failure kind, and MUST
+ * NOT be read as "0 commits". Awaited: the event loop stays live.
  */
-export function probeCommitsSince(root: string, since: string): SyncCommitProbe {
-  const result = spawnSync('git', ['log', '--oneline', `--since=${since}`], {
-    cwd: root,
-    encoding: 'utf-8',
-    timeout: 10000,
-  });
-  if (result.status !== 0) {
-    return { commits: [], issue: { code: 'GIT_LOG_FAILED', detail: firstStderrLine(result.stderr, result.status) } };
+export async function probeCommitsSince(root: string, since: string): Promise<SyncCommitProbe> {
+  const result = await runSyncGitProcess({ cwd: root, args: ['log', '--oneline', `--since=${since}`] });
+  if (!result.ok) {
+    return { commits: [], issue: { code: 'GIT_LOG_FAILED', detail: result.detail } };
   }
   return { commits: result.stdout.trim().split('\n').filter(line => line.length > 0), issue: null };
 }
@@ -216,18 +198,10 @@ export function probeCommitsSince(root: string, since: string): SyncCommitProbe 
  * Kept for existing consumers of this export — it cannot tell a failed log
  * from zero commits, so NEW callers use `probeCommitsSince` / `collectGitChanges`.
  */
-export function getCommitsSince(root: string, since: string): string[] {
-  return probeCommitsSince(root, since).commits;
+export async function getCommitsSince(root: string, since: string): Promise<string[]> {
+  return (await probeCommitsSince(root, since)).commits;
 }
 
-/**
- * First line of a git stderr blob, or a status-code fallback when stderr is
- * empty (e.g. the process was killed, or wrote nothing before failing).
- */
-function firstStderrLine(stderr: string | null | undefined, status: number | null): string {
-  const line = (stderr ?? '').split('\n').find(l => l.trim().length > 0);
-  return line ? line.trim() : `exit ${status ?? 'unknown'}`;
-}
 
 /**
  * Get changed files for the last N commits and report HOW the comparison
@@ -239,14 +213,16 @@ function firstStderrLine(stderr: string | null | undefined, status: number | nul
  *   against the empty tree (nothing to modify, delete or rename from), but
  *   derived from the repository itself instead of a fixed empty-tree object
  *   id — so it holds for SHA-256 repositories, where the SHA-1 id does not exist.
- * - any git failure → 'unavailable' with a typed issue; lists empty.
+ * - any git failure (non-zero exit, timeout, output overflow, signal, spawn
+ *   error) → 'unavailable' with a typed issue whose detail names the failure
+ *   kind; lists empty. A truncated listing is never parsed as a success.
  *
  * `commitCount` is the number of commits a SUCCESSFUL `probeCommitsSince`
  * returned (see `collectGitChanges`) — a non-negative safe integer. Any other
- * value is a caller bug and throws (`RangeError`) rather than returning an
- * authoritative-looking empty result.
+ * value is a caller bug: the returned promise REJECTS with a `RangeError`
+ * before any Git process is started, never an authoritative-looking empty result.
  */
-export function getChangedFiles(root: string, commitCount: number): Pick<SyncResult, 'modified' | 'added' | 'deleted' | 'renamed' | 'detection'> {
+export async function getChangedFiles(root: string, commitCount: number): Promise<Pick<SyncResult, 'modified' | 'added' | 'deleted' | 'renamed' | 'detection'>> {
   if (!Number.isSafeInteger(commitCount) || commitCount < 0) {
     throw new RangeError(`getChangedFiles: commitCount must be a non-negative safe integer, got ${String(commitCount)}`);
   }
@@ -260,14 +236,9 @@ export function getChangedFiles(root: string, commitCount: number): Pick<SyncRes
     return { modified, added, deleted, renamed, detection: { mode: 'range', issue: null } };
   }
 
-  const revListResult = spawnSync('git', ['rev-list', '--count', 'HEAD'], {
-    cwd: root,
-    encoding: 'utf-8',
-    timeout: 10000,
-  });
-
-  const historyDepth = revListResult.status === 0 ? parseInt(revListResult.stdout.trim(), 10) : NaN;
-  if (revListResult.status !== 0 || !Number.isFinite(historyDepth)) {
+  const revListResult = await runSyncGitProcess({ cwd: root, args: ['rev-list', '--count', 'HEAD'] });
+  const historyDepth = revListResult.ok ? parseInt(revListResult.stdout.trim(), 10) : NaN;
+  if (!revListResult.ok || !Number.isFinite(historyDepth)) {
     return {
       modified,
       added,
@@ -275,7 +246,10 @@ export function getChangedFiles(root: string, commitCount: number): Pick<SyncRes
       renamed,
       detection: {
         mode: 'unavailable',
-        issue: { code: 'GIT_REV_LIST_FAILED', detail: firstStderrLine(revListResult.stderr, revListResult.status) },
+        issue: {
+          code: 'GIT_REV_LIST_FAILED',
+          detail: revListResult.ok ? `unparseable: git rev-list returned "${revListResult.stdout.trim()}"` : revListResult.detail,
+        },
       },
     };
   }
@@ -283,36 +257,28 @@ export function getChangedFiles(root: string, commitCount: number): Pick<SyncRes
   const attemptedMode: SyncChangeDetectionMode = commitCount >= historyDepth ? 'root-fallback' : 'range';
 
   if (attemptedMode === 'root-fallback') {
-    const lsTreeResult = spawnSync('git', ['ls-tree', '-r', '--name-only', 'HEAD'], {
-      cwd: root,
-      encoding: 'utf-8',
-      timeout: 10000,
-    });
-    if (lsTreeResult.status !== 0) {
+    // `-z`: NUL-separated raw paths — Git's default C-style quoting of paths
+    // with spaces/Unicode/special bytes (core.quotePath) never reaches the list.
+    const lsTreeResult = await runSyncGitProcess({ cwd: root, args: ['ls-tree', '-r', '--name-only', '-z', 'HEAD'] });
+    if (!lsTreeResult.ok) {
       return {
         modified,
         added,
         deleted,
         renamed,
-        detection: {
-          mode: 'unavailable',
-          issue: { code: 'GIT_LS_TREE_FAILED', detail: firstStderrLine(lsTreeResult.stderr, lsTreeResult.status) },
-        },
+        detection: { mode: 'unavailable', issue: { code: 'GIT_LS_TREE_FAILED', detail: lsTreeResult.detail } },
       };
     }
-    for (const line of lsTreeResult.stdout.split('\n')) {
-      if (line.length > 0) added.push(line);
+    for (const entry of lsTreeResult.stdout.split('\0')) {
+      if (entry.length > 0) added.push(entry);
     }
     return { modified, added, deleted, renamed, detection: { mode: 'root-fallback', issue: null } };
   }
 
-  const diffResult = spawnSync('git', ['diff', '--name-status', '-M', `HEAD~${commitCount}`, 'HEAD'], {
-    cwd: root,
-    encoding: 'utf-8',
-    timeout: 10000,
-  });
-
-  if (diffResult.status !== 0) {
+  // `-z`: NUL-separated `<status>\0<path>[\0<new path>]` records — exact paths
+  // (spaces, Unicode, tabs) instead of Git's quoted display form.
+  const diffResult = await runSyncGitProcess({ cwd: root, args: ['diff', '--name-status', '-M', '-z', `HEAD~${commitCount}`, 'HEAD'] });
+  if (!diffResult.ok) {
     return {
       modified,
       added,
@@ -322,17 +288,28 @@ export function getChangedFiles(root: string, commitCount: number): Pick<SyncRes
         // The file lists below are empty and not trustworthy — the mode the
         // caller was attempting is irrelevant once the diff itself failed.
         mode: 'unavailable',
-        issue: { code: 'GIT_DIFF_FAILED', detail: firstStderrLine(diffResult.stderr, diffResult.status) },
+        issue: { code: 'GIT_DIFF_FAILED', detail: diffResult.detail },
       },
     };
   }
 
-  const lines = diffResult.stdout.trim().split('\n').filter(l => l.length > 0);
-  for (const line of lines) {
-    const parts = line.split('\t');
-    const status = parts[0]?.charAt(0);
-    const filePath = parts[1] ?? '';
-
+  const tokens = diffResult.stdout.split('\0');
+  for (let i = 0; i < tokens.length; i += 1) {
+    const statusToken = tokens[i] ?? '';
+    if (statusToken.length === 0) continue;
+    const status = statusToken.charAt(0);
+    // Rename/copy records carry TWO paths (old, new); every other record one.
+    if (status === 'R' || status === 'C') {
+      const oldPath = tokens[i + 1] ?? '';
+      const newPath = tokens[i + 2] ?? '';
+      i += 2;
+      if (status === 'R') renamed.push(newPath || oldPath);
+      else if (newPath) added.push(newPath);
+      continue;
+    }
+    const filePath = tokens[i + 1] ?? '';
+    i += 1;
+    if (!filePath) continue;
     switch (status) {
       case 'A':
         added.push(filePath);
@@ -340,12 +317,9 @@ export function getChangedFiles(root: string, commitCount: number): Pick<SyncRes
       case 'D':
         deleted.push(filePath);
         break;
-      case 'R':
-        renamed.push(parts[2] ?? filePath);
-        break;
       case 'M':
       default:
-        if (filePath) modified.push(filePath);
+        modified.push(filePath);
         break;
     }
   }
@@ -358,10 +332,11 @@ export function getChangedFiles(root: string, commitCount: number): Pick<SyncRes
  * changed-file lists, as ONE typed record. A failed `git log` short-circuits
  * to `commits: 0` + `detection: unavailable / GIT_LOG_FAILED` — it never
  * reaches `getChangedFiles`, so a failure can never masquerade as the
- * successful-zero early return there (7104).
+ * successful-zero early return there (7104). Every Git call is awaited in
+ * sequence — one controlled chain, no parallel Git processes.
  */
-export function collectGitChanges(root: string, since: string): Omit<SyncResult, 'sprintId'> {
-  const probe = probeCommitsSince(root, since);
+export async function collectGitChanges(root: string, since: string): Promise<Omit<SyncResult, 'sprintId'>> {
+  const probe = await probeCommitsSince(root, since);
   if (probe.issue) {
     return {
       commits: 0,
@@ -372,7 +347,7 @@ export function collectGitChanges(root: string, since: string): Omit<SyncResult,
       detection: { mode: 'unavailable', issue: probe.issue },
     };
   }
-  return { commits: probe.commits.length, ...getChangedFiles(root, probe.commits.length) };
+  return { commits: probe.commits.length, ...(await getChangedFiles(root, probe.commits.length)) };
 }
 
 /**
@@ -544,21 +519,21 @@ export function formatSyncOutput(syncResult: SyncResult, lang: string = getLangu
 
 /**
  * Run the full sync: detect out-of-band changes since last sprint.
- * Returns SyncResult or null if sync cannot be performed.
+ * Resolves to SyncResult or null if sync cannot be performed.
  */
-export function runSync(root: string): SyncResult | null {
-  if (!isGitRepo(root)) {
+export async function runSync(root: string): Promise<SyncResult | null> {
+  if (!(await isGitRepo(root))) {
     return null; // caller handles warning
   }
 
-  const lastSprint = getLastSprintTimestamp(root);
+  const lastSprint = await getLastSprintTimestamp(root);
   if (!lastSprint) {
     return null; // caller handles info message
   }
 
   return {
     sprintId: lastSprint.sprintId,
-    ...collectGitChanges(root, lastSprint.timestamp),
+    ...(await collectGitChanges(root, lastSprint.timestamp)),
   };
 }
 
@@ -943,7 +918,7 @@ export function registerSync(program: Command): void {
     .option('--adapters-only', cliContractMessage('cliContract.sync.opt.adapters_only', helpLang))
     .option('--dry-run', cliContractMessage('cliContract.sync.opt.dry_run', helpLang))
     .option('--json', cliContractMessage('cliContract.sync.opt.json', helpLang))
-    .action((opts: { gitOnly?: boolean; adaptersOnly?: boolean; dryRun?: boolean; json?: boolean }) => {
+    .action(async (opts: { gitOnly?: boolean; adaptersOnly?: boolean; dryRun?: boolean; json?: boolean }) => {
       const root = resolveProjectRoot();
       const lang = getLanguage();
 
@@ -1156,7 +1131,7 @@ export function registerSync(program: Command): void {
 
       // --- Git-based change detection ---
       if (!opts.adaptersOnly) {
-        if (!isGitRepo(root)) {
+        if (!(await isGitRepo(root))) {
           const notGitRepoMsg = getMessage('sync.not_git_repo', lang);
           warnings.push(notGitRepoMsg);
           if (opts.json) {
@@ -1169,7 +1144,7 @@ export function registerSync(program: Command): void {
           return;
         }
 
-        const lastSprint = getLastSprintTimestamp(root);
+        const lastSprint = await getLastSprintTimestamp(root);
         if (!lastSprint) {
           // C) Explicit warning when no previous sprint exists
           const noSprintMsg = getMessage('sync.no_previous_sprint', lang);
@@ -1186,7 +1161,7 @@ export function registerSync(program: Command): void {
 
         const syncResult: SyncResult = {
           sprintId: lastSprint.sprintId,
-          ...collectGitChanges(root, lastSprint.timestamp),
+          ...(await collectGitChanges(root, lastSprint.timestamp)),
         };
 
         output.gitChanges = syncResult;

@@ -19,6 +19,22 @@ vi.mock('node:fs', async (importOriginal) => ({
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
+  // 7104 SYNC-ASYNC-GIT-CLOSURE: the sync-git-process adapter's default
+  // spawnImpl is node:child_process's `spawn` — without an export here the
+  // adapter throws "No 'spawn' export is defined on the 'node:child_process'
+  // mock" the instant isGitRepo/getLastSprintTimestamp run. The adapter
+  // itself is separately mocked below, so this export is never actually
+  // invoked; it exists only so the module shape resolves.
+  spawn: vi.fn(),
+}));
+
+// 7104 SYNC-ASYNC-GIT-CLOSURE: sync.ts's Git chain now goes exclusively
+// through this adapter (no more node:child_process spawnSync calls) — mock
+// it the same way tests/cli/commands/sync.test.ts does, keeping every other
+// export (e.g. SYNC_GIT_PROBE_TIMEOUT_MS) real via importOriginal.
+vi.mock('../../src/cli/helpers/sync-git-process.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../src/cli/helpers/sync-git-process.js')>(),
+  runSyncGitProcess: vi.fn(),
 }));
 
 vi.mock('node:readline/promises', () => ({
@@ -34,6 +50,29 @@ vi.mock('../../src/core/utils.js', () => ({
 }));
 
 import { ensureDeckentImport } from '../../src/core/utils.js';
+import { runSyncGitProcess } from '../../src/cli/helpers/sync-git-process.js';
+import type { SyncGitProcessResult, SyncGitFailureKind } from '../../src/cli/helpers/sync-git-process.js';
+
+function ok(stdout: string): SyncGitProcessResult {
+  return { ok: true, stdout, stderr: '', stderrBytesDropped: 0, exitCode: 0, durationMs: 1, pid: 1 };
+}
+
+function fail(kind: SyncGitFailureKind, detail: string, exitCode: number | null = 1): SyncGitProcessResult {
+  return {
+    ok: false,
+    kind,
+    detail,
+    exitCode,
+    signal: null,
+    stdoutBytes: 0,
+    stdoutTruncated: false,
+    childExited: true,
+    streamsClosed: true,
+    treeTerminated: null,
+    durationMs: 1,
+    pid: 1,
+  };
+}
 
 describe('CLI: deckent sync', () => {
   let program: Command;
@@ -61,8 +100,9 @@ describe('CLI: deckent sync', () => {
   it('calls ensureDeckentImport for CLAUDE.md and AGENTS.md when DECKENT.md exists', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([]);
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0, stdout: 'true\n', stderr: '', pid: 1, output: [], signal: null,
+    vi.mocked(runSyncGitProcess).mockImplementation(async (options) => {
+      if (options.args[0] === 'rev-parse') return ok('true\n');
+      return fail('nonzero_exit', 'nonzero_exit: fatal: no sprints', 128);
     });
 
     await program.parseAsync(['node', 'deckent', 'sync']);
@@ -74,8 +114,9 @@ describe('CLI: deckent sync', () => {
   it('does not set error exitCode when DECKENT.md exists', async () => {
     vi.mocked(existsSync).mockReturnValue(true);
     vi.mocked(readdirSync).mockReturnValue([]);
-    vi.mocked(spawnSync).mockReturnValue({
-      status: 0, stdout: 'true\n', stderr: '', pid: 1, output: [], signal: null,
+    vi.mocked(runSyncGitProcess).mockImplementation(async (options) => {
+      if (options.args[0] === 'rev-parse') return ok('true\n');
+      return fail('nonzero_exit', 'nonzero_exit: fatal: no sprints', 128);
     });
 
     await program.parseAsync(['node', 'deckent', 'sync']);
