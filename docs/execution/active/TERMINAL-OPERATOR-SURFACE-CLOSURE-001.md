@@ -3207,6 +3207,256 @@ Git otomatik bakımında unreachable-loose-object/gc.log uyarısı verdi; prune 
 gc.log silme yapılmadı (ilgili olmayan bakım bulgusu). Formal XVerify/settlement/
 Windows-native/macOS/SSH/whole-L3/7099 closure iddiası yok. MASTER VERIFY korunur.
 
+### L6 native Terminal ASCII — bounded continuation, 2026-09-08T03:17Z
+
+Existing7099 owner-approved manual recovery. L5 actual result8b63dd83af327
+provides new direct evidence: environment ASCII1, owned UI Unicode still emitted.
+Exact root/worker trace: run.tsx terminalAscii feeds picker/overflow only;
+TurnView/status/input/cards/Markdown chrome lacks that consumer wiring.
+Candidate /tmp/deckent-7099-ascii-yXvJA6/candidate detached8920219fc;
+exact13source/7test scope, negative scope, DAG, resource/finite correction bounds
+and actual proof contract: /tmp/deckent-7099-ascii-yXvJA6/plan.md.
+Root supplement1 adds only run-flow-inbox.ts and tool-read-view.ts after exact
+producer inspection: both compose owned separators with raw values, so downstream
+output replacement would corrupt payloads. Scope now15source/7test; plan digest
+b2e2babc7493aa73174cb146bea9ff698d765aa3abd2616b87d1a788bff2547f;
+preimages-supplement1.json SHA7c31fdb304231831a1032a659ae51aa7afbf903e230ad7350c805411bda45d43.
+No new product outcome or authority semantics; source-only dependency completion.
+Supplements2/3 complete the same preview chain: cursor-model.ts plus
+picker-specs.ts and exact picker-closure.test.tsx caller regression. Root inspected
+owned ellipsis producers before admission; shared grapheme/display-cell budgeting
+must retain raw input/config values. Current scope17source/8test, plan SHA
+7fa31e99adf81a65228f614dd441b5f17b95e8b4a9e1976b478f29bd73092c69.
+Preimages-supplement2 SHAa67c705a18362c16ad15c782a2843a6a2a330cb16573e26b6382d11056ccc38a;
+supplement3 SHAc67498139b4a02f41356273557f4c0e2230253afc9691db6798e3aeb2b493137.
+All three supplemental source preimages equal candidate base and main before edits.
+Supplement4 adds only f11-016-stab.test.tsx queue regression: preview budget now
+includes the selected marker and counts display cells/graphemes, not codepoints.
+Raw/stored input remains complete. Main/base test SHA5f73f21950ff65698f410e1252d4527b641fd6702c2ece7addb2125fa9fae70e;
+preimage manifest SHA0c10ea575808ff5a3c0aec108ccf8988debc39b6178ac2e00ba996d9d1ba73c8.
+Current17source/9test plan SHA25c1039033d9f16cccd9ccd31f87f20e7395ed6b4c07c9d9adf35cd0e9faccc4.
+approval_truth_a sole candidate writer; root owns main. memory_landing_map only
+prepares independent private proof helper, no runtime execution. Existing same
+capability resolver + closed glyph mapping/context; no global transliteration,
+no Turkish/user/provider/identifier data rewriting, no new mode/theme authority.
+NativePermissionIntentCard lives in scoped approval-card.tsx. KRAKEN splash is
+not on native REPL entry; fixed brand/ADR-G-010 remains unchanged and separate
+CLI splash cannot be claimed closed. Prior debug lifecycle HOLD preserved.
+Main inherited run.tsx7lines/messages73/-10 protected; no source fan-in yet.
+Tests/actual ASCII+Unicode/EN+TR/resize/content-preservation evidence pending.
+Helper V4 PREPARED_UNRUN: SHA38feac9903feef92306a989c757d52b04460d89881459646924804bf83d01ef7;
+contract SHA5d54d841b6334778de47310651f06426d63ea68295c596930433f65d42a35042.
+Root read full V3 and V4 diff: wait uses rendered data carriers, not raw Markdown;
+checks scoped authored decoration separately from preserved Unicode payload.
+Node syntax checks passed only. Earlier V1–V3 remain UNRUN, not failed CLI runs.
+Root prepared finite private OS-container runner and pre/post-build source pins;
+no execution or product capability inferred from helper preparation.
+No build/restart/sprint/paid provider/MASTER mutation or whole7099 closure here.
+
+#### L6 frozen candidate and actual CLI HOLD — 2026-09-08T04:01Z
+
+Worker-result /tmp/deckent-7099-ascii-yXvJA6/worker-result.json SHA
+a004d0a3c68aa25ec5a327a6918678912e0e25fceb60476402cfde1c9fd55eaf.
+Exact17source/9test, no drift. Initial Vitest83/85 retained (code-frame cell
+padding and wrong test import); corrected85/85 SHA9912d4ea8b0d80f022643f3e77419c2d04d18e8ec67581ac80c2ff619f22c485.
+Missing TerminalGlyphs type import then tscPASS; root96445 exit0 too.
+Two worker corrections consumed; source frozen, no blind third correction.
+Root fresh candidate canonical clean ALLOW→npm build72397 exit0. Native build,
+tsc and123asset copies completed; source/compiled freeze41/42pins SHA
+751ee46dd2dc4c446c2ec2c97825e9a9d16750812f218d46906cab9cc4175ee0.
+Main source/dist/bot/index/MASTER unchanged; this is candidate build only.
+
+First proof launch deckent-proof-l6-cli-derybk never started: Docker local log
+compression rejects max-file1. Exact invocation retained; runner2 changed only
+max-file2 (bounded4MB log storage). No product source change or prior PASS claim.
+Actual deckent-proof-l6-cli-fnfmzj ran03:58:07.366Z–03:58:34.918Z, exit1/noOOM,
+networknone/read-only/nonroot. Result SHA97c59c178873452ed0e40cf07e675581bca5c85b779b4f4283e0387ad101940f
+is FAILED en-ascii:timeout:busy. Helper demands thinking; actual transcript
+SHA7b41f950eaa291dccc703d606504aace19c6a32f62b361441006dab3abd1d75f
+shows generating then completed synthetic provider Markdown/Unicode turn.
+ASCII frames and preserved TR/CJK/emoji were observed, not whole-proof PASS.
+Compact/context/picker and remaining3cases were never executed; unchanged failure
+is not retried or retroactively rewritten green.
+
+BLOCKS_CURRENT_DONE: run.tsx wireBgTurnsProducer→buildBgTurnEvent and
+buildApprovalDemoCopy still produce owned Unicode (worker finding); real boot
+preamble adds entry.ts emitHealth→health-snapshot.ts renderHealthSnapshot's ·.
+All remain inside intended full native ASCII outcome; no exclusion to fake closure.
+Root984 SHA8b663580e6e507666788e564ee642e18ea96342b43eb313540f024846bcf107b
+requests one consolidated Fable review of NEW actual evidence and next bounded
+three-producer closure continuation; helper phase predicate is separate proof work.
+
+Durable archive /home/alperen/deckent-recovery-20260904/terminal-7099-l6-ascii-held-123Z8i:
+122payload/123checksums verified; manifest SHAbe4ce4da3b0504a3dd5a217f8367f154fe48c06d1a65d2f9126787f1b0058e40,
+SUMS SHAe97d67150d785378b4fb1d375ccd1ccced432027e0891bec8629714249e37a2e.
+Contains frozen source/compiled/test/helper/invocation/terminal artifacts, not raw
+DB/config/auth trees. No main landing, paid-provider, XVerify receipt, platform or
+whole7099 closure; capability stays HOLD/kanıtlanamadı.
+
+#### L6 three-producer continuation — root bounded admission
+
+New actual preamble evidence and exact producer trace admit a distinct finite
+continuation under existing owner-approved7099/manual authority; previous worker
+HOLD/counter and failed proof remain immutable in archive, not renewed to green.
+Plan /tmp/deckent-7099-ascii-yXvJA6/continuation-v2.md SHA
+290e7faa10641d4b5a448e2c870ad734d83730576fb7b52405d97e8faf8e8c53;
+preimages SHA88bb544972f1e8269bf056ecaf8cbdb9e9928f3aad741fe315ae2db2bc8dae4f.
+Exact3source run.tsx/entry.ts/health-snapshot.ts plus bg-turns-producer,
+renderer-i18n, health-snapshot and health-snapshot-live-provider tests.
+Same resolved glyph instance travels through optional onBootSelection callback
+argument; no duplicate environment authority, changed boot ordering or raw data
+rewriting. approval_truth_a sole candidate writer: one pass+max1changed-evidence
+correction, then terminalHOLD if unresolved. Proof lane only V5 phase-predicate
+fix; root alone runs finite fresh-build/actual proof and protects main. No new
+MASTER identity, product permission, mode or provider authority is introduced.
+
+#### L6 continuation V5 — actual evidence and pre-landing review HOLD
+
+Continuation result510626430f94: targeted159/159, tsc90344 exit0. Candidate build
+24146 emitted BUILD_ASSETS_COMPLETED123; handle subsequently terminal/missing.
+V5 freeze8ab2429c332615d0afe1b2a544fd899368c41c5741b64aa9843d3b6c258823e4
+binds42source/43compiled with pre/post-build source equality. No main build.
+Actual container deckent-proof-l6-cli-kueto8 exited1/noOOM; each of four child
+CLI cases exited0, user/provider Unicode preserved, ASCII owned decorations0,
+context reports14input/9output/reports2/epoch2, child custody true; pins unchanged.
+Whole helper result remains FAILED SHA8b52bb4a58401bf6694342fd1012f66a208f822c42fb58eab508bd545c25f954:
+expected2 template/tokenize calls, actual3. Source session.ts measureContext before
+turn adds empty-transcript measurement; admission and explicit checkpoint each
+measure separately. V5 resize wait accepted ready before the new-width frame.
+Neither observation is rewritten green or claimed full resize proof.
+
+Durable archive /home/alperen/deckent-recovery-20260904/terminal-7099-l6-v5-held-kec4h6:
+135payload/136checksums verified, manifest01e232db50040ff3c1b0e49f9384aaa2858df956951dea65266fd9b509f7379e,
+SUMS2734979f0213e89ae3b3adccdf1102a53aa40fcf17bb1141cbbd5ade3b773393.
+Contains exact frozen source/compiled/tests plus helper, preimages, results,
+invocation, transcripts and child observations; no raw DB/config/auth tree.
+Proof lane V6 remains PREPARED_UNRUN: single changed-helper correction must prove
+exact measurement-purpose/order and actual40→100 border widths, not merely ready.
+
+Root pre-landing source review found another BLOCKS_CURRENT_DONE regression:
+new localizeNativeError/buildReplErrorDescriber and formerly getMessage(vars)
+calls use chained replacement strings instead of canonical single-pass callback.
+Replacement metacharacters and nested placeholder-shaped raw values can change.
+This is a different source fingerprint, not the prior test-regex failure. No main
+landing is allowed with that known raw-data violation; exact scoped integration
+correction and regression proof are required before the final build/CLI check.
+Prior worker correction counters and failed artifacts remain terminal and intact.
+
+#### L6 candidate LOCAL_VERIFIED — 2026-09-08T04:41Z
+
+Root exact two-path integration correction reused the private one-pass catalog
+formatter; six newly unsafe raw replacement callsites restored. Result908baaa36b8c,
+13-suite168/168 SHAe64c48a81c0b; tsc23469 exit0. Source run37185e157653,
+renderer testfd72fc29f41d. Earlier failures/counters remain archived, not rewritten.
+Fanin-map-v2 SHA4e45848bff43 is machine-derived:19source/13test,32 target paths,
+main preimage drift0, protected mismatch0; inherited main run7 label lines retained.
+
+Root build39476 exit0, durable build-v6-result.json; prebuild freeze8ae14aae0651.
+Compiled freeze19fe6db72e9e binds42source/43compiled; source unchanged in build.
+V6 helper e4fec1648bbf / contractf13bc79805f6 was reviewed before execution:
+decorations derived from glyph table plus renderer frames/Braille; raw carriers
+preserved separately. Exact40→100 border widths, busy generating|thinking,
+three chronologically ordered and prompt-bound measurement pairs, two chat calls.
+This distinguishes pre-turn empty-transcript probe, admitted turn and checkpoint.
+
+Actual /tmp/deckent-7099-l6-cli-candidate-Mcagwe/deckent-7099-l6-ascii-4y2whq/result.json
+SHA201e133af5971f4c9fda242b9c964ce8242396600938d79cac17a7a22048cae3:
+4/4 EN/TR×ASCII/Unicode PASS;85pins unchanged. ASCII own decorations0, meaningful
+user/provider Unicode preserved, context14input/9output/reports2/epoch2;
+compact, resize, resume picker/Esc and exit observed. All child custody checks pass.
+Container mcagwe04:38:50.804Z–04:38:57.768Z, exit0/noOOM, nonroot/networknone/
+read-only/2GB/2CPU/pids128. Only private proof output writable; main runtime/auth
+not mounted. This is synthetic HTTP provider/Linux PTY, not paid-provider evidence.
+
+Durable /home/alperen/deckent-recovery-20260904/terminal-7099-l6-cli-aFFmya:
+144payload/145checksums verified; manifest732eb5cfdbe31ffdf4d3a510d77b755905dd27e5626843195e8edd2f4bba690e,
+SUMS1c2a902a342ce7e11fdd7f515673c59170b9f690dedaeebe13ece2396c26e62b.
+Exact source/compiled/test/build/helper/actual/985 review allowlist; raw DB/config/
+auth excluded. Fable985 digest16d59a6f8ac4 consumed and archived. Root986 corrects
+stale claims: V4 already listed ·/⋯/⎿, and run→onBootSelection→emitHealth already
+passes one resolved glyph instance; no duplicate environment resolver was added.
+Root987 SHAb57513e00df9 requests one final scoped review of new candidate proof.
+Main source/dist/bot/index unchanged, no main landing/build/restart/commit/push.
+Main verification and independent review pending; whole7099 remains VERIFY.
+
+Root prepared exact32path fan-in patch in candidate parent (not applied):
+fanin-candidate-v1.patch SHA07e9bb5dccc8cee4ee35eca9af4f652400961ee9d161201e6095abb8688272ad,
+865insertions/236deletions; `git apply --check` against current main PASS. All32
+candidate/main preimage hashes rechecked, index stays empty. Patch excludes
+messages/MASTER/generated/inherited unrelated work; existing seven main footer
+labels survive the contextual application. No source landing implied by dry-run.
+
+Root continued the implementation/integration phase while foreign review987 is
+pending; no independent GO or commit was inferred. Candidate remains immutable.
+Exact32path patch applied to main with apply_patch; reverse-check PASS, empty index.
+The first apply_patch format conversion was rejected atomically on an empty hunk
+separator; removing that non-diff separator allowed the same reviewed source delta.
+No product code or proof expectation changed to accommodate the tooling error.
+main-fanin-check-v1.json proves all32 candidate-owned byte streams (run.tsx after
+removing the exact preserved7line footer block) and5protected current-main hashes.
+Main13-file168/168 tests35459 PASS; report7543e744266c29f12e5681e4cb356dcd36349ec337feddd958a80fd6bbba42c8.
+Main source is now integrated but not committed/production-verified; fresh build,
+canonical bot lifecycle and main CLI proof remain required. No MASTER mutation.
+
+#### L6 main LOCAL_VERIFIED — 2026-09-08T05:00Z
+
+Main tsc56405 exit0 after168/168 tests. Canonical `bot stop`10828 stopped
+3269967; old PID absent and fresh clean inspector ALLOW. Root `build:all`70339
+exit0, including native executable, TypeScript,123assets and Dashboard. Existing
+large-Vite-chunk advisory retained, not hidden or treated as scoped source FAIL.
+Prebuild source freeze1d072daeb5af and postbuild compiled freezeeaf3296151ce:
+42source/43compiled; source unchanged. Canonical `bot start`26387 yielded3466215;
+PID live and loaded entry/bot-module digests match disk. Runtime observation is
+main-runtime-v6.json. Initial read-only observer used incorrect prefixed SHA and
+build-manifest semantics; source bot-daemon.ts:317–328 shows raw hex entry and
+module digests. Observer2 corrected only that attribution, no bot retry/mutation.
+MCP adapter reconnect remains unproven, not inferred from bot freshness.
+
+Actual /tmp/deckent-7099-l6-cli-main-vxf379/deckent-7099-l6-ascii-cOdi24/result.json
+SHAe251ca6564ca696faa667031722735d0a263f7346f3f4838def3ae903ea93a93:
+4/4 EN/TR×ASCII/Unicode PASS,85pins unchanged. Raw meaningful data preserved,
+ASCII owned0, exact40→100 borders, typed ordered3measurement pairs/2chat,
+compact/context14input/9output/reports2/epoch2, picker/Esc/exit; child custody true.
+Container vxf37904:54:52.667Z–04:54:59.725Z, exit0/noOOM, same pinned nonroot/
+networknone/read-only limits; only private output writable, no main runtime/auth.
+
+Durable /home/alperen/deckent-recovery-20260904/terminal-7099-l6-main-cli-6tCQrk:
+153payload/154checksums verified; manifest135493ee141b09891205138edd89138c7615b2fc1f593754030d2dbef89e2d0c,
+SUMScae41dbdf021f8e913dc32726cfbe8258d76cd8fa58ace5fd8e9c3f83584d46c.
+Includes actual working-tree source (inherited changes explicitly retained),
+compiled snapshots, tests, build log/status, guarded bot observation and helpers.
+Raw DB/config/auth excluded; candidate and earlier failed archives unchanged.
+Main i18n structured gate:61REPL files,0hits; default human report omits this
+separate count. MASTER590rows/501active/232receipts/13classes in sync; Closure7
+events PASS. No ledger mutation, commit, push, paid-provider or whole7099 claim.
+Root988 SHAb1210a865c42 supplies main evidence to the same pending987 scoped
+foreign review. Independent verdict still needed before bounded source commit.
+
+#### L6 ASCII source landing and evidence seal — 2026-09-08T05:12Z
+
+Fable989 scoped GO, bodySHA
+1b94e2919cd9010d4ebb1bf2949f38c4df9dacaa0c3941d53feaf71fdf4a6b6b:
+independently checked main/candidate actual4/4,168tests,85fresh pins, both archives,
+one glyph resolver, content-safe interpolation and exact32path commit boundary.
+Source commit383aae8afa0b8b45c7704c1ec9fe947220f3b79a contains19source/13test,
+865insertions/236deletions. Root staged candidate-owned blobs; run.tsx HEAD equals
+candidate37185e157653 while worktree keeps seven inherited footer-label lines.
+Other31paths HEAD==candidate==worktree. Commit changed no worktree source bytes;
+85main proof pins remain equal and outside-scope diffSHAe7f9b93b96f4 unchanged.
+Index empty. messages/MASTER/generated/context-slashes and other dirt preserved.
+
+Supporting seal /home/alperen/deckent-recovery-20260904/terminal-7099-l6-seal-qQJven:
+7payload/8checksums; manifest198a0b2a251b32c20b1fb488161fdcdea92050d52b1f0b15af7c2328c3b79c7d,
+SUMSb7392fabe7cf72ab4e8ad6164a7a6f4e8cd50d16aa0657a960d6e862aaa8af5f.
+Contains989 raw review, exact staging map/preflight/result and postlanding proof;
+links candidate archiveaFFmya and main archive6tCQrk above. Both prior archives'
+full SHA256SUMS revalidated. No canonical receipt, signing or MASTER classification.
+LOCAL_VERIFIED only for named native ASCII/Linux PTY slice; REMOTE_ADVISORY unrun.
+KRAKEN/non-native CLI splash, Windows-native/macOS/SSH, MCP freshness and debug
+privacy remain open; no paid-provider, billing, autonomous or whole7099 closure.
+Git repeated prior unreachable-loose-object/gc.log advisory; no prune/cleanup.
+Source commit did not build/restart/run/push or mutate retained runtime/Brain.
+
 ### L4/L5 supportive evidence seal — 2026-09-08T03:26Z
 
 Fable980 independent scoped GO, UTC03:24:49.914Z, bodySHA
