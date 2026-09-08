@@ -2,7 +2,10 @@ import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { shortCodeFor } from '../../../src/core/approval-short-code.js';
-import { registerApprovalsCommand } from '../../../src/cli/commands/approvals.js';
+import {
+  executeApprovalDecision,
+  registerApprovalsCommand,
+} from '../../../src/cli/commands/approvals.js';
 import { resolveLocalOsActorId } from '../../../src/core/principal.js';
 
 const state = vi.hoisted(() => ({
@@ -14,6 +17,7 @@ const state = vi.hoisted(() => ({
   sweepCalls: 0,
   decideCalls: 0,
   closeCalls: 0,
+  exerciseReauth: false,
 }));
 
 vi.mock('../../../src/core/config.js', () => ({
@@ -48,8 +52,16 @@ vi.mock('../../../src/core/approval-authority-runtime.js', () => ({
         getRequest: (id: string) => state.brokerRequest?.id === id ? state.brokerRequest : undefined,
         getDecision: () => state.brokerDecision,
       },
-      decideTerminal: async () => {
+      decideTerminal: async (authentication: {
+        provider: { reauthenticate: (context: { request: Record<string, unknown> }) => Promise<unknown> };
+      }) => {
         state.decideCalls += 1;
+        if (state.exerciseReauth) {
+          const assertion = await authentication.provider.reauthenticate({
+            request: state.brokerRequest ?? {},
+          });
+          if (assertion === null) return { kind: 'rejected', reason: 'DECISION_UNTRUSTED' };
+        }
         state.brokerDecision = { action: 'allow' };
         return { kind: 'rejected', reason: 'test-refusal' };
       },
@@ -63,7 +75,7 @@ vi.mock('../../../src/core/approval-inbox-federation.js', () => ({
 }));
 
 vi.mock('../../../src/orchestra/approval-decision-federation.js', () => ({
-  isDecisionFederatedOrigin: (origin: string) => origin === 'confirmation',
+  isDecisionFederatedOrigin: (origin: string) => origin === 'confirmation' || origin === 'checkpoint',
   mirrorFederatedItemToBroker: vi.fn(),
   settleFederatedDecision: vi.fn(),
 }));
@@ -119,10 +131,14 @@ beforeEach(() => {
   state.sweepCalls = 0;
   state.decideCalls = 0;
   state.closeCalls = 0;
+  state.exerciseReauth = false;
   process.exitCode = 0;
 });
 
-afterEach(() => { process.exitCode = 0; });
+afterEach(() => {
+  vi.restoreAllMocks();
+  process.exitCode = 0;
+});
 
 describe('approvals command registration', () => {
   it('uses the shared fail-closed OS actor projection required by terminal reauth', () => {
@@ -193,6 +209,70 @@ describe('approvals command registration', () => {
     expect(state.decideCalls).toBe(1);
     expect(state.stdout.join('\n')).toContain(privateSummary);
     expect(state.stderr.join('\n')).toContain('test-refusal');
+    expect(process.exitCode).toBe(1);
+  });
+
+  it.each([
+    ['broker-only same id', []],
+    ['wrong federated origin', [{
+      origin: 'confirmation',
+      id: foreignRequestId,
+      tenantId: 'tenant-a',
+      summary: privateSummary,
+      decideHintKey: 'approvals.federated.hint_confirmation',
+      sourceReference: 'confirmation:source',
+    }]],
+  ])('fails a checkpoint-constrained caller closed for %s before mutation', async (_label, federated) => {
+    state.brokerRequest = nativeRequest('tenant-a');
+    state.federated = federated;
+
+    await executeApprovalDecision(
+      foreignRequestId,
+      { allow: true },
+      { requiredFederatedOrigin: 'checkpoint' },
+    );
+
+    expect(state.sweepCalls).toBe(0);
+    expect(state.decideCalls).toBe(0);
+    expect(state.brokerDecision).toBeNull();
+    expect(state.stderr.join('\n')).toContain('required-federated-origin:checkpoint');
+    expect(state.closeCalls).toBe(1);
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('reuses terminal live-auth and refuses a checkpoint decision without a TTY', async () => {
+    state.brokerRequest = nativeRequest('tenant-a');
+    state.federated = [{
+      origin: 'checkpoint',
+      id: foreignRequestId,
+      tenantId: 'tenant-a',
+      summary: privateSummary,
+      decideHintKey: 'approvals.federated.hint_checkpoint',
+      sourceReference: 'checkpoint:s1:plan',
+    }];
+    state.exerciseReauth = true;
+    const stdinDescriptor = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
+    const stdoutDescriptor = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
+    Object.defineProperty(process.stdin, 'isTTY', { configurable: true, value: false });
+    Object.defineProperty(process.stdout, 'isTTY', { configurable: true, value: false });
+    try {
+      await executeApprovalDecision(
+        foreignRequestId,
+        { deny: true },
+        { requiredFederatedOrigin: 'checkpoint' },
+      );
+    } finally {
+      if (stdinDescriptor) Object.defineProperty(process.stdin, 'isTTY', stdinDescriptor);
+      else delete (process.stdin as NodeJS.ReadStream & { isTTY?: boolean }).isTTY;
+      if (stdoutDescriptor) Object.defineProperty(process.stdout, 'isTTY', stdoutDescriptor);
+      else delete (process.stdout as NodeJS.WriteStream & { isTTY?: boolean }).isTTY;
+    }
+
+    expect(state.sweepCalls).toBe(1);
+    expect(state.decideCalls).toBe(1);
+    expect(state.brokerDecision).toBeNull();
+    expect(state.stderr.join('\n')).toContain('DECISION_UNTRUSTED');
+    expect(state.closeCalls).toBe(1);
     expect(process.exitCode).toBe(1);
   });
 });
