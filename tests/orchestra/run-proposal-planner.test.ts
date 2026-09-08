@@ -28,6 +28,8 @@ import {
 } from '../../src/orchestra/run-proposal-compiler.js';
 import { callZeroConfigPlanner, buildZeroConfigPlanPrompt } from '../../src/orchestra/planner.js';
 import { DEFAULT_MODES } from '../../src/core/config.js';
+import { getEquivalentModel } from '../../src/core/model-equivalence.js';
+import { providerRegistry } from '../../src/core/provider.js';
 import type { RunProposal } from '../../src/core/run-flow-contract.js';
 import type { DeckentConfig, PlannerResult, PlannerTask } from '../../src/core/types.js';
 
@@ -252,6 +254,60 @@ describe('compileRunProposalIntent — production default is wired to the real p
 // the spy's recorded call, then let the same RunProposalPlanError surface.
 
 describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(config)', () => {
+  it('uses grouped Brain provider when no effective flat projection is supplied', async () => {
+    const proposal = makeProposal({ flowId: 'flow-brain-provider-parity' });
+    const spy = vi.mocked(callZeroConfigPlanner);
+    spy.mockClear();
+    const config: DeckentConfig = {
+      mode: 'balanced',
+      modes: DEFAULT_MODES,
+      providers: { brain: 'codex' },
+    };
+    const available = vi.spyOn(providerRegistry, 'hasProvider').mockReturnValue(true);
+
+    try {
+      await expect(compileRunProposalIntent(proposal, undefined, config)).rejects.toThrow(RunProposalPlanError);
+    } finally {
+      available.mockRestore();
+    }
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0]?.[1]).toBe(getEquivalentModel('claude-sonnet-5', 'codex'));
+    expect(spy.mock.calls[0]?.[7]).toMatchObject({
+      configuredProvider: 'codex',
+      requestedProvider: 'codex',
+      configuredModel: 'claude-sonnet-5',
+      requestedModel: 'claude-sonnet-5',
+    });
+  });
+
+  it('preserves an effective flat Brain provider over the retained grouped authoring value', async () => {
+    const proposal = makeProposal({ flowId: 'flow-brain-provider-env-override' });
+    const spy = vi.mocked(callZeroConfigPlanner);
+    spy.mockClear();
+    const config: DeckentConfig = {
+      mode: 'balanced',
+      modes: DEFAULT_MODES,
+      brain_provider: 'codex',
+      providers: { brain: 'claude' },
+    };
+    const available = vi.spyOn(providerRegistry, 'hasProvider').mockReturnValue(true);
+
+    try {
+      await expect(compileRunProposalIntent(proposal, undefined, config)).rejects.toThrow(RunProposalPlanError);
+    } finally {
+      available.mockRestore();
+    }
+
+    expect(spy.mock.calls[0]?.[1]).toBe(getEquivalentModel('claude-sonnet-5', 'codex'));
+    expect(spy.mock.calls[0]?.[7]).toMatchObject({
+      configuredProvider: 'codex',
+      requestedProvider: 'codex',
+      configuredModel: 'claude-sonnet-5',
+      requestedModel: 'claude-sonnet-5',
+    });
+  });
+
   it("passes the balanced-mode canonical 'claude-sonnet-5' when no config is given", async () => {
     const proposal = makeProposal({ flowId: 'flow-431-no-config' });
     const spy = vi.mocked(callZeroConfigPlanner);

@@ -37,6 +37,8 @@ import type { DeckentConfig, PlannerResult, PlannerTask } from '../core/types.js
 import { createGoNoGoCriterionItem } from '../core/task-types.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 import { readAuthMode, resolveBrainModel, resolveDefaultModel } from '../core/config.js';
+import { getEquivalentModel } from '../core/model-equivalence.js';
+import { providerRegistry } from '../core/provider.js';
 import { buildDirectives, type DirectiveBuildIntent, type DirectiveBuildTask } from './directives-builder.js';
 import { spawn } from 'node:child_process';
 import {
@@ -157,8 +159,15 @@ function readTrackedFileTree(timeoutMs = 10_000): Promise<string[]> {
 async function defaultRunProposalPlanner(proposal: RunProposal, config?: RunProposalPlannerConfig): Promise<PlannerResult> {
   const description = proposal.intentSummary.trim();
   const projectRoot = process.cwd();
-  const brainModel = resolveBrainModel(config);
-  const configuredProvider = config?.brain_provider ?? null;
+  const configuredBrainModel = resolveBrainModel(config);
+  // loadConfig projects the effective grouped provider onto brain_provider,
+  // then applies env overrides to that flat field. Raw planner-seam callers may
+  // still supply only the grouped authoring form, so it is a fallback — never
+  // allowed to override an already-resolved flat value.
+  const configuredProvider = config?.brain_provider ?? config?.providers?.brain ?? null;
+  const brainModel = configuredProvider && providerRegistry.hasProvider(configuredProvider)
+    ? getEquivalentModel(configuredBrainModel, configuredProvider)
+    : configuredBrainModel;
   const taskModelPolicy = createPlannerTaskModelPolicy(
     resolveDefaultModel(config),
     config?.worker_provider,
@@ -177,8 +186,8 @@ async function defaultRunProposalPlanner(proposal: RunProposal, config?: RunProp
       runId: `${proposal.flowId}:revision:${proposal.revision}`,
       configuredProvider,
       requestedProvider: configuredProvider,
-      configuredModel: brainModel,
-      requestedModel: brainModel,
+      configuredModel: configuredBrainModel,
+      requestedModel: configuredBrainModel,
       authMode: await readAuthMode(projectRoot),
     },
     taskModelPolicy,

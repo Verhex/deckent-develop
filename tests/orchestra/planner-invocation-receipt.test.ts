@@ -32,7 +32,7 @@ const validPlannerJSON = JSON.stringify({
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'receipt proof',
-    scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/receipt.ts'] },
+    scope: { directories: ['docs/'], filesRead: [], filesWrite: ['docs/receipt.md'] },
     dependencies: [],
     goNogo: { goCriteria: 'green', noGoCriteria: 'red', techDebtAcceptable: 'none' },
   }],
@@ -75,6 +75,24 @@ function adapter(): ProviderAdapter {
   };
 }
 
+function namedAdapter(name: string, model: ModelType, command: string): ProviderAdapter {
+  return {
+    name,
+    supportedModels: [model],
+    spawn: vi.fn(), kill: vi.fn(), listWorkers: vi.fn(() => []),
+    isAvailable: vi.fn(async () => true),
+    buildCommand: vi.fn(() => `${command} --model ${model}`),
+    buildPlannerCommand: vi.fn((_prompt, requestedModel) => ({
+      command,
+      args: ['--model', requestedModel],
+      calledProvider: name,
+      calledModel: requestedModel,
+      transport: 'cli',
+      executionBackend: 'host-subprocess',
+    })),
+  };
+}
+
 function receiptContext(
   root: string,
   store: InvocationReceiptLedger,
@@ -114,6 +132,84 @@ afterEach(() => {
 });
 
 describe('Brain planner InvocationReceipt boundary', () => {
+  it('refuses a model-owner mismatch under the exact requested provider', async () => {
+    const root = makeRoot();
+    const store = new InvocationReceiptStore(root);
+    const modelOwner = namedAdapter('claude', 'claude-sonnet-5', 'claude-planner');
+    const requested = namedAdapter('codex', 'gpt-5.5', 'codex-planner');
+    providerRegistry.registerProvider(modelOwner, true);
+    providerRegistry.registerProvider(requested);
+    const spawn: PlannerSpawnFn = vi.fn(async () => ({
+      status: 0, signal: null, stdout: validPlannerJSON, stderr: '',
+    }));
+    const context: PlannerReceiptContext = {
+      tenantId: 'tenant-a', projectRoot: root, runId: 'zero-provider-authority',
+      invocationId: 'inv-zero-provider-authority',
+      configuredProvider: 'codex', requestedProvider: 'codex',
+      configuredModel: 'claude-sonnet-5', requestedModel: 'claude-sonnet-5',
+      authMode: 'subscription', store,
+    };
+
+    const result = await callZeroConfigPlanner(
+      'plan with exact provider', 'claude-sonnet-5', 'receipt-project', [], undefined, 1_000, spawn, context,
+    );
+
+    expect(result).toBeNull();
+    expect(requested.buildPlannerCommand).toHaveBeenCalled();
+    expect(modelOwner.buildPlannerCommand).not.toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
+    const scope = { tenantId: 'tenant-a', projectId: store.projectId };
+    const view = store.get(scope, 'inv-zero-provider-authority');
+    expect(view).toBeNull();
+    store.close();
+  });
+
+  it('preserves explicit adapter precedence over receipt provider authority', async () => {
+    const explicit = namedAdapter('claude', 'claude-sonnet-5', 'explicit-planner');
+    providerRegistry.registerProvider(namedAdapter('codex', 'gpt-5.5', 'codex-planner'), true);
+    const spawn: PlannerSpawnFn = vi.fn(async () => ({
+      status: 0, signal: null, stdout: validPlannerJSON, stderr: '',
+    }));
+
+    const result = await callZeroConfigPlanner(
+      'plan explicitly', 'claude-sonnet-5', 'receipt-project', [], explicit, 1_000, spawn, {
+        tenantId: 'tenant-a', projectRoot: makeRoot(), runId: 'explicit-adapter',
+        requestedProvider: 'codex', requestedModel: 'claude-sonnet-5',
+      },
+    );
+
+    expect(result).not.toBeNull();
+    expect(spawn).toHaveBeenCalledWith('explicit-planner', expect.any(Array), expect.any(Object));
+  });
+
+  it('does not fall back to the registry default when the requested provider is absent', async () => {
+    providerRegistry.registerProvider(namedAdapter('claude', 'claude-sonnet-5', 'default-planner'), true);
+    const spawn: PlannerSpawnFn = vi.fn();
+
+    await expect(callZeroConfigPlanner(
+      'plan without provider', 'claude-sonnet-5', 'receipt-project', [], undefined, 1_000, spawn, {
+        tenantId: 'tenant-a', projectRoot: makeRoot(), runId: 'missing-provider',
+        requestedProvider: 'codex', requestedModel: 'claude-sonnet-5',
+      },
+    )).rejects.toThrow(/Provider not found: "codex"/);
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it('keeps model-owner resolution for legacy zero-config callers without receipt context', async () => {
+    providerRegistry.registerProvider(namedAdapter('codex', 'gpt-5.5', 'default-planner'), true);
+    providerRegistry.registerProvider(namedAdapter('claude', 'claude-sonnet-5', 'model-owner-planner'));
+    const spawn: PlannerSpawnFn = vi.fn(async () => ({
+      status: 0, signal: null, stdout: validPlannerJSON, stderr: '',
+    }));
+
+    const result = await callZeroConfigPlanner(
+      'legacy plan', 'claude-sonnet-5', 'receipt-project', [], undefined, 1_000, spawn,
+    );
+
+    expect(result).not.toBeNull();
+    expect(spawn).toHaveBeenCalledWith('model-owner-planner', expect.any(Array), expect.any(Object));
+  });
+
   it('persists zero-config planner calls and their schema retry as separate invocations', async () => {
     const root = makeRoot();
     const store = new InvocationReceiptStore(root);

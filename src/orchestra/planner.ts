@@ -1773,7 +1773,7 @@ export async function callZeroConfigPlanner(
     taskModelPolicy ?? createPlannerTaskModelPolicy(model),
   );
   const prompt = buildZeroConfigPlanPrompt(description, projectName, fileTree, modelPolicy);
-  const resolved = resolveAdapter(adapter, model);
+  const resolved = resolveAdapter(adapter, model, receiptContext?.requestedProvider);
   const timeoutMs = timeout ?? BRAIN_PLAN_TIMEOUT_MS;
   interface ZeroConfigAttempt {
     readonly outcome: PlannerSpawnOutcome;
