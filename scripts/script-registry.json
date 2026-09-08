@@ -29,6 +29,16 @@
  "derivedFrom": "task 517-006 — read scripts/*.mjs headers + package.json \"scripts\" block + intra-scripts/ import grep, 2026-08-11",
  "entries": [
   {
+   "file": "scripts/verify-cli-help-matrix.mjs",
+   "class": "recurring-proof",
+   "owner": "terminal-7099-cli-surface-truth",
+   "npmScript": null,
+   "input": "built dist CLI, generated CLI manifest and live public Commander inventory; isolated per-case environment",
+   "output": "raw EN/TR help captures and hash-bound PASS/FAIL/HOLD manifest; nonzero on failure or custody/pin uncertainty",
+   "expiry": "none — rerun on changed CLI contract or consumer inputs",
+   "notes": "Read-only help consumer proof, not command-action or whole-product closure. Preserves missing-contract HOLD and process-close evidence; no provider execution."
+  },
+  {
    "file": "scripts/589-prototip-daemon.mjs",
    "class": "one-shot",
    "owner": "nova-design-loop",
