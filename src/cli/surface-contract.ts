@@ -3,7 +3,7 @@
 export const DEPRECATED_FORWARDING_SURFACES = [
   ['dashboard', 'status --watch', 'cli.batch.deprecated.dashboard'],
   ['attach', 'watch', 'cli.batch.deprecated.attach'],
-  ['output', 'watch --logs', 'cli.batch.deprecated.output'],
+  ['output', 'watch output', 'cli.batch.deprecated.output'],
   ['plan-nl', 'do', 'cli.batch.deprecated.plan_nl'],
   ['archive-debt', 'status --debt', 'cli.batch.deprecated.archive_debt'],
   ['confirmations', 'approvals', 'cli.batch.deprecated.confirmations'],

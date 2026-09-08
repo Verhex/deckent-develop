@@ -66,7 +66,7 @@ import { interpolateConfig } from '../core/deck-interpolation.js';
 import { resolveChatReply } from './chat-handler.js';
 import { streamChatMessage, streamToSseLines, type ChatProviderAdapter } from './chat-stream.js';
 import { startLiveEventBridge, formatLiveEventFrame, type LiveEventBridge } from './live-events.js';
-import { matchWorkerLogStream, isValidTaskId, handleWorkerLogStream } from './worker-logs.js';
+import { matchWorkerLogStream, isValidTaskId } from './worker-logs.js';
 import { registerEvolutionRoutes } from './evolution-endpoint.js';
 import { registerMemorySearch } from './memory-search-endpoint.js';
 import { registerNervousRoutes } from './nervous-endpoint.js';
@@ -88,8 +88,10 @@ import { registerOidcCallbackRoute } from './oidc-callback-endpoint.js';
 import { registerApprovalHistoryRoute } from './approval-history-endpoint.js';
 import { registerLimitsRoute } from './limits-endpoint.js';
 import { registerEvaluateHealthRoute } from './evaluate-health-endpoint.js';
-import { handleOutputStream, isOutputStreamRequest } from './output-stream.js';
+import { isOutputStreamRequest } from './output-stream.js';
+import { handleTaskOutputStream } from './task-output-stream.js';
 import { createOutputCollector, type OutputCollector } from '../core/output-collector.js';
+import { attendedExecutionProjectId } from '../core/attended-execution-approval.js';
 import { reconcileStatusResponse } from './status-reconcile.js';
 import { ApprovalStore, type ApprovalStoreEntry, type ApprovalStoreCategory } from '../core/approval-store.js';
 import { ApprovalBroker } from '../core/approval-broker.js';
@@ -787,7 +789,7 @@ async function handleRequest(
   _apiToken?: string | null,
   rateLimiter?: SlidingWindowRateLimiter,
   authMiddleware?: (req: IncomingMessage, res: ServerResponse) => boolean,
-  outputCollector?: OutputCollector,
+  _outputCollector?: OutputCollector,
   serveIndexHtml?: (req: IncomingMessage, res: ServerResponse) => boolean,
   chatAdapter?: ChatProviderAdapter | null,
   terminalManager?: PtySessionManager,
@@ -1091,17 +1093,16 @@ async function handleRequest(
       return;
     }
 
-    // Worker output SSE (Sprint 230 T-230-008): live log fan-out for the
-    // dashboard. Mounted via isOutputStreamRequest so the route matches the
-    // exact /api/output-stream path and ignores unrelated GETs. The collector
-    // is created eagerly at server setup (Sprint 269 B-OutputStream); a null
-    // collector (constructor failure) gets an honest 503 instead of a crash.
+    // Exact output SSE: the legacy OutputCollector stays exported for its own
+    // compatibility consumers but is never selected for worker-output custody.
     if (isOutputStreamRequest(req)) {
-      if (!outputCollector) {
-        sendError(res, 503, 'output-stream collector unavailable');
-        return;
-      }
-      handleOutputStream(req, res, outputCollector);
+      await handleTaskOutputStream(req, res, {
+        projectRoot,
+        projectId: attendedExecutionProjectId(projectRoot),
+        principal: deriveRequestPrincipal(req),
+        allowedOrigin,
+        redactionLabel: getMessage('outputView.redaction_label', approvalLang),
+      });
       return;
     }
 
@@ -1171,7 +1172,14 @@ async function handleRequest(
           sendError(res, 403, 'Invalid task id');
           return;
         }
-        handleWorkerLogStream(req, res, projectRoot, taskId, allowedOrigin);
+        await handleTaskOutputStream(req, res, {
+          projectRoot,
+          projectId: attendedExecutionProjectId(projectRoot),
+          principal: deriveRequestPrincipal(req),
+          allowedOrigin,
+          redactionLabel: getMessage('outputView.redaction_label', approvalLang),
+          routeTaskId: taskId,
+        });
         return;
       }
     }

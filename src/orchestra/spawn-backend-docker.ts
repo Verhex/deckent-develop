@@ -9,7 +9,7 @@ import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync, openSyn
 import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep, win32 } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { homedir, tmpdir, totalmem } from 'node:os';
-import { types as nodeTypes } from 'node:util';
+import { TextDecoder, types as nodeTypes } from 'node:util';
 import type { ModelType } from '../core/types.js';
 import { canonicalJson } from '../core/audit-writer.js';
 import {
@@ -32,6 +32,21 @@ import {
 } from '../core/task-types.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { attendedExecutionProjectId } from '../core/attended-execution-approval.js';
+import { resolveCallerTenant } from '../core/principal.js';
+import type {
+  TaskOutputReadCapability,
+  TaskOutputReadIdentity,
+  TaskOutputReadQuery,
+  TaskOutputReadResult,
+  TaskOutputReadService,
+  TaskOutputLiveObserveInput,
+  TaskOutputLiveObserveResult,
+} from '../core/task-output-read-service.js';
+import {
+  streamTaskOutputLive,
+  type TaskOutputLiveTransportInput,
+  type TaskOutputLiveTransportResult,
+} from './task-output-live-transport.js';
 import { getProviderCommandSpec, buildProviderCommand, PROMPT_CAT_TOKEN, type ProviderCommandSpec } from '../core/provider-command-spec.js';
 import type {
   BoundedReachabilityProbeRequest,
@@ -100,12 +115,14 @@ import {
   type TaskAttemptCustodyEffectCommittedReleasePendingDispatchV2,
   type TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2,
   type TaskAttemptCustodyDispatchNotDispatchedAuthorityV2,
+  type TaskAttemptCustodyDispatchReleasedAuthorityV2,
   type TaskAttemptCustodyDispatchRecoveryAuthorityV2,
   type TaskAttemptCustodyDispatchObservationClass,
   type TaskAttemptCustodyDispatchPredecessorRefV2,
   type TaskAttemptCustodyIdentityV2,
   type TaskAttemptCustodyNotDispatchedReasonCode,
   type TaskAttemptCustodyPolicyV2,
+  type TaskAttemptCustodyHoldCode,
   type TaskAttemptCustodyRootProof,
 } from '../core/task-attempt-custody-store.js';
 import {
@@ -168,6 +185,7 @@ import {
 } from '../core/task-result-settlement.js';
 import { projectDockerRecoveryPreDispatchSettlement } from '../core/pre-dispatch-settlement.js';
 import { normalizeTaskResultShape } from '../core/task-result-schema.js';
+import { validateTaskId } from '../core/validators.js';
 import {
   taskResultV2Digest,
   validateProductionTaskResultV2,
@@ -1260,6 +1278,22 @@ interface PreparedExactDockerCustodyScope {
   launch: ExactDockerCustodyLaunchContext | null;
   mountTransferReceipt: TaskAttemptCustodyBackendMountTransferReceipt | null;
 }
+
+/** Read-side custody scope. It intentionally cannot carry attempt write access. */
+interface ExactDockerTaskOutputReadScope {
+  readonly store: TaskAttemptCustodyStore;
+  readonly policy: TaskAttemptCustodyPolicyV2;
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly admissionRef: TaskAttemptCustodyDispatchAdmissionRefV2;
+  readonly taskSnapshot: ExactDockerDispatchSnapshotV2;
+  readonly model: ModelType;
+  readonly provider: ProviderName;
+}
+
+type ExactDockerProviderExitReadScope = Pick<
+  PreparedExactDockerCustodyScope,
+  'store' | 'policy' | 'admissionRef'
+>;
 
 type ExactDockerDurableAdmissionV2 = Extract<
   ReturnType<TaskAttemptCustodyStore['readDispatchAdmission']>,
@@ -5366,6 +5400,56 @@ const EXACT_DOCKER_CUSTODY_LABELS = Object.freeze({
   workspaceResourceInstance: 'io.deckent.exact-custody.workspace-resource-instance',
   dependencyResourceInstance: 'io.deckent.exact-custody.dependency-resource-instance',
 } as const);
+
+const EXACT_DOCKER_TASK_OUTPUT_INSPECT_LABELS = Object.freeze([
+  EXACT_DOCKER_CUSTODY_LABELS.managed,
+  EXACT_DOCKER_CUSTODY_LABELS.rootId,
+  EXACT_DOCKER_CUSTODY_LABELS.scopeDigest,
+  EXACT_DOCKER_CUSTODY_LABELS.effectOpDigest,
+  EXACT_DOCKER_CUSTODY_LABELS.attemptId,
+  EXACT_DOCKER_CUSTODY_LABELS.generation,
+  EXACT_DOCKER_CUSTODY_LABELS.releaseNonceSha256,
+  EXACT_DOCKER_CUSTODY_LABELS.providerInvocationDigest,
+] as const);
+
+/** Docker formats only these fields; Config.Env and unrelated labels never cross the process seam. */
+const EXACT_DOCKER_TASK_OUTPUT_INSPECT_FORMAT = Object.freeze([
+  '{{json .Id}}',
+  '{{json .Image}}',
+  ...EXACT_DOCKER_TASK_OUTPUT_INSPECT_LABELS.map(
+    label => `{{json (index .Config.Labels ${JSON.stringify(label)})}}`,
+  ),
+]).join('\n');
+
+interface ExactDockerTaskOutputDaemonProjection {
+  readonly containerId: string;
+  readonly imageDigest: Sha256Digest;
+  readonly labels: Readonly<Record<string, string>>;
+}
+
+function parseExactDockerTaskOutputDaemonProjection(
+  bytes: Uint8Array,
+): ExactDockerTaskOutputDaemonProjection | null {
+  let text: string;
+  try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+  catch { return null; }
+  const lines = text.endsWith('\n') ? text.slice(0, -1).split('\n') : text.split('\n');
+  if (lines.length !== EXACT_DOCKER_TASK_OUTPUT_INSPECT_LABELS.length + 2) return null;
+  let values: unknown[];
+  try { values = lines.map(line => JSON.parse(line) as unknown); }
+  catch { return null; }
+  const [containerId, imageDigest, ...labelValues] = values;
+  if (typeof containerId !== 'string' || !/^[a-f0-9]{64}$/u.test(containerId)
+    || !isExactDigest(imageDigest)
+    || labelValues.some(value => typeof value !== 'string')) return null;
+  return Object.freeze({
+    containerId,
+    imageDigest,
+    labels: Object.freeze(Object.fromEntries(EXACT_DOCKER_TASK_OUTPUT_INSPECT_LABELS.map(
+      (label, index) => [label, labelValues[index] as string],
+    ))),
+  });
+}
 
 const EXACT_DOCKER_WORKSPACE_VOLUME_PREFIX = 'deckent-xw-';
 const EXACT_DOCKER_DEPENDENCY_VOLUME_PREFIX = 'deckent-xd-';
@@ -10399,6 +10483,10 @@ export interface DockerSpawnBackendConstructionOptions {
   readonly nowIso?: () => string;
   /** Async, bounded git/docker seam for exact private-workspace lifecycle. */
   readonly exactWorkspaceCommandRunner?: ExactDockerWorkspaceCommandRunnerV1;
+  /** Hermetic seam for the observer client; custody admission remains backend-owned. */
+  readonly taskOutputLiveTransport?: (
+    input: TaskOutputLiveTransportInput,
+  ) => Promise<TaskOutputLiveTransportResult>;
   /** Trusted host composition only; absent means production-wiring remains typed HOLD. */
   readonly productionWiringHostObserver?: ExactProductionWiringHostObserver;
   /** Normal factory-only composition; direct low-level construction remains fail-closed. */
@@ -10407,6 +10495,19 @@ export interface DockerSpawnBackendConstructionOptions {
     readonly image: string;
     readonly platform: NodeJS.Platform;
   }>) => ExactProductionWiringHostObserver;
+}
+
+/** Production read-only composition for exact worker output custody. */
+export function createExactDockerTaskOutputReadService(
+  projectDir: string,
+  opts?: DockerSpawnBackendConstructionOptions,
+): TaskOutputReadService {
+  const backend = new DockerSpawnBackend(projectDir, opts);
+  return Object.freeze({
+    read: (query: TaskOutputReadQuery) => backend.readExactDockerTaskOutput(query),
+    observe: (capability: TaskOutputReadCapability, input: TaskOutputLiveObserveInput) =>
+      backend.observeExactDockerTaskOutput(capability, input),
+  });
 }
 
 /** Read-only restart/CLI composition; it never returns the private Store. */
@@ -10817,6 +10918,9 @@ export class DockerSpawnBackend implements SpawnBackend {
   private readonly exactAcceptanceConfirmations = new Map<string,
     Promise<{ state: 'applied' } | { state: 'hold'; reasonCode: string }>>();
   private readonly exactWorkspaceCommandRunner: ExactDockerWorkspaceCommandRunnerV1;
+  private readonly taskOutputLiveTransport: (
+    input: TaskOutputLiveTransportInput,
+  ) => Promise<TaskOutputLiveTransportResult>;
   private readonly productionWiringHostObserver: ExactProductionWiringHostObserver | undefined;
   private readonly exactCustodyScopes = new WeakMap<object, PreparedExactDockerCustodyScope>();
   private readonly exactCustodyTokens = new WeakMap<object, Readonly<{
@@ -10898,6 +11002,16 @@ export class DockerSpawnBackend implements SpawnBackend {
     hostUsageAuthority: ExactDockerAcceptedResultV2['hostUsageAuthority'];
     hostBillingAuthority: ExactDockerAcceptedResultV2['hostBillingAuthority'];
     hostEffectAuthority: ExactDockerAcceptedResultV2['hostEffectAuthority'];
+  }>>();
+  /** Opaque output readers retain verified custody privately; no Docker id crosses the API. */
+  private readonly exactTaskOutputReadCapabilities = new WeakMap<object, Readonly<{
+    scope: ExactDockerTaskOutputReadScope;
+    dispatchReceiptDigest: Sha256Digest;
+    releaseReceiptDigest: Sha256Digest;
+    projectionFence: Sha256Digest;
+    providerExecutionAttempt: TaskAttemptCustodyDispatchReleasedAuthorityV2['providerExecutionAttempt'];
+    backendExecutionId: string;
+    imageDigest: Sha256Digest;
   }>>();
   /**
    * Son spawn'ın async-kuyruğu (capture + launch). Üretim fire-and-forget'tir ve
@@ -10981,6 +11095,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     this.nowIso = opts?.nowIso ?? (() => new Date().toISOString());
     this.exactWorkspaceCommandRunner =
       opts?.exactWorkspaceCommandRunner ?? runExactDockerWorkspaceCommand;
+    this.taskOutputLiveTransport = opts?.taskOutputLiveTransport ?? streamTaskOutputLive;
     this.productionWiringHostObserver = opts?.productionWiringHostObserver
       ?? opts?.productionWiringHostObserverFactory?.({
         projectRoot: this.projectDir,
@@ -15693,7 +15808,7 @@ export class DockerSpawnBackend implements SpawnBackend {
   }
 
   private rereadExactProviderExitObservation(
-    scope: PreparedExactDockerCustodyScope,
+    scope: ExactDockerProviderExitReadScope,
     providerExit: ExactDockerProviderExitObservationRefV2,
   ): void {
     const observation = scope.store.readDispatchObservation({
@@ -16665,6 +16780,436 @@ export class DockerSpawnBackend implements SpawnBackend {
       containerIdentityDigest:
         ready.providerStopped.containerIdentityDigest as Sha256Digest,
     }));
+  }
+
+  /**
+   * Resolve one exact-attempt output without consulting public task files or
+   * starting Docker. Every candidate is semantically reread from the private
+   * Store; task-only ambiguity is never collapsed to a newest generation.
+   */
+  private readExactDockerTaskOutputScope(
+    store: TaskAttemptCustodyStore,
+    policy: TaskAttemptCustodyPolicyV2,
+    admitted: ExactDockerDurableAdmissionV2,
+    expectedProjectId: string,
+  ): ExactDockerTaskOutputReadScope {
+    const durableSnapshot = store.readTaskSnapshot({
+      identity: admitted.ref.identity,
+      policy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+    });
+    const taskSnapshot = durableSnapshot
+      ? parseExactDockerDispatchSnapshot(durableSnapshot.bytes, policy) : null;
+    if (!durableSnapshot || !taskSnapshot
+      || canonicalJson(admitted.admission.identity)
+        !== canonicalJson(admitted.ref.identity)
+      || admitted.admission.receiptDigest !== admitted.ref.admissionReceiptDigest
+      || durableSnapshot.proof.sha256 !== admitted.admission.taskSnapshot.sha256
+      || taskSnapshot.dispatchRequestId !== admitted.ref.dispatchRequestId
+      || taskSnapshot.projectId !== admitted.ref.identity.projectId
+      || taskSnapshot.taskId !== admitted.ref.identity.taskId
+      || taskSnapshot.projectId !== expectedProjectId) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    return Object.freeze({
+      store,
+      policy,
+      identity: admitted.ref.identity,
+      admissionRef: admitted.ref,
+      taskSnapshot,
+      model: taskSnapshot.dispatch.model,
+      provider: taskSnapshot.dispatch.provider,
+    });
+  }
+
+  readExactDockerTaskOutput(input: TaskOutputReadQuery): TaskOutputReadResult {
+    const raw = snapshotExactPlainData(input);
+    const hasSprint = raw.ok && Object.prototype.hasOwnProperty.call(raw.value, 'sprintId');
+    const hasAttempt = raw.ok && Object.prototype.hasOwnProperty.call(raw.value, 'attemptId');
+    const hasDispatch = raw.ok
+      && Object.prototype.hasOwnProperty.call(raw.value, 'dispatchRequestId');
+    const query = raw.ok ? exactOwnDataRecord(raw.value, [
+      'projectId', 'taskId', 'caller', 'strictTenantIsolation',
+      ...(hasSprint ? ['sprintId'] : []),
+      ...(hasAttempt ? ['attemptId'] : []),
+      ...(hasDispatch ? ['dispatchRequestId'] : []),
+    ]) : null;
+    const caller = exactOwnDataRecord(query?.caller, [
+      'id',
+      ...(query?.caller && Object.prototype.hasOwnProperty.call(query.caller, 'tenantId')
+        ? ['tenantId'] : []),
+    ]);
+    const deny = (reasonCode: Extract<TaskOutputReadResult, { state: 'denied' }>['reasonCode']) =>
+      Object.freeze({ state: 'denied' as const, reasonCode });
+    let validTaskId = false;
+    if (typeof query?.taskId === 'string') {
+      try { validTaskId = validateTaskId(query.taskId) === query.taskId; } catch { /* denied below */ }
+    }
+    if (!query || !caller
+      || typeof query.projectId !== 'string' || query.projectId.length === 0
+      || !validTaskId
+      || (query.sprintId !== undefined
+        && (typeof query.sprintId !== 'string' || query.sprintId.length === 0
+          || Buffer.byteLength(query.sprintId) > 16_384))
+      || (query.attemptId !== undefined
+        && (typeof query.attemptId !== 'string' || query.attemptId.length === 0
+          || Buffer.byteLength(query.attemptId) > 16_384))
+      || (query.dispatchRequestId !== undefined
+        && (typeof query.dispatchRequestId !== 'string'
+          || !/^dreq-[a-f0-9]{64}$/u.test(query.dispatchRequestId)))
+      || typeof caller.id !== 'string' || caller.id.length === 0
+      || (caller.tenantId !== undefined && typeof caller.tenantId !== 'string')
+      || typeof query.strictTenantIsolation !== 'boolean') return deny('invalid-query');
+    const strictTenantIsolation = query.strictTenantIsolation;
+    const expectedProjectId = attendedExecutionProjectId(this.projectDir);
+    if (query.projectId !== expectedProjectId) return deny('project-mismatch');
+    let callerTenant: string;
+    try {
+      callerTenant = resolveCallerTenant(
+        caller as { id: string; tenantId?: string },
+        strictTenantIsolation,
+      );
+    } catch {
+      return deny('tenant-unresolved');
+    }
+    try {
+      const opened = this.openExactDockerRecoveryStore();
+      if (!opened) return Object.freeze({ state: 'unavailable' as const, reasonCode: 'store-unavailable' as const });
+      let candidates: ExactDockerDurableAdmissionV2[];
+      if (typeof query.dispatchRequestId === 'string') {
+        const direct = opened.store.readDispatchAdmission({
+          dispatchRequestId: query.dispatchRequestId,
+          policy: opened.policy,
+        });
+        if (direct.state !== 'admitted') {
+          return Object.freeze({ state: 'unavailable' as const, reasonCode: 'admission-not-found' as const });
+        }
+        candidates = [direct];
+      } else {
+        const listed = opened.store.listDispatchAdmissions({
+          policy: opened.policy,
+          maxEntries: 100_000,
+          maxNameBytes: 128,
+          deadlineAt: new Date(Date.now() + 10_000).toISOString(),
+        });
+        candidates = listed.entries.filter((entry): entry is ExactDockerDurableAdmissionV2 =>
+          entry.state === 'admitted' && entry.ref.identity.taskId === query.taskId);
+      }
+      if (candidates.length === 0) {
+        return Object.freeze({ state: 'unavailable' as const, reasonCode: 'admission-not-found' as const });
+      }
+      const inspected = candidates.map(admitted => {
+        const scope = this.readExactDockerTaskOutputScope(
+          opened.store, opened.policy, admitted, expectedProjectId,
+        );
+        const approved = scope.taskSnapshot.material.approved as { readonly sprintId?: unknown };
+        if (typeof approved.sprintId !== 'string' || approved.sprintId.length === 0) {
+          throw new ExactDockerCustodyFailure('EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED', true);
+        }
+        const task = scope.taskSnapshot.material.dispatch;
+        let taskTenant: string;
+        try {
+          taskTenant = resolveCallerTenant(
+            task.actor ?? { id: `task:${task.id}` },
+            strictTenantIsolation,
+          );
+        } catch {
+          return { state: 'tenant-unresolved' as const, scope, sprintId: approved.sprintId };
+        }
+        return { state: taskTenant === callerTenant ? 'eligible' as const : 'foreign' as const,
+          scope, sprintId: approved.sprintId, taskTenant };
+      });
+      if (typeof query.dispatchRequestId === 'string') {
+        const only = inspected[0]!;
+        if (only.scope.identity.taskId !== query.taskId) return deny('task-mismatch');
+        if (query.attemptId !== undefined
+          && only.scope.identity.attemptId !== query.attemptId) return deny('attempt-mismatch');
+        if (query.sprintId !== undefined && only.sprintId !== query.sprintId) return deny('sprint-mismatch');
+        if (only.state === 'tenant-unresolved') return deny('tenant-unresolved');
+        if (only.state === 'foreign') return deny('tenant-mismatch');
+      }
+      const selected = inspected.filter(candidate =>
+        candidate.state === 'eligible'
+        && (query.sprintId === undefined || candidate.sprintId === query.sprintId)
+        && (query.attemptId === undefined
+          || candidate.scope.identity.attemptId === query.attemptId));
+      if (selected.length === 0) {
+        if (inspected.some(candidate => candidate.state === 'tenant-unresolved')) return deny('tenant-unresolved');
+        if (inspected.some(candidate => candidate.state === 'foreign')) return deny('tenant-mismatch');
+        if (query.attemptId !== undefined) return deny('attempt-mismatch');
+        if (query.sprintId !== undefined) return deny('sprint-mismatch');
+        return Object.freeze({ state: 'unavailable' as const, reasonCode: 'admission-not-found' as const });
+      }
+      if (selected.length !== 1) return Object.freeze({
+        state: 'ambiguous' as const,
+        reasonCode: 'multiple-exact-attempts' as const,
+        candidateCount: selected.length,
+      });
+      const chosen = selected[0]!;
+      if (chosen.state !== 'eligible') {
+        return Object.freeze({ state: 'unavailable' as const, reasonCode: 'custody-read-hold' as const });
+      }
+      const { scope, sprintId, taskTenant } = chosen;
+      const identity: TaskOutputReadIdentity = Object.freeze({
+        projectId: scope.identity.projectId,
+        taskId: scope.identity.taskId,
+        sprintId,
+        attemptId: scope.identity.attemptId,
+        generation: scope.identity.generation,
+        dispatchRequestId: scope.admissionRef.dispatchRequestId,
+        tenantId: taskTenant!,
+        provider: scope.provider,
+        model: scope.model,
+      });
+      const dispatch = scope.store.readDispatchAuthority({
+        admissionRef: scope.admissionRef,
+        policy: scope.policy,
+      });
+      if (dispatch.state === 'ambiguous') return Object.freeze({
+        state: 'ambiguous' as const,
+        reasonCode: 'dispatch-authority-ambiguous' as const,
+        candidateCount: 1,
+      });
+      if (dispatch.state !== 'terminal') return Object.freeze({
+        state: 'pending' as const, identity, phase: 'dispatch' as const, capability: null,
+      });
+      if (dispatch.authority.state === 'NOT_DISPATCHED') return Object.freeze({
+        state: 'not-dispatched' as const,
+        identity,
+        receiptDigest: dispatch.authority.receiptDigest,
+        reasonCode: dispatch.authority.reasonCode,
+      });
+      const capability = Object.freeze(Object.create(null)) as TaskOutputReadCapability;
+      this.exactTaskOutputReadCapabilities.set(capability as object, Object.freeze({
+        scope,
+        dispatchReceiptDigest: dispatch.authority.receiptDigest,
+        releaseReceiptDigest: dispatch.authority.releaseReceiptDigest,
+        projectionFence: dispatch.authority.projectionFence,
+        providerExecutionAttempt: dispatch.authority.providerExecutionAttempt,
+        backendExecutionId: dispatch.authority.backendExecutionId,
+        imageDigest: dispatch.authority.releaseEvidence.imageDigest,
+      }));
+      const providerExit = this.readExactDockerRecoveryProviderExit(scope);
+      if (!providerExit) return Object.freeze({
+        state: 'pending' as const, identity, phase: 'provider-exit' as const, capability,
+      });
+      if (providerExit.containerId !== dispatch.authority.backendExecutionId) {
+        return Object.freeze({ state: 'unavailable' as const, reasonCode: 'custody-read-hold' as const });
+      }
+      const artifactKey = `provider-${scope.identity.attemptId}`;
+      const receipt = scope.store.readArtifactReceipt({
+        identity: scope.identity,
+        policy: scope.policy,
+        artifactClass: 'pristine-provider-stream',
+        artifactKey,
+      });
+      if (!receipt) return Object.freeze({
+        state: 'pending' as const, identity, phase: 'stream-seal' as const, capability,
+      });
+      const verified = scope.store.readVerifiedArtifact({
+        identity: scope.identity,
+        policy: scope.policy,
+        artifactClass: 'pristine-provider-stream',
+        artifactKey,
+        receiptDigest: receipt.receiptDigest,
+      });
+      if (!verified
+        || verified.receipt.receiptDigest !== receipt.receiptDigest
+        || verified.receipt.artifactClass !== 'pristine-provider-stream'
+        || verified.receipt.artifactKey !== artifactKey
+        || verified.receipt.admissionReceiptDigest !== scope.admissionRef.admissionReceiptDigest
+        || verified.receipt.policyDigest !== scope.policy.policyDigest
+        || verified.receipt.capturedAt !== providerExit.observedAt
+        || verified.receipt.artifact.sha256 !== exactCustodyDigest(verified.bytes)
+        || verified.receipt.artifact.byteLength !== verified.bytes.byteLength
+        || canonicalJson(verified.receipt.identity) !== canonicalJson(scope.identity)) {
+        return Object.freeze({ state: 'unavailable' as const, reasonCode: 'custody-read-hold' as const });
+      }
+      let content: string;
+      try { content = new TextDecoder('utf-8', { fatal: true }).decode(verified.bytes); }
+      catch { return Object.freeze({ state: 'unavailable' as const, reasonCode: 'custody-read-hold' as const }); }
+      return Object.freeze({
+        state: 'sealed' as const,
+        identity,
+        capability,
+        source: 'pristine-provider-stream' as const,
+        encoding: 'utf8' as const,
+        content,
+        receiptDigest: verified.receipt.receiptDigest,
+        contentSha256: verified.receipt.artifact.sha256,
+        byteLength: verified.receipt.artifact.byteLength,
+        capturedAt: verified.receipt.capturedAt,
+        providerExitReceiptDigest: providerExit.observationReceiptDigest,
+      });
+    } catch (error) {
+      debugLog('docker-backend:task-output-read-hold', error);
+      return Object.freeze({
+        state: 'unavailable' as const,
+        reasonCode: 'custody-read-hold' as const,
+        ...(error instanceof TaskAttemptCustodyHold
+          ? { detailCode: error.code as TaskAttemptCustodyHoldCode }
+          : {}),
+      });
+    }
+  }
+
+  private rereadExactDockerTaskOutputCapability(
+    retained: NonNullable<ReturnType<typeof this.exactTaskOutputReadCapabilities.get>>,
+  ): Readonly<{
+    scope: ExactDockerTaskOutputReadScope;
+    released: TaskAttemptCustodyDispatchReleasedAuthorityV2;
+  }> | null {
+    const { scope: prior } = retained;
+    const admitted = prior.store.readDispatchAdmission({
+      dispatchRequestId: prior.admissionRef.dispatchRequestId,
+      policy: prior.policy,
+    });
+    if (admitted.state !== 'admitted') return null;
+    const scope = this.readExactDockerTaskOutputScope(
+      prior.store,
+      prior.policy,
+      admitted,
+      attendedExecutionProjectId(this.projectDir),
+    );
+    if (canonicalJson(scope.identity) !== canonicalJson(prior.identity)
+      || canonicalJson(scope.admissionRef) !== canonicalJson(prior.admissionRef)
+      || canonicalJson(scope.taskSnapshot) !== canonicalJson(prior.taskSnapshot)) return null;
+    const dispatch = scope.store.readDispatchAuthority({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+    });
+    if (dispatch.state !== 'terminal' || dispatch.authority.state !== 'RELEASED') return null;
+    const released = dispatch.authority;
+    const attempt = released.providerExecutionAttempt;
+    if (canonicalJson(released.admissionRef) !== canonicalJson(scope.admissionRef)
+      || released.receiptDigest !== retained.dispatchReceiptDigest
+      || released.releaseReceiptDigest !== retained.releaseReceiptDigest
+      || released.projectionFence !== retained.projectionFence
+      || canonicalJson(attempt) !== canonicalJson(retained.providerExecutionAttempt)
+      || released.backendExecutionId !== retained.backendExecutionId
+      || released.releaseEvidence.containerId !== retained.backendExecutionId
+      || released.releaseEvidence.imageDigest !== retained.imageDigest
+      || released.releaseEvidence.receiptDigest !== retained.releaseReceiptDigest
+      || released.releaseEvidence.releaseNonceDigest
+        !== scope.taskSnapshot.dispatch.releaseCommitNonceSha256
+      || released.releaseEvidence.providerInvocationDigest
+        !== scope.taskSnapshot.dispatch.providerInvocationDigest
+      || attempt.backendExecutionId !== retained.backendExecutionId
+      || attempt.admissionReceiptDigest !== scope.admissionRef.admissionReceiptDigest
+      || canonicalJson(attempt.custodyIdentity) !== canonicalJson(scope.identity)) return null;
+    return Object.freeze({ scope, released });
+  }
+
+  private async inspectExactDockerTaskOutputAuthority(
+    scope: ExactDockerTaskOutputReadScope,
+    released: TaskAttemptCustodyDispatchReleasedAuthorityV2,
+  ): Promise<'verified' | 'unavailable' | 'mismatch'> {
+    let inspected: ExactDockerWorkspaceCommandResultV1;
+    try {
+      inspected = await this.exactWorkspaceCommandRunner(Object.freeze({
+        command: 'docker' as const,
+        args: Object.freeze([
+          'inspect', '--format', EXACT_DOCKER_TASK_OUTPUT_INSPECT_FORMAT,
+          released.backendExecutionId,
+        ]),
+        stdin: Buffer.alloc(0),
+        timeoutMs: 10_000,
+        stdoutCeiling: 32 * 1024,
+        stderrCeiling: 64 * 1024,
+      }));
+    } catch {
+      return 'unavailable';
+    }
+    if (!exactDockerWorkspaceCommandSucceeded(inspected)) return 'unavailable';
+    const daemon = parseExactDockerTaskOutputDaemonProjection(inspected.stdout);
+    if (!daemon) return 'mismatch';
+    const rootId = daemon.labels[EXACT_DOCKER_CUSTODY_LABELS.rootId];
+    const scopeDigest = daemon.labels[EXACT_DOCKER_CUSTODY_LABELS.scopeDigest];
+    const effectOpDigest = daemon.labels[EXACT_DOCKER_CUSTODY_LABELS.effectOpDigest];
+    const semanticLabelDigest = isExactDigest(rootId)
+      && isExactDigest(scopeDigest)
+      && isExactDigest(effectOpDigest)
+      ? taskAttemptCustodyPosixDockerAuthorityLabelDigestV2(Object.freeze({
+          rootId,
+          scopeDigest,
+          effectOpDigest,
+          attemptId: scope.identity.attemptId,
+          generation: scope.identity.generation,
+        }))
+      : null;
+    return daemon.containerId === released.backendExecutionId
+      && daemon.imageDigest === released.releaseEvidence.imageDigest
+      && daemon.labels[EXACT_DOCKER_CUSTODY_LABELS.managed] === 'true'
+      && rootId === scope.store.root.rootId
+      && daemon.labels[EXACT_DOCKER_CUSTODY_LABELS.attemptId] === scope.identity.attemptId
+      && daemon.labels[EXACT_DOCKER_CUSTODY_LABELS.generation]
+        === String(scope.identity.generation)
+      && daemon.labels[EXACT_DOCKER_CUSTODY_LABELS.releaseNonceSha256]
+        === released.releaseEvidence.releaseNonceDigest
+      && daemon.labels[EXACT_DOCKER_CUSTODY_LABELS.providerInvocationDigest]
+        === released.releaseEvidence.providerInvocationDigest
+      && semanticLabelDigest === released.releaseEvidence.daemonAuthorityLabelDigest
+      ? 'verified' : 'mismatch';
+  }
+
+  async observeExactDockerTaskOutput(
+    capability: TaskOutputReadCapability,
+    input: TaskOutputLiveObserveInput,
+  ): Promise<TaskOutputLiveObserveResult> {
+    const unavailable = (
+      reasonCode: Extract<TaskOutputLiveObserveResult, { state: 'unavailable' }>['reasonCode'],
+    ): TaskOutputLiveObserveResult => Object.freeze({ state: 'unavailable' as const, reasonCode });
+    if (!input || typeof input !== 'object' || nodeTypes.isProxy(input)
+      || !Number.isSafeInteger(input.tail) || input.tail < 0
+      || typeof input.follow !== 'boolean'
+      || typeof input.onChunk !== 'function'
+      || !(input.signal instanceof AbortSignal)
+      || !input.limits || typeof input.limits !== 'object'
+      || nodeTypes.isProxy(input.limits)
+      || ![input.limits.termGraceMs, input.limits.reapObservationMs,
+        input.limits.streamCloseMs].every(value => Number.isSafeInteger(value) && value > 0)) {
+      return unavailable('invalid-observation');
+    }
+    const retained = capability && typeof capability === 'object'
+      ? this.exactTaskOutputReadCapabilities.get(capability as object) : undefined;
+    if (!retained) return unavailable('capability-denied');
+    let before: ReturnType<typeof this.rereadExactDockerTaskOutputCapability>;
+    try { before = this.rereadExactDockerTaskOutputCapability(retained); }
+    catch { return unavailable('custody-changed'); }
+    if (!before) return unavailable('custody-changed');
+    const daemonBefore = await this.inspectExactDockerTaskOutputAuthority(
+      before.scope, before.released,
+    );
+    if (daemonBefore !== 'verified') {
+      return unavailable(daemonBefore === 'unavailable'
+        ? 'daemon-unavailable' : 'daemon-identity-mismatch');
+    }
+    const observed = await this.taskOutputLiveTransport(Object.freeze({
+      containerId: before.released.backendExecutionId,
+      tail: input.tail,
+      follow: input.follow,
+      cwd: canonicalExactDockerProjectRoot(this.projectDir),
+      signal: input.signal,
+      limits: Object.freeze({ ...input.limits }),
+      onChunk: input.onChunk,
+    }));
+    let after: ReturnType<typeof this.rereadExactDockerTaskOutputCapability>;
+    try { after = this.rereadExactDockerTaskOutputCapability(retained); }
+    catch { return unavailable('custody-changed'); }
+    if (!after) return unavailable('custody-changed');
+    const daemonAfter = await this.inspectExactDockerTaskOutputAuthority(
+      after.scope, after.released,
+    );
+    if (daemonAfter !== 'verified') return unavailable('custody-changed');
+    if (observed.kind === 'closed') {
+      return Object.freeze({ state: 'closed' as const, terminalMeaning: 'observer-only' as const });
+    }
+    if (observed.kind === 'aborted') return Object.freeze({ state: 'aborted' as const });
+    return unavailable(observed.reason === 'invalid-request'
+      ? 'invalid-observation' : observed.reason);
   }
 
   readExactDockerTaskAuthorityDiscrimination(
@@ -17683,7 +18228,7 @@ export class DockerSpawnBackend implements SpawnBackend {
   }
 
   private readExactDockerRecoveryProviderExit(
-    scope: PreparedExactDockerCustodyScope,
+    scope: ExactDockerProviderExitReadScope,
   ): ExactDockerProviderExitObservationRefV2 | null {
     const observation = scope.store.readDispatchObservationByClass({
       admissionRef: scope.admissionRef,

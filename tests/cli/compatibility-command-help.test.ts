@@ -106,6 +106,14 @@ describe('compatibility-command-help', () => {
           const contract = getContract(surface.command);
           expect(contract, surface.command).toBeDefined();
           expect(cmd!.description()).toBe(getMessage(contract!.summaryKey, lang));
+          if (surface.command === 'output') {
+            expect(cmd!.registeredArguments.map(arg => arg.name())).toEqual(['taskId']);
+            expect(cmd!.options.map(option => option.long)).toEqual(expect.arrayContaining([
+              '--tail', '--follow', '--sprint-id', '--attempt-id',
+              '--dispatch-request-id', '--json', '--lang',
+            ]));
+            continue;
+          }
           expect(cmd!.registeredArguments.some((arg) => arg.name() === 'args')).toBe(true);
           for (const legacyOpt of contract!.options) {
             if (legacyOpt.hidden) continue;

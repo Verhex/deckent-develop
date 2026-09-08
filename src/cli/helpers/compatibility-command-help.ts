@@ -27,6 +27,15 @@ export function deprecationHelpText(warningKey: string, lang?: string): string {
   return `${getMessage(warningKey, lang ?? 'en')}\n`;
 }
 
+/** Output aliases may keep machine stdout pristine by supplying a stderr sink. */
+export function emitDeprecatedForwardingWarning(
+  surface: DeprecatedForwardingSurface,
+  lang: string,
+  sink: (message: string) => void = print,
+): void {
+  sink(getMessage(surface.warningKey, lang));
+}
+
 function findNestedCommand(program: Command, ...segments: string[]): Command | undefined {
   let current: Command | undefined = program;
   for (const segment of segments) {
@@ -105,7 +114,7 @@ async function forwardDeprecatedAction(
   surface: DeprecatedForwardingSurface,
   args: string[],
 ): Promise<void> {
-  print(getMessage(surface.warningKey, getLanguage(undefined)));
+  emitDeprecatedForwardingWarning(surface, getLanguage(undefined));
   const { prefixFlags, targetPath } = parseReplacementSurface(surface.replacement);
   const target = findNestedCommand(program, ...targetPath);
   if (!target) {

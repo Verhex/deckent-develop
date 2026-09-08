@@ -17,6 +17,26 @@ için `DECKENT_LANGUAGE=tr` ayarlayın.
 Internal `gateway-runtime` child public referans sayfalarına bilinçli olarak alınmaz;
 registration drift denetimi kaybolmasın diye makine manifestinde `hidden: true` olarak kalır.
 
+## Exact worker çıktısı
+
+Worker çıktısını doğrulanmış yürütme kayıtlarından okumak için
+`deckent watch output <taskId> --tail 50` kullanın. `deckent output <taskId>` aynı
+okuyucunun uyumluluk adıdır; kullanım değişikliği uyarısı stderr'e gider. NDJSON
+olayları için `--json`, uygun canlı Docker attempt'ini izlemek için `--follow` ekleyin.
+
+Yürütmeyi `--sprint-id`, `--attempt-id` veya `--dispatch-request-id` ile seçebilirsiniz.
+Birden fazla aday varsa açık seçim gerekir: okuyucu en son attempt'i tahmin etmez,
+host `.tasks` loguna geri dönmez. Üst komutun `watch --follow <taskId>` biçimi farklı
+bir komuttur; buradaki boolean follow bayrağıyla aynı değildir.
+
+Sealed çıktı, provider çıkışıyla doğrulanmış kanıttır; görevin başarılı settlement'ı
+anlamına gelmez. Canlı gözlem, bekleyen çıktı, erişim reddi, belirsizlik ve erişilemeyen
+custody ayrı durumlardır. Görünümü kapatmak worker'ı değil yalnız gözlemcisini durdurur.
+Görünüm hassas metni maskeler; sınırlı görünüm belleğinde tam satırlar saklar, dışarıda
+kalan satırları bildirir. Saklanan kaynak değişmez. CLI ve Dashboard/API aynı
+projection'ı tüketir. Windows-native canlı transport şu an unsupported capability
+bildirir; burada macOS veya canlı worker yürütme kanıtı iddia edilmez.
+
 ## Terminal çıktısı ve splash davranışı
 
 Deckent terminalde üç ayrı sözleşmeyi ayırır:

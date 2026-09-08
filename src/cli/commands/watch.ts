@@ -11,6 +11,7 @@ import { getDefaultProviderName } from '../../orchestra/sprint-utils.js';
 import { dockerContainerNameForTask } from '../../core/task-result-settlement.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
+import { registerWatchOutput, type WatchOutputDeps } from './watch-output.js';
 
 /** H) Export cleanupWatchWindow so cleanup.ts can call it. */
 export function cleanupWatchWindow(): void {
@@ -133,10 +134,16 @@ function computeSplitRatio(): number {
   return 40;
 }
 
-export function registerWatch(program: Command): void {
+export function registerWatch(program: Command, outputDeps: WatchOutputDeps = {}): void {
   const helpLang = getLanguage(undefined);
-  program
+  // The child owns its boolean --follow while the historical parent retains
+  // --follow <taskId>. Commander needs positional option routing at both levels
+  // to avoid the parent consuming the child's flag.
+  program.enablePositionalOptions();
+  const watch = program
     .command('watch')
+    .enablePositionalOptions()
+    .passThroughOptions()
     .description(getMessage('cli.watch.desc', getLanguage(undefined)))
     .option('--follow <taskId>', cliContractMessage('cliContract.watch.opt.follow', helpLang))
     .action((opts: { follow?: string }) => {
@@ -216,4 +223,5 @@ export function registerWatch(program: Command): void {
         }
       }
     });
+  registerWatchOutput(watch, outputDeps);
 }

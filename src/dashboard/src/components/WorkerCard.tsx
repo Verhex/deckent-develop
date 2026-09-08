@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Gem, Zap, Leaf, Bot, Cpu, FileCode2, Activity, Clock, type LucideIcon } from "lucide-react";
 import type { AgentInfo } from "../types";
 import { useTranslation } from "../i18n/LanguageProvider";
 import type { TranslatorProp } from "../i18n/types";
-import { buildSseUrl } from "../lib/api";
+import { useExactTaskOutput } from "../lib/useExactTaskOutput";
 
 // 2px top status bar (handoff §3): EXECUTING teal gradient, DONE green, etc.
 const STATUS_BAR: Record<string, string> = {
@@ -114,45 +113,8 @@ const LIVE_LOG_TAIL = 5;
  *  few lines on the worker card. Returns an empty array until the SSE channel
  *  delivers data; cleans up on unmount. Defensively no-ops when EventSource
  *  is unavailable (server-side render, hardened test environments). */
-function useLiveLogTail(taskId: string | undefined, enabled: boolean): string[] {
-  const [lines, setLines] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (!enabled || !taskId) {
-      setLines([]);
-      return;
-    }
-    if (typeof EventSource === "undefined") return;
-
-    const url = buildSseUrl(`/api/output-stream?taskId=${encodeURIComponent(taskId)}`);
-    const es = new EventSource(url);
-
-    function handle(event: MessageEvent): void {
-      try {
-        const payload = JSON.parse(event.data) as {
-          lines?: Array<{ line?: string }>;
-          snapshot?: { lines?: Array<{ line?: string }> };
-        };
-        const next = payload.snapshot?.lines ?? payload.lines ?? [];
-        if (next.length === 0) return;
-        setLines((prev) => {
-          const merged = [...prev, ...next.map((e) => e.line ?? "").filter(Boolean)];
-          return merged.slice(-LIVE_LOG_TAIL);
-        });
-      } catch {
-        // ignore malformed payloads
-      }
-    }
-
-    es.addEventListener("snapshot", handle as EventListener);
-    es.addEventListener("output", handle as EventListener);
-
-    return () => {
-      es.close();
-    };
-  }, [taskId, enabled]);
-
-  return lines;
+function useLiveLogTail(taskId: string | undefined, enabled: boolean) {
+  return useExactTaskOutput(taskId, enabled, LIVE_LOG_TAIL);
 }
 
 export function WorkerCard({ agent, onClick }: WorkerCardProps) {
@@ -232,12 +194,15 @@ export function WorkerCard({ agent, onClick }: WorkerCardProps) {
       )}
 
       {/* Live docker log tail (Sprint 230 T-230-008) */}
-      {liveLog.length > 0 && (
+      {agent.taskId && agent.status === "EXECUTING" && agent.backend === "docker" && <p className="text-[10px] text-zinc-400" role="status">
+        {t(`worker_log.state.${liveLog.status}`)}
+      </p>}
+      {liveLog.lines.length > 0 && (
         <pre
           data-testid="worker-live-log"
           className="text-[10px] text-zinc-400 bg-zinc-950/60 rounded p-2 mb-3 max-h-24 overflow-hidden font-mono whitespace-pre-wrap"
         >
-          {liveLog.join("\n")}
+          {liveLog.lines.map((entry) => entry.line).join("\n")}
         </pre>
       )}
 

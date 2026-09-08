@@ -17,6 +17,7 @@ const enPath = join(I18N_DIR, "en.ts");
 const trPath = join(I18N_DIR, "tr.ts");
 
 const panel = () => readFileSync(panelPath, "utf-8");
+const stream = () => readFileSync(join(COMPONENTS_DIR, "../lib/useExactTaskOutput.ts"), "utf-8");
 const workersPage = () => readFileSync(workersPagePath, "utf-8");
 const en = () => readFileSync(enPath, "utf-8");
 const tr = () => readFileSync(trPath, "utf-8");
@@ -37,11 +38,12 @@ describe("worker-log-panel: file existence", () => {
 
 describe("worker-log-panel: SSE endpoint", () => {
   it("WorkerLogPanel references the logs/stream SSE endpoint", () => {
-    expect(panel()).toContain("logs/stream");
+    expect(panel()).toContain("useExactTaskOutput");
+    expect(stream()).toContain("/api/output-stream");
   });
 
   it("WorkerLogPanel uses buildSseUrl for auth token attachment", () => {
-    expect(panel()).toContain("buildSseUrl");
+    expect(stream()).toContain("buildSseUrl");
   });
 });
 
@@ -57,13 +59,14 @@ describe("worker-log-panel: log line rendering (satır-render)", () => {
 
   it("WorkerLogPanel listens for log_line SSE event", () => {
     const src = panel();
-    expect(src).toContain('"log_line"');
+    expect(src).toContain("useExactTaskOutput");
+    expect(stream()).toContain('"output-lines"');
   });
 
   it("WorkerLogPanel appends lines to state via setLines ring-buffer slice", () => {
     const src = panel();
-    expect(src).toContain("setLines");
-    expect(src).toContain(".slice(-MAX_LOG_LINES)");
+    expect(src).toContain("MAX_LOG_LINES");
+    expect(stream()).toContain("all.slice(start)");
   });
 
   it("WorkerLogPanel renders lines from state with lines.map", () => {
@@ -76,16 +79,18 @@ describe("worker-log-panel: log line rendering (satır-render)", () => {
 describe("worker-log-panel: unavailable state (unavailable-durum)", () => {
   it("WorkerLogPanel listens for log_unavailable SSE event", () => {
     const src = panel();
-    expect(src).toContain('"log_unavailable"');
+    expect(src).toContain("useExactTaskOutput");
+    expect(stream()).toContain('"output-state"');
   });
 
   it("WorkerLogPanel sets unavailable state on log_unavailable event", () => {
     const src = panel();
-    expect(src).toContain("setUnavailable");
+    expect(src).toContain("worker_log.state.${status}");
   });
 
   it("WorkerLogPanel shows i18n key for unavailable empty-state", () => {
-    expect(panel()).toContain("worker_log.empty_unavailable");
+    expect(panel()).toContain("worker_log.state.${status}");
+    expect(en()).toContain("worker_log.state.unavailable");
   });
 });
 
@@ -118,17 +123,17 @@ describe("worker-log-panel: auto-scroll toggle (auto-scroll-toggle)", () => {
 
 describe("worker-log-panel: reconnection handling", () => {
   it("WorkerLogPanel tracks connection status with status state", () => {
-    expect(panel()).toContain("setStatus");
-    expect(panel()).toContain('"disconnected"');
+    expect(stream()).toContain("setView");
+    expect(stream()).toContain('"disconnected"');
   });
 
   it("WorkerLogPanel shows reconnecting indicator on disconnect", () => {
-    expect(panel()).toContain("reconnecting-indicator");
+    expect(panel()).toContain("output-view-status");
   });
 
-  it("WorkerLogPanel reconnects after disconnect with setTimeout", () => {
-    expect(panel()).toContain("reconnectTimer");
-    expect(panel()).toContain("setTimeout");
+  it("WorkerLogPanel offers explicit snapshot retry without duplicate automatic append", () => {
+    expect(panel()).toContain("onClick={retry}");
+    expect(stream()).not.toContain("setTimeout");
   });
 });
 

@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { buildSseUrl } from "../lib/api";
 import { cn } from "../lib/utils";
+import { WorkerLogPanel } from "./WorkerLogPanel";
 
 // ─── Local types (mirrors src/core/log-event.ts — no cross-bundle import) ──
 
@@ -301,7 +302,7 @@ function LogEventRow({ event, labels }: EventRowProps) {
 export interface WorkerLogViewerProps {
   /** Task ID to stream logs for. */
   taskId: string;
-  /** SSE endpoint URL — defaults to /api/output-stream (handleLogStream route). */
+  /** Explicit legacy structured-log endpoint. Default uses exact provider output. */
   streamUrl?: string;
   /** Called when the close button is pressed (if provided, shows close button). */
   onClose?: () => void;
@@ -310,7 +311,14 @@ export interface WorkerLogViewerProps {
   className?: string;
 }
 
-export function WorkerLogViewer({
+export function WorkerLogViewer(props: WorkerLogViewerProps) {
+  if (props.streamUrl) return <StructuredWorkerLogViewer {...props} />;
+  return <WorkerLogPanel taskId={props.taskId} onClose={props.onClose} labels={props.labels}
+    className={props.className} testId="worker-log-viewer" />;
+}
+
+/** An explicitly selected legacy structured stream is never promoted to exact custody evidence. */
+function StructuredWorkerLogViewer({
   taskId,
   streamUrl,
   onClose,

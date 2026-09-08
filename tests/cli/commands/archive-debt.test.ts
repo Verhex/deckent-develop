@@ -6,7 +6,6 @@ import { registerAttach } from '../../../src/cli/commands/attach.js';
 import { registerCheckpoint } from '../../../src/cli/commands/checkpoint.js';
 import { registerConfirmationsCommand } from '../../../src/cli/commands/confirmations.js';
 import { registerDashboard } from '../../../src/cli/commands/dashboard.js';
-import { registerOutput } from '../../../src/cli/commands/output.js';
 import { registerPlanNl } from '../../../src/cli/commands/plan-nl.js';
 import { registerAuditVerify } from '../../../src/cli/commands/audit-verify.js';
 import { registerAutonomousMission } from '../../../src/cli/commands/autonomous-mission.js';
@@ -20,7 +19,6 @@ const aliases = [
   [registerCheckpoint, 'checkpoint', 'approvals', [], 'cli.batch.deprecated.checkpoint'],
   [registerConfirmationsCommand, 'confirmations', 'approvals', [], 'cli.batch.deprecated.confirmations'],
   [registerDashboard, 'dashboard', 'status', ['--watch'], 'cli.batch.deprecated.dashboard'],
-  [registerOutput, 'output', 'watch', ['--logs'], 'cli.batch.deprecated.output'],
   [registerPlanNl, 'plan-nl', 'do', [], 'cli.batch.deprecated.plan_nl'],
   [registerAuditVerify, 'audit-verify', 'audit', [], 'cli.batch.deprecated.audit_verify'],
   [registerAutonomousMission, 'autonomous-mission', 'autonomous', [], 'cli.batch.deprecated.autonomous_mission'],

@@ -733,6 +733,98 @@ const BASE_MESSAGES: MessageMap = {
     en: 'Refused: "{taskId}" is not a valid task identifier. Nothing was read.',
     tr: 'Reddedildi: "{taskId}" geçerli bir görev kimliği değil. Hiçbir şey okunmadı.',
   },
+  'outputView.redaction_label': {
+    en: '[redacted]',
+    tr: '[gizlendi]',
+  },
+  'outputView.arg.task_id': {
+    en: 'Exact worker task identifier',
+    tr: 'Tam worker görev kimliği',
+  },
+  'outputView.opt.tail': {
+    en: 'Show at most the last N complete lines',
+    tr: 'En fazla son N tamamlanmış satırı göster',
+  },
+  'outputView.opt.follow': {
+    en: 'Continue observing new output; stopping the view does not stop the worker',
+    tr: 'Yeni çıktıyı izlemeyi sürdür; görünümü kapatmak worker’ı durdurmaz',
+  },
+  'outputView.opt.sprint_id': {
+    en: 'Require an exact sprint identifier',
+    tr: 'Tam sprint kimliği eşleşmesini zorunlu tut',
+  },
+  'outputView.opt.attempt_id': {
+    en: 'Select an exact attempt identifier',
+    tr: 'Tam attempt kimliğini seç',
+  },
+  'outputView.opt.dispatch_request_id': {
+    en: 'Select an exact dispatch request identifier',
+    tr: 'Tam dispatch request kimliğini seç',
+  },
+  'outputView.opt.json': {
+    en: 'Emit machine-readable NDJSON events',
+    tr: 'Makinece okunabilir NDJSON event’leri üret',
+  },
+  'outputView.opt.lang': {
+    en: 'Output language (en or tr)',
+    tr: 'Çıktı dili (en veya tr)',
+  },
+  'outputView.lang_invalid': {
+    en: 'Output language must be "en" or "tr".',
+    tr: 'Çıktı dili "en" veya "tr" olmalıdır.',
+  },
+  'outputView.state.sealed': {
+    en: 'Sealed worker output · task {taskId} · attempt {attemptId}',
+    tr: 'Mühürlü worker çıktısı · görev {taskId} · attempt {attemptId}',
+  },
+  'outputView.state.pending': {
+    en: 'Worker output is pending at {phase}.',
+    tr: 'Worker çıktısı {phase} aşamasında bekliyor.',
+  },
+  'outputView.state.not_dispatched': {
+    en: 'Worker was not dispatched ({reasonCode}); no output observer was started.',
+    tr: 'Worker dispatch edilmedi ({reasonCode}); çıktı gözlemcisi başlatılmadı.',
+  },
+  'outputView.state.ambiguous': {
+    en: 'Output identity is ambiguous ({candidateCount} candidates). Supply --attempt-id or --dispatch-request-id.',
+    tr: 'Çıktı kimliği belirsiz ({candidateCount} aday). --attempt-id veya --dispatch-request-id verin.',
+  },
+  'outputView.state.unavailable': {
+    en: 'Worker output is unavailable ({reasonCode}).',
+    tr: 'Worker çıktısı kullanılamıyor ({reasonCode}).',
+  },
+  'outputView.state.denied': {
+    en: 'Worker output read was refused ({reasonCode}).',
+    tr: 'Worker çıktısı okuması reddedildi ({reasonCode}).',
+  },
+  'outputView.lines.omitted': {
+    en: '{count} complete line(s) were omitted by view limits.',
+    tr: 'Görünüm limitleri nedeniyle {count} tamamlanmış satır atlandı.',
+  },
+  'outputView.end.closed': {
+    en: 'Output observer closed; worker outcome was not inferred.',
+    tr: 'Çıktı gözlemcisi kapandı; worker sonucu çıkarılmadı.',
+  },
+  'outputView.end.aborted': {
+    en: 'Output view stopped; the worker was not cancelled.',
+    tr: 'Çıktı görünümü durdu; worker iptal edilmedi.',
+  },
+  'outputView.end.unavailable': {
+    en: 'Output observer became unavailable ({reasonCode}); worker outcome is unknown.',
+    tr: 'Çıktı gözlemcisi kullanılamaz oldu ({reasonCode}); worker sonucu bilinmiyor.',
+  },
+  'outputView.end.held': {
+    en: 'Output view held ({reasonCode}).',
+    tr: 'Çıktı görünümü HOLD durumunda ({reasonCode}).',
+  },
+  'outputView.end.not_observed': {
+    en: 'No live output observer was started.',
+    tr: 'Canlı çıktı gözlemcisi başlatılmadı.',
+  },
+  'outputView.policy_unavailable': {
+    en: 'Output view policy is unavailable ({reasonCode}).',
+    tr: 'Çıktı görünümü policy’si kullanılamıyor ({reasonCode}).',
+  },
   'run.settlement_declared': {
     en: 'Invocation receipt declared: {receiptId}',
     tr: 'Invocation receipt bildirildi: {receiptId}',
@@ -8782,6 +8874,10 @@ const BASE_MESSAGES: MessageMap = {
     en: 'Follow a live worker (docker logs / tmux pane / subprocess log) with --follow <taskId>, or open the tmux dashboard split',
     tr: 'Canlı bir worker\'ı --follow <taskId> ile takip edin (docker logs / tmux pane / subprocess log) veya tmux dashboard split\'ini açın',
   },
+  'cli.watch.output.desc': {
+    en: 'Read or follow exact worker output without changing worker execution',
+    tr: 'Worker execution’ını değiştirmeden tam worker çıktısını oku veya izle',
+  },
 
   // ─── MCP tool descriptions (559-004) ────────────────────────────────────────
   // A tool with a CLI counterpart SHARES that command's `cli.*.desc` /
@@ -9807,7 +9903,7 @@ const BASE_MESSAGES: MessageMap = {
   },
   'cli.batch.deprecated.dashboard': { en: 'Command "dashboard" is deprecated; use "status --watch" instead.', tr: '"dashboard" komutu kullanımdan kaldırılıyor; bunun yerine "status --watch" kullanın.' },
   'cli.batch.deprecated.attach': { en: 'Command "attach" is deprecated; use "watch" instead.', tr: '"attach" komutu kullanımdan kaldırılıyor; bunun yerine "watch" kullanın.' },
-  'cli.batch.deprecated.output': { en: 'Command "output" is deprecated; use "watch --logs" instead.', tr: '"output" komutu kullanımdan kaldırılıyor; bunun yerine "watch --logs" kullanın.' },
+  'cli.batch.deprecated.output': { en: 'Command "output" is deprecated; use "watch output" instead.', tr: '"output" komutu kullanımdan kaldırılıyor; bunun yerine "watch output" kullanın.' },
   'cli.batch.deprecated.plan_nl': { en: 'Command "plan-nl" is deprecated; use "do" instead.', tr: '"plan-nl" komutu kullanımdan kaldırılıyor; bunun yerine "do" kullanın.' },
   'cli.batch.deprecated.archive_debt': { en: 'Command "archive-debt" is deprecated; use "status --debt" instead.', tr: '"archive-debt" komutu kullanımdan kaldırılıyor; bunun yerine "status --debt" kullanın.' },
   'cli.batch.deprecated.confirmations': { en: 'Command "confirmations" is deprecated; use "approvals" instead.', tr: '"confirmations" komutu kullanımdan kaldırılıyor; bunun yerine "approvals" kullanın.' },

@@ -319,9 +319,7 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
   registerChat(program);
   registerCheckpoint(program);
   registerDocs(program);
-  registerOutput(program, {
-    openTaskSettlementProjection,
-  });
+  registerOutput(program);
   registerTaskSettlement(program);
   registerCostCommand(program);
   registerRecall(program);

@@ -241,7 +241,7 @@ describe("WorkerLogViewer — DOM render", () => {
   });
 
   it("renders events from log-backfill in seq order", async () => {
-    render(<WorkerLogViewer taskId="test-002" />);
+    render(<WorkerLogViewer taskId="test-002" streamUrl="/fixture/legacy-log-stream" />);
 
     await act(async () => {
       latestEs?.fire("log-backfill", {
@@ -264,7 +264,7 @@ describe("WorkerLogViewer — DOM render", () => {
   });
 
   it("appends new events from live log pushes without duplicating", async () => {
-    render(<WorkerLogViewer taskId="test-003" />);
+    render(<WorkerLogViewer taskId="test-003" streamUrl="/fixture/legacy-log-stream" />);
 
     await act(async () => {
       latestEs?.fire("log-backfill", {
@@ -290,7 +290,7 @@ describe("WorkerLogViewer — DOM render", () => {
   });
 
   it("does not duplicate events with the same seq already in view", async () => {
-    render(<WorkerLogViewer taskId="test-004" />);
+    render(<WorkerLogViewer taskId="test-004" streamUrl="/fixture/legacy-log-stream" />);
 
     await act(async () => {
       latestEs?.fire("log-backfill", {
@@ -314,7 +314,7 @@ describe("WorkerLogViewer — DOM render", () => {
   });
 
   it("renders turn events with the turn data-testid", async () => {
-    render(<WorkerLogViewer taskId="test-005" />);
+    render(<WorkerLogViewer taskId="test-005" streamUrl="/fixture/legacy-log-stream" />);
 
     await act(async () => {
       latestEs?.fire("log-backfill", {
@@ -328,7 +328,7 @@ describe("WorkerLogViewer — DOM render", () => {
   });
 
   it("renders tool_use events with the tool_use data-testid", async () => {
-    render(<WorkerLogViewer taskId="test-006" />);
+    render(<WorkerLogViewer taskId="test-006" streamUrl="/fixture/legacy-log-stream" />);
 
     await act(async () => {
       latestEs?.fire("log-backfill", {
@@ -349,7 +349,7 @@ describe("WorkerLogViewer — DOM render", () => {
   });
 
   it("renders stderr events with stderr data-testid", async () => {
-    render(<WorkerLogViewer taskId="test-007" />);
+    render(<WorkerLogViewer taskId="test-007" streamUrl="/fixture/legacy-log-stream" />);
 
     await act(async () => {
       latestEs?.fire("log-backfill", {
@@ -363,7 +363,7 @@ describe("WorkerLogViewer — DOM render", () => {
   });
 
   it("renders usage events with usage data-testid", async () => {
-    render(<WorkerLogViewer taskId="test-008" />);
+    render(<WorkerLogViewer taskId="test-008" streamUrl="/fixture/legacy-log-stream" />);
 
     await act(async () => {
       latestEs?.fire("log-backfill", {
@@ -384,7 +384,7 @@ describe("WorkerLogViewer — DOM render", () => {
   });
 
   it("marks stream as done when done event received", async () => {
-    render(<WorkerLogViewer taskId="test-009" />);
+    render(<WorkerLogViewer taskId="test-009" streamUrl="/fixture/legacy-log-stream" />);
 
     // Wait for onopen to fire
     await act(async () => {
@@ -411,11 +411,11 @@ describe("WorkerLogViewer — DOM render", () => {
   it("shows close button when onClose prop is provided", () => {
     const onClose = vi.fn();
     render(<WorkerLogViewer taskId="test-011" onClose={onClose} />);
-    expect(screen.getByTestId("log-viewer-close")).toBeDefined();
+    expect(screen.getByTestId("log-panel-close")).toBeDefined();
   });
 
   it("does not show close button when onClose is not provided", () => {
-    render(<WorkerLogViewer taskId="test-012" />);
+    render(<WorkerLogViewer taskId="test-012" streamUrl="/fixture/legacy-log-stream" />);
     expect(screen.queryByTestId("log-viewer-close")).toBeNull();
   });
 });

@@ -17,6 +17,27 @@ The internal `gateway-runtime` child is intentionally omitted from public refere
 remains present in the machine manifest with `hidden: true` so registration drift is still
 checked.
 
+## Exact worker output
+
+Use `deckent watch output <taskId> --tail 50` to inspect worker output through its
+verified execution custody. `deckent output <taskId>` is the compatibility spelling
+of the same reader; its deprecation notice goes to stderr. Add `--json` for NDJSON
+events, or `--follow` to observe an eligible live Docker attempt.
+
+Select an exact execution with `--sprint-id`, `--attempt-id`, or
+`--dispatch-request-id`. Ambiguous attempts require explicit selection: the reader
+never guesses the latest attempt or falls back to a host `.tasks` log. The parent
+`watch --follow <taskId>` is a different command, not this boolean follow flag.
+
+Sealed output is verified provider-exit evidence, not proof of successful task
+settlement. Live observation, pending output, denial, ambiguity and unavailable
+custody remain distinct. Closing the view stops only its observer, not the worker.
+The display redacts sensitive text and retains complete lines within bounded view
+memory; omitted lines are reported and the stored source remains unchanged.
+CLI and Dashboard/API consumers share this projection. Native Windows live
+transport currently reports unsupported capability; macOS/live-worker execution
+proof is not claimed here.
+
 ## Terminal output and splash behavior
 
 Deckent separates three contracts on the terminal:
