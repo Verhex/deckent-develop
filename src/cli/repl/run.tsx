@@ -205,6 +205,8 @@ import { dispatchMcpSlash, type McpConnectPlan, type ReplMcpBridge } from './mcp
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { colorTier, isColorSuppressed, isDumbTerminal } from '../helpers/theme.js';
 import { InkPaletteProvider } from './ink-palette-context.js';
+import { TerminalGlyphProvider } from './terminal-glyph-context.js';
+import { renderTerminalOwnedTemplate, resolveTerminalGlyphs, type TerminalGlyphs } from '../helpers/terminal-glyphs.js';
 import { resolveHyperlinks } from '../helpers/terminal-links.js';
 import { resolveInkPalette } from './ink-palette.js';
 import { buildToolExecLabels } from '../helpers/tool-exec-labels.js';
@@ -297,10 +299,18 @@ export function hasUtf8Locale(env: Record<string, string | undefined>): boolean 
 // re-exported here for their existing importers.
 export { readProjectConfigRaw, buildConfigEntries, parseConfigValueText } from './config-entries.js';
 
-export function localizeNativeError(err: ProviderError, lang: string, phase: NativeErrorPhase = 'switch'): string {
+export function localizeNativeError(
+  err: ProviderError,
+  lang: string,
+  phase: NativeErrorPhase = 'switch',
+  glyphs: TerminalGlyphs = resolveTerminalGlyphs(false),
+): string {
   if (!err.errorCode) return err.error;
   const key = `native.${phase}.${err.errorCode}`;
-  const localized = getMessage(key, lang, { provider: err.provider ?? '', detail: err.detail ?? '' });
+  const localized = renderTerminalMessage(key, lang, glyphs, {
+    provider: err.provider ?? '',
+    detail: err.detail ?? '',
+  });
   return localized === key ? err.error : localized;
 }
 
@@ -473,9 +483,15 @@ export function buildStructuredActionLabels(t: (key: string) => string): Structu
  * label and code substituted; every other error passes its own message
  * through unchanged (technical pass-through — no prose is invented here).
  */
-export function buildReplErrorDescriber(lang: string): (err: Error) => string {
+export function buildReplErrorDescriber(
+  lang: string,
+  glyphs: TerminalGlyphs = resolveTerminalGlyphs(false),
+): (err: Error) => string {
   return (err) => (err instanceof InjectedLabelMissingError
-    ? getMessage('tui.injected_label_missing', lang, { label: err.label, code: err.code })
+    ? renderTerminalMessage('tui.injected_label_missing', lang, glyphs, {
+        label: err.label,
+        code: err.code,
+      })
     : err.message);
 }
 
@@ -928,15 +944,18 @@ export interface RunFlowResultLabels {
   evidenceTests: string;
   /** SURF-3 result-evidence — truncation footer when more tasks than the cap, e.g. "  … {n} more". */
   evidenceMore: string;
+  /** Optional native Terminal glyph contract; omitted preserves legacy output. */
+  glyphs?: TerminalGlyphs;
 }
 
-export function buildRunFlowResultLabels(t: (key: string) => string): RunFlowResultLabels {
+export function buildRunFlowResultLabels(t: (key: string) => string, glyphs?: TerminalGlyphs): RunFlowResultLabels {
   return {
     completed: t('runFlow.result.completed'),
     failed: t('runFlow.result.failed'),
     evidenceFiles: t('runFlow.result.evidence_files'),
     evidenceTests: t('runFlow.result.evidence_tests'),
     evidenceMore: t('runFlow.result.evidence_more'),
+    ...(glyphs ? { glyphs } : {}),
   };
 }
 
@@ -946,12 +965,12 @@ export function buildRunFlowResultLabels(t: (key: string) => string): RunFlowRes
 export const MAX_EVIDENCE_TASKS = 12;
 
 /** DONE → ✅ · GO_WITH_TECH_DEBT → ⚠ · NO_GO → ❌ · anything else → •. */
-export function verdictIcon(evaluation: string): string {
+export function verdictIcon(evaluation: string, glyphs: TerminalGlyphs = resolveTerminalGlyphs(false)): string {
   switch (evaluation) {
-    case 'DONE': return '✅';
-    case 'GO_WITH_TECH_DEBT': return '⚠';
-    case 'NO_GO': return '❌';
-    default: return '•';
+    case 'DONE': return glyphs.verdictSuccess;
+    case 'GO_WITH_TECH_DEBT': return glyphs.warning;
+    case 'NO_GO': return glyphs.verdictFailure;
+    default: return glyphs.bullet;
   }
 }
 
@@ -963,7 +982,7 @@ export function verdictIcon(evaluation: string): string {
  * "0 files · +0/-0"). `{coverage}` is omitted when zero.
  */
 export function formatTaskEvidenceLine(task: RunTaskEvidence, labels: RunFlowResultLabels): string {
-  const base = `  ${verdictIcon(task.evaluation)} ${task.taskId}${task.title ? ` ${task.title}` : ''}`;
+  const base = `  ${verdictIcon(task.evaluation, labels.glyphs)} ${task.taskId}${task.title ? ` ${task.title}` : ''}`;
   let detail = '';
   if (task.filesChanged > 0) {
     detail += labels.evidenceFiles
@@ -973,7 +992,7 @@ export function formatTaskEvidenceLine(task: RunTaskEvidence, labels: RunFlowRes
   }
   if (task.testsPassed || task.coverage > 0) {
     detail += labels.evidenceTests
-      .replace('{mark}', task.testsPassed ? '✓' : '✗')
+      .replace('{mark}', task.testsPassed ? (labels.glyphs?.success ?? '✓') : (labels.glyphs?.failure ?? '✗'))
       .replace('{coverage}', task.coverage > 0 ? ` ${task.coverage}%` : '');
   }
   return base + detail;
@@ -1152,12 +1171,26 @@ export function wireApprovalCrossProcess(
  * verdict tokens (DONE/TECH_DEBT/NO_GO/FAILED), counts, ids, and raw failure
  * detail remain unchanged inside the localized envelope.
  */
-export function buildBgTurnEvent(info: RunCompletionInfo, language: 'en' | 'tr' = 'en'): ChatTurnBgEvent {
+function renderTerminalMessage(
+  key: string,
+  language: string,
+  glyphs: TerminalGlyphs,
+  values: Readonly<Record<string, string>> = {},
+): string {
+  const template = renderTerminalOwnedTemplate(getMessage(key, language), glyphs);
+  return template.replace(/\{([^{}]+)\}/g, (placeholder, name: string) => values[name] ?? placeholder);
+}
+
+export function buildBgTurnEvent(
+  info: RunCompletionInfo,
+  language: 'en' | 'tr' = 'en',
+  glyphs: TerminalGlyphs = resolveTerminalGlyphs(false),
+): ChatTurnBgEvent {
   const source = info.sprintId ?? info.jobId;
   if (info.status === 'FAILED') {
     return {
       source,
-      summary: getMessage(info.error ? 'tui.bg_turn.failed_with_error' : 'tui.bg_turn.failed', language, {
+      summary: renderTerminalMessage(info.error ? 'tui.bg_turn.failed_with_error' : 'tui.bg_turn.failed', language, glyphs, {
         source,
         ...(info.error ? { error: info.error } : {}),
       }),
@@ -1169,7 +1202,7 @@ export function buildBgTurnEvent(info: RunCompletionInfo, language: 'en' | 'tr' 
   const noGo = info.noGo ?? 0;
   return {
     source,
-    summary: getMessage('tui.bg_turn.completed', language, {
+    summary: renderTerminalMessage('tui.bg_turn.completed', language, glyphs, {
       source,
       done: String(done),
       total: String(total),
@@ -1179,10 +1212,13 @@ export function buildBgTurnEvent(info: RunCompletionInfo, language: 'en' | 'tr' 
   };
 }
 
-export function buildApprovalDemoCopy(language: 'en' | 'tr'): { summary: string; reason: string } {
+export function buildApprovalDemoCopy(
+  language: 'en' | 'tr',
+  glyphs: TerminalGlyphs = resolveTerminalGlyphs(false),
+): { summary: string; reason: string } {
   return {
-    summary: getMessage('tui.approval_demo.summary', language),
-    reason: getMessage('tui.approval_demo.reason', language),
+    summary: renderTerminalOwnedTemplate(getMessage('tui.approval_demo.summary', language), glyphs),
+    reason: renderTerminalOwnedTemplate(getMessage('tui.approval_demo.reason', language), glyphs),
   };
 }
 
@@ -1204,10 +1240,11 @@ export function wireBgTurnsProducer(
   enqueueBg: (event: ChatTurnBgEvent) => void,
   watchFactory: typeof createRunCompletionWatch = createRunCompletionWatch,
   language: 'en' | 'tr' = 'en',
+  glyphs: TerminalGlyphs = resolveTerminalGlyphs(false),
 ): RunCompletionWatchHandle | undefined {
   if (!enabled) return undefined;
   return watchFactory(jobsDir, {
-    onComplete: (info) => enqueueBg(buildBgTurnEvent(info, language)),
+    onComplete: (info) => enqueueBg(buildBgTurnEvent(info, language, glyphs)),
   });
 }
 
@@ -1489,7 +1526,7 @@ export async function runInkRepl(
   createLegacyProvider: LegacyProviderFactory,
   rebuild: ProviderRebuild,
   registerTeardown: ReplTeardownRegistrar,
-  onBootSelection?: (selection?: BootHealthSelection) => Promise<void>,
+  onBootSelection?: (selection?: BootHealthSelection, glyphs?: TerminalGlyphs) => Promise<void>,
 ): Promise<void | NativeBootFailure> {
   // Project config is loaded once here and reused by boot admission and the
   // surface wire. A load failure is an honest typed boot refusal: silently
@@ -1519,9 +1556,14 @@ export async function runInkRepl(
   let lang = 'en';
   try { lang = getLanguage(projectCfg.language); } catch { /* default en */ }
   const t = (key: string, vars?: Record<string, string>): string => getMessage(key, lang, vars);
+  const terminalAscii = isDumbTerminal() || process.env['DECKENT_ASCII'] === '1' || !hasUtf8Locale(process.env);
+  const terminalGlyphs = resolveTerminalGlyphs(terminalAscii);
+  // Only catalog templates pass through this adapter, before callers insert
+  // identifiers or provider/user values into their placeholders.
+  const terminalLabel = (key: string): string => renderTerminalOwnedTemplate(t(key), terminalGlyphs);
 
   if (configLoadFailed) {
-    process.stdout.write(`\n${nativeBootErrorCode('config-invalid')}: ${t('native.boot.config-invalid')}\n`);
+    process.stdout.write(`\n${nativeBootErrorCode('config-invalid')}: ${terminalLabel('native.boot.config-invalid')}\n`);
     return { exitCode: 1, errorCode: 'config-invalid' };
   }
 
@@ -1558,10 +1600,10 @@ export async function runInkRepl(
     );
     if ('error' in nativeBoot) {
       if (explicitNativeIntent || nativeBoot.errorCode !== 'no-transport') {
-        process.stdout.write(`\n${nativeBootErrorCode(nativeBoot.errorCode)}: ${localizeNativeError(nativeBoot, lang, 'boot')}\n`);
+        process.stdout.write(`\n${nativeBootErrorCode(nativeBoot.errorCode)}: ${localizeNativeError(nativeBoot, lang, 'boot', terminalGlyphs)}\n`);
         return { exitCode: 1, errorCode: nativeBoot.errorCode ?? 'native-boot-failed' };
       }
-      process.stdout.write(`\n${t('native.boot.legacy-host-fallback', { provider: providerName })}\n`);
+      process.stdout.write(`\n${renderTerminalMessage('native.boot.legacy-host-fallback', lang, terminalGlyphs, { provider: providerName })}\n`);
     }
   }
 
@@ -1576,7 +1618,7 @@ export async function runInkRepl(
       // boot-time readiness: construction failure is reported before watchers.
       provider = createLegacyProvider();
     } catch {
-      process.stdout.write(`\n${t('native.boot.legacy-host-unavailable', { provider: providerName })}\n`);
+      process.stdout.write(`\n${renderTerminalMessage('native.boot.legacy-host-unavailable', lang, terminalGlyphs, { provider: providerName })}\n`);
       return { exitCode: 1, errorCode: 'legacy-host-unavailable' };
     }
   }
@@ -1640,7 +1682,7 @@ export async function runInkRepl(
       // in-process fixture, not a foreign-process record.
       if (process.env['DECKENT_APPROVAL_DEMO'] === '1') {
         const now = new Date();
-        const demoCopy = buildApprovalDemoCopy(lang as 'en' | 'tr');
+        const demoCopy = buildApprovalDemoCopy(lang as 'en' | 'tr', terminalGlyphs);
         broker.submit({
           id: randomUUID(),
           requester: { role: 'worker', instanceId: 'demo-worker' },
@@ -1676,7 +1718,7 @@ export async function runInkRepl(
         lifecycle: approvalLifecycle,
         actorId: nativePermissionActor,
         tenantId: nativePermissionTenant,
-        summary: (tool) => t('native_permission.request_summary').replace('{tool}', tool),
+        summary: (tool) => terminalLabel('native_permission.request_summary').replace('{tool}', tool),
         retireLocalRequest: (requestId) => retireNativeApproval?.(requestId),
       })
     : undefined;
@@ -1697,6 +1739,7 @@ export async function runInkRepl(
       (event) => bgEventSink?.(event),
       createRunCompletionWatch,
       lang as 'en' | 'tr',
+      terminalGlyphs,
     );
   } catch { runCompletionWatch = undefined; }
 
@@ -1829,7 +1872,7 @@ export async function runInkRepl(
     cliDispatcher,
     askConfirm,
     askConfirmAlways,
-    t,
+    t: terminalLabel,
     getToolSink: () => toolSink,
   });
 
@@ -1943,7 +1986,7 @@ export async function runInkRepl(
         };
         const next = resolveNativeSelection(target, { projectRoot: process.cwd(), env: process.env, config: resolvedNativeCfg, secrets: resolvedDeckSecrets });
         if ('error' in next) {
-          return { provider: live.provider, model: live.model, switchError: localizeNativeError(next, lang) };
+          return { provider: live.provider, model: live.model, switchError: localizeNativeError(next, lang, 'switch', terminalGlyphs) };
         }
         live.adapter = next.adapter;
         live.model = next.model;
@@ -1986,7 +2029,7 @@ export async function runInkRepl(
           return {
             ok: false,
             code: missingKey ? 'MISSING_CREDENTIAL' : 'NO_NATIVE_TRANSPORT',
-            detail: missingKey && probe.detail ? probe.detail : localizeNativeError(probe, lang),
+            detail: missingKey && probe.detail ? probe.detail : localizeNativeError(probe, lang, 'switch', terminalGlyphs),
           };
         };
         return {
@@ -1995,11 +2038,11 @@ export async function runInkRepl(
           policy,
           current: { provider: live.provider, model: live.model },
           availability,
-          modelsFact: (n) => t('tui.picker.fact.models').replace('{n}', String(n)),
+          modelsFact: (n) => terminalLabel('tui.picker.fact.models').replace('{n}', String(n)),
           // TERMINAL-PROVIDER-VOCAB-001 — rows are labeled by the REGISTRY owner
           // of each native transport; the transport itself is the via fact.
           transport: (provider) => ({ owner: registryProviderFor(provider) ?? provider, via: nativeProviderVia(provider) }),
-          viaFact: (via) => t(PICKER_VIA_KEYS[via]),
+          viaFact: (via) => terminalLabel(PICKER_VIA_KEYS[via]),
         };
       };
       pickerSpecs = {
@@ -2083,8 +2126,8 @@ export async function runInkRepl(
         root: process.cwd(),
         config: cfg as ResolvedConfig,
         completionLabels: {
-          completed: (jobId) => t('tui.run_flow.completed', { jobId }),
-          failed: (jobId) => t('tui.run_flow.failed', { jobId }),
+          completed: (jobId) => renderTerminalMessage('tui.run_flow.completed', lang, terminalGlyphs, { jobId }),
+          failed: (jobId) => renderTerminalMessage('tui.run_flow.failed', lang, terminalGlyphs, { jobId }),
         },
       });
       // TERM5-UI (sprint-427, task 6) — connects Task-4/5's ChatTurnQueue.
@@ -2100,7 +2143,7 @@ export async function runInkRepl(
           true,
           join(process.cwd(), JOBS_DIR),
           runFlowController,
-          buildRunFlowResultLabels(t),
+          buildRunFlowResultLabels(terminalLabel, terminalGlyphs),
           (event) => { runFlowResultSink?.(event); },
         );
       }
@@ -2137,7 +2180,7 @@ export async function runInkRepl(
               nativePermissionDecision(request, approval, lifetimes, maskedArgs, signal, validateRequest)
           : async () => ({ decision: 'hold', reasonCode: 'NATIVE_PERMISSION_AUTHORITY_UNAVAILABLE' }),
         toolSink: (info) => { if (toolSink) toolSink(info); },
-        t: (key: string) => getMessage(key, lang),
+        t: terminalLabel,
         ...(costCeilingUsd !== undefined ? { costCeilingUsd } : {}),
         ...(recordTurn ? { recordTurn } : {}),
         scratch: scratchIds,
@@ -2148,17 +2191,17 @@ export async function runInkRepl(
 
   // Health is emitted only after the native authority's single boot resolution.
   // Undefined preserves the legacy host selection/probe path.
-  await onBootSelection?.(bootHealthSelection);
+  await onBootSelection?.(bootHealthSelection, terminalGlyphs);
 
   // NATIVE-BUDGET-RENEWAL (557-002) — register `/renew` on the native path ONLY.
   // The command is answered by the wrapper (engine seam + localized confirmation,
   // no provider turn); the legacy loop path builds no engine here and therefore
   // never gains it. Renewal stays strictly user-initiated — the wrapper is the
   // ONLY caller of the session's renewBudgetEpoch seam.
-  if (nativeEngine) nativeEngine = withRenewSlash(nativeEngine, buildRenewSlashLabels(t));
+  if (nativeEngine) nativeEngine = withRenewSlash(nativeEngine, buildRenewSlashLabels(terminalLabel));
   // TERMINAL-TOOLS-010 — `/context` · `/compact` on the native path only (the
   // legacy loop has no engine here and therefore no seam to answer them).
-  if (nativeEngine) nativeEngine = withContextSlashes(nativeEngine, buildContextSlashLabels(t));
+  if (nativeEngine) nativeEngine = withContextSlashes(nativeEngine, buildContextSlashLabels(terminalLabel));
 
   // Alternate-screen mode (OPT-IN: DECKENT_ALTSCREEN=1). It fixed the WSL
   // drift/blank but REMOVES native scrollback — long replies couldn't be scrolled
@@ -2199,14 +2242,13 @@ export async function runInkRepl(
   const sessionAuthority = createSessionAuthority({
     posture: resolveConfiguredPosture((projectCfg as { terminal?: { posture?: unknown } }).terminal?.posture),
   });
-  const terminalAscii = isDumbTerminal() || process.env['DECKENT_ASCII'] === '1' || !hasUtf8Locale(process.env);
-
   // TERMINAL-READABILITY-001 — the palette is resolved ONCE from the color gate
   // (host-theme-mapped 16-color unless a dark background is proven; nothing
   // when suppressed) and provided to every card through context.
   const appElement = (
     <InkPaletteProvider palette={resolveInkPalette(colorTier())}>
-    <ReplErrorBoundary label={t('tui.render_error')} describeError={buildReplErrorDescriber(lang)}>
+    <TerminalGlyphProvider glyphs={terminalGlyphs}>
+    <ReplErrorBoundary label={terminalLabel('tui.render_error')} warning={terminalGlyphs.warning} describeError={buildReplErrorDescriber(lang, terminalGlyphs)}>
     <ReplApp
       provider={switcher.proxy}
       dispatcher={dispatcher}
@@ -2215,7 +2257,7 @@ export async function runInkRepl(
       slashRegistry={buildSlashRegistry(lang, {
         busyControls: replSurfaceEnabled && nativeEngine !== undefined,
         interrupt: nativeEngine?.cancelTurn !== undefined,
-      })}
+      }).map((entry) => ({ ...entry, desc: renderTerminalOwnedTemplate(entry.desc, terminalGlyphs) }))}
       {...(replMcpBridge || replMcpUnavailableMessage ? {
         nativeMcpSlash: (args: readonly string[]) => replMcpBridge
           ? dispatchMcpSlash({
@@ -2238,20 +2280,20 @@ export async function runInkRepl(
       {...(memory ? { memory } : {})}
       {...(sessionId ? { sessionId } : {})}
       sprintHistoricalContext={sprintHistoricalContext}
-      renderSprintContextReason={(reasonCode) => localizeSprintContextReason(reasonCode, t)}
+      renderSprintContextReason={(reasonCode) => localizeSprintContextReason(reasonCode, terminalLabel)}
       lang={lang}
-      labels={buildReplLabels(t)}
-      approvalLabels={buildApprovalLabels(t)}
-      doSlashLabels={buildDoSlashLabels(t)}
-      runInboxProvider={(input) => renderRunsCommand(process.cwd(), input, buildInboxLabels(t))}
+      labels={buildReplLabels(terminalLabel)}
+      approvalLabels={buildApprovalLabels(terminalLabel)}
+      doSlashLabels={buildDoSlashLabels(terminalLabel)}
+      runInboxProvider={(input) => renderRunsCommand(process.cwd(), input, buildInboxLabels(terminalLabel), { separator: terminalGlyphs.separator })}
       inboxFollowFeed={() => collectInboxRows(process.cwd())}
-      inboxLabels={buildInboxLabels(t)}
-      pickerLabels={buildPickerLabels(t)}
+      inboxLabels={buildInboxLabels(terminalLabel)}
+      pickerLabels={buildPickerLabels(terminalLabel)}
       pickerSpecs={pickerSpecs ?? buildLegacyPickerSpecs(
         () => switcher.current(),
         () => process.cwd(),
-        (n) => t('tui.picker.fact.models').replace('{n}', String(n)),
-        (via) => t(PICKER_VIA_KEYS[via]),
+        (n) => terminalLabel('tui.picker.fact.models').replace('{n}', String(n)),
+        (via) => terminalLabel(PICKER_VIA_KEYS[via]),
         (provider) => hostEvidence.get(provider),
       )}
       pickerEvidence={{ refresh: () => hostEvidence.refresh(), subscribe: (listener) => hostEvidence.subscribe(listener) }}
@@ -2259,7 +2301,7 @@ export async function runInkRepl(
         // Native and legacy-host selectors have distinct persisted authority.
         // A legacy subscription identity must never become an API transport pin.
         const selection = resolveProviderDefaultWrite(nativeSelection, kind, id);
-        if ('errorKey' in selection) return { ok: false, error: t(selection.errorKey) };
+        if ('errorKey' in selection) return { ok: false, error: terminalLabel(selection.errorKey) };
         const out = setConfigValues(process.cwd(), selection.patch);
         return out.ok ? { ok: true } : { ok: false, error: out.error };
       }}
@@ -2286,42 +2328,43 @@ export async function runInkRepl(
       atRefPathProvider={atRefPathProvider}
       atRefReader={atRefReader}
       caretStyle={isColorSuppressed() ? 'marker' : 'inverse'}
-      shortcutsPanel={buildShortcutsPanel(t)}
+      shortcutsPanel={buildShortcutsPanel(terminalLabel)}
       {...(nativeEngine ? { nativeEngine } : {})}
       {...(nativeEngine ? {
         toolRead: {
           dispatchRead: cliDispatcher.dispatchRead,
-          dispatchStructuredAction: buildStructuredActionDispatcher({ cliDispatcher, askConfirm, askConfirmAlways, t }),
-          actionLabels: buildStructuredActionLabels(t),
+          dispatchStructuredAction: buildStructuredActionDispatcher({ cliDispatcher, askConfirm, askConfirmAlways, t: terminalLabel }),
+          actionLabels: buildStructuredActionLabels(terminalLabel),
           readDetailRange: sessionContentStore.readDetailRange,
-          labels: buildToolReadLabels(t),
+          labels: buildToolReadLabels(terminalLabel),
         },
       } : {})}
       replSurfaceEnabled={replSurfaceEnabled}
       startupRecentSessions={projectCfg.terminal?.startup?.recent_sessions === true}
       {...(stateFeed ? { stateFeed } : {})}
-      liveFooterLabels={buildLiveFooterLabels(t)}
+      liveFooterLabels={buildLiveFooterLabels(terminalLabel)}
       approvalsEnabled={approvalsEnabled}
       {...(approvalChannel ? { approvalChannel } : {})}
       nativePermissionIntent={{
         controller: nativePermissionIntent,
-        labels: buildNativePermissionIntentLabels(t),
+        labels: buildNativePermissionIntentLabels(terminalLabel),
       }}
       registerNativeApprovalRetire={(retire) => { retireNativeApproval = retire; }}
       {...(bgTurnsEnabled ? { registerBgEventSink: (enqueue: (event: ChatTurnBgEvent) => void) => { bgEventSink = enqueue; } } : {})}
-      runFlowCardLabels={buildPlanPreviewCardLabels(lang)}
-      runFlowMountLabels={buildRunFlowMountLabels(t)}
+      runFlowCardLabels={buildPlanPreviewCardLabels(lang, terminalGlyphs)}
+      runFlowMountLabels={buildRunFlowMountLabels(terminalLabel)}
       {...(runFlowController ? {
         runFlowController,
         registerRunFlowResultSink: (enqueue: (event: ChatTurnBgEvent) => void) => { runFlowResultSink = enqueue; },
       } : {})}
     />
     </ReplErrorBoundary>
+    </TerminalGlyphProvider>
     </InkPaletteProvider>
   );
   const resizeMediator = createTerminalResizeMediator({
     stdout: process.stdout,
-    onFailure: ({ code }) => { process.stderr.write(`${t('tui.resize.failed').replace('{code}', () => code)}\n`); },
+    onFailure: ({ code }) => { process.stderr.write(`${terminalLabel('tui.resize.failed').replace('{code}', () => code)}\n`); },
   });
   const inkTree = <TerminalViewportProvider mediator={resizeMediator}>{appElement}</TerminalViewportProvider>;
   const inkInstance = render(

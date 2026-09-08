@@ -25,6 +25,8 @@ import type { ResolvedConfig } from '../../src/core/config-types.js';
 import { modelRegistry } from '../../src/core/model-registry.js';
 import { MemoryStore } from '../../src/core/memory-store.js';
 import type { AuthProbeResult } from '../../src/core/provider-auth-probe.js';
+import { getMessage } from '../../src/cli/helpers/messages.js';
+import { resolveTerminalGlyphs } from '../../src/cli/helpers/terminal-glyphs.js';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────
 
@@ -398,5 +400,28 @@ describe('renderHealthSnapshot', () => {
     // the leading provider/model segment (before the first ` · `) must NOT
     // try to pair an unresolved provider with a model (e.g. "unknown/sonnet").
     expect(en.split(' · ')[0]).not.toContain('/');
+  });
+
+  it('uses ASCII owned separators while preserving raw provider, model, cwd, and injected warning bytes', () => {
+    const rawSnapshot = {
+      ...snapshot,
+      provider: { status: 'ok' as const, label: 'provider·raw' },
+      model: { status: 'ok' as const, label: 'model—raw' },
+      sessions: { status: 'warn' as const, label: '4·—raw' },
+      cwd: '/work/·/—/raw',
+    };
+    const getMessageFn: typeof getMessage = (key, _lang, vars) => key === 'health.session_warn'
+      ? `⚠ ${vars?.['count']} — sessions · active`
+      : key;
+    const out = renderHealthSnapshot(rawSnapshot, 'en', {
+      glyphs: resolveTerminalGlyphs(true),
+      getMessageFn,
+    });
+
+    expect(out).toContain('provider·raw/model—raw');
+    expect(out).toContain('/work/·/—/raw');
+    expect(out).toContain('⚠ 4·—raw — sessions · active');
+    expect(out.split('\n')[0]).toContain(' | auth:');
+    expect(out.split('\n')[0]).not.toContain(' · auth:');
   });
 });

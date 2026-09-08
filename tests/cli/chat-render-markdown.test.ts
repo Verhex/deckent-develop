@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { renderMarkdown } from '../../src/cli/commands/chat-render.js';
+import { stripAnsi } from '../../src/cli/helpers/output.js';
+import { displayWidth } from '../../src/cli/repl/cursor-model.js';
 
 // born-525: (1) inline-code/link RESET bleeding through an outer heading/bold
 // span, (2) markdown link regex truncating a balanced-paren URL.
@@ -68,5 +70,33 @@ describe('renderMarkdown — link regex balanced-paren URL (born-525)', () => {
   it('still handles a link with a title attribute (no regression)', () => {
     const out = renderMarkdown('[Docs](https://example.com "Title") end', true, { hyperlinks: true });
     expect(out).toContain('\x1b]8;;https://example.com\x07');
+  });
+});
+
+describe('renderMarkdown — ASCII-owned decoration', () => {
+  it('uses ASCII frames/lists/rules while preserving raw Unicode content', () => {
+    const input = [
+      '```txt', 'Türkçe ✓ 東京 😀', '```', '',
+      '| ad | değer |', '| --- | --- |', '| 東京 | kullanıcı·✓ |', '',
+      '- öğe✓', '', '---', '', '> [!NOTE] Türkçe·uyarı', '> sağlayıcı✓',
+    ].join('\n');
+    const plain = stripAnsi(renderMarkdown(input, true, { ascii: true }));
+    expect(plain).toContain('Türkçe ✓ 東京 😀');
+    expect(plain).toContain('kullanıcı·✓');
+    expect(plain).toContain('- öğe✓');
+    expect(plain).toContain('! NOTE Türkçe·uyarı');
+    expect(plain).not.toMatch(/[╭╮╰╯┌┬┐├┼┤└┴┘│─▌•]/u);
+    expect(plain).toContain('+');
+    expect(plain).toContain('|');
+  });
+
+  it('aligns authored code/table frames by display cells for CJK and emoji', () => {
+    const plain = stripAnsi(renderMarkdown('```txt\n東京😀\nx\n```', true, { ascii: true }));
+    const framed = plain.split('\n');
+    expect(new Set(framed.map(displayWidth)).size).toBe(1);
+
+    const table = stripAnsi(renderMarkdown('| ad | değer |\n| --- | --- |\n| 東京 | 😀 |', true, { ascii: true }));
+    const rows = table.split('\n');
+    expect(new Set(rows.map(displayWidth)).size).toBe(1);
   });
 });

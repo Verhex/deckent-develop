@@ -4,6 +4,8 @@ import { render } from 'ink-testing-library';
 import { ToolReadCard } from '../../../src/cli/repl/tool-read-card.js';
 import type { ToolReadLabels } from '../../../src/cli/repl/tool-read-labels.js';
 import type { ToolReadProjection } from '../../../src/cli/repl/tool-read-model.js';
+import { TerminalGlyphProvider } from '../../../src/cli/repl/terminal-glyph-context.js';
+import { resolveTerminalGlyphs } from '../../../src/cli/helpers/terminal-glyphs.js';
 
 const labels: ToolReadLabels = {
   title: { doctor: 'Doctor', history: 'History', models: 'Models', 'model-active-set': 'Active models', agents: 'Agents', skills: 'Skills' },
@@ -22,7 +24,11 @@ const model: ToolReadProjection = {
   ],
 };
 const tick = (ms = 30): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-const CARD = (extra: Partial<React.ComponentProps<typeof ToolReadCard>> = {}): React.ReactElement => <ToolReadCard open model={model} labels={labels} columns={24} rows={8} overflow="..." ascii={false} isActive onClose={() => {}} {...extra} />;
+const CARD = (extra: Partial<React.ComponentProps<typeof ToolReadCard>> = {}, ascii = false): React.ReactElement => (
+  <TerminalGlyphProvider glyphs={resolveTerminalGlyphs(ascii)}>
+    <ToolReadCard open model={model} labels={labels} columns={24} rows={8} overflow="..." ascii={ascii} isActive onClose={() => {}} {...extra} />
+  </TerminalGlyphProvider>
+);
 
 describe('ToolReadCard', () => {
   it('reuses complete detail wrapping across page keys and recomputes for new geometry', async () => {
@@ -104,6 +110,21 @@ describe('ToolReadCard', () => {
     expect(normalized).toContain('a'.repeat(64));
     expect(pages.join('\n')).toContain('123456');
     expect(normalized).toContain('count:2');
+    ui.unmount();
+  });
+
+  it('uses ASCII card chrome/state separators without rewriting projected data', async () => {
+    const projected: ToolReadProjection = {
+      kind: 'agents', state: 'partial', count: 1, reasonCode: 'Türkçe·CODE😀',
+      rows: [{ id: 'raw-unicode', title: 'sağlayıcı✓東京', fields: [{ key: 'value', value: 'içerik·😀' }] }],
+    };
+    const ui = render(CARD({ model: projected, columns: 50 }, true));
+    await tick();
+    const frame = ui.lastFrame() ?? '';
+    expect(frame).toMatch(/^\+-+\+$/m);
+    expect(frame).toContain('Partial | reason: Türkçe·CODE😀');
+    expect(frame).toContain('sağlayıcı✓東京');
+    expect(frame).not.toMatch(/[╭╮╰╯│❯]/u);
     ui.unmount();
   });
 });

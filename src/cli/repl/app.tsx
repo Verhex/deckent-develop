@@ -11,6 +11,7 @@
 
 import { Box, Text, Static, useInput, useApp, useStdout, measureElement, type DOMElement } from 'ink';
 import { InkPaletteContext, useInkPalette } from './ink-palette-context.js';
+import { useTerminalGlyphs } from './terminal-glyph-context.js';
 import type { SessionAuthority } from './session-authority.js';
 import type { InkPalette } from './ink-palette.js';
 import { useState, useRef, useEffect, useContext, Component, type ReactElement, type ReactNode } from 'react';
@@ -57,7 +58,7 @@ import { buildApprovalPickerSpec, buildTermPickerSpec, buildResumePickerSpec, bu
 import { APPROVAL_MODES, type ApprovalMode } from '../../agent/permission-types.js';
 import { createChatTurnQueue, type ChatTurnQueue, type ChatTurnBgEvent, type ChatTurnPayload } from './chat-turn-queue.js';
 import { createInputQueue, type InputQueue } from './input-queue.js';
-import { displayWidth } from './cursor-model.js';
+import { displayWidth, truncateEnd } from './cursor-model.js';
 import { listRecentSessions, pickSession, type SessionRecord } from '../helpers/session-resume.js';
 import {
   appendSprintHistoricalContext,
@@ -438,12 +439,13 @@ export function buildResumePickerLines(
   disk: readonly SessionRecord[],
   chat: readonly SessionRecord[],
   labels: Pick<ReplLabels, 'resumeHeader' | 'resumeHint'>,
+  separator = '·',
 ): string[] {
   const combined = [...disk, ...chat];
   if (combined.length === 0) return [];
   const lines: string[] = [requireInjectedLabel('resumeHeader', labels.resumeHeader)];
   combined.forEach((s, i) => {
-    lines.push(`  ${i + 1}. ${s.title} · ${s.status} · ${shortSessionTime(s.date)}`);
+    lines.push(`  ${i + 1}. ${s.title} ${separator} ${s.status} ${separator} ${shortSessionTime(s.date)}`);
   });
   lines.push(requireInjectedLabel('resumeHint', labels.resumeHint));
   return lines;
@@ -475,11 +477,12 @@ export function resolveResumeCommand(
   disk: readonly SessionRecord[],
   chat: readonly SessionRecord[],
   labels: Pick<ReplLabels, 'resumeHeader' | 'resumeHint' | 'resumeSwitched' | 'resumeNotFound' | 'resumeAmbiguous'>,
+  separator = '·',
 ): ResumeCommandDecision {
   const combined = [...disk, ...chat];
   if (combined.length === 0) return { kind: 'passthrough' };
   const trimmed = arg.trim();
-  if (trimmed.length === 0) return { kind: 'list', lines: buildResumePickerLines(disk, chat, labels) };
+  if (trimmed.length === 0) return { kind: 'list', lines: buildResumePickerLines(disk, chat, labels, separator) };
   const picked = pickSession(trimmed, combined);
   if (picked.kind === 'found') {
     return {
@@ -492,7 +495,7 @@ export function resolveResumeCommand(
     };
   }
   if (picked.kind === 'ambiguous') {
-    const ids = picked.matches.map((m) => m.id).join(' · ');
+    const ids = picked.matches.map((m) => m.id).join(` ${separator} `);
     return { kind: 'reject', line: requireInjectedLabel('resumeAmbiguous', labels.resumeAmbiguous).replace('{matches}', ids) };
   }
   if (/^\d+$/.test(trimmed)) {
@@ -598,9 +601,8 @@ export function buildSegmentTurns(
  * whole code points instead. TERMINAL-TOOLS-004: the caller derives `max`
  * from the live terminal width (queuePreviewCells) — 60 stays the default
  * for the pure helper's existing callers/tests. */
-export function truncateQueuePreview(text: string, max = 60): string {
-  const points = [...text];
-  return points.length > max ? points.slice(0, max).join('') + '…' : text;
+export function truncateQueuePreview(text: string, max = 60, ellipsis = '…'): string {
+  return truncateEnd(text, max, ellipsis);
 }
 
 /** Queue-preview budget for a terminal width: the row prefix (`  ⋯ <label> N: `)
@@ -882,11 +884,11 @@ export interface DoSlashLabels {
  * `do.slash_no_providers` template (same `.replace('{…}')` precedent as
  * run.tsx's renew/compact labels). Pure; string-free beyond punctuation.
  */
-export function formatDoSlashNoProviders(template: string, details: RunFlowProviderHoldDetails): string {
+export function formatDoSlashNoProviders(template: string, details: RunFlowProviderHoldDetails, emptyValue = '—'): string {
   return template
     .replace('{model}', details.model)
     .replace('{provider}', details.provider ?? '?')
-    .replace('{registered}', details.registered.length > 0 ? details.registered.join(', ') : '—');
+    .replace('{registered}', details.registered.length > 0 ? details.registered.join(', ') : emptyValue);
 }
 
 /** Dependency-injected effect seam for the REPL `/do <goal>` slash (452-002),
@@ -910,6 +912,8 @@ export interface ReplDoSlashDeps {
   setPreview: (preview: PlanPreview | null) => void;
   /** Report a controller error as a transcript line (formatRunFlowOutcomeLine). */
   reportError: (message: string) => void;
+  /** Caller-owned unavailable-value punctuation. */
+  emptyValue?: string;
 }
 
 /**
@@ -943,7 +947,7 @@ export async function runReplDoSlash(goal: string, deps: ReplDoSlashDeps): Promi
     deps.setPreview(deriveRunFlowPreview(ctx));
   } catch (err) {
     if (err instanceof RunFlowProviderHoldError) {
-      deps.reportError(formatDoSlashNoProviders(deps.labels.noProviders, err.details));
+      deps.reportError(formatDoSlashNoProviders(deps.labels.noProviders, err.details, deps.emptyValue));
       return;
     }
     deps.reportError(err instanceof Error ? err.message : String(err));
@@ -1309,8 +1313,8 @@ export async function runNativeTurnLoop(
  * label so the localized `tui.turn_error` row (run.tsx) is not forced to
  * embed a decorative glyph. `label` is the injected `{error}` template;
  * TERMINAL-TOOLS-002 removed the English fallback (typed guard error). */
-export function formatTurnErrorLine(message: string, label: string): string {
-  return `⚠ ${requireInjectedLabel('turnError', label).replace('{error}', message)}`;
+export function formatTurnErrorLine(message: string, label: string, warning = '⚠'): string {
+  return `${warning} ${requireInjectedLabel('turnError', label).replace('{error}', message)}`;
 }
 
 /**
@@ -1331,6 +1335,7 @@ export function formatTurnErrorLine(message: string, label: string): string {
 export interface ReplErrorBoundaryProps {
   children: ReactNode;
   label: string;
+  warning?: string;
   describeError?: (err: Error) => string;
 }
 
@@ -1345,7 +1350,7 @@ export class ReplErrorBoundary extends Component<ReplErrorBoundaryProps, { err: 
   override render(): ReactNode {
     if (this.state.err) {
       const describe = this.props.describeError ?? ((err: Error): string => err.message);
-      return <Text {...(this.context?.error ?? {})}>{`⚠ ${this.props.label}: ${describe(this.state.err)}`}</Text>;
+      return <Text {...(this.context?.error ?? {})}>{`${this.props.warning ?? '⚠'} ${this.props.label}: ${describe(this.state.err)}`}</Text>;
     }
     return this.props.children;
   }
@@ -1594,7 +1599,10 @@ export interface Turn { id: number; role: 'user' | 'head' | 'seg' | 'foot' | 'to
 /** Animated braille spinner (no extra dep). */
 function Spinner(): ReactElement {
   const palette = useInkPalette();
-  const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  const glyphs = useTerminalGlyphs();
+  const frames = glyphs.ascii
+    ? ['-', '\\', '|', '/']
+    : ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
   const [i, setI] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setI((n) => (n + 1) % frames.length), 80);
@@ -1605,15 +1613,17 @@ function Spinner(): ReactElement {
 
 function DeckentHeader(): ReactElement {
   const palette = useInkPalette();
-  return <Text><Text {...palette.accent}>● </Text><Text bold>deckent</Text></Text>;
+  const glyphs = useTerminalGlyphs();
+  return <Text><Text {...palette.accent}>{`${glyphs.assistant} `}</Text><Text bold>deckent</Text></Text>;
 }
 
 function TurnView({ turn, hyperlinks }: { turn: Turn; hyperlinks: boolean }): ReactElement {
   const palette = useInkPalette();
+  const glyphs = useTerminalGlyphs();
   if (turn.role === 'user') {
     return (
       <Box marginTop={1}>
-        <Text {...palette.muted}>{'› '}</Text>
+        <Text {...palette.muted}>{`${glyphs.user} `}</Text>
         <Text>{turn.text}</Text>
       </Box>
     );
@@ -1626,16 +1636,16 @@ function TurnView({ turn, hyperlinks }: { turn: Turn; hyperlinks: boolean }): Re
     if (failed) {
       return (
         <Box marginTop={1}>
-          <Text {...palette.muted}><Text {...palette.error}>✗ </Text>{verb}<Text {...palette.muted}> {target}</Text></Text>
+          <Text {...palette.muted}><Text {...palette.error}>{`${glyphs.failure} `}</Text>{verb}<Text {...palette.muted}> {target}</Text></Text>
         </Box>
       );
     }
     return (
       <Box flexDirection="column" marginTop={1}>
-        <Text><Text {...palette.accent}>● </Text><Text bold>{verb}</Text><Text {...palette.muted}> {target}</Text></Text>
+        <Text><Text {...palette.accent}>{`${glyphs.assistant} `}</Text><Text bold>{verb}</Text><Text {...palette.muted}> {target}</Text></Text>
         {hasDelta && (
           <Text>
-            {'  ⎿ '}
+            {`  ${glyphs.branch} `}
             {added !== undefined ? <Text {...palette.success}>+{added} </Text> : null}
             {removed !== undefined ? <Text {...palette.error}>-{removed} </Text> : null}
             {note !== undefined ? <Text {...palette.muted}>{note}</Text> : null}
@@ -1651,18 +1661,18 @@ function TurnView({ turn, hyperlinks }: { turn: Turn; hyperlinks: boolean }): Re
     return (
       <Box flexDirection="column" marginTop={1}>
         {turn.text.split('\n').map((line, i) => (
-          <Text key={i} {...palette.muted}><Text {...palette.accent}>{'» '}</Text>{line}</Text>
+          <Text key={i} {...palette.muted}><Text {...palette.accent}>{`${glyphs.background} `}</Text>{line}</Text>
         ))}
       </Box>
     );
   }
   if (turn.role === 'foot') {
     const s = turn.stats;
-    return <Text {...palette.muted}>{`⏱ ${s ? (s.elapsedMs / 1000).toFixed(1) : '0'}s${s?.tokens ? ` · ${s.tokens} tok` : ''}`}</Text>;
+    return <Text {...palette.muted}>{`${glyphs.elapsed} ${s ? (s.elapsedMs / 1000).toFixed(1) : '0'}s${s?.tokens ? ` ${glyphs.separator} ${s.tokens} tok` : ''}`}</Text>;
   }
   // 'seg' — one completed reply line/block, rendered markdown, no margin (flows
   // directly under the head + previous segments).
-  return <Text>{renderMarkdown(turn.text, true, { hyperlinks })}</Text>;
+  return <Text>{renderMarkdown(turn.text, true, { hyperlinks, ascii: glyphs.ascii })}</Text>;
 }
 
 export interface NativeMcpRouteOptions {
@@ -1688,6 +1698,7 @@ export async function routeNativeMcpInput(options: NativeMcpRouteOptions): Promi
 export function ReplApp(props: ReplAppProps): ReactElement {
   const palette = useInkPalette();
   const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, nativeMcpSlash, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, startupRecentSessions = false, sprintHistoricalContext, renderSprintContextReason, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, nativePermissionIntent, registerNativeApprovalRetire, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false, reducedMotion = false, dualStreamOverflow, toolRead } = props;
+  const glyphs = useTerminalGlyphs();
   const resumeLedgerOptions: LedgerStoreOptions = { ...props.resumeLedgerOptions, cwd: props.cwd };
   const { exit, suspendTerminal } = useApp();
   // TERMINAL-TOOLS-004 — live width for the status row + queue preview (reflows on resize).
@@ -1833,7 +1844,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       return false;
     }
     setSelection({ provider: next.provider, model: next.model });
-    pushTurn('seg', `${labels.switched}: ${next.provider}${next.model ? ` · ${next.model}` : ''}`);
+    pushTurn('seg', `${labels.switched}: ${next.provider}${next.model ? ` ${glyphs.separator} ${next.model}` : ''}`);
     return true;
   };
 
@@ -1941,7 +1952,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (kind === 'approve') return buildApprovalPickerSpec(APPROVAL_MODES, approval, (m) => pickerLabels.approveFacts[m]);
     if (kind === 'term') {
       return buildTermPickerSpec(TERM_MODES, termModeRef.current.mode,
-        (mode) => [...ALLOWED_RISKS_BY_MODE[mode]].map((risk) => renderCommandRisk(risk, lang ?? 'en').label).join(' · '),
+        (mode) => [...ALLOWED_RISKS_BY_MODE[mode]].map((risk) => renderCommandRisk(risk, lang ?? 'en').label).join(` ${glyphs.separator} `),
         (mode) => resolveModeLabel(mode, labels));
     }
     if (kind === 'resume') {
@@ -1954,8 +1965,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       if (!configEntries) return null;
       return buildConfigKeyPickerSpec(configEntries(), (e) => [
         e.category,
-        pickerLabels.configFacts.current.replace('{value}', formatConfigValue(e.current)),
-        pickerLabels.configFacts.default.replace('{value}', formatConfigValue(e.defaultValue)),
+        pickerLabels.configFacts.current.replace('{value}', formatConfigValue(e.current, glyphs.ellipsis)),
+        pickerLabels.configFacts.default.replace('{value}', formatConfigValue(e.defaultValue, glyphs.ellipsis)),
       ]);
     }
     if (kind === 'config-value') {
@@ -1984,7 +1995,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (kind === 'term') { runTerm(id as TermMode); return; }
     if (kind === 'resume') {
       const merged = mergedResumeRecords();
-      applyResumeDecision(resolveResumeCommand(id, merged.disk, merged.resumable, labels));
+      applyResumeDecision(resolveResumeCommand(id, merged.disk, merged.resumable, labels, glyphs.separator));
       return;
     }
     // TERMINAL-PICKER-004 — key stage → value stage for that key; value stage
@@ -2331,7 +2342,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       chatSessionsToRecords(listLedgerSessions(RESUME_RECENT_LIMIT, resumeLedgerOptions)),
       chatSessionsToRecords(memory?.listChatSessions?.(RESUME_RECENT_LIMIT) ?? []),
     );
-    const lines = buildResumePickerLines(merged.disk, merged.resumable, labels);
+    const lines = buildResumePickerLines(merged.disk, merged.resumable, labels, glyphs.separator);
     if (lines.length > 0) pushTurn('bg', lines.join('\n'));
     // labels/props.cwd are mount-stable (run.tsx passes literals); the ref
     // guard makes this one-shot even if the deps ever re-fired.
@@ -2493,7 +2504,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         // as a visible transcript line instead of silently exiting.
         onTurnError: (message) => {
           finalizeReply();
-          pushTurn('seg', formatTurnErrorLine(message, labels.turnError));
+          pushTurn('seg', formatTurnErrorLine(message, labels.turnError, glyphs.warning));
         },
         // REPL-575 K3 — persist native turns so /resume can replay them. The
         // legacy engine (else-branch below) already passes memory/sessionId to
@@ -2798,7 +2809,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         if (action.kind === 'picker') {
           const spec = buildStructuredActionPicker(action.family, actionLabels);
           if (resolvePickerSurfaceMode(columns) === 'lines') {
-            pushTurn('bg', pickerLinesFor(spec, pickerLabels, resolvePickerGlyphs(pickerAscii), trimmed).join('\n'));
+            pushTurn('bg', pickerLinesFor(spec, pickerLabels, resolvePickerGlyphs(pickerAscii), trimmed, { separator: ` ${glyphs.separator} `, overflowMarker: glyphs.ellipsis }).join('\n'));
           } else {
             pickerActionFamily.current = action.family;
             setPicker({ kind: 'action', spec });
@@ -2834,7 +2845,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           // TERMINAL-PICKER-005 — too narrow for a card: numbered transcript
           // lines; the next typed `<command> <n|id>` resolves against them.
           narrowPickerRef.current = { kind: pickerRequest.kind, spec };
-          pushTurn('bg', pickerLinesFor(spec, pickerLabels, resolvePickerGlyphs(pickerAscii), trimmed).join('\n'));
+          pushTurn('bg', pickerLinesFor(spec, pickerLabels, resolvePickerGlyphs(pickerAscii), trimmed, { separator: ` ${glyphs.separator} `, overflowMarker: glyphs.ellipsis }).join('\n'));
           return;
         }
         setPicker({ kind: pickerRequest.kind, spec });
@@ -2934,7 +2945,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       const resume = trimmed.match(/^\/resume(?:\s+(.*))?$/i);
       if (resume) {
         const merged = mergedResumeRecords();
-        const decision = resolveResumeCommand(resume[1] ?? '', merged.disk, merged.resumable, labels);
+        const decision = resolveResumeCommand(resume[1] ?? '', merged.disk, merged.resumable, labels, glyphs.separator);
         const literalId = (resume[1] ?? '').trim();
         if (decision.kind === 'passthrough' && /^sprint-\d+$/u.test(literalId)) {
           pushTurn('user', trimmed);
@@ -2994,7 +3005,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       if (arg) {
         runSwitch(kind, arg);
       } else {
-        pushTurn('seg', `${labels.switchUsage}\n${selection.provider}${selection.model ? ` · ${selection.model}` : ''}`);
+        pushTurn('seg', `${labels.switchUsage}\n${selection.provider}${selection.model ? ` ${glyphs.separator} ${selection.model}` : ''}`);
       }
       return;
     }
@@ -3026,6 +3037,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         setPreview: setRunFlowPreview,
         reportError: (message) =>
           pushTurn('bg', formatRunFlowOutcomeLine({ kind: 'error', message }, runFlowMountLabels)),
+        emptyValue: glyphs.dash,
       });
       return;
     }
@@ -3217,7 +3229,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         ? nativeToolActivity.cancelRequestedCompactLabel
         : nativeToolActivity.compactLabel)
         .replace('{tool}', tool).replace('{elapsed}', elapsed);
-      const budget = Math.max(1, columns - displayWidth('● deckent · '));
+      const budget = Math.max(1, columns - displayWidth(`${glyphs.assistant} deckent ${glyphs.separator} `));
       return clipTerminalCells(displayWidth(rich) <= budget ? rich : compact, budget, dualStreamOverflow);
     })()
     : null;
@@ -3225,9 +3237,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     ? (() => {
       const phaseText = phase === 'thinking' ? labels.thinking : labels.generating;
       const anchorPrefix = phase === 'idle'
-        ? `${inputBarActiveNow ? `✓ ${labels.ready}` : labels.inputPaused} · `
-        : `● deckent · ${phaseText} · `;
-      const interruptSuffix = interruptHint ? `  · ${interruptHint.text}` : '';
+        ? `${inputBarActiveNow ? `${glyphs.success} ${labels.ready}` : labels.inputPaused} ${glyphs.separator} `
+        : `${glyphs.assistant} deckent ${glyphs.separator} ${phaseText} ${glyphs.separator} `;
+      const interruptSuffix = interruptHint ? `  ${glyphs.separator} ${interruptHint.text}` : '';
       return clipTerminalCells(
         formatNativeRequestMetricSummary(nativeRequestMeasurement.event, labels.requestMetric),
         Math.max(1, columns - displayWidth(anchorPrefix) - displayWidth(interruptSuffix)),
@@ -3258,7 +3270,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       {queued.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
           {queued.map((q, i) => (
-            <Text key={i} {...palette.muted}>{`  ⋯ ${labels.queued} ${i + 1}: ${truncateQueuePreview(q, queuePreviewCells(columns))}`}</Text>
+            <Text key={i} {...palette.muted}>{`  ${glyphs.queue} ${labels.queued} ${i + 1}: ${truncateQueuePreview(q, queuePreviewCells(columns), glyphs.ellipsis)}`}</Text>
           ))}
         </Box>
       )}
@@ -3389,12 +3401,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         {/* TERMINAL-TOOLS-013: while a card owns stdin the anchor SAYS so
             instead of promising "your turn" (textual carrier, not layout). */}
         {nativeToolActivityText
-          ? <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`· ${nativeToolActivityText}`}</Text></>
+          ? <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`${glyphs.separator} ${nativeToolActivityText}`}</Text></>
           : phase === 'idle'
-          ? <Text {...palette.muted}>{inputBarActiveNow ? `✓ ${labels.ready}` : labels.inputPaused}{nativeRequestMetricText ? ` · ${nativeRequestMetricText}` : ''}</Text>
-          : <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`· ${phase === 'thinking' ? labels.thinking : labels.generating}${nativeRequestMetricText ? ` · ${nativeRequestMetricText}` : ''}`}</Text></>}
+          ? <Text {...palette.muted}>{inputBarActiveNow ? `${glyphs.success} ${labels.ready}` : labels.inputPaused}{nativeRequestMetricText ? ` ${glyphs.separator} ${nativeRequestMetricText}` : ''}</Text>
+          : <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`${glyphs.separator} ${phase === 'thinking' ? labels.thinking : labels.generating}${nativeRequestMetricText ? ` ${glyphs.separator} ${nativeRequestMetricText}` : ''}`}</Text></>}
         {/* TERMINAL-TOOLS-006: transient Ctrl-C hint (names the next key). */}
-        {interruptHint ? <Text {...palette.info}>{`  · ${interruptHint.text}`}</Text> : null}
+        {interruptHint ? <Text {...palette.info}>{`  ${glyphs.separator} ${interruptHint.text}`}</Text> : null}
       </Box>
 
       {/* Pinned input with a VISIBLE cursor + interactive /menu — always last. */}
@@ -3437,6 +3449,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           cwd,
           sessionTok,
           approval: approval !== 'suggest' ? approval : undefined,
+          glyphs,
           ...(activeSessionId ? { activeSession: { label: labels.activeChatSession, id: activeSessionId, overflowMarker: dualStreamOverflow ?? '...' } } : {}),
         }}
       />

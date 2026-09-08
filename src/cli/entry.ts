@@ -72,6 +72,7 @@ import {
   type OpenAICompatPresetName,
 } from '../providers/openai-compatible.js';
 import { buildHealthSnapshot, renderHealthSnapshot } from './helpers/health-snapshot.js';
+import type { TerminalGlyphs } from './helpers/terminal-glyphs.js';
 import { getLangFromConfig } from './helpers/config-reader.js';
 import { resolveWorktreeBinaryAuthority } from './worktree-binary-authority.js';
 import { withCliProviderAuthority } from './provider-authority-process-runtime.js';
@@ -723,12 +724,15 @@ export async function launchDefaultRepl(): Promise<void> {
   // TERMINAL-TOOLS-002 — ONE session-language resolution for every line this
   // boot path emits (health line, banner hint, `/` menu, loop, spinner, ticker).
   const replLang = getLangFromConfig(healthRoot);
-  const emitHealth = async (resolvedSelection?: import('./helpers/health-snapshot.js').HealthSnapshotDeps['resolvedSelection']): Promise<void> => {
+  const emitHealth = async (
+    resolvedSelection?: import('./helpers/health-snapshot.js').HealthSnapshotDeps['resolvedSelection'],
+    glyphs?: TerminalGlyphs,
+  ): Promise<void> => {
     try {
       // TERMINAL-TOOLS-007 — the snapshot names the provider THIS boot resolved
       // (env override included), never a second, divergent config read.
       const snapshot = await buildHealthSnapshot(healthRoot, resolvedSelection ? { resolvedSelection } : { provider: providerName });
-      process.stdout.write(`${renderHealthSnapshot(snapshot, replLang)}\n`);
+      process.stdout.write(`${renderHealthSnapshot(snapshot, replLang, glyphs ? { glyphs } : {})}\n`);
     } catch { /* best-effort UX chrome only */ }
   };
 

@@ -104,6 +104,8 @@ export interface CollectInboxOptions {
   jobsDir?: string;
   /** Row cap (tests). Default MAX_INBOX_ROWS. */
   limit?: number;
+  /** Deckent-owned display separator; does not alter row identities or data. */
+  separator?: string;
 }
 
 /**
@@ -253,16 +255,16 @@ function formatStateWithLiveness(row: InboxRow, labels: InboxLabels): string {
   return `${state}${mark}`;
 }
 
-export function formatInboxRowBody(row: InboxRow, index: number, labels: InboxLabels): string {
+export function formatInboxRowBody(row: InboxRow, index: number, labels: InboxLabels, separator = '·'): string {
   const shortId = row.flowId.slice(0, SHORT_ID_LEN);
   const intent = row.intentSummary ? ` ${row.intentSummary}` : '';
   const metrics = row.done !== undefined && row.total !== undefined ? ` (${row.done}/${row.total})` : '';
-  return `${index + 1}. ${shortId} · ${formatStateWithLiveness(row, labels)}${metrics}${intent}`;
+  return `${index + 1}. ${shortId} ${separator} ${formatStateWithLiveness(row, labels)}${metrics}${intent}`;
 }
 
 /** Render one transcript row: two-space indent + the shared body. */
-function formatRow(row: InboxRow, index: number, labels: InboxLabels): string {
-  return `  ${formatInboxRowBody(row, index, labels)}`;
+function formatRow(row: InboxRow, index: number, labels: InboxLabels, separator: string): string {
+  return `  ${formatInboxRowBody(row, index, labels, separator)}`;
 }
 
 /**
@@ -271,10 +273,10 @@ function formatRow(row: InboxRow, index: number, labels: InboxLabels): string {
  * `buildResumePickerLines`'s numbered-picker shape so `/runs <n>` (D2) can reuse
  * the same numbering later.
  */
-export function buildInboxLines(rows: readonly InboxRow[], labels: InboxLabels): string[] {
+export function buildInboxLines(rows: readonly InboxRow[], labels: InboxLabels, separator = '·'): string[] {
   if (rows.length === 0) return [labels.empty];
   const lines = [labels.header];
-  rows.forEach((row, i) => lines.push(formatRow(row, i, labels)));
+  rows.forEach((row, i) => lines.push(formatRow(row, i, labels, separator)));
   lines.push(labels.hint);
   return lines;
 }
@@ -489,7 +491,7 @@ export function renderRunsCommand(root: string, input: string, labels: InboxLabe
     return buildRunDetailLines(collectRunDetail(root, selection.row), labels).join('\n');
   }
   if (selection.kind === 'not-found') return labels.notFound.replace('{arg}', selection.arg);
-  return buildInboxLines(rows, labels).join('\n');
+  return buildInboxLines(rows, labels, opts.separator).join('\n');
 }
 
 /**

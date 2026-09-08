@@ -155,11 +155,20 @@ describe('boot-time native engine failure is worded as a boot outcome, not a swi
 
   it('run.tsx resolves and refuses native boot before resources; successful selection reaches health', () => {
     const run = readFileSync(join(ROOT, 'src/cli/repl/run.tsx'), 'utf-8');
-    expect(run).toMatch(/nativeBoot = resolveNativeProvider[\s\S]*localizeNativeError\(nativeBoot, lang, 'boot'\)/);
+    expect(run).toMatch(/nativeBoot = resolveNativeProvider[\s\S]*localizeNativeError\(nativeBoot, lang, 'boot', terminalGlyphs\)/);
     expect(run.indexOf('nativeBoot = resolveNativeProvider')).toBeLessThan(run.indexOf('new ApprovalBroker'));
     const entry = readFileSync(join(ROOT, 'src/cli/entry.ts'), 'utf-8');
     expect(entry).toMatch(/terminalSurface\.surface !== 'ink'\) await emitHealth\(\)/);
     expect(entry).toMatch(/registerReplTeardown,\s*emitHealth\)/);
     expect(run).toMatch(/resolveNativeProvider[\s\S]*bootHealthSelection[\s\S]*onBootSelection/);
+    expect(run).toContain('onBootSelection?.(bootHealthSelection, terminalGlyphs)');
+    expect(entry).toMatch(/emitHealth = async \([\s\S]*glyphs\?: TerminalGlyphs[\s\S]*renderHealthSnapshot\(snapshot, replLang, glyphs \? \{ glyphs \} : \{\}\)/);
+  });
+
+  it('keeps a one-argument boot callback structurally compatible with the optional glyph argument', async () => {
+    const callback: Parameters<typeof import('../../src/cli/repl/run.js').runInkRepl>[4] = async (selection) => {
+      expect(selection).toBeUndefined();
+    };
+    await callback?.();
   });
 });

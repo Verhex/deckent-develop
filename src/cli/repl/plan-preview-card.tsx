@@ -27,9 +27,11 @@
 import { Box, Text, useInput } from 'ink';
 import { useState, type ReactElement } from 'react';
 import { useInkPalette } from './ink-palette-context.js';
+import { useTerminalGlyphs } from './terminal-glyph-context.js';
 import type { InkRole } from './ink-palette.js';
 import type { PlanPreview, RunFlowGateResult, RunFlowPolicyDecision } from '../../core/run-flow-contract.js';
 import { getMessage } from '../helpers/messages.js';
+import { renderTerminalOwnedTemplate, resolveTerminalGlyphs, type TerminalGlyphs } from '../helpers/terminal-glyphs.js';
 
 // ─── Pure key mapper (framework-free — unit-testable without Ink) ──────────
 
@@ -65,14 +67,14 @@ const POLICY_ROLES: Record<RunFlowPolicyDecision, InkRole> = {
 const DIGEST_SHORT_LEN = 12;
 
 /** One-line task summary — 1-indexed for display. */
-export function formatTaskSummaryLine(index: number, task: { title: string; summary: string }): string {
-  return `${index + 1}. ${task.title} — ${task.summary}`;
+export function formatTaskSummaryLine(index: number, task: { title: string; summary: string }, separator = '—'): string {
+  return `${index + 1}. ${task.title} ${separator} ${task.summary}`;
 }
 
 /** Truncates a hex digest for the collapsed card (the full value is still
  *  visible in the expanded `d` details view via JSON.stringify(preview)). */
-export function formatDigestShort(digest: string): string {
-  return digest.length > DIGEST_SHORT_LEN ? `${digest.slice(0, DIGEST_SHORT_LEN)}…` : digest;
+export function formatDigestShort(digest: string, ellipsis = '…'): string {
+  return digest.length > DIGEST_SHORT_LEN ? `${digest.slice(0, DIGEST_SHORT_LEN)}${ellipsis}` : digest;
 }
 
 // ─── Labels (i18n-first — string-free component; caller injects) ───────────
@@ -107,32 +109,36 @@ export interface PlanPreviewCardLabels {
 }
 
 /** Builds real en/tr labels from messages.ts's `runFlow.planPreview.*` keys. */
-export function buildPlanPreviewCardLabels(lang: string): PlanPreviewCardLabels {
+export function buildPlanPreviewCardLabels(
+  lang: string,
+  glyphs: TerminalGlyphs = resolveTerminalGlyphs(false),
+): PlanPreviewCardLabels {
+  const message = (key: string): string => renderTerminalOwnedTemplate(getMessage(key, lang), glyphs);
   return {
-    heading: getMessage('runFlow.planPreview.heading', lang),
-    digestLabel: getMessage('runFlow.planPreview.digestLabel', lang),
+    heading: message('runFlow.planPreview.heading'),
+    digestLabel: message('runFlow.planPreview.digestLabel'),
     gateLabels: {
-      pass: getMessage('runFlow.planPreview.gate.pass', lang),
-      fail: getMessage('runFlow.planPreview.gate.fail', lang),
-      skipped: getMessage('runFlow.planPreview.gate.skipped', lang),
+      pass: message('runFlow.planPreview.gate.pass'),
+      fail: message('runFlow.planPreview.gate.fail'),
+      skipped: message('runFlow.planPreview.gate.skipped'),
     },
     policyLabels: {
-      allow: getMessage('runFlow.planPreview.policy.allow', lang),
-      deny: getMessage('runFlow.planPreview.policy.deny', lang),
-      'needs-approval': getMessage('runFlow.planPreview.policy.needsApproval', lang),
+      allow: message('runFlow.planPreview.policy.allow'),
+      deny: message('runFlow.planPreview.policy.deny'),
+      'needs-approval': message('runFlow.planPreview.policy.needsApproval'),
     },
-    hint: getMessage('runFlow.planPreview.hint', lang),
-    detailsHeading: getMessage('runFlow.planPreview.detailsHeading', lang),
-    noTasks: getMessage('runFlow.planPreview.noTasks', lang),
-    scopeGateFailLabel: getMessage('runFlow.planPreview.scopeGate.fail', lang),
-    scopeGateOverriddenLabel: getMessage('runFlow.planPreview.scopeGate.overridden', lang),
-    topologyPassLabel: getMessage('runFlow.planPreview.topology.pass', lang),
-    topologyBlockLabel: getMessage('runFlow.planPreview.topology.block', lang),
-    topologyConcurrencyLabel: getMessage('runFlow.planPreview.topology.concurrency', lang),
-    topologyCollisionsLabel: getMessage('runFlow.planPreview.topology.collisions', lang),
-    topologySyntheticEdgesLabel: getMessage('runFlow.planPreview.topology.syntheticEdges', lang),
-    topologyWavesLabel: getMessage('runFlow.planPreview.topology.waves', lang),
-    topologyFindingsLabel: getMessage('runFlow.planPreview.topology.findings', lang),
+    hint: message('runFlow.planPreview.hint'),
+    detailsHeading: message('runFlow.planPreview.detailsHeading'),
+    noTasks: message('runFlow.planPreview.noTasks'),
+    scopeGateFailLabel: message('runFlow.planPreview.scopeGate.fail'),
+    scopeGateOverriddenLabel: message('runFlow.planPreview.scopeGate.overridden'),
+    topologyPassLabel: message('runFlow.planPreview.topology.pass'),
+    topologyBlockLabel: message('runFlow.planPreview.topology.block'),
+    topologyConcurrencyLabel: message('runFlow.planPreview.topology.concurrency'),
+    topologyCollisionsLabel: message('runFlow.planPreview.topology.collisions'),
+    topologySyntheticEdgesLabel: message('runFlow.planPreview.topology.syntheticEdges'),
+    topologyWavesLabel: message('runFlow.planPreview.topology.waves'),
+    topologyFindingsLabel: message('runFlow.planPreview.topology.findings'),
   };
 }
 
@@ -250,6 +256,7 @@ export function PlanPreviewCard(props: PlanPreviewCardProps): ReactElement | nul
   }, { isActive: preview !== null && mutexActive });
 
   const palette = useInkPalette();
+  const glyphs = useTerminalGlyphs();
   if (!preview) return null;
 
   const gateStyle = palette[GATE_ROLES[preview.gateResult]];
@@ -257,7 +264,7 @@ export function PlanPreviewCard(props: PlanPreviewCardProps): ReactElement | nul
   const failStyle = palette[GATE_ROLES.fail];
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={gateStyle.color} paddingX={1}>
+    <Box flexDirection="column" borderStyle={glyphs.borderStyle} borderColor={gateStyle.color} paddingX={1}>
       <Box>
         <Text bold>{labels.heading}</Text>
       </Box>
@@ -265,7 +272,7 @@ export function PlanPreviewCard(props: PlanPreviewCardProps): ReactElement | nul
         <Text {...palette.muted}>{labels.noTasks}</Text>
       ) : (
         preview.taskSummaries.map((t, i) => (
-          <Text key={`${i}-${t.title}`}>{formatTaskSummaryLine(i, t)}</Text>
+          <Text key={`${i}-${t.title}`}>{formatTaskSummaryLine(i, t, glyphs.dash)}</Text>
         ))
       )}
       <Box>
@@ -279,7 +286,7 @@ export function PlanPreviewCard(props: PlanPreviewCardProps): ReactElement | nul
       {formatTopologyLines(preview, labels).map((line, i) => (
         <Text key={`tg-${i}`} {...(preview.topologyGateResult === 'fail' ? failStyle : {})}>{line}</Text>
       ))}
-      <Text {...palette.muted}>{`${labels.digestLabel} ${formatDigestShort(preview.planDigest)}`}</Text>
+      <Text {...palette.muted}>{`${labels.digestLabel} ${formatDigestShort(preview.planDigest, glyphs.ellipsis)}`}</Text>
       {expanded && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold>{labels.detailsHeading}</Text>

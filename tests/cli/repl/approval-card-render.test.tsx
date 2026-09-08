@@ -15,9 +15,13 @@ import { getMessage } from '../../../src/cli/helpers/messages.js';
 import { validateApprovalRequest, type ApprovalRequest } from '../../../src/core/approval-contract.js';
 import type { ApprovalStreamEvent } from '../../../src/core/approval-eventstream.js';
 import type { ApprovalTerminalDecisionResult } from '../../../src/cli/repl/approval-terminal-command.js';
+import { TerminalGlyphProvider } from '../../../src/cli/repl/terminal-glyph-context.js';
+import { renderTerminalOwnedTemplate, resolveTerminalGlyphs } from '../../../src/cli/helpers/terminal-glyphs.js';
 
 /** en card labels — app.tsx owns no default object since TERMINAL-TOOLS-002. */
 const EN_LABELS = buildApprovalLabels((k) => getMessage(k, 'en'));
+const ASCII_GLYPHS = resolveTerminalGlyphs(true);
+const ASCII_LABELS = buildApprovalLabels((k) => renderTerminalOwnedTemplate(getMessage(k, 'en'), ASCII_GLYPHS));
 
 function buildRequest(id: string): ApprovalRequest {
   const result = validateApprovalRequest({
@@ -103,6 +107,30 @@ describe('ApprovalCard — render + decide keypress (born-697, ink-testing-libra
     } finally {
       fixture.release();
       unmount();
+    }
+  });
+
+  it('uses an ASCII frame/owned separators and preserves request Unicode', async () => {
+    const req: ApprovalRequest = {
+      ...buildRequest('apr-ascii'),
+      summary: 'Türkçe✓ karar · 東京😀',
+      maskedArgs: { note: 'sağlayıcı·✓東京😀' },
+    };
+    const fixture = pendingFixture(req);
+    const ui = render(
+      <TerminalGlyphProvider glyphs={ASCII_GLYPHS}>
+        <ApprovalCard events={fixture.events} onDecide={() => {}} labels={ASCII_LABELS} suspendTerminal={suspend} />
+      </TerminalGlyphProvider>,
+    );
+    try {
+      await waitForText(ui.lastFrame, req.summary);
+      expect(ui.lastFrame() ?? '').toMatch(/^\+-+\+$/m);
+      expect(ui.lastFrame() ?? '').not.toMatch(/[╭╮╰╯│]/u);
+      ui.stdin.write('d');
+      await waitForText(ui.lastFrame, 'sağlayıcı·✓東京😀');
+    } finally {
+      fixture.release();
+      ui.unmount();
     }
   });
 

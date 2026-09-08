@@ -29,6 +29,7 @@ import {
   type Turn,
 } from '../../../src/cli/repl/app.js';
 import { createStreamSegmenter, type Segment } from '../../../src/cli/repl/stream-segmenter.js';
+import { displayWidth } from '../../../src/cli/repl/cursor-model.js';
 
 // ─── FIX-1: confirmKeyToAnswer — only documented keys decide a card ──────────
 
@@ -180,7 +181,7 @@ describe('truncateQueuePreview — code-point-safe queue preview (360-009 FIX-4)
 
   it('truncates ASCII past the cap with a trailing ellipsis', () => {
     const long = 'x'.repeat(61);
-    expect(truncateQueuePreview(long)).toBe('x'.repeat(60) + '…');
+    expect(truncateQueuePreview(long)).toBe('x'.repeat(59) + '…');
   });
 
   it('never bisects a surrogate pair (the pre-fix q.slice(0, 60) did)', () => {
@@ -190,7 +191,7 @@ describe('truncateQueuePreview — code-point-safe queue preview (360-009 FIX-4)
     const mixed = 'x' + '🎉'.repeat(65); // 131 code units, 66 code points
     const out = truncateQueuePreview(mixed);
     const points = [...out];
-    expect(points).toHaveLength(61); // 60 whole code points + '…'
+    expect(displayWidth(out)).toBeLessThanOrEqual(60);
     expect(points[0]).toBe('x');
     expect(points.slice(1, -1).every((p) => p === '🎉')).toBe(true);
     expect(points.at(-1)).toBe('…');
@@ -201,6 +202,9 @@ describe('truncateQueuePreview — code-point-safe queue preview (360-009 FIX-4)
   });
 
   it('honors a custom max', () => {
-    expect(truncateQueuePreview('abcdef', 3)).toBe('abc…');
+    expect(truncateQueuePreview('abcdef', 3)).toBe('ab…');
+    expect(truncateQueuePreview('abcdef', 1, '...')).toBe('.');
+    expect(truncateQueuePreview('abcdef', 2, '...')).toBe('..');
+    expect(truncateQueuePreview('abcdef', 3, '...')).toBe('...');
   });
 });

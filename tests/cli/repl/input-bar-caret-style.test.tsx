@@ -15,6 +15,8 @@ import { join } from 'node:path';
 import { InputBar } from '../../../src/cli/repl/input-bar.js';
 import { buildReplLabels } from '../../../src/cli/repl/run.js';
 import { getMessage } from '../../../src/cli/helpers/messages.js';
+import { TerminalGlyphProvider } from '../../../src/cli/repl/terminal-glyph-context.js';
+import { resolveTerminalGlyphs } from '../../../src/cli/helpers/terminal-glyphs.js';
 
 const tick = (ms = 25): Promise<void> => new Promise((r) => setTimeout(r, ms));
 const en = buildReplLabels((k) => getMessage(k, 'en'));
@@ -23,20 +25,22 @@ describe('InputBar — caretStyle', () => {
   const roots: string[] = [];
   afterEach(() => { for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true }); });
 
-  function mount(caretStyle: 'inverse' | 'marker') {
+  function mount(caretStyle: 'inverse' | 'marker', ascii = false) {
     const root = mkdtempSync(join(tmpdir(), 'deckent-caret-'));
     roots.push(root);
     return render(
-      <InputBar
-        active
-        onSubmit={() => {}}
-        onInterrupt={() => {}}
-        menuMoreAbove={en.menuMoreAbove}
-        menuMoreBelow={en.menuMoreBelow}
-        reverseSearchLabel={en.reverseSearch}
-        historyProjectRoot={root}
-        caretStyle={caretStyle}
-      />,
+      <TerminalGlyphProvider glyphs={resolveTerminalGlyphs(ascii)}>
+        <InputBar
+          active
+          onSubmit={() => {}}
+          onInterrupt={() => {}}
+          menuMoreAbove={en.menuMoreAbove}
+          menuMoreBelow={en.menuMoreBelow}
+          reverseSearchLabel={en.reverseSearch}
+          historyProjectRoot={root}
+          caretStyle={caretStyle}
+        />
+      </TerminalGlyphProvider>,
     );
   }
 
@@ -60,6 +64,18 @@ describe('InputBar — caretStyle', () => {
     const frame = lastFrame() ?? '';
     expect(frame).toContain('› ab');
     expect(frame).not.toContain('|');
+    unmount();
+  });
+
+  it('renders a classic ASCII frame and prompt without changing typed Unicode', async () => {
+    const { stdin, lastFrame, unmount } = mount('marker', true);
+    await tick();
+    stdin.write('Türkçe·東京😀');
+    await tick();
+    const frame = lastFrame() ?? '';
+    expect(frame).toContain('> Türkçe·東京😀|');
+    expect(frame).toMatch(/^\+-+\+$/m);
+    expect(frame).not.toMatch(/[╭╮╰╯│›]/u);
     unmount();
   });
 });

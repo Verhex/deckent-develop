@@ -44,14 +44,14 @@ export function reduceToolReadNav(state: ToolReadNavState, action: ToolReadNavAc
   return { selectedId: rows[next]!.id, detailOpen: state.detailOpen, page: 0 };
 }
 
-export function toolReadStateLine(model: ToolReadProjection, labels: ToolReadLabels): string | null {
+export function toolReadStateLine(model: ToolReadProjection, labels: ToolReadLabels, separator = '·'): string | null {
   if (model.state === 'loading') return labels.loading;
   if (model.state === 'valid') return null;
   if (model.state === 'empty') return labels.empty;
   if (model.state === 'raw') return labels.rawComplete;
-  if (model.state === 'partial') return labels.partial + (model.reasonCode ? ` · ${labels.reason(model.reasonCode)}` : '');
-  if (model.state === 'unavailable') return labels.unavailable + (model.reasonCode ? ` · ${labels.reason(model.reasonCode)}` : '');
-  return labels.schemaUnknown + (model.reasonCode ? ` · ${labels.reason(model.reasonCode)}` : '');
+  if (model.state === 'partial') return labels.partial + (model.reasonCode ? ` ${separator} ${labels.reason(model.reasonCode)}` : '');
+  if (model.state === 'unavailable') return labels.unavailable + (model.reasonCode ? ` ${separator} ${labels.reason(model.reasonCode)}` : '');
+  return labels.schemaUnknown + (model.reasonCode ? ` ${separator} ${labels.reason(model.reasonCode)}` : '');
 }
 
 /** Printable, cell-bounded list row. Detail retains every field untrimmed. */

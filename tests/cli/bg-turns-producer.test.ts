@@ -29,6 +29,7 @@ import {
 } from '../../src/cli/repl/run-completion-watch.js';
 import { buildBgTurnEvent, wireBgTurnsProducer } from '../../src/cli/repl/run.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
+import { resolveTerminalGlyphs } from '../../src/cli/helpers/terminal-glyphs.js';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 
@@ -387,6 +388,24 @@ describe('buildBgTurnEvent', () => {
       getMessage('tui.bg_turn.failed_with_error', 'tr', { source: 'job-tr', error: 'ham hata' }),
     );
   });
+
+  it('maps only owned punctuation in ASCII mode and preserves raw source and error bytes', () => {
+    const glyphs = resolveTerminalGlyphs(true);
+    const complete: RunCompletionInfo = {
+      jobId: 'job · raw — id', status: 'COMPLETE', totalTasks: 2, done: 1, techDebt: 1, noGo: 0,
+    };
+    expect(buildBgTurnEvent(complete, 'en', glyphs)).toEqual({
+      source: 'job · raw — id',
+      summary: 'job · raw — id - 1/2 DONE | 1 TECH_DEBT | 0 NO_GO',
+    });
+    const failed: RunCompletionInfo = {
+      jobId: 'failed · raw', status: 'FAILED', error: 'provider — detail · exact',
+    };
+    expect(buildBgTurnEvent(failed, 'tr', glyphs)).toEqual({
+      source: 'failed · raw',
+      summary: 'failed · raw - FAILED: provider — detail · exact',
+    });
+  });
 });
 
 // ─── run.tsx: wireBgTurnsProducer — composition-pin ─────────────────────────
@@ -453,6 +472,31 @@ describe('wireBgTurnsProducer — enabled: setup site + enqueueBg feed site', ()
     expect(enqueueBg).toHaveBeenCalledWith({
       source: 'sprint-tr',
       summary: getMessage('tui.bg_turn.failed', 'tr', { source: 'sprint-tr' }),
+    });
+    handle!.dispose();
+  });
+
+  it('threads the resolved glyph palette through the actual watch callback', () => {
+    const manual = makeManualWatch();
+    const enqueueBg = vi.fn();
+    const factory = (dir: string, handlers: { onComplete: (info: RunCompletionInfo) => void }) =>
+      createRunCompletionWatch(dir, handlers, { watch: manual.watch, pollIntervalMs: 999_000 });
+    const handle = wireBgTurnsProducer(
+      true,
+      jobsDir,
+      enqueueBg,
+      factory,
+      'en',
+      resolveTerminalGlyphs(true),
+    );
+
+    writeJob(jobsDir, 'sprint-ascii.json', {
+      status: 'FAILED', sprintId: 'sprint · raw', error: 'detail — raw',
+    });
+    manual.fire();
+    expect(enqueueBg).toHaveBeenCalledWith({
+      source: 'sprint · raw',
+      summary: 'sprint · raw - FAILED: detail — raw',
     });
     handle!.dispose();
   });

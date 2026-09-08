@@ -27,6 +27,7 @@ import { buildModelPickerSpec, buildProviderPickerSpec, buildTermPickerSpec, bui
 import { buildLegacyPickerSpecs } from '../../../src/cli/repl/picker-legacy.js';
 import { runChatNativeLoop, type ChatProviderAdapter } from '../../../src/cli/commands/chat-native.js';
 import { getMessage } from '../../../src/cli/helpers/messages.js';
+import { displayWidth } from '../../../src/cli/repl/cursor-model.js';
 
 const ROOT = join(__dirname, '..', '..', '..');
 const EN = buildPickerLabels((k) => getMessage(k, 'en'));
@@ -98,7 +99,11 @@ describe('specs — evidence-honest states and localized facts', () => {
     expect(formatConfigValue(undefined)).toBe('-');
     expect(formatConfigValue(null)).toBe('-');
     expect(formatConfigValue(true)).toBe('true');
-    expect(formatConfigValue('x'.repeat(80)).length).toBeLessThanOrEqual(41);
+    expect(displayWidth(formatConfigValue('x'.repeat(80)))).toBeLessThanOrEqual(40);
+    expect(formatConfigValue('x'.repeat(80), '...')).toBe(`${'x'.repeat(37)}...`);
+    const wide = formatConfigValue('東京😀'.repeat(20), '...');
+    expect(displayWidth(wide)).toBeLessThanOrEqual(40);
+    expect(wide).not.toContain('\ufffd');
     expect(formatConfigValue({ a: 1 })).not.toContain('[object');
   });
 });
@@ -168,7 +173,7 @@ describe('wiring — app.tsx closure', () => {
     expect(app).toMatch(/onInterrupt=\{\(\) => setPicker\(null\)\}/);
     expect(app).not.toMatch(/onInterrupt=\{\(\) => \{ setPicker\(null\); handleInterrupt/);
     expect(app).toMatch(/<PickerCard\s+key=\{/);
-    expect(app).toMatch(/formatConfigValue\(e\.current\)/);
+    expect(app).toMatch(/formatConfigValue\(e\.current, glyphs\.ellipsis\)/);
     expect(app).toMatch(/pickerLabels\.readOnlyBusy/);
   });
 });

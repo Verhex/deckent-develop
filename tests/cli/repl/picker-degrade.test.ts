@@ -17,7 +17,7 @@ import { runChatNativeLoop, type ChatProviderAdapter } from '../../../src/cli/co
 import { resolvePickerSurfaceMode } from '../../../src/cli/repl/app.js';
 import { buildPickerLabels } from '../../../src/cli/repl/picker-labels.js';
 import { getMessage } from '../../../src/cli/helpers/messages.js';
-import type { PickerSpec } from '../../../src/cli/repl/picker.js';
+import { pickerLinesFor, resolvePickerGlyphs, type PickerSpec } from '../../../src/cli/repl/picker.js';
 
 const ROOT = join(__dirname, '..', '..', '..');
 const EN = buildPickerLabels((k) => getMessage(k, 'en'));
@@ -104,6 +104,20 @@ describe('Ink surface below 40 columns — transcript lines instead of a card', 
     expect(resolvePickerSurfaceMode(100)).toBe('card');
     expect(resolvePickerSurfaceMode(39)).toBe('lines');
     expect(resolvePickerSurfaceMode(20)).toBe('lines');
+  });
+
+  it('uses ASCII separators and overflow while preserving raw candidate text', () => {
+    const spec: PickerSpec = {
+      kind: 'model', initialId: null, scopes: ['session'],
+      candidates: [{
+        id: 'uzun-東京-id', label: `Türkçe·😀-${'x'.repeat(30)}`,
+        facts: [{ key: 'provider', value: 'sağlayıcı✓' }, { key: 'tier', value: 'özel·katman' }], state: 'ok',
+      }],
+    };
+    const lines = pickerLinesFor(spec, EN, resolvePickerGlyphs(true), '/model', { width: 24, separator: ' | ', overflowMarker: '...' });
+    expect(lines.join('\n')).toContain('Türkçe·😀');
+    expect(lines.join('\n')).toContain('...');
+    expect(lines.join('\n')).not.toContain('…');
   });
 });
 

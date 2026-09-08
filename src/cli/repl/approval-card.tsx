@@ -19,6 +19,8 @@
 import { Box, Text, useInput } from 'ink';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useInkPalette } from './ink-palette-context.js';
+import { useTerminalGlyphs } from './terminal-glyph-context.js';
+import { resolveTerminalGlyphs, type TerminalGlyphs } from '../helpers/terminal-glyphs.js';
 import type { InkRole } from './ink-palette.js';
 import type { ApprovalRequest, ApprovalRequestV2, ApprovalRisk } from '../../core/approval-contract.js';
 import type {
@@ -51,6 +53,7 @@ export function NativePermissionIntentCard(props: {
   isActive: boolean;
 }): ReactElement | null {
   const { intent, controller, labels, isActive } = props;
+  const glyphs = useTerminalGlyphs();
   useInput((input, key) => {
     if (!intent || !isActive) return;
     if (key.escape || input === 'n') { controller.cancel(); return; }
@@ -60,11 +63,11 @@ export function NativePermissionIntentCard(props: {
   });
   if (!intent) return null;
   const rows = [
-    intent.lifetimes.includes('once') ? `1  ${labels.once} — ${labels.onceConsequence}` : null,
-    intent.lifetimes.includes('session') ? `2  ${labels.session} — ${labels.sessionConsequence}` : null,
-    intent.lifetimes.includes('always') ? `3  ${labels.always} — ${labels.alwaysConsequence}` : null,
+    intent.lifetimes.includes('once') ? `1  ${labels.once} ${glyphs.dash} ${labels.onceConsequence}` : null,
+    intent.lifetimes.includes('session') ? `2  ${labels.session} ${glyphs.dash} ${labels.sessionConsequence}` : null,
+    intent.lifetimes.includes('always') ? `3  ${labels.always} ${glyphs.dash} ${labels.alwaysConsequence}` : null,
   ].filter((row): row is string => row !== null);
-  return <Box borderStyle="round" flexDirection="column" paddingX={1}>
+  return <Box borderStyle={glyphs.borderStyle} flexDirection="column" paddingX={1}>
     <Text bold>{labels.title.replace('{tool}', intent.tool)}</Text>
     <Text>{labels.actor.replace('{actor}', intent.actorId)}</Text>
     <Text>{labels.resource.replace('{resource}', intent.resource)}</Text>
@@ -336,7 +339,12 @@ const isV2 = (request: ApprovalRequest): request is ApprovalRequestV2 => 'origin
 const HIGH_RISK: ReadonlySet<ApprovalRisk> = new Set<ApprovalRisk>(['high', 'critical']);
 
 /** The §4 field set for one request at `nowMs` (pure — unit-testable without Ink). */
-export function buildApprovalFacts(request: ApprovalRequest, labels: ApprovalCardLabels, nowMs: number): ApprovalFact[] {
+export function buildApprovalFacts(
+  request: ApprovalRequest,
+  labels: ApprovalCardLabels,
+  nowMs: number,
+  glyphs: TerminalGlyphs = resolveTerminalGlyphs(false),
+): ApprovalFact[] {
   const f = labels.facts;
   const weighty = HIGH_RISK.has(request.risk);
   const declared = (key: 'consequence' | 'rollbackLimit'): { value: string; emphasis: boolean } => {
@@ -352,16 +360,16 @@ export function buildApprovalFacts(request: ApprovalRequest, labels: ApprovalCar
     : f.expiredOutcome.replace('{outcome}', outcome);
   if (isV2(request)) expiry += ` (${f.timeoutDispositionLabels[request.lifecycleProfile.timeoutDisposition]})`;
   const facts: ApprovalFact[] = [
-    { key: 'action', label: f.action, value: `${f.scopeLabels[request.scope]} · ${request.scopeId}`, emphasis: true },
-    { key: 'requester', label: f.requester, value: `${request.requester.role} · ${request.requester.instanceId}`, emphasis: false },
-    { key: 'tenant', label: f.tenant, value: `${request.tenantId} · ${request.userId}`, emphasis: false },
+    { key: 'action', label: f.action, value: `${f.scopeLabels[request.scope]} ${glyphs.separator} ${request.scopeId}`, emphasis: true },
+    { key: 'requester', label: f.requester, value: `${request.requester.role} ${glyphs.separator} ${request.requester.instanceId}`, emphasis: false },
+    { key: 'tenant', label: f.tenant, value: `${request.tenantId} ${glyphs.separator} ${request.userId}`, emphasis: false },
     { key: 'policy', label: f.policy, value: f.policyLabels[request.policy], emphasis: false },
   ];
   if (isV2(request)) {
     facts.push({
       key: 'lifecycle',
       label: f.lifecycle,
-      value: `${f.originLabels[request.origin]} · ${f.riskTierLabels[request.riskTier]} · ${f.blockingLabels[request.blocking]} · ${f.slaStageLabels[request.slaStage]}`,
+      value: [f.originLabels[request.origin], f.riskTierLabels[request.riskTier], f.blockingLabels[request.blocking], f.slaStageLabels[request.slaStage]].join(` ${glyphs.separator} `),
       emphasis: false,
     });
   }
@@ -625,14 +633,15 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
   });
 
   const palette = useInkPalette();
+  const glyphs = useTerminalGlyphs();
   if (!head) return null;
 
   const { request, index, total } = head;
   const riskStyle = palette[RISK_ROLES[request.risk]];
-  const facts = buildApprovalFacts(request, labels, now());
+  const facts = buildApprovalFacts(request, labels, now(), glyphs);
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={riskStyle.color} paddingX={1}>
+    <Box flexDirection="column" borderStyle={glyphs.borderStyle} borderColor={riskStyle.color} paddingX={1}>
       {/* One inline Text: at narrow widths a flex row of two Texts dropped the
           separating space when the summary wrapped ("HIGHDEMO — …"). */}
       <Text wrap="wrap">

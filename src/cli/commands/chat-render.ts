@@ -2,6 +2,8 @@ import { highlight, type Theme as HighlightTheme } from 'cli-highlight';
 import { stripAnsi } from '../helpers/output.js';
 import { roleSgrAt, suppressionTier, type ColorTier } from '../helpers/theme.js';
 import type { PaletteRole } from '../helpers/generated/palette.js';
+import { resolveTerminalGlyphs, type TerminalGlyphs } from '../helpers/terminal-glyphs.js';
+import { displayWidth } from '../repl/cursor-model.js';
 
 // TERMINAL-READABILITY-001 — every color here is a palette ROLE resolved for
 // the tier the color gate admits (helpers/theme.ts): host-theme-mapped 16-color
@@ -53,7 +55,7 @@ function resolveStyles(tier: ColorTier): Styles {
 }
 
 /** Visible (printable) width of a string, ignoring ANSI escapes. */
-function visibleWidth(s: string): number { return stripAnsi(s).length; }
+function visibleWidth(s: string): number { return displayWidth(stripAnsi(s)); }
 
 /** Wrap text in a style; an empty style (default foreground) leaves the text untouched. */
 function style(open: string, text: string): string {
@@ -79,6 +81,8 @@ export interface RenderMarkdownOptions {
    *  off by default so no unproven terminal ever receives the bytes — the URL
    *  then stays visible as text for the host's own link detection. */
   hyperlinks?: boolean;
+  /** Render only Deckent-authored decoration with the closed ASCII glyph set. */
+  ascii?: boolean;
 }
 
 /**
@@ -141,7 +145,7 @@ function codeTheme(s: Styles): HighlightTheme {
 }
 
 /** A fenced code block → syntax-highlighted, framed box with a language label. */
-function renderCodeBlock(lang: string, code: string, s: Styles): string {
+function renderCodeBlock(lang: string, code: string, s: Styles, glyphs: TerminalGlyphs): string {
   const body = code.replace(/\n$/, '');
   let highlighted = body;
   try {
@@ -151,15 +155,20 @@ function renderCodeBlock(lang: string, code: string, s: Styles): string {
   const lines = highlighted.split('\n');
   const label = lang || 'code';
   const inner = Math.max(visibleWidth(label) + 2, ...lines.map(visibleWidth));
-  const top = `${style(s.accent, '╭─ ')}${style(s.code, label)}${style(s.accent, ` ${'─'.repeat(Math.max(0, inner - visibleWidth(label) - 2))}╮`)}`;
-  const bottom = style(s.accent, `╰${'─'.repeat(inner + 1)}╯`);
-  const bar = style(s.accent, '│');
-  const mid = lines.map((l) => `${bar} ${l}${' '.repeat(Math.max(0, inner - visibleWidth(l) - 1))}${bar}`);
+  const topLeft = glyphs.ascii ? `+${glyphs.horizontal}` : '╭─';
+  const topRight = glyphs.ascii ? '+' : '╮';
+  const bottomLeft = glyphs.ascii ? '+' : '╰';
+  const bottomRight = glyphs.ascii ? '+' : '╯';
+  const edge = glyphs.ascii ? '|' : '│';
+  const top = `${style(s.accent, `${topLeft} `)}${style(s.code, label)}${style(s.accent, ` ${glyphs.horizontal.repeat(Math.max(0, inner - visibleWidth(label) - 2))}${topRight}`)}`;
+  const bottom = style(s.accent, `${bottomLeft}${glyphs.horizontal.repeat(inner + 1)}${bottomRight}`);
+  const bar = style(s.accent, edge);
+  const mid = lines.map((l) => `${bar} ${l}${' '.repeat(Math.max(0, inner - visibleWidth(l)))}${bar}`);
   return [top, ...mid, bottom].join('\n');
 }
 
 /** A markdown table block (header + separator + rows) → aligned, boxed ANSI. */
-function renderTable(block: string[], s: Styles): string {
+function renderTable(block: string[], s: Styles, glyphs: TerminalGlyphs): string {
   const cells = (line: string): string[] =>
     line.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map((c) => c.trim());
   const header = cells(block[0] as string);
@@ -180,16 +189,16 @@ function renderTable(block: string[], s: Styles): string {
     return text + ' '.repeat(gap);
   };
   const bar = (l: string, m: string, r: string): string =>
-    style(s.accent, `${l}${widths.map((w) => '─'.repeat(w + 2)).join(m)}${r}`);
-  const edge = style(s.accent, '│');
+    style(s.accent, `${l}${widths.map((w) => glyphs.horizontal.repeat(w + 2)).join(m)}${r}`);
+  const edge = style(s.accent, glyphs.ascii ? '|' : '│');
   const rowLine = (vals: string[], bold: boolean): string =>
     `${edge} ` + vals.map((v, i) => (bold ? style(s.bold, pad(v, i)) : pad(v, i))).join(` ${edge} `) + ` ${edge}`;
   return [
-    bar('┌', '┬', '┐'),
+    glyphs.ascii ? bar('+', '+', '+') : bar('┌', '┬', '┐'),
     rowLine(header, true),
-    bar('├', '┼', '┤'),
+    glyphs.ascii ? bar('+', '+', '+') : bar('├', '┼', '┤'),
     ...rows.map((r) => rowLine(Array.from({ length: cols }, (_, i) => r[i] ?? ''), false)),
-    bar('└', '┴', '┘'),
+    glyphs.ascii ? bar('+', '+', '+') : bar('└', '┴', '┘'),
   ].join('\n');
 }
 
@@ -216,6 +225,7 @@ export function renderMarkdown(text: string, tty?: boolean, opts: RenderMarkdown
   if (!isTTY) return text;
   const s = resolveStyles(suppressionTier());
   const links = opts.hyperlinks === true;
+  const glyphs = resolveTerminalGlyphs(opts.ascii === true);
 
   const blocks: string[] = [];
   const stash = (rendered: string): string => { blocks.push(rendered); return `\x00B${blocks.length - 1}\x00`; };
@@ -223,7 +233,7 @@ export function renderMarkdown(text: string, tty?: boolean, opts: RenderMarkdown
   let result = text;
 
   // 1. Fenced code blocks → cli-highlight + framed box (stash to protect).
-  result = result.replace(/```(\w*)[^\n]*\n([\s\S]*?)```/g, (_, lang: string, code: string) => stash(renderCodeBlock(lang, code, s)));
+  result = result.replace(/```(\w*)[^\n]*\n([\s\S]*?)```/g, (_, lang: string, code: string) => stash(renderCodeBlock(lang, code, s, glyphs)));
 
   // 2. Tables (header + |---| separator + rows) → aligned boxed table (stash).
   const isSep = (l: string): boolean => /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?\s*$/.test(l) && l.includes('-');
@@ -237,7 +247,7 @@ export function renderMarkdown(text: string, tty?: boolean, opts: RenderMarkdown
         const blk = [cur, next];
         let j = i + 2;
         while (j < lines.length && (lines[j] as string).includes('|') && (lines[j] as string).trim() !== '') { blk.push(lines[j] as string); j++; }
-        out.push(stash(renderTable(blk, s)));
+        out.push(stash(renderTable(blk, s, glyphs)));
         i = j - 1;
       } else { out.push(cur); }
     }
@@ -266,7 +276,7 @@ export function renderMarkdown(text: string, tty?: boolean, opts: RenderMarkdown
   if (links) result = result.replace(/(?<![;\w])(https?:\/\/[^\s)<>\]]+)/g, (_: string, url: string) => hyperlink(url, url, s, true));
 
   // 7. Horizontal rule (---, ***, ___) — a decorative frame line.
-  result = result.replace(/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/gm, style(s.accent, '─'.repeat(40)));
+  result = result.replace(/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/gm, style(s.accent, glyphs.horizontal.repeat(40)));
 
   // 8. ATX headings — hierarchy: # bold+info, ## bold, ### bold (weight, never dim).
   result = result.replace(/^(#{1,6}) (.+)$/gm, (_: string, hashes: string, content: string) => {
@@ -285,11 +295,12 @@ export function renderMarkdown(text: string, tty?: boolean, opts: RenderMarkdown
         const a = ADMONITIONS[(adm[1] as string).toUpperCase()];
         if (a) {
           activeStyle = s[a.role];
-          return `${style(`${activeStyle}${s.bold}`, `${a.icon} ${(adm[1] as string).toUpperCase()}`)}${adm[2] ? ` ${style(activeStyle, adm[2])}` : ''}`;
+          const icon = glyphs.ascii ? '!' : a.icon;
+          return `${style(`${activeStyle}${s.bold}`, `${icon} ${(adm[1] as string).toUpperCase()}`)}${adm[2] ? ` ${style(activeStyle, adm[2])}` : ''}`;
         }
       }
       const q = line.match(/^\s*>\s?(.*)$/);
-      if (q) { const c = activeStyle ?? s.accent; return `${style(c, '▌')} ${q[1]}`; }
+      if (q) { const c = activeStyle ?? s.accent; return `${style(c, glyphs.ascii ? '|' : '▌')} ${q[1]}`; }
       activeStyle = null;
       return line;
     }).join('\n');
@@ -306,7 +317,7 @@ export function renderMarkdown(text: string, tty?: boolean, opts: RenderMarkdown
   result = result.replace(/^(\s*)(\d+)\. (.+)$/gm, (_: string, ind: string, n: string, c: string) => `${ind}${style(s.accent, `${n}.`)} ${c}`);
 
   // 12. Unordered list items (-, *, + at line start) — preserve indent (nesting).
-  result = result.replace(/^(\s*)[*+-] (.+)$/gm, (_: string, ind: string, c: string) => `${ind}${style(s.accent, '•')} ${c}`);
+  result = result.replace(/^(\s*)[*+-] (.+)$/gm, (_: string, ind: string, c: string) => `${ind}${style(s.accent, glyphs.bullet)} ${c}`);
 
   // 13. Project file paths → code role. LAST + ANSI-safe (split on escapes, colour plain only).
   const ANSI_RUN = /(\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07)/;

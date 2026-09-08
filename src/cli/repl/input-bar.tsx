@@ -20,6 +20,7 @@ import type { SlashRegistry, SlashCommand } from '../commands/chat-slash-registr
 import { activeAtQuery, filterAtPaths, completeAtToken, type ActiveAtToken } from './at-ref.js';
 import { requireInjectedLabel } from '../helpers/injected-label.js';
 import { useInkPalette } from './ink-palette-context.js';
+import { useTerminalGlyphs } from './terminal-glyph-context.js';
 
 // TERMINAL-READABILITY-001 — no color literal: the frame and chevrons take the
 // decorative accent role, the selected menu row the focus role (inverse), key
@@ -267,6 +268,7 @@ export function InputBar(props: InputBarProps): ReactElement {
   // TERMINAL-TOOLS-010 — `?` shortcuts panel (open/closed).
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const palette = useInkPalette();
+  const glyphs = useTerminalGlyphs();
   const shortcutsOpenRef = useRef(false);
   const setShortcuts = (open: boolean): void => { shortcutsOpenRef.current = open; setShortcutsOpen(open); };
   // TERMINAL-TOOLS-001 — string-free mechanism: no English fallback here. A
@@ -476,7 +478,7 @@ export function InputBar(props: InputBarProps): ReactElement {
               const i = lo + vi;
               return (
                 <Text key={c.name}>
-                  <Text {...palette.accent}>{i === sel ? '❯ ' : '  '}</Text>
+                  <Text {...palette.accent}>{i === sel ? `${glyphs.cursor} ` : '  '}</Text>
                   <Text {...(i === sel ? palette.focus : {})} bold={i === sel}>{c.name.padEnd(10)}</Text>
                   <Text {...palette.muted}> {c.desc}</Text>
                 </Text>
@@ -493,15 +495,15 @@ export function InputBar(props: InputBarProps): ReactElement {
         <Box flexDirection="column" marginBottom={0}>
           {atOpen.matches.map((p, i) => (
             <Text key={p}>
-              <Text {...palette.accent}>{i === atSel ? '❯ ' : '  '}</Text>
+              <Text {...palette.accent}>{i === atSel ? `${glyphs.cursor} ` : '  '}</Text>
               <Text {...(i === atSel ? palette.focus : {})} bold={i === atSel}>{p}</Text>
             </Text>
           ))}
           {atMenuHint ? <Text {...palette.muted}>{`  ${atMenuHint}`}</Text> : null}
         </Box>
       )}
-      <Box borderStyle="round" borderColor={palette.accent.color} paddingX={1}>
-        <Text {...palette.accent}>{'› '}</Text>
+      <Box borderStyle={glyphs.borderStyle} borderColor={palette.accent.color} paddingX={1}>
+        <Text {...palette.accent}>{`${glyphs.user} `}</Text>
         <CaretText state={state} caretStyle={props.caretStyle ?? 'inverse'} />
       </Box>
     </Box>

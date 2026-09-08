@@ -311,7 +311,7 @@ const GAP = '  ';
  * Facts drop from the END first (the caller orders them most→least useful);
  * only then does the label truncate (`…`). The state word always survives.
  */
-export function fitPickerRow(parts: PickerRowParts, columns: number, opts: { readonly labelWidth?: number } = {}): FittedPickerRow {
+export function fitPickerRow(parts: PickerRowParts, columns: number, opts: { readonly labelWidth?: number; readonly separator?: string; readonly overflowMarker?: string } = {}): FittedPickerRow {
   const stateTag = `[${parts.state}]`;
   // TERMINAL-PICKER-007 — a shared label column keeps facts and state tags
   // aligned across rows (§7: alignment before color); it yields when the row
@@ -322,7 +322,7 @@ export function fitPickerRow(parts: PickerRowParts, columns: number, opts: { rea
     return w < padTo ? label + ' '.repeat(padTo - w) : label;
   };
   const compose = (facts: readonly string[], label: string): string =>
-    facts.length > 0 ? `${label}${GAP}${facts.join(FACT_SEP)}${GAP}${stateTag}` : `${label}${GAP}${stateTag}`;
+    facts.length > 0 ? `${label}${GAP}${facts.join(opts.separator ?? FACT_SEP)}${GAP}${stateTag}` : `${label}${GAP}${stateTag}`;
   let facts = [...parts.facts];
   let line = compose(facts, padded(parts.label));
   let dropped = 0;
@@ -335,7 +335,7 @@ export function fitPickerRow(parts: PickerRowParts, columns: number, opts: { rea
   line = compose(facts, parts.label); // give the padding back before truncating
   if (displayWidth(line) <= columns) return { line, dropped, truncated: false };
   const budget = columns - displayWidth(GAP) - displayWidth(stateTag);
-  const label = truncateEnd(parts.label, Math.max(1, budget));
+  const label = truncateEnd(parts.label, Math.max(1, budget), opts.overflowMarker);
   return { line: compose([], label), dropped, truncated: true };
 }
 
@@ -376,16 +376,22 @@ export function pickerLinesFor(
   labels: PickerLabels,
   glyphs: PickerGlyphs,
   command: string,
-  opts: { readonly width?: number; readonly typedHint?: boolean } = {},
+  opts: { readonly width?: number; readonly typedHint?: boolean; readonly separator?: string; readonly overflowMarker?: string } = {},
 ): string[] {
-  void glyphs;
   const lines: string[] = [labels.title[spec.kind].replace('{key}', spec.titleSubject ?? '')];
   const prefixCells = displayWidth(`  ${spec.candidates.length}) `);
   const rowWidth = opts.width !== undefined ? Math.max(8, opts.width - prefixCells) : Number.MAX_SAFE_INTEGER;
   spec.candidates.forEach((c, i) => {
     // TERMINAL-PICKER-007 — under a width budget the facts drop before the
     // state word wraps; the tag stays the short word (reason lines are for cards).
-    const fit = fitPickerRow({ label: c.label, facts: c.facts.map((f) => f.value), state: opts.width !== undefined ? labels.states[c.state] : pickerStateWord(c, labels) }, rowWidth);
+    const fit = fitPickerRow(
+      { label: c.label, facts: c.facts.map((f) => f.value), state: opts.width !== undefined ? labels.states[c.state] : pickerStateWord(c, labels) },
+      rowWidth,
+      {
+        separator: opts.separator ?? (glyphs.cursor === '>' ? ' | ' : FACT_SEP),
+        overflowMarker: opts.overflowMarker ?? (glyphs.cursor === '>' ? '...' : undefined),
+      },
+    );
     lines.push(`  ${i + 1}) ${fit.line}`);
   });
   if (spec.candidates.length === 0) lines.push(`  ${labels.empty}`);

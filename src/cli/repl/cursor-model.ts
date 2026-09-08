@@ -292,35 +292,51 @@ export function applyCursorEdit(state: CursorState, operation: EditOperation, te
 
 const ELLIPSIS = '…';
 
-/** Keep the TAIL of `text` within `cells` display cells, prefixed with `…`. */
-export function truncateStart(text: string, cells: number): string {
+function fitOverflowMarker(marker: string, cells: number): string {
+  let width = 0;
+  let out = '';
+  for (const cluster of segmentGraphemes(marker)) {
+    const clusterWidth = displayWidth(cluster);
+    if (width + clusterWidth > cells) break;
+    width += clusterWidth;
+    out += cluster;
+  }
+  return out;
+}
+
+/** Keep the TAIL of `text` within `cells`, prefixed with the owned marker. */
+export function truncateStart(text: string, cells: number, overflowMarker = ELLIPSIS): string {
   if (cells <= 0) return '';
   if (displayWidth(text) <= cells) return text;
-  if (cells === 1) return ELLIPSIS;
+  const marker = fitOverflowMarker(overflowMarker, cells);
+  const markerWidth = displayWidth(marker);
+  if (markerWidth >= cells) return marker;
   const clusters = segmentGraphemes(text);
   let width = 0;
   let start = clusters.length;
   while (start > 0) {
     const w = displayWidth(clusters[start - 1] as string);
-    if (width + w > cells - 1) break;
+    if (width + w > cells - markerWidth) break;
     width += w;
     start -= 1;
   }
-  return ELLIPSIS + clusters.slice(start).join('');
+  return marker + clusters.slice(start).join('');
 }
 
-/** Keep the HEAD of `text` within `cells` display cells, suffixed with `…`. */
-export function truncateEnd(text: string, cells: number): string {
+/** Keep the HEAD of `text` within `cells`, suffixed with the owned marker. */
+export function truncateEnd(text: string, cells: number, overflowMarker = ELLIPSIS): string {
   if (cells <= 0) return '';
   if (displayWidth(text) <= cells) return text;
-  if (cells === 1) return ELLIPSIS;
+  const marker = fitOverflowMarker(overflowMarker, cells);
+  const markerWidth = displayWidth(marker);
+  if (markerWidth >= cells) return marker;
   let width = 0;
   let out = '';
   for (const cluster of segmentGraphemes(text)) {
     const w = displayWidth(cluster);
-    if (width + w > cells - 1) break;
+    if (width + w > cells - markerWidth) break;
     width += w;
     out += cluster;
   }
-  return out + ELLIPSIS;
+  return out + marker;
 }

@@ -15,6 +15,7 @@
 import { Box, Text, useInput } from 'ink';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useInkPalette } from './ink-palette-context.js';
+import { useTerminalGlyphs } from './terminal-glyph-context.js';
 import type { PickerLabels } from './picker-labels.js';
 import { displayWidth } from './cursor-model.js';
 import {
@@ -58,6 +59,7 @@ export function PickerCard(props: PickerCardProps): ReactElement {
   const { spec, labels, glyphs, columns, rows, isActive = true, noColor = false, readOnlyReason = null, onCommit, onClose, onInterrupt } = props;
   const [nav, setNav] = useState<PickerNav>(() => initialPickerNav(spec));
   const palette = useInkPalette();
+  const terminalGlyphs = useTerminalGlyphs();
   const navRef = useRef(nav);
   const [notice, setNotice] = useState<string | null>(null);
   const setNavBoth = (next: PickerNav): void => { navRef.current = next; setNav(next); };
@@ -108,7 +110,7 @@ export function PickerCard(props: PickerCardProps): ReactElement {
     : null;
 
   return (
-    <Box flexDirection="column" borderStyle="round" paddingX={1} width={columns} {...border}>
+    <Box flexDirection="column" borderStyle={terminalGlyphs.borderStyle} paddingX={1} width={columns} {...border}>
       <Text bold={!noColor}>{title}</Text>
       {nav.query.length > 0 && <Text {...dim}>{labels.hintFilter.replace('{query}', nav.query)}</Text>}
       {filtered.length === 0 && <Text>{labels.empty}</Text>}
@@ -118,7 +120,11 @@ export function PickerCard(props: PickerCardProps): ReactElement {
         // The state tag is the short word only; a blocked row's typed reason
         // renders on its own line under the cursor (never inside the tag, so a
         // long reason can never eat the label).
-        const fit = fitPickerRow({ label: c.label, facts: compact ? [] : c.facts.map((f) => f.value), state: labels.states[c.state] }, rowCells, { labelWidth });
+        const fit = fitPickerRow(
+          { label: c.label, facts: compact ? [] : c.facts.map((f) => f.value), state: labels.states[c.state] },
+          rowCells,
+          { labelWidth, separator: ` ${terminalGlyphs.separator} `, overflowMarker: terminalGlyphs.ellipsis },
+        );
         const gutter = focused ? `${glyphs.cursor} ` : ' '.repeat(GUTTER_CELLS);
         return (
           <Box key={c.id} flexDirection="column">

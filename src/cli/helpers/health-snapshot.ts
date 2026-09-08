@@ -22,6 +22,7 @@ import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { listActive, type ReplSession } from './session-registry.js';
 import { theme } from './theme.js';
 import { getMessage } from './messages.js';
+import { renderTerminalOwnedTemplate, resolveTerminalGlyphs, type TerminalGlyphs } from './terminal-glyphs.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -318,6 +319,7 @@ function authLabelText(field: HealthField, lang: string): string {
  */
 export interface RenderHealthSnapshotDeps {
   getMessageFn?: typeof getMessage;
+  glyphs?: TerminalGlyphs;
 }
 
 /** Compact single-line render — "tek-bakış" (ADR-G-010: terminal stays concise).
@@ -328,6 +330,8 @@ export function renderHealthSnapshot(
   deps: RenderHealthSnapshotDeps = {},
 ): string {
   const getMessageFn = deps.getMessageFn ?? getMessage;
+  const glyphs = deps.glyphs ?? resolveTerminalGlyphs(false);
+  const ownedMessage = (key: string): string => renderTerminalOwnedTemplate(getMessage(key, lang), glyphs);
   const providerText = genericLabel(snapshot.provider, lang);
   const modelText = genericLabel(snapshot.model, lang);
   // Model rides on top of provider: show `provider/unknown` when only the model
@@ -337,15 +341,17 @@ export function renderHealthSnapshot(
 
   const segments = [
     statusColor(snapshot.provider.status, providerModel),
-    `${getMessage('health.auth', lang)}: ${statusColor(snapshot.auth.status, authLabelText(snapshot.auth, lang))}`,
-    `${getMessage('health.mcp', lang)}: ${statusColor(snapshot.mcp.status, genericLabel(snapshot.mcp, lang))}`,
-    `${getMessage('health.mem', lang)}: ${statusColor(snapshot.memory.status, genericLabel(snapshot.memory, lang))}`,
-    `${getMessage('health.mode', lang)}: ${statusColor(snapshot.mode.status, genericLabel(snapshot.mode, lang))}`,
+    `${ownedMessage('health.auth')}: ${statusColor(snapshot.auth.status, authLabelText(snapshot.auth, lang))}`,
+    `${ownedMessage('health.mcp')}: ${statusColor(snapshot.mcp.status, genericLabel(snapshot.mcp, lang))}`,
+    `${ownedMessage('health.mem')}: ${statusColor(snapshot.memory.status, genericLabel(snapshot.memory, lang))}`,
+    `${ownedMessage('health.mode')}: ${statusColor(snapshot.mode.status, genericLabel(snapshot.mode, lang))}`,
   ];
 
-  const line = `${segments.join(' · ')}  ${theme.muted(snapshot.cwd)}`;
+  const line = `${segments.join(` ${glyphs.separator} `)}  ${theme.muted(snapshot.cwd)}`;
   if (snapshot.sessions?.status !== 'warn') return line;
 
-  const warning = getMessageFn('health.session_warn', lang, { count: snapshot.sessions.label });
+  const warning = deps.getMessageFn
+    ? getMessageFn('health.session_warn', lang, { count: snapshot.sessions.label })
+    : ownedMessage('health.session_warn').replaceAll('{count}', () => snapshot.sessions!.label);
   return `${line}\n${statusColor('warn', warning)}`;
 }

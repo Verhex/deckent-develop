@@ -1,6 +1,7 @@
 import { Box, Text, useInput } from 'ink';
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useInkPalette } from './ink-palette-context.js';
+import { useTerminalGlyphs } from './terminal-glyph-context.js';
 import type { ToolReadProjection } from './tool-read-model.js';
 import type { ToolReadLabels } from './tool-read-labels.js';
 import {
@@ -36,11 +37,12 @@ export interface ToolReadCardProps {
  * content path. The App remains owner of focus lifecycle and invocation truth.
  */
 export function ToolReadCard(props: ToolReadCardProps): ReactElement | null {
-  const { open, model, labels, columns, rows, overflow, ascii, isActive, onClose, raw, stderrRaw } = props;
+  const { open, model, labels, columns, rows, overflow, isActive, onClose, raw, stderrRaw } = props;
   const [nav, setNav] = useState<ToolReadNavState>(EMPTY_TOOL_READ_NAV);
   const navRef = useRef(nav);
   navRef.current = nav;
   const palette = useInkPalette();
+  const glyphs = useTerminalGlyphs();
   const execution = model?.execution;
   const executionRows = execution ? [{ id: 'read:execution', title: '', titleKind: 'execution' as const, fields: [
     ...(execution.command ? [{ key: 'command', value: execution.command }] : []),
@@ -68,7 +70,7 @@ export function ToolReadCard(props: ToolReadCardProps): ReactElement | null {
   const readRows = [...(raw ? [{ id: 'raw', title: '', titleKind: 'summary' as const, fields: [{ key: 'bytes', value: raw.text }] }] : (model?.rows ?? [])),
     ...(stderrRaw ? [{ id: 'raw:stderr', title: labels.sectionStderr, fields: [{ key: 'stderr', value: stderrRaw.text }] }] : []), ...captureRows, ...executionRows];
   const snapshotLine = observation ? labels.snapshot.replace('{at}', observation.observedAt).replace('{count}', model?.count === null || model?.count === undefined ? labels.unknownCount : String(model.count)) : null;
-  const stateLine = model ? toolReadStateLine(model, labels) : null;
+  const stateLine = model ? toolReadStateLine(model, labels, glyphs.separator) : null;
   const executionFailed = execution && (execution.exitCode !== 0 || execution.signal !== null || execution.reason !== null);
   const headerRows = Number(stateLine !== null) + Number(Boolean(executionFailed)) + Number(snapshotLine !== null);
   const selectedId = selectedToolReadId(nav.selectedId, readRows);
@@ -125,7 +127,7 @@ export function ToolReadCard(props: ToolReadCardProps): ReactElement | null {
   if (nav.detailOpen && selected) {
     const page = pages[Math.min(nav.page, pages.length - 1)] ?? [];
     return (
-      <Box flexDirection="column" borderStyle={ascii ? 'single' : 'round'} borderColor={palette.accent.color} paddingX={1}>
+      <Box flexDirection="column" borderStyle={glyphs.borderStyle} borderColor={palette.accent.color} paddingX={1}>
         <Text>{labels.title[model.kind]}</Text>
         {snapshotLine !== null && <Text wrap="truncate">{snapshotLine}</Text>}
         {stateLine !== null && <Text wrap="truncate">{stateLine}</Text>}
@@ -138,7 +140,7 @@ export function ToolReadCard(props: ToolReadCardProps): ReactElement | null {
   }
 
   return (
-    <Box flexDirection="column" borderStyle={ascii ? 'single' : 'round'} borderColor={palette.accent.color} paddingX={1}>
+    <Box flexDirection="column" borderStyle={glyphs.borderStyle} borderColor={palette.accent.color} paddingX={1}>
       <Text>{labels.title[model.kind]}</Text>
       {snapshotLine !== null && <Text wrap="truncate">{snapshotLine}</Text>}
       {stateLine !== null && <Text wrap="truncate">{stateLine}</Text>}
@@ -147,7 +149,7 @@ export function ToolReadCard(props: ToolReadCardProps): ReactElement | null {
       {readRows.slice(listWindow.lo, listWindow.hi).map((row) => {
         const focused = row.id === selectedId;
         const title = sectionTitle(row.titleKind) ?? row.title;
-        return <Text key={row.id} {...(focused ? palette.focus : {})}>{formatToolReadListRow({ ...row, title }, focused, Math.max(1, columns - 4), overflow, ascii ? '>' : '❯')}</Text>;
+        return <Text key={row.id} {...(focused ? palette.focus : {})}>{formatToolReadListRow({ ...row, title }, focused, Math.max(1, columns - 4), overflow, glyphs.cursor)}</Text>;
       })}
       {listWindow.hi < readRows.length && <Text {...palette.muted}>{labels.moreBelow.replace('{n}', String(readRows.length - listWindow.hi))}</Text>}
       <Text {...palette.muted}>{labels.listHint}</Text>

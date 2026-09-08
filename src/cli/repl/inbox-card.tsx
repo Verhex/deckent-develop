@@ -25,6 +25,7 @@
 import { Box, Text, useInput } from 'ink';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useInkPalette } from './ink-palette-context.js';
+import { useTerminalGlyphs } from './terminal-glyph-context.js';
 import type { InboxRow, InboxLabels, InboxNavState, InboxDecisionVerb } from './run-flow-inbox.js';
 import {
   EMPTY_INBOX_NAV,
@@ -117,6 +118,7 @@ export function InboxCard(props: InboxCardProps): ReactElement | null {
   }, { isActive: open && mutexActive });
 
   const palette = useInkPalette();
+  const glyphs = useTerminalGlyphs();
   if (!open) return null;
 
   const selectedFlowId = realignInboxSelection(nav.selectedFlowId, rows);
@@ -126,7 +128,7 @@ export function InboxCard(props: InboxCardProps): ReactElement | null {
   if (nav.detailOpen && selectedRow) {
     const verbs = onDecide ? decidableInboxVerbs(selectedRow) : [];
     return (
-      <Box flexDirection="column" borderStyle="round" borderColor={palette.accent.color} paddingX={1}>
+      <Box flexDirection="column" borderStyle={glyphs.borderStyle} borderColor={palette.accent.color} paddingX={1}>
         {buildInboxDetailLines(selectedRow, labels).map((line, i) => (
           <Text key={`detail-${i}-${line}`}>{line}</Text>
         ))}
@@ -140,7 +142,7 @@ export function InboxCard(props: InboxCardProps): ReactElement | null {
 
   // ── List view — header + rows (focused row gets a ❯ gutter + the focus role). ──
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={palette.accent.color} paddingX={1}>
+    <Box flexDirection="column" borderStyle={glyphs.borderStyle} borderColor={palette.accent.color} paddingX={1}>
       {rows.length === 0 ? (
         <Text>{labels.empty}</Text>
       ) : (
@@ -150,7 +152,7 @@ export function InboxCard(props: InboxCardProps): ReactElement | null {
             const focused = row.flowId === selectedFlowId;
             return (
               <Text key={row.flowId} {...(focused ? palette.focus : {})}>
-                {(focused ? '❯ ' : '  ') + formatInboxRowBody(row, i, labels)}
+                {(focused ? `${glyphs.cursor} ` : '  ') + formatInboxRowBody(row, i, labels, glyphs.separator)}
               </Text>
             );
           })}

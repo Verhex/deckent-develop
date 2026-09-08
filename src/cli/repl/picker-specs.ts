@@ -17,6 +17,7 @@
 import type { PickerCandidate, PickerFact, PickerSpec, ProviderTransport, ProviderVia } from './picker.js';
 import type { NativeModelCandidate } from './native-transport.js';
 import { registryProviderFor } from './native-transport.js';
+import { truncateEnd } from './cursor-model.js';
 
 /** `ok: 'unknown'` — no evidence either way (a surface without a credential
  *  probe): rows render the `unknown` word, never a false `ok` (RECONCILIATION L204). */
@@ -186,10 +187,10 @@ export function buildConfigValuePickerSpec(key: string, options: readonly string
 const CONFIG_VALUE_CELLS = 40;
 
 /** A setting's value as a bounded, honest token: never "[object Object]". */
-export function formatConfigValue(value: unknown): string {
+export function formatConfigValue(value: unknown, overflowMarker = '…'): string {
   if (value === undefined || value === null) return '-';
   const text = typeof value === 'string' ? value : typeof value === 'object' ? JSON.stringify(value) : String(value);
-  return text.length > CONFIG_VALUE_CELLS ? `${text.slice(0, CONFIG_VALUE_CELLS)}…` : text;
+  return truncateEnd(text, CONFIG_VALUE_CELLS, overflowMarker);
 }
 
 export function buildProviderPickerSpec(ctx: PickerSpecContext): PickerSpec {

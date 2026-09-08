@@ -11,6 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { fitStatusRow, formatSessionIdForTerminal, statusRowText, type StatusRowInput } from '../../../src/cli/repl/status-row.js';
 import { displayWidth } from '../../../src/cli/repl/cursor-model.js';
+import { resolveTerminalGlyphs } from '../../../src/cli/helpers/terminal-glyphs.js';
 
 const base: StatusRowInput = {
   brand: 'deckent',
@@ -95,5 +96,26 @@ describe('fitStatusRow — one line, never wider than the terminal', () => {
   it('exposes typed segments so the renderer colors roles, not substrings', () => {
     const row = fitStatusRow({ ...base, cwd: '/w', model: 'm' }, 120);
     expect(row.segments.map((s) => s.role)).toEqual(['brand', 'gap', 'provider', 'model', 'gap', 'cwd']);
+  });
+
+  it('uses ASCII chrome while preserving provider, model and cwd content', () => {
+    const input: StatusRowInput = {
+      ...base,
+      provider: 'sağlayıcı·東京',
+      model: 'm✓😀',
+      cwd: '/çalışma/東京/çok-uzun-bir-dizin',
+      sessionTok: 42,
+      approval: 'öneri',
+      glyphs: resolveTerminalGlyphs(true),
+    };
+    const wide = statusRowText(fitStatusRow(input, 200));
+    expect(wide).toContain('sağlayıcı·東京 | m✓😀');
+    expect(wide).toContain('| # 42 tok');
+    expect(wide).toContain('| >>öneri');
+    expect(wide).not.toContain('Σ');
+    const narrow = statusRowText(fitStatusRow(input, 28));
+    expect(displayWidth(narrow)).toBeLessThanOrEqual(28);
+    expect(narrow).not.toContain('…');
+    expect(narrow).toContain('...');
   });
 });

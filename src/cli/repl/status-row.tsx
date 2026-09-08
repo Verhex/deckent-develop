@@ -23,6 +23,7 @@ import { displayWidth, truncateStart, truncateEnd } from './cursor-model.js';
 import { clipTerminalCells } from './dual-stream.js';
 import { useInkPalette } from './ink-palette-context.js';
 import type { InkPalette, InkRoleStyle } from './ink-palette.js';
+import { resolveTerminalGlyphs, type TerminalGlyphs } from '../helpers/terminal-glyphs.js';
 
 /**
  * Preserve ordinary persisted IDs byte-for-byte while making C0/C1/DEL,
@@ -57,6 +58,8 @@ export interface StatusRowInput {
   approval?: string | undefined;
   /** Caller-local active chat identity. It is never an optional/drop segment. */
   activeSession?: { label: string; id: string; overflowMarker: string } | undefined;
+  /** Deckent-owned punctuation resolved once by the Terminal entry. */
+  glyphs?: TerminalGlyphs | undefined;
 }
 
 export type StatusRowRole = 'brand' | 'gap' | 'provider' | 'model' | 'cwd' | 'tokens' | 'approval' | 'session';
@@ -81,17 +84,18 @@ const MIN_CWD_CELLS = 12;
 const GAP = '  ';
 
 function buildSegments(input: StatusRowInput, dropped: ReadonlySet<StatusRowOptional>): StatusRowSegment[] {
+  const glyphs = input.glyphs ?? resolveTerminalGlyphs(false);
   const segments: StatusRowSegment[] = [
     { role: 'brand', text: input.brand },
     { role: 'gap', text: GAP },
     { role: 'provider', text: input.provider },
   ];
-  if (input.model && !dropped.has('model')) segments.push({ role: 'model', text: ` · ${input.model}` });
+  if (input.model && !dropped.has('model')) segments.push({ role: 'model', text: ` ${glyphs.separator} ${input.model}` });
   segments.push({ role: 'gap', text: GAP }, { role: 'cwd', text: input.cwd });
   if (input.sessionTok !== undefined && input.sessionTok > 0 && !dropped.has('tokens')) {
-    segments.push({ role: 'tokens', text: `${GAP}· Σ ${input.sessionTok} tok` });
+    segments.push({ role: 'tokens', text: `${GAP}${glyphs.separator} ${glyphs.tokens} ${input.sessionTok} tok` });
   }
-  if (input.approval && !dropped.has('approval')) segments.push({ role: 'approval', text: `${GAP}· »${input.approval}` });
+  if (input.approval && !dropped.has('approval')) segments.push({ role: 'approval', text: `${GAP}${glyphs.separator} ${glyphs.background}${input.approval}` });
   if (input.activeSession) segments.push({ role: 'session', text: `${GAP}${input.activeSession.label} ${formatSessionIdForTerminal(input.activeSession.id)}` });
   return segments;
 }
@@ -122,7 +126,8 @@ export function fitStatusRow(input: StatusRowInput, columns: number): StatusRowL
 
   // 2. Tail-truncate the cwd into whatever is left.
   const available = budget - widthOf(segments, 'cwd');
-  segments = segments.map((s) => (s.role === 'cwd' ? { ...s, text: truncateStart(s.text, available) } : s));
+  const overflowMarker = input.glyphs?.ellipsis;
+  segments = segments.map((s) => (s.role === 'cwd' ? { ...s, text: truncateStart(s.text, available, overflowMarker) } : s));
 
   // 3. Last-resort guard: an active identity has priority over every other
   // status fact. A physically tiny terminal cannot show a whole identifier;
@@ -147,7 +152,7 @@ export function fitStatusRow(input: StatusRowInput, columns: number): StatusRowL
     for (const s of segments) {
       const w = displayWidth(s.text);
       if (used + w <= budget) { kept.push(s); used += w; continue; }
-      const cut = truncateEnd(s.text, budget - used);
+      const cut = truncateEnd(s.text, budget - used, overflowMarker);
       if (cut.length > 0) kept.push({ ...s, text: cut });
       break;
     }
