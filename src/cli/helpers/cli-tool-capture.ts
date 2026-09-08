@@ -15,6 +15,17 @@ export type CliReadRequest =
   | { readonly kind: 'agents' }
   | { readonly kind: 'skills'; readonly category?: string };
 
+/**
+ * Closed structured actions admitted to the bounded CLI capture path.
+ * Authorization is deliberately not represented here: the caller must gate
+ * the canonical tool projection before dispatching the validated request.
+ */
+export type CliStructuredActionRequest =
+  | { readonly kind: 'sync'; readonly mode: 'preview' | 'apply' }
+  | { readonly kind: 'audit-gate'; readonly sprintId: string }
+  | { readonly kind: 'audit-query'; readonly channel?: string }
+  | { readonly kind: 'audit-compliance'; readonly sprintId?: string };
+
 type UnknownArgs = Readonly<Record<string, unknown>>;
 
 function hasOnlyKeys(args: UnknownArgs, allowed: readonly string[]): boolean {
@@ -30,6 +41,30 @@ function nonEmpty(value: unknown): string | null {
   if (value === undefined) return '';
   if (typeof value !== 'string' || value.trim().length === 0 || value !== value.trim()) return null;
   return value;
+}
+
+const AUDIT_RESERVED_VERBS: ReadonlySet<string> = new Set([
+  'gate',
+  'query',
+  'compliance',
+  'forward',
+  'retention',
+  'verify',
+]);
+
+function auditSprintId(value: unknown): string | null {
+  const sprintId = nonEmpty(value);
+  if (!sprintId) return null;
+  // A gate id becomes one filename component on every platform. Do not allow
+  // drive-relative paths, separators, option syntax or terminal controls.
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(sprintId)) return null;
+  return AUDIT_RESERVED_VERBS.has(sprintId.toLowerCase()) ? null : sprintId;
+}
+
+function optionValue(value: unknown): string | null {
+  const parsed = nonEmpty(value);
+  return parsed !== null && !parsed.startsWith('-')
+    && !/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u.test(parsed) ? parsed : null;
 }
 
 function parseRest(value: unknown, aliases: readonly string[], flags: Readonly<Record<string, boolean>>): { alias: string; values: Record<string, string> } | null {
@@ -100,6 +135,86 @@ export function cliArgsForReadRequest(value: unknown): string[] | null {
       return ['skill', 'list', '--json', ...(category ? ['--category', category] : [])];
     }
     default: return null;
+  }
+}
+
+/** Revalidate a structured action and build its only executable JSON argv. */
+export function cliArgsForStructuredActionRequest(value: unknown): string[] | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  const request = value as UnknownArgs;
+  switch (request['kind']) {
+    case 'sync':
+      if (!hasOnlyKeys(request, ['kind', 'mode'])) return null;
+      if (request['mode'] === 'preview') return ['sync', '--dry-run', '--json'];
+      return request['mode'] === 'apply' ? ['sync', '--json'] : null;
+    case 'audit-gate': {
+      if (!hasOnlyKeys(request, ['kind', 'sprintId'])) return null;
+      const sprintId = auditSprintId(request['sprintId']);
+      return sprintId ? ['audit', sprintId, '--json'] : null;
+    }
+    case 'audit-query': {
+      if (!hasOnlyKeys(request, ['kind', 'channel'])) return null;
+      const channel = optionValue(request['channel']);
+      if (channel === null) return null;
+      return ['audit', 'query', '--json', ...(channel ? ['--action', channel] : [])];
+    }
+    case 'audit-compliance': {
+      if (!hasOnlyKeys(request, ['kind', 'sprintId'])) return null;
+      const sprintId = request['sprintId'] === undefined ? '' : auditSprintId(request['sprintId']);
+      if (sprintId === null) return null;
+      return ['audit', 'compliance', '--json', ...(sprintId ? ['--sprint', sprintId] : [])];
+    }
+    default: return null;
+  }
+}
+
+/** Resolve only catalog-shaped action args. Invalid input performs no I/O. */
+export function resolveCliStructuredActionRequest(
+  toolName: string,
+  args: UnknownArgs,
+): CliStructuredActionRequest | null {
+  if (args === null || typeof args !== 'object' || Array.isArray(args)) return null;
+  if (toolName === 'deckent_sync') {
+    if (!hasOnlyKeys(args, ['mode'])) return null;
+    const mode = args['mode'] ?? 'apply';
+    return mode === 'preview' || mode === 'apply' ? { kind: 'sync', mode } : null;
+  }
+
+  if (toolName !== 'deckent_audit') return null;
+  const action = args['action'] ?? 'gate';
+  if (action === 'gate') {
+    if (!hasOnlyKeys(args, ['action', 'sprintId'])) return null;
+    const sprintId = auditSprintId(args['sprintId']);
+    return sprintId ? { kind: 'audit-gate', sprintId } : null;
+  }
+  if (action === 'query') {
+    if (!hasOnlyKeys(args, ['action', 'channel'])) return null;
+    const channel = optionValue(args['channel']);
+    if (channel === null) return null;
+    return { kind: 'audit-query', ...(channel ? { channel } : {}) };
+  }
+  if (action === 'compliance') {
+    if (!hasOnlyKeys(args, ['action', 'sprintId'])) return null;
+    const sprintId = args['sprintId'] === undefined ? '' : auditSprintId(args['sprintId']);
+    if (sprintId === null) return null;
+    return { kind: 'audit-compliance', ...(sprintId ? { sprintId } : {}) };
+  }
+  return null;
+}
+
+/** Canonical tool identity and args used by classifyTool and the approval gate. */
+export function cliToolForStructuredActionRequest(
+  request: CliStructuredActionRequest,
+): { tool: string; args: Record<string, unknown> } {
+  switch (request.kind) {
+    case 'sync':
+      return { tool: 'deckent_sync', args: { mode: request.mode } };
+    case 'audit-gate':
+      return { tool: 'deckent_audit', args: { action: 'gate', sprintId: request.sprintId } };
+    case 'audit-query':
+      return { tool: 'deckent_audit', args: { action: 'query', ...(request.channel ? { channel: request.channel } : {}) } };
+    case 'audit-compliance':
+      return { tool: 'deckent_audit', args: { action: 'compliance', ...(request.sprintId ? { sprintId: request.sprintId } : {}) } };
   }
 }
 

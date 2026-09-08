@@ -1353,7 +1353,7 @@ export interface SelfAuditGateOptions {
   /** Override tsc execution (for testing) */
   runTsc?: (projectRoot: string) => { status: number; stdout: string; stderr: string };
   /** Override vitest execution (for testing) */
-  runVitest?: (projectRoot: string) => { status: number; stdout: string; stderr: string };
+  runVitest?: (projectRoot: string) => { status: number | null; stdout: string; stderr: string };
   /** Finalizer-only bounded manifest. Absence means an explicit full audit surface. */
   scopedManifest?: ScopedSelfAuditManifest;
   /** Async scoped runner seam; receives shell-free argv. */
@@ -1484,9 +1484,16 @@ export async function runSelfAuditGate(
       const netNewFailures = baseline != null && current != null
         ? delta.fail
         : (current?.fail ?? 0);
+      // Exit zero remains authoritative success. A non-zero or signal/null
+      // result may only use the historical regression policy when the output
+      // was actually parseable; missing evidence must never become a synthetic
+      // zero-delta PASS.
       const vitestPassed = vitestRun.status === 0
-        || (current != null && current.fail === 0)
-        || netNewFailures <= 0;
+        || (current != null && (
+          baseline != null
+            ? netNewFailures <= 0
+            : current.fail === 0
+        ));
       vitestResult = { status: vitestPassed ? 'PASS' : 'FAIL', delta };
     }
   } catch (e) {

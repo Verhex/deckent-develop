@@ -43,6 +43,7 @@ export function ToolReadCard(props: ToolReadCardProps): ReactElement | null {
   const palette = useInkPalette();
   const execution = model?.execution;
   const executionRows = execution ? [{ id: 'read:execution', title: '', titleKind: 'execution' as const, fields: [
+    ...(execution.command ? [{ key: 'command', value: execution.command }] : []),
     { key: 'exitCode', value: String(execution.exitCode) },
     { key: 'signal', value: String(execution.signal) },
     { key: 'reason', value: String(execution.reason) },
@@ -81,8 +82,9 @@ export function ToolReadCard(props: ToolReadCardProps): ReactElement | null {
   // large detail only when its immutable source, labels or geometry changes.
   const pages = useMemo(() => selected ? toolReadDetailPages(selected, labels, Math.max(1, columns - 4), pageRows) : [[]],
     [model, selectedId, raw?.text, stderrRaw?.text, labels, columns, pageRows]);
-  const sectionTitle = (kind: 'authority' | 'summary' | 'capture' | 'execution' | undefined): string | undefined =>
-    kind === 'authority' ? labels.sectionAuthority : kind === 'summary' ? labels.sectionSummary : kind === 'capture' ? labels.sectionCapture : kind === 'execution' ? labels.sectionExecution : undefined;
+  const sectionTitle = (kind: NonNullable<ToolReadProjection['rows'][number]['titleKind']> | undefined): string | undefined =>
+    kind === 'authority' ? labels.sectionAuthority : kind === 'summary' ? labels.sectionSummary : kind === 'capture' ? labels.sectionCapture : kind === 'execution' ? labels.sectionExecution
+      : kind === 'tsc' || kind === 'vitest' || kind === 'honesty' || kind === 'observability' ? labels.auditSections[kind] : undefined;
   const selectedTitle = sectionTitle(selected?.titleKind) ?? selected?.title;
   const previousRawOffset = useRef<{ id: string | null; offset: number | undefined }>({ id: selectedId, offset: selectedRaw?.offset });
   useEffect(() => {

@@ -252,6 +252,38 @@ describe('runSelfAuditGate — dedicated tests', () => {
     expect(result.honesty.violations).toBe(0);
   });
 
+  it.each([
+    { status: 1, label: 'non-zero exit' },
+    { status: null, label: 'signal or missing exit status' },
+  ])('fails closed when $label has no parseable Vitest evidence', async ({ status }) => {
+    const result = await runSelfAuditGate(SPRINT_ID, tempRoot, {
+      runTsc: () => ({ status: 0, stdout: '', stderr: '' }),
+      runVitest: () => ({ status, stdout: 'worker exited before summary', stderr: '' }),
+      honestyResults: [],
+    });
+
+    expect(result.vitest).toEqual({
+      status: 'FAIL',
+      delta: { files: 0, pass: 0, fail: 0, skipped: 0 },
+    });
+    expect(result.overallGate).toBe('GATE_FAILURE');
+  });
+
+  it('keeps exit-zero valid parsed evidence green', async () => {
+    const result = await runSelfAuditGate(SPRINT_ID, tempRoot, {
+      runTsc: () => ({ status: 0, stdout: '', stderr: '' }),
+      runVitest: () => ({
+        status: 0,
+        stdout: 'Tests  100 passed (100)\nTest Files  10 passed (10)\n',
+        stderr: '',
+      }),
+      honestyResults: [],
+    });
+
+    expect(result.vitest.status).toBe('PASS');
+    expect(result.overallGate).toBe('PASS');
+  });
+
   // ─── Test 4: Honesty violation ─────────────────────────────────────
   it('honesty violation present → overallGate GATE_FAILURE, honesty.violations > 0', async () => {
     writeMetricsJsonl(tempRoot);

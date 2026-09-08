@@ -36,11 +36,14 @@ import type { SessionToolContentStore, ToolCaptureReceipt } from '../../agent/se
 import {
   captureCliTool,
   cliArgsForReadRequest,
+  cliArgsForStructuredActionRequest,
   createMemoryPreviewContentStore,
   resolveCliReadRequest,
+  resolveCliStructuredActionRequest,
   type CliCapturedOutcome,
   type CliCaptureFailureReason,
   type CliReadRequest,
+  type CliStructuredActionRequest,
 } from '../helpers/cli-tool-capture.js';
 
 // ─── Tool → CLI subcommand map ─────────────────────────────────────────────
@@ -201,8 +204,20 @@ export interface CliToolReadResult {
   readonly containmentReason: CliCaptureFailureReason | null;
 }
 
+export interface CliStructuredActionResult {
+  readonly request: CliStructuredActionRequest;
+  readonly rendered: string;
+  readonly envelope: ToolResultEnvelope;
+  readonly stdoutCapture: ToolCaptureReceipt;
+  readonly stderrCapture: ToolCaptureReceipt;
+  readonly signal: NodeJS.Signals | null;
+  readonly containmentReason: CliCaptureFailureReason | null;
+}
+
 export interface CliToolDispatcher extends McpToolDispatcher {
   dispatchRead(request: CliReadRequest): Promise<CliToolReadResult>;
+  /** Caller must authorize the exact cliToolForStructuredActionRequest projection first. */
+  dispatchStructuredAction(request: CliStructuredActionRequest): Promise<CliStructuredActionResult>;
 }
 
 function resolveEntryPath(): string {
@@ -672,8 +687,25 @@ export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): Cl
         containmentReason: captured.reason ?? null,
       };
     },
+    async dispatchStructuredAction(request) {
+      // This low-level capture boundary never grants authority. The caller owns
+      // the canonical classifyTool/approval check immediately before invoking it.
+      const cliArgs = cliArgsForStructuredActionRequest(request);
+      if (cliArgs === null) throw new TypeError('invalid CLI structured action request');
+      const captured = await captureSpawn(cliArgs, sessionContentStore);
+      const envelope = capturedEnvelope(captured);
+      return {
+        request,
+        envelope,
+        rendered: renderToolResultEnvelope(envelope),
+        stdoutCapture: captured.stdout,
+        stderrCapture: captured.stderr,
+        signal: captured.signal,
+        containmentReason: captured.reason ?? null,
+      };
+    },
   };
 }
 
-export { resolveCliReadRequest };
-export type { CliReadRequest };
+export { resolveCliReadRequest, resolveCliStructuredActionRequest };
+export type { CliReadRequest, CliStructuredActionRequest };

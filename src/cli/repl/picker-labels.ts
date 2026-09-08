@@ -41,6 +41,7 @@ export function buildPickerLabels(t: (key: string) => string): PickerLabels {
       'config-key': t('tui.picker.title.config_key'),
       'config-value': t('tui.picker.title.config_value'),
       confirm: t('tui.picker.title.confirm'),
+      action: t('tui.picker.title.action'),
     },
     hintPick: t('tui.picker.hint_pick'),
     hintScope: t('tui.picker.hint_scope'),

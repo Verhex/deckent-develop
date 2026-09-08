@@ -186,7 +186,16 @@ import { resolveScratchRoot } from '../../agent/scratch-checkpoint.js';
 import { createSessionToolContentStore } from '../../agent/session-tool-content.js';
 import { projectSlug } from '../../core/project-slug.js';
 import type { ChatProviderAdapter } from '../commands/chat-native.js';
-import { createCliToolDispatcher, cliArgsFor } from '../commands/chat-tool-bridge.js';
+import {
+  createCliToolDispatcher,
+  cliArgsFor,
+  type CliStructuredActionResult,
+} from '../commands/chat-tool-bridge.js';
+import {
+  cliArgsForStructuredActionRequest,
+  cliToolForStructuredActionRequest,
+  type CliStructuredActionRequest,
+} from '../helpers/cli-tool-capture.js';
 import { createToolExecDispatcher, walkProjectFiles, readIgnoredDirs, resolveRealPathLenient } from '../commands/chat-tool-exec.js';
 import { createCachedPathLister, isScopedRelPath } from './at-ref.js';
 import { createPermissionStore } from '../commands/chat-permissions.js';
@@ -206,6 +215,7 @@ import { createSwitchableProvider, type ActiveSelection } from './provider-switc
 import { createRunStateFeed } from '../helpers/run-state-feed.js';
 import type { LiveFooterLabels } from '../helpers/live-footer.js';
 import type { ToolReadLabels } from './tool-read-labels.js';
+import type { StructuredActionLabels } from './structured-action-picker.js';
 import { InjectedLabelMissingError } from '../helpers/injected-label.js';
 import { ApprovalBroker } from '../../core/approval-broker.js';
 import { ApprovalRelay } from '../../core/approval-relay.js';
@@ -392,11 +402,21 @@ export function buildToolReadLabels(t: (key: string) => string): ToolReadLabels 
       'model-active-set': t('tui.tool_read.title.model_active_set'),
       agents: t('tui.tool_read.title.agents'),
       skills: t('tui.tool_read.title.skills'),
+      sync: t('tui.tool_read.title.sync'),
+      'audit-gate': t('tui.tool_read.title.audit_gate'),
+      'audit-query': t('tui.tool_read.title.audit_query'),
+      'audit-compliance': t('tui.tool_read.title.audit_compliance'),
     },
     sectionAuthority: t('tui.tool_read.section.authority'),
     sectionSummary: t('tui.tool_read.section.summary'),
     sectionCapture: t('tui.tool_read.section.capture'),
     sectionExecution: t('tui.tool_read.section.execution'),
+    auditSections: {
+      tsc: t('tui.tool_read.audit_section.tsc'),
+      vitest: t('tui.tool_read.audit_section.vitest'),
+      honesty: t('tui.tool_read.audit_section.honesty'),
+      observability: t('tui.tool_read.audit_section.observability'),
+    },
     sectionStderr: t('tui.tool_read.section.stderr'),
     snapshot: t('tui.tool_read.snapshot'),
     unknownCount: t('tui.tool_read.unknown_count'),
@@ -416,6 +436,21 @@ export function buildToolReadLabels(t: (key: string) => string): ToolReadLabels 
     moreBelow: t('tui.tool_read.more_below'),
     field: (key, value) => t('tui.tool_read.field').replace(/\{key\}|\{value\}/g, (token) => token === '{key}' ? key : value),
     reason: (code) => t('tui.tool_read.reason').replace('{code}', code),
+  };
+}
+
+export function buildStructuredActionLabels(t: (key: string) => string): StructuredActionLabels {
+  return {
+    syncTitle: t('tui.structured_action.sync_title'),
+    auditTitle: t('tui.structured_action.audit_title'),
+    preview: t('tui.structured_action.preview'),
+    apply: t('tui.structured_action.apply'),
+    gate: t('tui.structured_action.gate'),
+    query: t('tui.structured_action.query'),
+    compliance: t('tui.structured_action.compliance'),
+    gatePrompt: t('tui.structured_action.gate_prompt'),
+    invalid: t('tui.structured_action.invalid'),
+    busy: t('tui.structured_action.busy'),
   };
 }
 
@@ -1296,6 +1331,68 @@ export interface ToolDispatcherDeps {
   getToolSink: () => ToolSink | null;
 }
 
+export interface StructuredActionDispatcherDeps {
+  cliDispatcher: {
+    dispatchStructuredAction: (request: CliStructuredActionRequest) => Promise<CliStructuredActionResult>;
+  };
+  askConfirm: (summary: string, toolName: string, args?: Record<string, unknown>) => Promise<boolean>;
+  askConfirmAlways: (summary: string) => Promise<boolean>;
+  t: (key: string) => string;
+}
+
+export type StructuredActionDispatchOutcome =
+  | { readonly kind: 'captured'; readonly result: CliStructuredActionResult }
+  | { readonly kind: 'denied'; readonly rendered: string };
+
+function snapshotStructuredActionRequest(request: CliStructuredActionRequest): CliStructuredActionRequest {
+  switch (request.kind) {
+    case 'sync': return Object.freeze({ kind: 'sync', mode: request.mode });
+    case 'audit-gate': return Object.freeze({ kind: 'audit-gate', sprintId: request.sprintId });
+    case 'audit-query': return Object.freeze({ kind: 'audit-query', ...(request.channel ? { channel: request.channel } : {}) });
+    case 'audit-compliance': return Object.freeze({ kind: 'audit-compliance', ...(request.sprintId ? { sprintId: request.sprintId } : {}) });
+  }
+}
+
+async function authorizeCliDispatch(
+  toolName: string,
+  args: Record<string, unknown>,
+  argv: readonly string[],
+  deps: Pick<ToolDispatcherDeps, 'askConfirm' | 'askConfirmAlways' | 't'>,
+): Promise<{ allowed: true } | { allowed: false; rendered: string }> {
+  const tier = classifyTool(toolName, args);
+  if (tier === 'read') return { allowed: true };
+  const summary = `${deps.t('tui.confirm_run')}: deckent ${argv.join(' ')}`;
+  const allowed = tier === 'always'
+    ? await deps.askConfirmAlways(summary)
+    : await deps.askConfirm(summary, toolName, args);
+  return allowed
+    ? { allowed: true }
+    : { allowed: false, rendered: `[${deps.t('tui.cmd_cancelled')}] deckent ${argv.join(' ')}` };
+}
+
+/** Authorization boundary for card- and typed-action ingress. It accepts only
+ * the closed structured request union, then reuses the legacy CLI tool policy
+ * before the shared capture dispatcher can allocate or spawn. */
+export function buildStructuredActionDispatcher(
+  deps: StructuredActionDispatcherDeps,
+): (request: CliStructuredActionRequest) => Promise<StructuredActionDispatchOutcome> {
+  return async (request) => {
+    const argv = cliArgsForStructuredActionRequest(request);
+    if (argv === null) {
+      return { kind: 'denied', rendered: deps.t('tui.structured_action.invalid') };
+    }
+    const snapshot = snapshotStructuredActionRequest(request);
+    const projected = cliToolForStructuredActionRequest(snapshot);
+    const authorization = await authorizeCliDispatch(projected.tool, projected.args, argv, deps);
+    if (!authorization.allowed) return { kind: 'denied', rendered: authorization.rendered };
+    try {
+      return { kind: 'captured', result: await deps.cliDispatcher.dispatchStructuredAction(snapshot) };
+    } finally {
+      if (process.stdin.isTTY) { try { process.stdin.setRawMode(true); } catch { /* not a tty */ } }
+    }
+  };
+}
+
 /**
  * born-528 (REPL-DENY-TOOLSINK) — builds the tool dispatcher used by the REPL's
  * native/legacy engines. CLI-bridge tools (config set, sync, kill, …) are
@@ -1333,14 +1430,11 @@ export function buildToolDispatcher(deps: ToolDispatcherDeps): { dispatch: (tool
       // before they run. EXEC_TOOLS (write/edit/bash) have their own confirm
       // inside execDispatcher, so they bypass this gate.
       if (!EXEC_TOOLS.has(toolName)) {
-        const tier = classifyTool(toolName, args);
-        if (tier !== 'read') {
-          const argv = cliArgsFor(toolName, args) ?? [toolName];
-          const summary = `${t('tui.confirm_run')}: deckent ${argv.join(' ')}`;
-          const ok = tier === 'always'
-            ? await askConfirmAlways(summary)
-            : await askConfirm(summary, toolName, args);
-          if (!ok) {
+        const argv = cliArgsFor(toolName, args) ?? [toolName];
+        const authorization = await authorizeCliDispatch(toolName, args, argv, {
+          askConfirm, askConfirmAlways, t,
+        });
+        if (!authorization.allowed) {
             if (process.stdin.isTTY) { try { process.stdin.setRawMode(true); } catch { /* not a tty */ } }
             // born-528 fix: this early return used to skip the toolSink block
             // below entirely — a denied CLI-bridge tool rendered NOTHING in the
@@ -1349,8 +1443,7 @@ export function buildToolDispatcher(deps: ToolDispatcherDeps): { dispatch: (tool
             // path, so both denial routes render an identical dim ✗ block.
             const sink = getToolSink();
             if (sink) sink({ verb: `${t('tui.cmd_cancelled')}: ${toolName}`, target: '', failed: true });
-            return `[${t('tui.cmd_cancelled')}] deckent ${argv.join(' ')}`;
-          }
+            return authorization.rendered;
         }
       }
       const result = EXEC_TOOLS.has(toolName)
@@ -2198,6 +2291,8 @@ export async function runInkRepl(
       {...(nativeEngine ? {
         toolRead: {
           dispatchRead: cliDispatcher.dispatchRead,
+          dispatchStructuredAction: buildStructuredActionDispatcher({ cliDispatcher, askConfirm, askConfirmAlways, t }),
+          actionLabels: buildStructuredActionLabels(t),
           readDetailRange: sessionContentStore.readDetailRange,
           labels: buildToolReadLabels(t),
         },

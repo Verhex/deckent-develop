@@ -7,6 +7,7 @@ export interface ToolReadLabels {
   readonly sectionSummary: string;
   readonly sectionCapture: string;
   readonly sectionExecution: string;
+  readonly auditSections: Readonly<Record<'tsc' | 'vitest' | 'honesty' | 'observability', string>>;
   readonly sectionStderr: string;
   readonly snapshot: string;
   readonly unknownCount: string;

@@ -8,8 +8,11 @@ import { join } from 'node:path';
 import {
   captureCliTool,
   cliArgsForReadRequest,
+  cliArgsForStructuredActionRequest,
+  cliToolForStructuredActionRequest,
   createMemoryPreviewContentStore,
   resolveCliReadRequest,
+  resolveCliStructuredActionRequest,
 } from '../../src/cli/helpers/cli-tool-capture.js';
 import { createSessionToolContentStore } from '../../src/agent/session-tool-content.js';
 
@@ -45,6 +48,61 @@ describe('resolveCliReadRequest', () => {
     expect(cliArgsForReadRequest({ kind: 'models', cliArgs: ['kill', '--all'] })).toBeNull();
     expect(cliArgsForReadRequest({ kind: 'history', last: Number.POSITIVE_INFINITY })).toBeNull();
     expect(cliArgsForReadRequest({ kind: 'unknown' })).toBeNull();
+  });
+});
+
+describe('resolveCliStructuredActionRequest', () => {
+  it.each([
+    ['deckent_sync', {}, { kind: 'sync', mode: 'apply' }, ['sync', '--json']],
+    ['deckent_sync', { mode: 'preview' }, { kind: 'sync', mode: 'preview' }, ['sync', '--dry-run', '--json']],
+    ['deckent_audit', { action: 'gate', sprintId: 'sprint-7099' }, { kind: 'audit-gate', sprintId: 'sprint-7099' }, ['audit', 'sprint-7099', '--json']],
+    ['deckent_audit', { action: 'query' }, { kind: 'audit-query' }, ['audit', 'query', '--json']],
+    ['deckent_audit', { action: 'query', channel: 'approval.decided' }, { kind: 'audit-query', channel: 'approval.decided' }, ['audit', 'query', '--json', '--action', 'approval.decided']],
+    ['deckent_audit', { action: 'compliance' }, { kind: 'audit-compliance' }, ['audit', 'compliance', '--json']],
+    ['deckent_audit', { action: 'compliance', sprintId: 'sprint-7099' }, { kind: 'audit-compliance', sprintId: 'sprint-7099' }, ['audit', 'compliance', '--json', '--sprint', 'sprint-7099']],
+  ] as const)('resolves %s to one closed action and canonical JSON argv', (tool, args, request, cliArgs) => {
+    const resolved = resolveCliStructuredActionRequest(tool, args);
+    expect(resolved).toEqual(request);
+    expect(cliArgsForStructuredActionRequest(resolved)).toEqual(cliArgs);
+  });
+
+  it('projects the validated action back to exact tool args for classification and approval binding', () => {
+    expect(cliToolForStructuredActionRequest({ kind: 'sync', mode: 'preview' })).toEqual({
+      tool: 'deckent_sync', args: { mode: 'preview' },
+    });
+    expect(cliToolForStructuredActionRequest({ kind: 'audit-gate', sprintId: 'sprint-7099' })).toEqual({
+      tool: 'deckent_audit', args: { action: 'gate', sprintId: 'sprint-7099' },
+    });
+    expect(cliToolForStructuredActionRequest({ kind: 'audit-query', channel: 'rbac.check' })).toEqual({
+      tool: 'deckent_audit', args: { action: 'query', channel: 'rbac.check' },
+    });
+    expect(cliToolForStructuredActionRequest({ kind: 'audit-compliance' })).toEqual({
+      tool: 'deckent_audit', args: { action: 'compliance' },
+    });
+  });
+
+  it.each([
+    ['deckent_sync', { mode: 'apply', extra: true }],
+    ['deckent_sync', { mode: 'bogus' }],
+    ['deckent_sync', { _rest: ['--dry-run'] }],
+    ['deckent_audit', { action: 'gate' }],
+    ['deckent_audit', { action: 'gate', sprintId: '--json' }],
+    ['deckent_audit', { action: 'gate', sprintId: '../sprint-7099' }],
+    ['deckent_audit', { action: 'gate', sprintId: 'query' }],
+    ['deckent_audit', { action: 'query', tenant: 'tenant-a' }],
+    ['deckent_audit', { action: 'query', channel: '--tenant' }],
+    ['deckent_audit', { action: 'compliance', channel: 'rbac.check' }],
+    ['deckent_audit', { action: 'retention' }],
+    ['deckent_status', {}],
+  ] as const)('rejects unsupported or ambiguous structured action %s', (tool, args) => {
+    expect(resolveCliStructuredActionRequest(tool, args)).toBeNull();
+  });
+
+  it('rejects forged action requests instead of trusting embedded argv or normalized values', () => {
+    expect(cliArgsForStructuredActionRequest({ kind: 'sync', mode: 'apply', argv: ['kill'] })).toBeNull();
+    expect(cliArgsForStructuredActionRequest({ kind: 'audit-gate', sprintId: ' sprint-7099' })).toBeNull();
+    expect(cliArgsForStructuredActionRequest({ kind: 'audit-gate', sprintId: 'compliance' })).toBeNull();
+    expect(cliArgsForStructuredActionRequest({ kind: 'unknown' })).toBeNull();
   });
 });
 

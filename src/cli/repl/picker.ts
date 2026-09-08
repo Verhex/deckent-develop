@@ -76,7 +76,7 @@ export interface PickerLabels {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type PickerKind = 'model' | 'provider' | 'approve' | 'term' | 'resume' | 'config-key' | 'config-value' | 'confirm';
+export type PickerKind = 'model' | 'provider' | 'approve' | 'term' | 'resume' | 'config-key' | 'config-value' | 'confirm' | 'action';
 export type PickerState = 'current' | 'ok' | 'blocked' | 'unknown';
 export type PickerScope = 'session' | 'default' | 'apply' | 'cancel';
 

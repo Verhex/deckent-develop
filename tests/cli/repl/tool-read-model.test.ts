@@ -162,4 +162,122 @@ describe('structured tool read model', () => {
     }
     expect(parseToolReadJson('agents', JSON.stringify([{ ...agent, successRate: '-' }])).state).toBe('schema-unknown');
   });
+
+  it('parses the optional canonical sync report without inventing aggregate success or a count', () => {
+    const report = {
+      adaptersSynced: ['Claude'],
+      adapterErrors: [{ label: 'Gemini', file: 'GEMINI.md', reason: 'kept-local' }],
+      agentPromptSync: { created: [], updated: ['worker'], conflicts: [] },
+      agentManifestSync: { created: [], updated: [], conflicts: [] },
+      agentCapabilitiesSync: { migrated: [], alreadyV3: ['worker'], issues: [] },
+      skillManifestSync: { created: [], updated: [], keptLocal: [], unchanged: ['audit'], issues: [] },
+      workspaceSync: { changed: [], unchanged: ['AGENTS.md'] },
+      gitChanges: { commits: 0, sprintId: null, modified: [], added: [], deleted: [], renamed: [] },
+      warnings: [],
+      future: { retained: true },
+    };
+    const parsed = parseToolReadJson('sync', JSON.stringify(report));
+    expect(parsed).toMatchObject({ kind: 'sync', state: 'valid', count: null, reasonCode: null });
+    expect(parsed.rows[0]?.fields).toHaveLength(Object.keys(report).length);
+    expect(parsed.rows[0]?.fields).toContainEqual({ key: 'future', value: '{"retained":true}' });
+    expect(parseToolReadJson('sync', '{}').state).toBe('schema-unknown');
+    expect(parseToolReadJson('sync', JSON.stringify({ gitChanges: { commits: -1 } })).state).toBe('schema-unknown');
+  });
+
+  it('keeps producer error JSON visibly raw and never promotes it to a successful structured action', () => {
+    for (const kind of ['sync', 'audit-gate', 'audit-query', 'audit-compliance'] as const) {
+      const parsed = parseToolReadJson(kind, JSON.stringify({
+        error: 'unsafe\u001b[2J\u202etext',
+        code: 'PRODUCER_FAILED',
+        future: { retained: true },
+      }));
+      expect(parsed).toMatchObject({ kind, state: 'raw', count: null, reasonCode: 'READ_PRODUCER_ERROR' });
+      expect(parsed.rows[0]?.fields).toContainEqual({ key: 'error', value: 'unsafe\\u001b[2J\\u202etext' });
+      expect(parsed.rows[0]?.fields).toContainEqual({ key: 'future', value: '{"retained":true}' });
+    }
+  });
+
+  it('parses audit gate verdict as data independently from the attached process exit truth', () => {
+    const gate = {
+      overallGate: 'GATE_FAILURE',
+      tsc: { status: 'PASS', errors: [], future: null },
+      vitest: {
+        status: 'FAIL',
+        delta: { files: 2, pass: 7, fail: 1, skipped: 0 },
+        execution: { mode: 'scoped', exitCode: 1 },
+      },
+      honesty: { violations: 0, flaggedTasks: [] },
+      observability: { metricsJsonlExists: true, lineCount: 4 },
+      futureTopLevel: ['retained'],
+    };
+    const parsed = parseToolReadJson('audit-gate', JSON.stringify(gate));
+    const withExecution = {
+      ...parsed,
+      execution: { exitCode: 1, signal: null, reason: 'exit-code', stderr: null },
+    };
+    expect(withExecution).toMatchObject({ state: 'valid', count: null, execution: { exitCode: 1 } });
+    expect(withExecution.rows[0]?.fields).toContainEqual({ key: 'overallGate', value: 'GATE_FAILURE' });
+    expect(withExecution.rows[0]?.fields).toContainEqual({ key: 'futureTopLevel', value: '["retained"]' });
+    expect(withExecution.rows.find((row) => row.id === 'audit-gate:vitest')?.fields)
+      .toContainEqual({ key: 'execution', value: '{"mode":"scoped","exitCode":1}' });
+    expect(withExecution.rows.slice(1).map((row) => row.titleKind)).toEqual([
+      'tsc', 'vitest', 'honesty', 'observability',
+    ]);
+    expect(parseToolReadJson('audit-gate', JSON.stringify({ ...gate, overallGate: 'PASS', vitest: { status: 'FAIL', delta: gate.vitest.delta } })).state)
+      .toBe('valid');
+    const negativeDelta = parseToolReadJson('audit-gate', JSON.stringify({
+      ...gate,
+      vitest: { status: 'PASS', delta: { files: -2, pass: -7, fail: -1, skipped: -3 } },
+    }));
+    expect(negativeDelta).toMatchObject({ state: 'valid', reasonCode: null });
+    expect(negativeDelta.rows.find((row) => row.id === 'audit-gate:vitest')?.fields)
+      .toContainEqual({ key: 'delta', value: '{"files":-2,"pass":-7,"fail":-1,"skipped":-3}' });
+    expect(parseToolReadJson('audit-gate', JSON.stringify({ ...gate, vitest: { status: 'FAIL', delta: { pass: 7 } } })).state)
+      .toBe('schema-unknown');
+  });
+
+  it('keeps an empty audit query as an explicit scanned/matched summary, not an invented success', () => {
+    const empty = parseToolReadJson('audit-query', JSON.stringify({
+      sprintId: 'sprint-7099', totalScanned: 3, matched: [], filteredBy: { tenant: 'acme' },
+    }));
+    expect(empty).toMatchObject({ state: 'valid', count: 0, reasonCode: null });
+    expect(empty.rows).toHaveLength(1);
+    expect(empty.rows[0]?.fields).toContainEqual({ key: 'totalScanned', value: '3' });
+    expect(empty.rows[0]?.fields).toContainEqual({ key: 'filteredBy', value: '{"tenant":"acme"}' });
+
+    const matched = parseToolReadJson('audit-query', JSON.stringify({
+      sprintId: 'sprint-7099', totalScanned: 4,
+      matched: [{
+        timestamp: '2026-09-08T00:00:00.000Z', sequence: 2,
+        source: 'operator\u001b[2J', target: 'runtime', channel: 'approval\u202e',
+        tenantId: 'acme', payload: { verdict: 'deny' }, additive: null,
+      }],
+    }));
+    expect(matched).toMatchObject({ state: 'valid', count: 1 });
+    expect(matched.rows[1]?.title).toBe('approval\\u202e');
+    expect(matched.rows[1]?.fields).toContainEqual({ key: 'source', value: 'operator\\u001b[2J' });
+    expect(matched.rows[1]?.fields).toContainEqual({ key: 'additive', value: 'null' });
+    expect(parseToolReadJson('audit-query', '{').reasonCode).toBe('READ_JSON_INVALID');
+    expect(parseToolReadJson('audit-query', JSON.stringify({ sprintId: 's', totalScanned: 1, matched: [{}] })).state)
+      .toBe('schema-unknown');
+  });
+
+  it('parses compliance controls, empty actors, broken chains and additive evidence without inference', () => {
+    const report = {
+      rbacStatus: 'ON', tenantIsolationStatus: 'OFF',
+      auditChainIntegrity: { intact: false, brokenAt: 2, evidence: 'digest' },
+      eventCount: 0,
+      actorBreakdown: {},
+      controls: { rbacEnforcement: 'ON', tenantIsolation: 'OFF', auditChainIntact: 'OFF', additive: true },
+      future: { version: 2 },
+    };
+    const parsed = parseToolReadJson('audit-compliance', JSON.stringify(report));
+    expect(parsed).toMatchObject({ state: 'valid', count: 0, reasonCode: null });
+    expect(parsed.rows).toHaveLength(1);
+    expect(parsed.rows[0]?.fields).toContainEqual({ key: 'auditChainIntegrity', value: '{"intact":false,"brokenAt":2,"evidence":"digest"}' });
+    expect(parsed.rows[0]?.fields).toContainEqual({ key: 'controls', value: '{"rbacEnforcement":"ON","tenantIsolation":"OFF","auditChainIntact":"OFF","additive":true}' });
+    expect(parsed.rows[0]?.fields).toContainEqual({ key: 'future', value: '{"version":2}' });
+    expect(parseToolReadJson('audit-compliance', JSON.stringify({ ...report, controls: { ...report.controls, auditChainIntact: 'UNKNOWN' } })).state)
+      .toBe('schema-unknown');
+  });
 });

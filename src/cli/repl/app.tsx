@@ -86,6 +86,8 @@ import { parseToolReadJson, safeTerminalText, type ToolReadKind, type ToolReadPr
 import type { ToolReadLabels } from './tool-read-labels.js';
 import type { CliReadRequest, CliToolDispatcher, CliToolReadResult } from '../commands/chat-tool-bridge.js';
 import { resolveCliReadRequest } from '../commands/chat-tool-bridge.js';
+import { cliArgsForStructuredActionRequest, cliToolForStructuredActionRequest, type CliStructuredActionRequest } from '../helpers/cli-tool-capture.js';
+import { buildStructuredActionPicker, resolveStructuredActionInput, type StructuredActionDecision, type StructuredActionFamily, type StructuredActionLabels } from './structured-action-picker.js';
 import type { SessionToolContentStore } from '../../agent/session-tool-content.js';
 
 export type ConfirmAnswer = 'y' | 'a' | 'n';
@@ -1457,6 +1459,9 @@ export interface ReplAppProps {
    * established dispatcher path. The App never receives a content path. */
   toolRead?: {
     dispatchRead: CliToolDispatcher['dispatchRead'];
+    /** Already confirmation-gated by the production host; never inject the raw CLI dispatcher. */
+    dispatchStructuredAction?: (request: CliStructuredActionRequest) => Promise<StructuredActionDecision>;
+    actionLabels?: StructuredActionLabels;
     readDetailRange: SessionToolContentStore['readDetailRange'];
     labels: ToolReadLabels;
     now?: () => string;
@@ -1968,6 +1973,13 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // the typed forms use.
   const commitPicker = (kind: PickerKind, id: string, scope: PickerScope): void => {
     setPicker(null);
+    if (kind === 'action') {
+      const family = pickerActionFamily.current;
+      pickerActionFamily.current = null;
+      // Selection is not approval. Re-enter typed input and both policy gates.
+      if (family && scope === 'apply') void handleSubmit(`/${family} ${id}`);
+      return;
+    }
     if (kind === 'approve') { runApprove(id as ApprovalMode); return; }
     if (kind === 'term') { runTerm(id as TermMode); return; }
     if (kind === 'resume') {
@@ -2148,6 +2160,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // TERMINAL-PICKER-002 — the open value picker (null = closed). Opened by a
   // bare selection command; closed by Esc / commit / interrupt.
   const [picker, setPicker] = useState<{ kind: PickerKind; spec: PickerSpec } | null>(null);
+  const pickerActionFamily = useRef<StructuredActionFamily | null>(null);
+  const structuredActionBusy = useRef(false);
   const pendingSlashPrompt = useRef<{ command: string; argument: string } | null>(null);
   // TERMINAL-PROVIDER-EVIDENCE-001 — when evidence lands while a model /
   // provider picker is open, rebuild its spec in place: the card keeps its
@@ -2582,7 +2596,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     return { result, pendingTool };
   };
 
-  const loadToolRead = async (request: CliReadRequest): Promise<void> => {
+  const loadToolRead = async (request: CliReadRequest | CliStructuredActionRequest): Promise<void> => {
     if (!toolRead) return;
     const generation = ++toolReadGeneration.current;
     toolReadAbort.current?.abort();
@@ -2601,7 +2615,16 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     setToolReadModel({ kind, state: 'loading', count: null, rows: [], reasonCode: null });
     setToolReadOpen(true);
     try {
-      const result: CliToolReadResult = await toolRead.dispatchRead(request);
+      let result: CliToolReadResult | Awaited<ReturnType<CliToolDispatcher['dispatchStructuredAction']>>;
+      if (request.kind === 'sync' || request.kind === 'audit-gate' || request.kind === 'audit-query' || request.kind === 'audit-compliance') {
+        if (!toolRead.dispatchStructuredAction) { unavailable('READ_DETAIL_UNAVAILABLE'); return; }
+        const decision = await toolRead.dispatchStructuredAction(request);
+        if (decision.kind === 'denied') {
+          if (current()) { setToolReadOpen(false); pushTurn('seg', decision.rendered); }
+          return;
+        }
+        result = decision.result;
+      } else result = await toolRead.dispatchRead(request);
       if (!current()) return;
       const capture = result.stdoutCapture;
       observation = {
@@ -2618,6 +2641,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         exitCode: result.envelope.exitCode, signal: result.signal,
         reason: result.containmentReason ?? result.envelope.reason,
         stderr: stderr.length > 0 ? stderr : null,
+        ...(cliArgsForStructuredActionRequest(result.request) ? {
+          command: safeTerminalText(`deckent ${cliArgsForStructuredActionRequest(result.request)!.join(' ')}`),
+        } : {}),
       };
       // Diagnostics have independent custody. Keep stdout/schema truth usable
       // even when the stderr reader is unavailable; never call its preview the
@@ -2681,7 +2707,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       let projection: ToolReadProjection;
       try { projection = parseToolReadJson(kind, new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
       catch { projection = { kind, state: 'schema-unknown', count: null, rows: [], reasonCode: 'READ_UTF8_INVALID' }; }
-      if (projection.state === 'schema-unknown') installRaw(bytes.subarray(0, 8 * 1024 + 3), 0, bytes.length);
+      if (projection.state === 'schema-unknown' || projection.state === 'raw') installRaw(bytes.subarray(0, 8 * 1024 + 3), 0, bytes.length);
       publish(projection);
     } catch { unavailable('READ_DETAIL_UNAVAILABLE'); }
   };
@@ -2753,6 +2779,42 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         shellNotesRef.current = pushShellNote(shellNotesRef.current, { cmd: shellCmd, output: out });
       }
       return;
+    }
+    // Structured action cards use the same finite picker, posture and confirm
+    // authority as typed commands. A preview is not relabelled as read-only:
+    // the canonical sync implementation still owns its dry-run semantics.
+    if (nativeEngine && replSurfaceEnabled && toolRead?.dispatchStructuredAction && toolRead.actionLabels) {
+      const action = resolveStructuredActionInput(trimmed);
+      if (action) {
+        pushTurn('user', trimmed);
+        const actionLabels = toolRead.actionLabels;
+        if (structuredActionBusy.current) { pushTurn('seg', actionLabels.busy); return; }
+        if (action.kind === 'invalid') { pushTurn('seg', actionLabels.invalid); return; }
+        if (action.kind === 'prompt') {
+          pendingSlashPrompt.current = { command: action.command, argument: 'sprintId' };
+          pushTurn('seg', actionLabels.gatePrompt);
+          return;
+        }
+        if (action.kind === 'picker') {
+          const spec = buildStructuredActionPicker(action.family, actionLabels);
+          if (resolvePickerSurfaceMode(columns) === 'lines') {
+            pushTurn('bg', pickerLinesFor(spec, pickerLabels, resolvePickerGlyphs(pickerAscii), trimmed).join('\n'));
+          } else {
+            pickerActionFamily.current = action.family;
+            setPicker({ kind: 'action', spec });
+          }
+          return;
+        }
+        const target = cliToolForStructuredActionRequest(action.request);
+        if (!target) { pushTurn('seg', actionLabels.invalid); return; }
+        const entry = slashRegistry.find((command) => command.agenticTool === target.tool);
+        const gate = gateAction(termModeRef.current, { tool: target.tool, args: target.args, declaredRisk: entry?.risk });
+        if (gate.kind === 'deny') { pushTurn('seg', denyLine(gate, trimmed)); return; }
+        structuredActionBusy.current = true;
+        try { await loadToolRead(action.request); }
+        finally { structuredActionBusy.current = false; }
+        return;
+      }
     }
     // TERMINAL-PICKER-002/003 — a BARE selection command opens the interactive
     // picker (candidates re-resolved on every open): /model and /provider from

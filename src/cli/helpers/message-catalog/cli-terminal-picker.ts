@@ -24,6 +24,7 @@ export const CLI_TERMINAL_PICKER_MESSAGES: MessageFamily = Object.freeze({
   'tui.picker.title.config_key': { en: 'Choose a setting', tr: 'Ayar seç' },
   'tui.picker.title.config_value': { en: 'Choose a value for {key}', tr: '{key} için değer seç' },
   'tui.picker.title.confirm': { en: 'Confirm', tr: 'Onayla' },
+  'tui.picker.title.action': { en: '{key}', tr: '{key}' },
 
   // ── hints / lines ──────────────────────────────────────────────────────
   'tui.picker.hint_pick': { en: '↑↓ / j k move · type to filter · Enter select · Esc close', tr: '↑↓ / j k gez · yazarak filtrele · Enter seç · Esc kapat' },

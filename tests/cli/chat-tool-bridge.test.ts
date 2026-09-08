@@ -285,3 +285,46 @@ describe('structured read dispatch', () => {
     }
   });
 });
+
+describe('structured action dispatch', () => {
+  it.each([
+    [{ kind: 'sync', mode: 'preview' }, ['sync', '--dry-run', '--json']],
+    [{ kind: 'sync', mode: 'apply' }, ['sync', '--json']],
+    [{ kind: 'audit-gate', sprintId: 'sprint-7099' }, ['audit', 'sprint-7099', '--json']],
+    [{ kind: 'audit-query', channel: 'approval.decided' }, ['audit', 'query', '--json', '--action', 'approval.decided']],
+    [{ kind: 'audit-compliance', sprintId: 'sprint-7099' }, ['audit', 'compliance', '--json', '--sprint', 'sprint-7099']],
+  ] as const)('revalidates %j and invokes the shared capture exactly once', async (request, expectedArgv) => {
+    const store = createSessionToolContentStore();
+    const captureSpawnFn = vi.fn(async (_args: readonly string[], ownedStore: typeof store) => {
+      const stdout = ownedStore.beginCapture({ channel: 'stdout', previewBytes: 1024 });
+      const stderr = ownedStore.beginCapture({ channel: 'stderr', previewBytes: 1024 });
+      stdout.append(Buffer.from('{"schemaVersion":1,"status":"ok"}\n'));
+      return { stdout: stdout.finish(), stderr: stderr.finish(), exitCode: 0, signal: null, pid: 7099 };
+    });
+    try {
+      const dispatcher = createCliToolDispatcher({ sessionContentStore: store, captureSpawnFn });
+      const result = await dispatcher.dispatchStructuredAction(request);
+      expect(captureSpawnFn).toHaveBeenCalledOnce();
+      expect(captureSpawnFn).toHaveBeenCalledWith(expectedArgv, store);
+      expect(result.request).toEqual(request);
+      expect(result.envelope).toMatchObject({ ok: true, exitCode: 0 });
+      expect(result.stdoutCapture.preview).toBe('{"schemaVersion":1,"status":"ok"}\n');
+      expect(result.rendered).toContain('"status":"ok"');
+    } finally {
+      store.close();
+    }
+  });
+
+  it('rejects a forged action before capture and preserves legacy dispatch behavior independently', async () => {
+    const captureSpawnFn = vi.fn();
+    const spawnFn = vi.fn().mockResolvedValue('legacy') as unknown as CliToolSpawnFn;
+    const dispatcher = createCliToolDispatcher({ captureSpawnFn, spawnFn });
+    await expect(dispatcher.dispatchStructuredAction({
+      kind: 'audit-gate', sprintId: '--json', extra: 'unsafe',
+    } as never)).rejects.toThrow('invalid CLI structured action request');
+    expect(captureSpawnFn).not.toHaveBeenCalled();
+
+    expect(await dispatcher.dispatch('deckent_sync', {})).toBe('legacy');
+    expect(spawnFn).toHaveBeenCalledWith(['sync']);
+  });
+});

@@ -4,7 +4,17 @@
 // document supplied by the same-session detail reader. It never knows a file
 // path, ContentWriter, child process, or rendered broker preview.
 
-export type ToolReadKind = 'doctor' | 'history' | 'models' | 'model-active-set' | 'agents' | 'skills';
+export type ToolReadKind =
+  | 'doctor'
+  | 'history'
+  | 'models'
+  | 'model-active-set'
+  | 'agents'
+  | 'skills'
+  | 'sync'
+  | 'audit-gate'
+  | 'audit-query'
+  | 'audit-compliance';
 export type ToolReadDataState = 'loading' | 'valid' | 'empty' | 'schema-unknown' | 'partial' | 'unavailable' | 'raw';
 
 export interface ToolReadField {
@@ -16,7 +26,8 @@ export interface ToolReadRow {
   readonly id: string;
   readonly title: string;
   /** Presentation section resolved by injected caller labels, never prose here. */
-  readonly titleKind?: 'authority' | 'summary' | 'capture' | 'execution';
+  readonly titleKind?: 'authority' | 'summary' | 'capture' | 'execution'
+    | 'tsc' | 'vitest' | 'honesty' | 'observability';
   readonly fields: readonly ToolReadField[];
 }
 
@@ -27,7 +38,7 @@ export interface ToolReadProjection {
   readonly rows: readonly ToolReadRow[];
   /** Technical code only; caller maps its explanation through injected labels. */
   readonly reasonCode: string | null;
-  readonly execution?: { readonly exitCode: number | null; readonly signal: string | null; readonly reason: string | null; readonly stderr: string | null; readonly stderrReadReason?: string };
+  readonly execution?: { readonly exitCode: number | null; readonly signal: string | null; readonly reason: string | null; readonly stderr: string | null; readonly stderrReadReason?: string; readonly command?: string };
   readonly observation?: {
     readonly observedAt: string;
     readonly stdoutObservedBytes: number;
@@ -116,6 +127,34 @@ function parseArray(kind: ToolReadKind, value: unknown, map: (entry: UnknownReco
 
 function idOf(value: unknown, fallback: string): string | null {
   return typeof value === 'string' && value.length > 0 ? value : fallback;
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0;
+}
+
+function isSafeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value);
+}
+
+function producerError(kind: ToolReadKind, value: unknown): ToolReadProjection | null {
+  if (!isRecord(value) || typeof value.error !== 'string') return null;
+  return {
+    kind,
+    state: 'raw',
+    count: null,
+    rows: [{
+      id: `${kind}:producer-error`,
+      title: '',
+      titleKind: 'execution',
+      fields: completeFields(value, ['error']),
+    }],
+    reasonCode: 'READ_PRODUCER_ERROR',
+  };
 }
 
 function parseDoctor(value: unknown): ToolReadProjection {
@@ -231,6 +270,159 @@ function parseActiveModels(value: unknown): ToolReadProjection {
   return { kind: 'model-active-set', state: permitted.state, count: permitted.count, rows: [{ id: 'active:metadata', title: '', titleKind: 'authority', fields: metadata }, ...permitted.rows, ...unknownRows], reasonCode: null };
 }
 
+const SYNC_REPORT_KEYS = [
+  'adaptersSynced',
+  'adapterErrors',
+  'agentPromptSync',
+  'agentManifestSync',
+  'agentCapabilitiesSync',
+  'skillManifestSync',
+  'workspaceSync',
+  'gitChanges',
+  'warnings',
+] as const;
+
+function validSyncResult(value: unknown): boolean {
+  return isRecord(value)
+    && isNonNegativeInteger(value.commits)
+    && (value.sprintId === null || typeof value.sprintId === 'string')
+    && isStringArray(value.modified)
+    && isStringArray(value.added)
+    && isStringArray(value.deleted)
+    && isStringArray(value.renamed);
+}
+
+function validSyncReport(value: unknown): boolean {
+  return value === undefined || isRecord(value);
+}
+
+function parseSync(value: unknown): ToolReadProjection {
+  const error = producerError('sync', value);
+  if (error) return error;
+  if (!isRecord(value) || !SYNC_REPORT_KEYS.some((key) => Object.hasOwn(value, key))) return unknown('sync');
+  if (value.adaptersSynced !== undefined && !isStringArray(value.adaptersSynced)) return unknown('sync');
+  if (value.adapterErrors !== undefined && (!Array.isArray(value.adapterErrors)
+    || value.adapterErrors.some((entry) => !isRecord(entry)
+      || typeof entry.label !== 'string'
+      || typeof entry.file !== 'string'
+      || typeof entry.reason !== 'string'))) return unknown('sync');
+  for (const key of ['agentPromptSync', 'agentManifestSync', 'agentCapabilitiesSync', 'skillManifestSync'] as const) {
+    if (!validSyncReport(value[key])) return unknown('sync');
+  }
+  if (value.workspaceSync !== undefined && (!isRecord(value.workspaceSync)
+    || !isStringArray(value.workspaceSync.changed)
+    || !isStringArray(value.workspaceSync.unchanged))) return unknown('sync');
+  if (value.gitChanges !== undefined && value.gitChanges !== null && !validSyncResult(value.gitChanges)) return unknown('sync');
+  if (value.warnings !== undefined && !isStringArray(value.warnings)) return unknown('sync');
+  return {
+    kind: 'sync',
+    state: 'valid',
+    count: null,
+    rows: [{ id: 'sync:summary', title: '', titleKind: 'summary', fields: completeFields(value, SYNC_REPORT_KEYS) }],
+    reasonCode: null,
+  };
+}
+
+function validAuditGateSection(value: unknown, status: 'status' | 'violations' | 'metrics'): boolean {
+  if (!isRecord(value)) return false;
+  if (status === 'status') return value.status === 'PASS' || value.status === 'FAIL';
+  if (status === 'violations') return isNonNegativeInteger(value.violations) && isStringArray(value.flaggedTasks);
+  return typeof value.metricsJsonlExists === 'boolean' && isNonNegativeInteger(value.lineCount);
+}
+
+function validAuditGateDelta(value: unknown): boolean {
+  return isRecord(value)
+    && ['files', 'pass', 'fail', 'skipped'].every((key) => isSafeInteger(value[key]));
+}
+
+function parseAuditGate(value: unknown): ToolReadProjection {
+  const error = producerError('audit-gate', value);
+  if (error) return error;
+  if (!isRecord(value)
+    || (value.overallGate !== 'PASS' && value.overallGate !== 'GATE_FAILURE')
+    || !validAuditGateSection(value.tsc, 'status')
+    || !isRecord(value.tsc) || !isStringArray(value.tsc.errors)
+    || !validAuditGateSection(value.vitest, 'status')
+    || !isRecord(value.vitest) || !validAuditGateDelta(value.vitest.delta)
+    || !validAuditGateSection(value.honesty, 'violations')
+    || !validAuditGateSection(value.observability, 'metrics')) return unknown('audit-gate');
+  const rows: ToolReadRow[] = [{
+    id: 'audit-gate:summary',
+    title: '',
+    titleKind: 'summary',
+    fields: completeFields(value, ['overallGate'], ['tsc', 'vitest', 'honesty', 'observability']),
+  }];
+  for (const key of ['tsc', 'vitest', 'honesty', 'observability'] as const) {
+    rows.push({ id: `audit-gate:${key}`, title: '', titleKind: key, fields: completeFields(value[key] as UnknownRecord) });
+  }
+  return { kind: 'audit-gate', state: 'valid', count: null, rows, reasonCode: null };
+}
+
+function parseAuditQuery(value: unknown): ToolReadProjection {
+  const error = producerError('audit-query', value);
+  if (error) return error;
+  if (!isRecord(value) || typeof value.sprintId !== 'string' || value.sprintId.length === 0
+    || !isNonNegativeInteger(value.totalScanned) || !Array.isArray(value.matched)) return unknown('audit-query');
+  const rows: ToolReadRow[] = [{
+    id: 'audit-query:summary',
+    title: '',
+    titleKind: 'summary',
+    fields: completeFields(value, ['sprintId', 'totalScanned'], ['matched']),
+  }];
+  for (let index = 0; index < value.matched.length; index++) {
+    const entry = value.matched[index];
+    if (!isRecord(entry)
+      || typeof entry.timestamp !== 'string'
+      || !isNonNegativeInteger(entry.sequence)
+      || typeof entry.source !== 'string'
+      || typeof entry.target !== 'string'
+      || typeof entry.channel !== 'string'
+      || !(entry.tenantId === undefined || typeof entry.tenantId === 'string')) return unknown('audit-query');
+    rows.push({
+      id: `audit-query:${safeTerminalText(value.sprintId)}:${entry.sequence}:${index}`,
+      title: safeTerminalText(entry.channel),
+      fields: completeFields(entry, ['timestamp', 'sequence', 'source', 'target', 'channel', 'tenantId', 'payload']),
+    });
+  }
+  return { kind: 'audit-query', state: 'valid', count: value.matched.length, rows, reasonCode: null };
+}
+
+function isControlStatus(value: unknown): value is 'ON' | 'OFF' {
+  return value === 'ON' || value === 'OFF';
+}
+
+function parseAuditCompliance(value: unknown): ToolReadProjection {
+  const error = producerError('audit-compliance', value);
+  if (error) return error;
+  if (!isRecord(value)
+    || !isControlStatus(value.rbacStatus)
+    || !isControlStatus(value.tenantIsolationStatus)
+    || !isRecord(value.auditChainIntegrity)
+    || typeof value.auditChainIntegrity.intact !== 'boolean'
+    || !(value.auditChainIntegrity.brokenAt === undefined || isNonNegativeInteger(value.auditChainIntegrity.brokenAt))
+    || !isNonNegativeInteger(value.eventCount)
+    || !isRecord(value.actorBreakdown)
+    || Object.values(value.actorBreakdown).some((count) => !isNonNegativeInteger(count))
+    || !isRecord(value.controls)
+    || !isControlStatus(value.controls.rbacEnforcement)
+    || !isControlStatus(value.controls.tenantIsolation)
+    || !isControlStatus(value.controls.auditChainIntact)) return unknown('audit-compliance');
+  const rows: ToolReadRow[] = [{
+    id: 'audit-compliance:summary',
+    title: '',
+    titleKind: 'summary',
+    fields: completeFields(value, ['rbacStatus', 'tenantIsolationStatus', 'auditChainIntegrity', 'eventCount', 'controls'], ['actorBreakdown']),
+  }];
+  for (const actor of Object.keys(value.actorBreakdown).sort()) {
+    rows.push({
+      id: `audit-compliance:actor:${safeTerminalText(actor)}`,
+      title: safeTerminalText(actor),
+      fields: [{ key: 'count', value: String(value.actorBreakdown[actor]) }],
+    });
+  }
+  return { kind: 'audit-compliance', state: 'valid', count: value.eventCount, rows, reasonCode: null };
+}
+
 /** Parse a complete verified JSON document. A parser failure never becomes empty. */
 export function parseToolReadJson(kind: ToolReadKind, text: string): ToolReadProjection {
   let value: unknown;
@@ -242,5 +434,9 @@ export function parseToolReadJson(kind: ToolReadKind, text: string): ToolReadPro
     case 'skills': return parseSkills(value);
     case 'models': return parseModels(value);
     case 'model-active-set': return parseActiveModels(value);
+    case 'sync': return parseSync(value);
+    case 'audit-gate': return parseAuditGate(value);
+    case 'audit-query': return parseAuditQuery(value);
+    case 'audit-compliance': return parseAuditCompliance(value);
   }
 }
