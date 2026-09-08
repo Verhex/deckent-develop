@@ -11,6 +11,200 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### L1 explicit migration landed / LOCAL_VERIFIED — 2026-09-08
+
+Commit334a1882aa712d13221943406b57e53680f278cb: exact7 paths,638added/14removed;
+7/7 committed blobs equal root-landing-freeze-v3. Messages only2owned hunks;
+inherited73/10+run7/0+MASTER19/0+generated206/11 and4/3 remain unstaged.
+Fable959 sha9b657fe96b20d679d46788c65f8757967ae394de189345478cc94595058649bd
+independent scoped GO accepted candidate23PASS+supplementPASS without rewriting
+the failed aggregate. This is not a canonical XVerify receipt or whole7099 DONE.
+
+Main8file149/149PASS5da941b9; tsc/i18n59REPL/0hits/config-writer gate PASS.
+Final CLI test-only path matcher switched to node:path join (candidate and main);
+7/7 targeted tests6d92fe16PASS. Production source and compiled bytes unchanged;
+old test bytes retained in proof/prior-cli-native-migration-test-v1.txt, new pin in
+root-landing-freeze-v3. No global registry/model namespace policy changed.
+Bot3034173 stopped canonically; fresh inspector ALLOW; build:all95085exit0;
+bot3101962 restarted and kill-0/digest observation passed, recorded23:56:27.532Z.
+MCP reconnect remains next owner904 session boundary, not falsely marked fresh.
+
+Main compiled Docker actual IHYNU2/result.json SHA
+5536a55e3d87618128ea2965bf30abc96a0d4471ea265fbcd1b1281335b4739f:
+24/24PASS,0UNRUN, before==after;78startup/78self-close,0spawn; container exit0.
+Readonly/network-none/nonroot2GB2CPU64PID containment independently inspected;
+host .brain/.deckent/credential stores not mounted. Real fsync/atomic writer kept.
+Linux-container config CLI proof only; Node permission-host7142 and other-platform,
+Brain receipt parity/provider readiness/multiworker/settlement boundaries stay OPEN.
+
+Durable archive /home/alperen/deckent-recovery-20260904/terminal-7099-native-migration-hVKHfe:
+1011payload/5646320bytes, private0700/0600, independent inode+SHA readback verified;
+manifest12b32aa574b65ee994640c0005e0cce99d046bfe91ed69e81aa33cf0ed8fd4ed,
+SUMSd3dd9dbb19fa512ae7e5c4af18ab4a36b0c26d418bdef5499abe76f36ecaa63a.
+Archives retain first failures, frozen source/compiled snapshots, raw command/
+child observations, Fable959 and per-case proofs; sourceCommit binds334a1882a.
+Three diagnostic containers are stopped, retained for independent inspection.
+No push, MASTER DONE, DB/task cleanup or fake receipt. Next L1 Brain receipt parity.
+
+### L1 Docker actual / missing exact-model substeps — 2026-09-08
+
+Docker q4zogt actual 6e4fwZ/result.json:23/24 cases PASS, last case aggregate
+FAIL retained. Real native apply/backup/reload/idempotence passes EN/TR on Ollama;
+all typed refusals and JSON safe-error cases pass, no network, children closed.
+OpenAI exact model first apply succeeds with exact disk/result model, but helper's
+scenario name apply-openai-idempotent does not match endsWith(apply-idempotent).
+It never ran second apply/reload; not product failure and not missing-proof GO.
+Source and compiled pins remain unchanged. No full matrix retry: one supplemental
+exact OpenAI case using existing apply-idempotent scenario with per-case target;
+original aggregate remains FAIL, supplement must independently run missing steps.
+Containment same pinned image/readonly/network-none limits; no source/helper edit.
+
+### L1 host permission boundary / OS-contained proof — 2026-09-08
+
+V3 host actual /tmp/deckent-7099-native-migration-7Yu9MC/result.json b7fa48ee:
+4PASS/1FAIL/19UNRUN. Apply creates backup but fsync fails before atomic rename.
+Direct private diagnostic LtUajP confirms ERR_ACCESS_DENIED; Node24.15 internal
+fsyncSync checks permission.isEnabled and unconditionally rejects. This is the
+existing7142 environment boundary, not grounds to weaken durability or mark it DONE.
+No product/source change, no fsync stub or synthetic accepted write. V3 retained.
+Distinct proof admission: one Docker OS-contained24-case attempt, local image
+sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e,
+network none, readonly root/source/dependencies, private output-only writable mount,
+nonroot uid, cap-drop all, no-new-privileges, bounded memory/CPU/PIDs. No host config,
+credential, Docker socket or run store mounted. Normal Node executes real fsync.
+Helper native-migration-actual-docker-v1 derives reviewed v3; only containment
+mechanism differs. Claim limited to Linux container real compiled CLI, not host
+permission support, other platforms, provider readiness or dogfood settlement.
+One attempt; changed evidence must be evaluated before any further execution.
+
+### L1 compiled proof harness correction — 2026-09-08
+
+Candidate build65693exit0; freeze8bd7b77e. Actual v2 first run failed before
+config action: /tmp/deckent-7099-native-migration-zgahKU/result.json d725e796,
+1FAIL/23UNRUN. Preload classified Yoga's inline data:application/octet-stream
+WASM fetch as network and synchronously threw, unlike the fetch Promise contract.
+Dependency source ya() confirms embedded data URI, not external traffic.
+One bounded changed-harness actual correction: v3 delegates only exact base64
+octet-stream data URIs to real fetch (separate inline-data event); all network
+requests remain denied, no runtime/source change or no-network assertion removal.
+V2 evidence retained. Next v3 actual attempt; same fingerprint stops.
+
+### L1 joint verification — 2026-09-08
+
+Root initial9file159test report e8a7e9d retained:154PASS/5FAIL; all failures
+are unchanged config.test.ts config-set mocks lacking validateProjectConfigWrite.
+Independent main baseline reproduces same5/10FAIL (1b0bb34e), not new L1 failure.
+No test was weakened or fixture patched for these inherited failures.
+New CLI helper lang signature was narrower than detectLang(string); corrected
+to existing getMessage-compatible string, no cast/new language normalization.
+Root final scoped8file149/149PASS c1665cc1; tsc52157exit0, i18n59REPL/0hits
+and config-writer gate PASS. These do not claim repository-wide green.
+Candidate build65693 started after its own canonical clean inspector ALLOW;
+no main build or bot restart.24-case compiled CLI helper v2 reviewed, UNRUN.
+
+### L1 exact-target joint correction — 2026-09-08
+
+Core v2 87/87 PASS retained (report SHA3bb82a37), but root did not accept
+requested gpt-5.6 becoming gpt-5.6-sol merely because loader does the same.
+New consumer evidence: resolveNativeSelection rejects legacy aliases before
+credentials/adapters (native-transport.ts); DECKENT requires exact authored IDs.
+Resolution stays in the admitted migration scope: explicit target aliases and
+surrounding whitespace refuse NATIVE_MODEL_INVALID without writes; no new
+canonicalizer/provider namespace policy. Existing stored-alias generic migration
+is unchanged. Exact selection and migration of legacy stored data are distinct.
+Core/CLI lanes' test budgets remain consumed; one root joint corrective pass now
+includes this refusal, JSON thrown-error truth, localized messages and portable
+backup-path assertions. Next is one combined root verification, not lane retries.
+Proof helper review adds exact-target reload, alias/whitespace refusals, timeout
+classification and post-reload disk comparison. No actual execution yet.
+Fable956 consumed by digest-bound957; owner push remote/local4432 verified.
+
+### L1 first integration review — 2026-09-08
+
+CLI lane6/6PASS22311db1; initial hyphen/status catalog mismatch failure retained
+at /tmp/deckent-7099-native-migration-cli-v1.json; correction maps already-native
+to canonical already_native. Lane budget consumed; root's one admitted joint
+correction covers --json caught exceptions: safe typed single JSON with
+mutationState=unknown (I/O can fail after a boundary), never rawerror/no-write lie.
+Root added matching regression; joint execution pending. Source remains candidate.
+Core pre-freeze review: existing native_provider-only/model-only configs are valid
+legacy boot inputs; pair requirement applies to explicit request flags only.
+Generic migration must preserve them; explicit same-value pair may fill missing
+half, but authored conflicting value refuses. Exclusive backup must not overwrite
+an existing snapshot. These refine original preservation obligations, not new keys.
+Helper preparation must use actual implemented catalog keys/JSON shape, not guesses.
+
+### L1 explicit native migration — bounded admission, 2026-09-08
+
+Owner-admitted7099 deprecate+migration obligation; manual continuation remains
+authorized, DOGFOOD ON/DEGRADED. Candidate /tmp/deckent-7099-native-migration-Dj6Xpb
+detached4432b172f; no project run/task identity created. Existing native intent
+separation is correct but config migrate neither reports pending legacy-native
+selection nor offers explicit transition. No new persisted config key admitted.
+
+Product: legacy users can preview and explicitly choose native provider/model,
+preserving legacy fallback and existing settings; no host subscription→API or
+Brain→native inference. Dogfood: Brain provider/receipt identity remains distinct.
+Canonical path: CLI config migrate→existing core migrateConfig→existing config
+write lock/atomic writer→loadConfig→native resolver. CLI flags --native-provider
+and --native-model must be supplied together. Existing native_provider/native_model
+only; preserve chat_provider bytes/meaning and canonical providers.brain. A complete
+explicit target already present is idempotent; conflicting native target or
+terminal.native_agent=false refuses without mutation. No network/auth probe or
+runtime start; selection validity never claims account entitlement/readiness.
+Without explicit target, report legacy selection-needed rather than claiming
+native migration complete; ordinary generic migration behavior stays compatible.
+
+Core API additive: MigrationOptions {dryRun?,nativeProvider?,nativeModel?};
+MigrationResult.nativeMigration optional structured {status: 'not-applicable' |
+'selection-required' | 'already-native' | 'planned' | 'applied', provider?,model?};
+nativeMigrationError optional stable code 'NATIVE_SELECTION_INCOMPLETE' |
+'NATIVE_PROVIDER_INVALID' | 'NATIVE_MODEL_INVALID' | 'NATIVE_TARGET_CONFLICT' |
+'NATIVE_LEGACY_OPT_OUT'. On these errors migrated=false, no backup/write/prune.
+Model must be nonempty and contain no control characters; use existing validation
+where applicable. No blanket native_model remap. Atomic apply reads/validates/
+backs up/writes inside one existing config lock; dry-run no writes/lock/backup.
+Backup preserves exact previous bytes; second same request has zero config/backup
+delta. Existing generic alias normalization semantics must not regress.
+
+Disjoint writers:
+A core: src/core/config-migration.ts; tests/core/config-native-migration.test.ts(new),
+tests/core/config-migration.test.ts only compatibility fixture correction.
+B CLI: src/cli/commands/config.ts; src/cli/helpers/messages.ts;
+tests/cli/commands/config-native-migration.test.ts(new).
+CLI localizes typed migration state/errors and new help flags; optional --json
+emits one structured result without raw config or credentials. No raw schema
+error dumping for native migration errors. No unconditional new strings in core.
+Root: proof helpers, docs/en/configuration.md+docs/tr/configuration.md, capsule/
+current-flow, joint verification, candidate/main build proof, fan-in and archive.
+
+Budget each lane:1implementation+1changed corrective pass,2targeted invocations,
+20min,2forks/6GB. Root1joint verification+1changed correction; no same-fingerprint
+retry. Core/CLI join before real CLI; no nested workers, full-suite/build/provider/
+commit by lanes. Protected: main sources, user config/auth, .brain/.tasks/runtime,
+MASTER/ledger/receipts, verifier assets, unrelated config APIs, approval semantics.
+Real private compiled CLI EN/TR: dry-run hash stable; explicit apply + byte-exact
+backup; reload preserves legacy/Brain identity and selects requested native pin;
+second apply no writes; invalid/partial/conflict/opt-out refuse. No live provider
+inference, receipt, multiworker or unsupported-platform closure inferred.
+Planner Brain-provider receipt parity remains explicit downstream proof, not
+silently satisfied by this config-only transition. Earliest safe run returns to
+canonical dogfood; one final compact Fable milestone.
+
+### L6 independent main GO / owner push verified — 2026-09-08
+
+Fable956 SHAfa06f9b121594e921dc1760c4758e74f1402947a37f1ad9a828a1f511f2babd1
+digest/full-body verified: GO / LOCAL_VERIFIED(main), exact10path owned blobs,
+inherited separation, source/timer semantics,10actual cases and both archives.
+Its "38 suite126" wording is a count typo: raw root report is13files/126tests;
+no count inflation adopted. Not canonical XVerify or whole7099 closure.
+NO_COLOR intentionally suppresses this Terminal's decorative activity animation
+as well as color; textual progress/timers remain. This is Deckent's explicit UX
+choice, not a claim that NO_COLOR universally requires reduced motion.
+Owner pushed48bdd4cd2..4432b172f; root git ls-remote independently matched4432b172f.
+Fable's same measurement agrees; local/remote equal, uncommitted state preserved.
+Typed config cast simplification is nonblocking, not a new admitted work item.
+
 ### L6 source checkpoint landed — 2026-09-08
 
 Source59f8cf581:10files,+276/-8, every committed blob SHA equals reviewed
