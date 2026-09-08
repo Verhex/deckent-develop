@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -221,10 +221,10 @@ describe('sprint finalizer exact attempt custody', () => {
     }]);
   });
 
-  it('persists every exact custody boundary digest in the terminal receipt', () => {
+  it('retains exact custody digests but blocks terminal receipt publication for an unminted current-shaped authority', () => {
     const projectRoot = mkdtempSync(join(tmpdir(), 'deckent-finalizer-exact-receipt-'));
     try {
-      const exactTask = task('910-004');
+      const exactTask = { ...task('910-004'), status: 'EXECUTING' } as Task;
       mkdirSync(join(projectRoot, '.tasks'), { recursive: true });
       writeFileSync(
         join(projectRoot, '.tasks', 'task-910-004.json'),
@@ -241,24 +241,58 @@ describe('sprint finalizer exact attempt custody', () => {
           currentRead('910-004', 'DONE', projected),
         ]]),
       });
-      const publication = publishFencedSprintTerminalReceipt({
+      expect(truth.exactCustodyDigests).toEqual([{
+        taskId: '910-004',
+        attemptId: 'exact-attempt:910-004',
+        generation: 1,
+        admissionReceiptDigest: digest('1'),
+        acceptedResultArtifactReceiptDigest: digest('2'),
+        acceptedResultChainDigest: digest('3'),
+        resultDigest: digest('4'),
+        evaluationArtifactReceiptDigest: digest('9'),
+        evaluationChainDigest: digest('7'),
+        evaluationReceiptDigest: digest('d'),
+        finalizerArtifactReceiptDigest: digest('b'),
+        finalizerChainDigest: digest('8'),
+        finalizerReceiptDigest: digest('e'),
+        settlementArtifactReceiptDigest: digest('5'),
+        settlementDigest: digest('6'),
+      }]);
+      expect(truth.attempts[0]?.attribution).toEqual({
+        state: 'HOLD',
+        reasonCode: 'EXACT_WORK_ATTRIBUTION_AUTHORITY_MISSING',
+      });
+      expect(truth.terminalEvidence.cleanupEligibility).toMatchObject({
+        candidate: false,
+        state: 'BLOCKED',
+        reasons: ['ATTRIBUTION_EXCLUDED'],
+      });
+      const sprint = {
+        id: 'sprint-910',
+        number: 910,
+        status: 'EVALUATING',
+        phase: 'EVALUATE',
+        tasks: [exactTask],
+        workers: [],
+      } as unknown as Sprint;
+
+      expect(() => publishFencedSprintTerminalReceipt({
         projectRoot,
-        sprint: {
-          id: 'sprint-910',
-          number: 910,
-          status: 'COMPLETE',
-          phase: 'COMPLETE',
-          tasks: [exactTask],
-          workers: [],
-        } as unknown as Sprint,
+        sprint,
         truth,
         now: () => '2026-09-02T00:00:00.000Z',
-      });
-      const persisted = JSON.parse(readFileSync(publication.artifactPath, 'utf-8')) as {
-        exactCustodyDigests?: unknown;
-      };
-
-      expect(persisted.exactCustodyDigests).toEqual(truth.exactCustodyDigests);
+      })).toThrow(/TERMINAL_PUBLICATION_NOT_CLEANUP_CANDIDATE_BLOCKED/u);
+      expect(existsSync(join(
+        projectRoot,
+        '.deckent',
+        'recently-works',
+        'sprint-910-terminal-receipt.json',
+      ))).toBe(false);
+      expect(sprint).toMatchObject({ status: 'EVALUATING', phase: 'EVALUATE' });
+      expect(JSON.parse(readFileSync(
+        join(projectRoot, '.tasks', 'task-910-004.json'),
+        'utf-8',
+      ))).toMatchObject({ status: 'EXECUTING' });
     } finally {
       rmSync(projectRoot, { recursive: true, force: true });
     }

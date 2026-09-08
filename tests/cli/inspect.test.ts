@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Command } from 'commander';
 import {
+  formatInspectTaskDetail,
   registerInspect,
   runInspectCommand,
 } from '../../src/cli/commands/inspect.js';
@@ -38,15 +39,18 @@ describe('deckent inspect', () => {
     expect(lines[0]).toContain('run-42\tEXECUTE\tauthority\t-');
   });
 
-  it('renders task drill-down including lineage', async () => {
+  it('renders the real core task detail DTO including distinct task and current-run truth', async () => {
     const lines: string[] = [];
     const code = await runInspectCommand('542-003', {}, {
       projectRoot: fixtureRoot,
       language: 'en',
       output: (value) => lines.push(value),
       readTaskDetail: () => ({
-        taskId: '542-003', status: 'EXECUTING', agent: 'terminal-ux-engineer', model: 'model-a',
-        heartbeat: { currentAction: 'testing' }, plan: { truncated: false },
+        taskId: '542-003',
+        task: { id: '542-003', status: 'EXECUTING', assignedAgent: 'terminal-ux-engineer', model: 'model-a' },
+        rawTaskProjectionStatus: 'EXECUTING',
+        currentRun: { lifecycle: 'ABORTED', status: 'FAILED', reason: 'PROVIDER_BILLING_UNAVAILABLE' },
+        hb: { currentAction: 'testing' }, plan: { truncated: false },
         result: { selfAssessment: 'DONE' },
         lineage: {
           logPath: 'task.log', logTailAvailable: true, resultEvidence: null,
@@ -55,12 +59,34 @@ describe('deckent inspect', () => {
       }),
     });
     expect(code).toBe(0);
-    expect(lines[0]).toContain('Status: EXECUTING');
+    expect(lines[0]).toContain('Task projection status: EXECUTING');
+    expect(lines[0]).toContain('Agent: terminal-ux-engineer');
+    expect(lines[0]).toContain('Model: model-a');
     expect(lines[0]).toContain('Heartbeat: testing');
     expect(lines[0]).toContain('Plan truncated: false');
     expect(lines[0]).toContain('Self-assessment: DONE');
+    expect(lines[0]).toContain('Current run lifecycle: ABORTED');
+    expect(lines[0]).toContain('Current run status: FAILED');
+    expect(lines[0]).toContain('Current run cause: PROVIDER_BILLING_UNAVAILABLE');
     expect(lines[0]).toContain('Lineage: {"logPath":"task.log"');
     expect(lines[0]).toContain('Log tail (2 lines, truncated: true):\nfirst\nlast');
+  });
+
+  it('does not invent current-run truth for a historical task DTO', () => {
+    const rendered = formatInspectTaskDetail({
+      taskId: '721-001',
+      task: { id: '721-001', status: 'FAILED' },
+      rawTaskProjectionStatus: 'FAILED',
+      currentRun: null,
+      hb: null,
+      plan: null,
+      result: null,
+      lineage: {},
+    }, 'en');
+    expect(rendered).toContain('Task projection status: FAILED');
+    expect(rendered).toContain('Current run lifecycle: -');
+    expect(rendered).toContain('Current run status: -');
+    expect(rendered).toContain('Current run cause: -');
   });
 
   it('returns typed exit 1 for an unknown task', async () => {
@@ -112,9 +138,9 @@ describe('deckent inspect', () => {
       },
     });
     await Promise.resolve();
-    emit?.({ lifecycle: 'EXECUTE', phase: 'RUNNING', workers: [{ taskId: '1' }], revision: 7 });
+    emit?.({ lifecycle: { lifecycle: 'ACTIVE' }, phase: 'RUNNING', workers: [{ taskId: '1' }], revision: 7 });
     expect(output[0]).toContain('Run ID\tState');
-    expect(output[1]).toBe('\r\u001b[2KLifecycle: EXECUTE · phase: RUNNING · workers: 1 · revision: 7');
+    expect(output[1]).toBe('\r\u001b[2KLifecycle: ACTIVE · phase: RUNNING · workers: 1 · revision: 7');
     listeners.get('close')?.();
     expect(await running).toBe(0);
     expect(closeCount).toBe(1);
@@ -129,7 +155,12 @@ describe('deckent inspect', () => {
       projectRoot: fixtureRoot,
       language: 'en',
       output: (value) => output.push(value),
-      readTaskDetail: () => ({ taskId: '544-003', status: 'EXECUTING', lineage: {} }),
+      readTaskDetail: () => ({
+        taskId: '544-003', task: {}, rawTaskProjectionStatus: 'EXECUTING', hb: null, lineage: {},
+        currentRun: {
+          sprintId: 'sprint-544', lifecycle: 'ACTIVE', status: 'EXECUTING', reason: null,
+        },
+      }),
       observeSnapshot: (_root, onSnapshot) => {
         emit = onSnapshot;
         return { close() {} };
@@ -142,10 +173,27 @@ describe('deckent inspect', () => {
     await Promise.resolve();
     emit?.({
       revision: 8,
-      tasks: [{ taskId: '544-003', status: 'EXECUTING', heartbeat: { currentAction: 'testing' } }],
+      lifecycle: { sprintId: 'sprint-544', lifecycle: 'ACTIVE', status: 'EXECUTING', reason: null },
+      workers: [{ taskId: '544-003', status: 'EXECUTING', hb: { currentAction: 'testing' } }],
     });
     expect(output[1]).toBe(
-      '\r\u001b[2KTask 544-003 · status: EXECUTING · heartbeat: testing · revision: 8',
+      '\r\u001b[2KTask 544-003 · status: EXECUTING · heartbeat: testing · current run: ACTIVE/EXECUTING · cause: - · revision: 8',
+    );
+    emit?.({
+      revision: 9,
+      lifecycle: { sprintId: 'sprint-544', lifecycle: 'ABORTED', status: 'FAILED', reason: 'PROVIDER_BILLING_UNAVAILABLE' },
+      workers: [{ taskId: '544-003', status: 'EXECUTING', hb: { currentAction: 'settling' } }],
+    });
+    expect(output[2]).toBe(
+      '\r\u001b[2KTask 544-003 · status: EXECUTING · heartbeat: settling · current run: ABORTED/FAILED · cause: PROVIDER_BILLING_UNAVAILABLE · revision: 9',
+    );
+    emit?.({
+      revision: 10,
+      lifecycle: { sprintId: 'sprint-545', lifecycle: 'ACTIVE', status: 'EXECUTING', reason: null },
+      workers: [{ taskId: '544-003', status: 'EXECUTING', hb: { currentAction: 'stale' } }],
+    });
+    expect(output[3]).toBe(
+      '\r\u001b[2KTask 544-003 · status: EXECUTING · heartbeat: stale · revision: 10',
     );
     listeners.get('SIGINT')?.();
     expect(await running).toBe(0);

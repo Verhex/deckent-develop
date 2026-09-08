@@ -7,6 +7,7 @@ const mockHasCheckpoint = vi.fn();
 const mockReadCheckpoint = vi.fn();
 const mockDetectStaleWorkers = vi.fn();
 const mockLoadConfig = vi.fn();
+const mockBootstrapProviders = vi.fn().mockResolvedValue({ connector: 'test-connector' });
 const mockDeriveResumeDisposition = vi.fn();
 const mockReadSprintState = vi.fn();
 const mockClearSprintState = vi.fn();
@@ -40,7 +41,7 @@ vi.mock('../../../src/core/config.js', () => ({
 }));
 
 vi.mock('../../../src/core/provider.js', () => ({
-  bootstrapProviders: vi.fn().mockResolvedValue({ connector: 'test-connector' }),
+  bootstrapProviders: (...args: unknown[]) => mockBootstrapProviders(...args),
 }));
 
 const mockExistsSync = vi.fn();
@@ -249,6 +250,46 @@ describe('deckent resume CLI — preplanned exactly-once handoff', () => {
         connector: 'test-connector',
       }),
     );
+  });
+
+  it('passes exact Store ownership to disposition before the reset boundary', async () => {
+    const discriminate = vi.fn(() => ({ state: 'exact' as const }));
+    mockDeriveResumeDisposition.mockReturnValue({
+      resumableIds: [],
+      parkedSettlements: [{ taskId: '321-004', state: 'pending-settlement' }],
+    });
+    mockReadSprintState.mockReturnValue({ sprintId: 'sprint-321' });
+
+    await runCommand(['sprint-321'], { resolveIsExactTask: () => discriminate });
+
+    expect(mockDeriveResumeDisposition).toHaveBeenCalledWith(
+      '/fake/project',
+      FAKE_CHECKPOINT,
+      discriminate,
+    );
+    expect(mockResetInterrupted).not.toHaveBeenCalled();
+    expect(mockBuildPreplanned).not.toHaveBeenCalled();
+    expect(mockRunSprint).toHaveBeenCalledTimes(1);
+  });
+
+  it('propagates exact Store ownership HOLD before kill, reset, or provider bootstrap', async () => {
+    const discriminate = vi.fn(() => ({
+      state: 'hold' as const,
+      reasonCode: 'exact-custody-store-unavailable',
+    }));
+    mockDeriveResumeDisposition.mockImplementation((_root: unknown, _checkpoint: unknown, port: unknown) => {
+      expect(port).toBe(discriminate);
+      throw new Error('Task 321-004 exact execution discriminator is unavailable: exact-custody-store-unavailable');
+    });
+
+    await expect(runCommand(['sprint-321'], { resolveIsExactTask: () => discriminate }))
+      .rejects.toThrow(/exact execution discriminator is unavailable/u);
+
+    expect(mockUnlinkSync).not.toHaveBeenCalled();
+    expect(mockResetInterrupted).not.toHaveBeenCalled();
+    expect(mockBuildPreplanned).not.toHaveBeenCalled();
+    expect(mockBootstrapProviders).not.toHaveBeenCalled();
+    expect(mockRunSprint).not.toHaveBeenCalled();
   });
 
   it('HOLDs an invalid settlement without invoking recovery', async () => {

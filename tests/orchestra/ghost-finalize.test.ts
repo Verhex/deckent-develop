@@ -7,8 +7,8 @@
 //
 // Fix verified here:
 //   - cleanupCheckpointFiles() purges .json + .json.tmp + -checkpoint-seq
-//   - isSprintFinalized() detects an already-finalized sprint (state COMPLETE
-//     / sprint-log present)
+//   - isSprintFinalized() accepts only a canonically sealed terminal archive;
+//     state COMPLETE / sprint-log are projections, not deletion authority
 //   - restoreSprintFromCheckpoint() purges + reports 'fresh' for a finalized
 //     leftover, while preserving genuine crash-recovery paths
 //   - persistFinalSprintState() purges checkpoint artifacts on every finalize
@@ -18,6 +18,7 @@
 // is read; no spawnSync.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { createHash } from 'node:crypto';
 import { mkdirSync, rmSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -31,6 +32,7 @@ import type { SprintCheckpoint } from '../../src/orchestra/sprint-checkpoint.js'
 import { persistFinalSprintState } from '../../src/orchestra/sprint-finalizer.js';
 import { SprintPhase, SprintStatus, TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task } from '../../src/core/types.js';
+import { sealSprintArchiveTerminal } from '../../src/core/sprint-archive.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -81,6 +83,43 @@ function writeSprintLog(root: string, sprintId: string): void {
   const sprintsDir = join(root, '.brain', 'sprints');
   mkdirSync(sprintsDir, { recursive: true });
   writeFileSync(join(sprintsDir, `${sprintId}.md`), `# ${sprintId}\nfinalized\n`, 'utf-8');
+}
+
+function sealVerifiedTerminalArchive(root: string, sprintId: string): void {
+  const recent = join(root, '.deckent', 'recently-works');
+  mkdirSync(recent, { recursive: true });
+  const receipt = {
+    version: 1 as const,
+    sprintId,
+    runId: `run-${sprintId}`,
+    coordinatorGeneration: 2,
+    terminalOutcome: 'COMPLETE' as const,
+    logicalSettlementDigest: 'a'.repeat(64),
+    priorAuthorityVersion: 0,
+    authorityVersion: 1,
+  };
+  writeFileSync(
+    join(recent, `${sprintId}-terminal-receipt.json`),
+    JSON.stringify(receipt),
+    'utf-8',
+  );
+  const eventLine = JSON.stringify({ sequence: 1 });
+  const journal = `${eventLine}\n`;
+  const hotJournalPath = join(recent, `${sprintId}-events.jsonl`);
+  writeFileSync(hotJournalPath, journal, 'utf-8');
+  writeFileSync(join(recent, `${sprintId}-seq`), '1', 'utf-8');
+  const sealed = sealSprintArchiveTerminal(root, sprintId, {
+    receipt,
+    finalEvent: {
+      sequence: 1,
+      digest: createHash('sha256').update(eventLine).digest('hex'),
+    },
+    hotJournalPath,
+    expectedArchivedPreimageSha256: null,
+    expectedHotJournalSha256: createHash('sha256').update(journal).digest('hex'),
+    operatorReason: 'verified ghost-checkpoint cleanup authority',
+  });
+  if (!sealed.terminalComplete) throw new Error('terminal archive fixture did not seal');
 }
 
 function makeTask(id: string, status: TaskStatus = TaskStatus.PENDING): Task {
@@ -180,13 +219,18 @@ describe('isSprintFinalized', () => {
   beforeEach(() => { root = makeTempRoot(); });
   afterEach(() => { rmSync(root, { recursive: true, force: true }); });
 
-  it('4. true when sprint-state.json is COMPLETE for this sprint', () => {
+  it('4. false when only sprint-state.json is COMPLETE for this sprint', () => {
     writeSprintStateFile(root, 'sprint-271', SprintStatus.COMPLETE);
-    expect(isSprintFinalized(root, 'sprint-271')).toBe(true);
+    expect(isSprintFinalized(root, 'sprint-271')).toBe(false);
   });
 
-  it('5. true when the sprint-log markdown exists (memory.db retro mirror)', () => {
+  it('5. false when only the sprint-log markdown exists', () => {
     writeSprintLog(root, 'sprint-271');
+    expect(isSprintFinalized(root, 'sprint-271')).toBe(false);
+  });
+
+  it('5b. true only when the canonical terminal archive verifies', () => {
+    sealVerifiedTerminalArchive(root, 'sprint-271');
     expect(isSprintFinalized(root, 'sprint-271')).toBe(true);
   });
 
@@ -248,9 +292,7 @@ describe('restoreSprintFromCheckpoint — ghost-finalize guard', () => {
   beforeEach(() => { root = makeTempRoot(); });
   afterEach(() => { rmSync(root, { recursive: true, force: true }); });
 
-  it('11. leftover + finalized (sprint-state COMPLETE) → cleaned + fresh, no ghost-complete', () => {
-    // The exact CANLI scenario: finalize stamped state COMPLETE but left the
-    // checkpoint behind; task.json files were archived (so they are absent).
+  it('11. leftover + sprint-state COMPLETE alone preserves checkpoint and does not start fresh', () => {
     writeSprintStateFile(root, 'sprint-271', SprintStatus.COMPLETE);
     writeCheckpointFile(root, baseCheckpoint('sprint-271', {
       completedTasks: ['271-001', '271-002'],
@@ -259,24 +301,34 @@ describe('restoreSprintFromCheckpoint — ghost-finalize guard', () => {
 
     const result = restoreSprintFromCheckpoint(root, 'sprint-271');
 
-    // NOT a phantom 'complete' — caller proceeds fresh to plan a NEW sprint.
-    expect(result.restored).toBe(false);
-    expect(result.action).toBe('fresh');
-    expect(result.restoredSprint).toBeUndefined();
-    // Stale checkpoint artifacts purged so it cannot recur next start.
-    expect(existsSync(checkpointJsonPath(root, 'sprint-271'))).toBe(false);
-    expect(existsSync(checkpointSeqPath(root, 'sprint-271'))).toBe(false);
+    expect(result.restored).toBe(true);
+    expect(result.action).toBe('resume-evaluate');
+    expect(existsSync(checkpointJsonPath(root, 'sprint-271'))).toBe(true);
+    expect(existsSync(checkpointSeqPath(root, 'sprint-271'))).toBe(true);
   });
 
-  it('12. leftover + finalized (sprint-log present) → cleaned + fresh', () => {
+  it('12. leftover + sprint-log alone preserves checkpoint and does not start fresh', () => {
     writeSprintLog(root, 'sprint-271');
     writeCheckpointFile(root, baseCheckpoint('sprint-271', { completedTasks: ['271-001'] }));
+
+    const result = restoreSprintFromCheckpoint(root, 'sprint-271');
+
+    expect(result.restored).toBe(true);
+    expect(result.action).toBe('resume-evaluate');
+    expect(existsSync(checkpointJsonPath(root, 'sprint-271'))).toBe(true);
+  });
+
+  it('12b. verified terminal archive authorizes checkpoint cleanup and fresh planning', () => {
+    writeCheckpointFile(root, baseCheckpoint('sprint-271', { completedTasks: ['271-001'] }));
+    writeCheckpointSeq(root, 'sprint-271', 6);
+    sealVerifiedTerminalArchive(root, 'sprint-271');
 
     const result = restoreSprintFromCheckpoint(root, 'sprint-271');
 
     expect(result.restored).toBe(false);
     expect(result.action).toBe('fresh');
     expect(existsSync(checkpointJsonPath(root, 'sprint-271'))).toBe(false);
+    expect(existsSync(checkpointSeqPath(root, 'sprint-271'))).toBe(false);
   });
 
   it('13. leftover + NOT finalized + all terminal → resume-evaluate for authoritative finalization', () => {

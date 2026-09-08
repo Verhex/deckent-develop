@@ -37,6 +37,8 @@ import type {
 } from '../core/task-types.js';
 import type { TaskResultSettlementRefV1 } from '../core/task-result-settlement.js';
 import { atomicWriteFileSync } from '../agents/worker-lifecycle.js';
+import { readExactAcceptanceVerificationSourceV2, createExactAcceptanceAdjudicationContractV2,
+  createExactAcceptanceEvidenceReadPortV2 } from './exact-acceptance-evidence.js';
 
 export interface CrossVerifyRuntimeBootstrapReady {
   readonly state: 'ready';
@@ -61,6 +63,7 @@ export type CrossVerifyRuntimeBootstrapResult =
     };
 
 export interface BootstrapCrossVerifyRuntimeInput {
+  readonly exactAcceptanceSource?: import('./exact-acceptance-evidence.js').ExactAcceptanceVerificationSourceV2;
   readonly projectRoot: string;
   readonly task: Task;
   readonly result: TaskResult;
@@ -182,7 +185,16 @@ export function bootstrapCrossVerifyRuntimeV2(
   if (!criteria || criteria.length === 0) {
     return bootstrapHold(input, 'xverify_v2_structured_criteria_missing', input.task.id);
   }
-  const relativePaths = [...new Set(
+  const exactSource = input.exactAcceptanceSource
+    ? readExactAcceptanceVerificationSourceV2(input.exactAcceptanceSource) : null;
+  if (exactSource && (exactSource.state !== 'ready'
+    || canonicalJson(exactSource.task) !== canonicalJson(input.task)
+    || canonicalJson(exactSource.result) !== canonicalJson(input.result)
+    || input.producerSettlementDigest !== `sha256:${exactSource.binding.bindingDigest}`)) {
+    return bootstrapHold(input, 'xverify_v2_bootstrap_failed', 'exact acceptance source changed');
+  }
+  const relativePaths = exactSource?.state === 'ready'
+    ? exactSource.evidence.map(entry => entry.relativePath) : [...new Set(
     [
       ...(input.task.scope.filesRead.length > 0
         ? input.task.scope.filesRead
@@ -206,11 +218,13 @@ export function bootstrapCrossVerifyRuntimeV2(
       settlementRef: input.settlementRef,
       fenceTokenHash: input.fenceTokenHash,
       relativePaths,
+      ...(input.exactAcceptanceSource ? { immutableSource: createExactAcceptanceEvidenceReadPortV2(input.exactAcceptanceSource) } : {}),
     });
     const evidenceSnapshot = captureCrossVerifyEvidenceSnapshotAtomic({
       projectRoot: input.projectRoot,
       settlementRef: input.settlementRef,
       claim: evidenceClaim,
+      ...(input.exactAcceptanceSource ? { immutableSource: createExactAcceptanceEvidenceReadPortV2(input.exactAcceptanceSource) } : {}),
     });
     const manifestEntries = evidenceSnapshot.manifest.entries;
 
@@ -219,7 +233,7 @@ export function bootstrapCrossVerifyRuntimeV2(
     // requirement is evidenced ONLY by its slices (the requirement load moves
     // off the full-file sha — that unmappable weight was the HOLD mechanism).
     const rangedByPath = new Map<string, RangedRequirement[]>();
-    for (const criterion of criteria) {
+    for (const criterion of exactSource ? [] : criteria) {
       for (const statement of criterion.evidenceRequirements) {
         const ranged = parseRangedRequirement(statement);
         if (!ranged) continue;
@@ -266,7 +280,9 @@ export function bootstrapCrossVerifyRuntimeV2(
       }
     }
 
-    const adjudicationContract = createCrossVerifyAdjudicationContractV2({
+    const adjudicationContract = exactSource?.state === 'ready'
+      ? createExactAcceptanceAdjudicationContractV2(exactSource.claim, manifestEntries)
+      : createCrossVerifyAdjudicationContractV2({
       schemaVersion: CROSS_VERIFY_ADJUDICATION_SCHEMA_VERSION,
       claimId: `claim-${input.task.id}`,
       summary: input.task.title,
@@ -290,6 +306,10 @@ export function bootstrapCrossVerifyRuntimeV2(
         contentSha256: entry.contentSha256,
       })),
     });
+    if (exactSource?.state === 'ready'
+      && adjudicationContract.claimDigest !== exactSource.binding.semanticClaimDigest) {
+      return bootstrapHold(input, 'xverify_v2_bootstrap_failed', 'exact acceptance semantic claim mismatch');
+    }
     const built = buildCrossVerifyAdjudicationPromptV2(adjudicationContract);
     if (built.state === 'hold') {
       return bootstrapHold(

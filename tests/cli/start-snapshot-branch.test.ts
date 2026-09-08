@@ -26,14 +26,17 @@
 // touching the run-flow-store.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createHash } from 'node:crypto';
 import { Command } from 'commander';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────
 
 vi.mock('../../src/core/config.js', () => ({
+  DEFAULT_MAX_FIX_RETRIES: 3,
+  getLoadedConfig: () => null,
   resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(),
@@ -105,13 +108,29 @@ import { runSprint, readContext, planSprint } from '../../src/orchestra/brain.js
 import { resolveProjectRoot } from '../../src/cli/helpers/process.js';
 import { print, printError, formatSprintSummary } from '../../src/cli/helpers/output.js';
 import { registerStart } from '../../src/cli/commands/start.js';
-import { saveApprovedSnapshot, loadRunHandle, type StoredApprovedSnapshot } from '../../src/core/run-flow-store.js';
+import {
+  saveApprovedSnapshot,
+  savePlannedSprint,
+  loadRunHandle,
+  loadStartAttempt,
+  readFlowEvents,
+  type StoredApprovedSnapshot,
+} from '../../src/core/run-flow-store.js';
 import { prepareInProcessExactRun, type ExactStartLineageInput } from '../../src/orchestra/exact-plan-start-service.js';
 import { getRunFlowCoordinator, _resetRunFlowCoordinatorsForTests } from '../../src/orchestra/run-flow-coordinator-registry.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
+import { SpawnBackendRecoveryHoldError } from '../../src/orchestra/spawn-backend.js';
+import { formatSpawnBackendRecoveryDiagnostic } from '../../src/orchestra/spawn-backend-recovery-diagnostic.js';
 import { SprintStatus, SprintPhase, TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task, ResolvedConfig } from '../../src/core/types.js';
 import { evaluateCostGate } from '../../src/core/cost-gate.js';
+import { processStartToken } from '../../src/core/pid-ownership.js';
+import { readCanonicalRunStatusReadModel } from '../../src/core/run-status-read-model.js';
+import { writeStateSnapshot } from '../../src/orchestra/sprint-pid-manager.js';
+import { canonicalJson } from '../../src/core/audit-writer.js';
+import { createPlannerInvocationBinding } from '../../src/core/planner-invocation-binding.js';
+import { computeExecutionPlanDigestV5 } from '../../src/core/execution-plan-digest.js';
+import { acceptedPlannerFixture } from '../helpers/accepted-planner-fixture.js';
 
 const mockLoadConfig = vi.mocked(loadConfig);
 const mockRunSprint = vi.mocked(runSprint);
@@ -187,6 +206,111 @@ function makeApprovedSnapshot(overrides?: Partial<StoredApprovedSnapshot>): Stor
     sprint: makeSprint(),
     ...overrides,
   } as StoredApprovedSnapshot;
+}
+
+function makePlannerAcceptedSnapshot(
+  root: string,
+  overrides?: Partial<StoredApprovedSnapshot>,
+): StoredApprovedSnapshot {
+  const snapshot = makeApprovedSnapshot(overrides);
+  const plannerResult = {
+    tasks: snapshot.sprint.tasks.map(task => ({
+      title: task.title,
+      description: task.description,
+      model: task.model,
+      effort: task.effort,
+      priority: task.priority,
+      reason: task.reason,
+      scope: task.scope,
+      dependencies: task.dependencies,
+      goNogo: task.goNogo,
+    })),
+    reasoning: 'accepted planner fixture',
+  };
+  const accepted = acceptedPlannerFixture(plannerResult, {
+    tenantId: snapshot.proposal!.tenant,
+    projectRoot: root,
+    runId: `${snapshot.flowId}:revision:${snapshot.revision}`,
+  });
+  if (!accepted.ok) throw new Error('accepted planner fixture did not settle');
+  const plannerResultSha256 = createHash('sha256')
+    .update(canonicalJson(plannerResult)).digest('hex');
+  const directivesSha256 = createHash('sha256')
+    .update('# accepted planner fixture').digest('hex');
+  const binding = createPlannerInvocationBinding(root, {
+    flowId: snapshot.flowId,
+    revision: snapshot.revision,
+    tenantId: snapshot.proposal!.tenant,
+    receiptRef: accepted.receiptRef,
+    plannerResultSha256,
+    directivesSha256,
+  });
+  const planningEvidence = { kind: 'accepted-planner-invocation' as const, binding };
+  const sourceAuthority = {
+    schemaVersion: 2 as const,
+    sourceKind: 'intent' as const,
+    contentSha256: plannerResultSha256,
+    configSha256: createHash('sha256').update(canonicalJson(makeConfig())).digest('hex'),
+    proposalSha256: createHash('sha256').update(canonicalJson(snapshot.proposal)).digest('hex'),
+    planningInputSha256: createHash('sha256').update(canonicalJson({
+      proposal: snapshot.proposal,
+      plannerResult,
+    })).digest('hex'),
+    scopeInputSha256: createHash('sha256').update(canonicalJson(
+      snapshot.sprint.tasks.map(task => task.scope),
+    )).digest('hex'),
+    lineageSha256: createHash('sha256').update(canonicalJson(snapshot.planLineage)).digest('hex'),
+    planningEvidence,
+  };
+  const planDigestContext = {
+    configuredProvider: 'codex' as const,
+    configuredModel: 'gpt-5.6-sol',
+    configuredBackend: 'docker' as const,
+    configuredAuthMode: 'subscription' as const,
+    fallbackProvider: null,
+    fallbackPolicy: null,
+    executionBudgetPolicy: {
+      roles: {
+        worker: {
+          default: {
+            maxTokens: 1_000_000,
+            maxTurns: 48,
+            maxCacheReadTokens: 1_000_000,
+            maxOutputTokens: 100_000,
+          },
+        },
+      },
+      landing: { reserve_ratio: 0.25 },
+      final_only_usage: {
+        action: 'allow-wall-clock-containment' as const,
+        roles: ['worker'],
+        max_wall_clock_seconds: 600,
+      },
+    },
+    configuredMaxWorkers: 4,
+    planningEvidence,
+    sourceAuthoritySha256: createHash('sha256')
+      .update(canonicalJson(sourceAuthority)).digest('hex'),
+  };
+  const planDigest = computeExecutionPlanDigestV5(snapshot.sprint, planDigestContext).digest;
+  const approved: StoredApprovedSnapshot = {
+    ...snapshot,
+    planDigest,
+    planDigestVersion: 5,
+    planDigestContext,
+    sourceAuthority,
+  };
+  savePlannedSprint(root, approved.flowId, {
+    revision: approved.revision,
+    sprint: approved.sprint,
+    planDigest,
+    planDigestVersion: 5,
+    planDigestContext,
+    proposal: approved.proposal,
+    sourceAuthority,
+    lineage: approved.planLineage,
+  });
+  return approved;
 }
 
 function makeStartLineage(idempotencyKey = 'start-idempotency'): ExactStartLineageInput {
@@ -372,7 +496,7 @@ describe('start --flow-id branch (427-021)', () => {
     });
 
     it('calls runSprint with the approved snapshot as preplannedSprint (no fresh planSprint replan)', async () => {
-      const snapshot = makeApprovedSnapshot();
+      const snapshot = makePlannerAcceptedSnapshot(root);
       saveApprovedSnapshot(root, snapshot);
       const capability = seedStartedFlow(root, snapshot);
 
@@ -392,7 +516,7 @@ describe('start --flow-id branch (427-021)', () => {
     });
 
     it('blocks unknown snapshot pricing under --force before persisting or running', async () => {
-      const snapshot = makeApprovedSnapshot();
+      const snapshot = makePlannerAcceptedSnapshot(root);
       saveApprovedSnapshot(root, snapshot);
       const capability = seedStartedFlow(root, snapshot);
       vi.mocked(evaluateCostGate).mockReturnValue({
@@ -415,7 +539,7 @@ describe('start --flow-id branch (427-021)', () => {
     });
 
     it('persists a run handle durably via the real run-flow-store (not just in-memory)', async () => {
-      const snapshot = makeApprovedSnapshot();
+      const snapshot = makePlannerAcceptedSnapshot(root);
       saveApprovedSnapshot(root, snapshot);
       const capability = seedStartedFlow(root, snapshot);
 
@@ -431,7 +555,7 @@ describe('start --flow-id branch (427-021)', () => {
     });
 
     it('prints the formatted sprint summary on success (no error, no non-zero exit)', async () => {
-      const snapshot = makeApprovedSnapshot();
+      const snapshot = makePlannerAcceptedSnapshot(root);
       saveApprovedSnapshot(root, snapshot);
       const capability = seedStartedFlow(root, snapshot);
 
@@ -443,8 +567,80 @@ describe('start --flow-id branch (427-021)', () => {
       expect(process.exitCode).toBeUndefined();
     });
 
+    it('persists bounded recovery hold evidence in both exact attempt and flow failure', async () => {
+      const snapshot = makePlannerAcceptedSnapshot(root);
+      saveApprovedSnapshot(root, snapshot);
+      const capability = seedStartedFlow(root, snapshot);
+      const error = new SpawnBackendRecoveryHoldError([{
+        kind: 'spawn-backend-recovery-hold', backend: 'docker', dispatchRequestId: 'dispatch-720',
+        taskId: '720-001', admissionRefDigest: null, authorityState: 'ADMISSION_DISCOVERY_REJECTED',
+        reasonCode: 'DISPATCH_DISCOVERY_TAMPERED_CANDIDATE', custodyHoldCode: 'IDENTITY_MISMATCH',
+      }]);
+      mockRunSprint.mockImplementationOnce(async (_root: string, _config: unknown, options?: any) => {
+        options?.onExactPlanMaterialize?.();
+        await options?.onExecutionAdmitted?.();
+        throw error;
+      });
+      await runCommand(root, exactFlowArgs(snapshot, capability));
+      const detail = formatSpawnBackendRecoveryDiagnostic(error);
+      expect(loadStartAttempt(root, capability.attemptId)?.settlement).toMatchObject({
+        state: 'FAILED', code: 'EXACT_CHILD_RUNTIME_FAILED', detail,
+      });
+      expect(readFlowEvents(root, snapshot.flowId)).toContainEqual(expect.objectContaining({
+        type: 'RUN_FAILED', error: `run crashed before completion: ${detail}`,
+      }));
+      expect(error.message).toBe('DECKENT_E091:spawn-backend-recovery-hold');
+      expect(process.exitCode).toBe(1);
+    });
+
+    it('publishes terminal run status after an exact detached child crashes', async () => {
+      const snapshot = makePlannerAcceptedSnapshot(root);
+      saveApprovedSnapshot(root, snapshot);
+      savePlannedSprint(root, snapshot.flowId, {
+        revision: snapshot.revision,
+        sprint: snapshot.sprint,
+      });
+      const capability = seedStartedFlow(root, snapshot);
+      mockRunSprint.mockImplementationOnce(async (_root: string, _config: unknown, options?: any) => {
+        options?.onExactPlanMaterialize?.();
+        await options?.onExecutionAdmitted?.();
+        mkdirSync(join(root, '.deckent', 'pids'), { recursive: true });
+        writeFileSync(join(root, '.deckent', 'sprint-state.json'), JSON.stringify({
+          sprintId: snapshot.sprint.id,
+          phase: 'EXECUTE',
+          status: 'ACTIVE',
+        }));
+        // runSprint's fatal-HOLD retirement has removed live PID/lock authority;
+        // the retained snapshot alone correlates the exact RunFlow generation.
+        writeStateSnapshot(root, snapshot.sprint.id, {
+          sprintId: snapshot.sprint.id,
+          pid: process.pid,
+          startToken: processStartToken(process.pid),
+          leaseId: 'test-exact-detached-child-failure',
+          startedAt: new Date().toISOString(),
+          currentWave: 1,
+          taskStatuses: {},
+          metricsJsonlSize: 0,
+          lastHeartbeat: new Date().toISOString(),
+        });
+        throw new Error('fatal exact execution hold');
+      });
+
+      await runCommand(root, exactFlowArgs(snapshot, capability));
+
+      expect(process.exitCode).toBe(1);
+      expect(getRunFlowCoordinator(root).getFlow(snapshot.flowId)).toMatchObject({
+        state: 'FAILED',
+      });
+      expect(readCanonicalRunStatusReadModel(root)?.authority).toMatchObject({
+        lifecycle: 'ABORTED',
+        sprintId: snapshot.sprint.id,
+        reason: 'run crashed before completion: fatal exact execution hold',
+      });
+    });
+
     it('a second identical start is refused as a typed attempt-mismatch — spawnStart-equivalent runSprint is NOT called twice', async () => {
-      const snapshot = makeApprovedSnapshot();
+      const snapshot = makePlannerAcceptedSnapshot(root);
       saveApprovedSnapshot(root, snapshot);
       const capability = seedStartedFlow(root, snapshot);
       const args = exactFlowArgs(snapshot, capability);

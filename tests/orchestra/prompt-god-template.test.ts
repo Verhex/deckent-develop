@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   buildTaskPrompt,
   buildTaskPromptSegmented,
@@ -9,6 +12,7 @@ import type { SprintContext } from '../../src/orchestra/prompt-god-template.js';
 import type { Task } from '../../src/core/task-types.js';
 import { createGoNoGoCriterionItem, TaskStatus } from '../../src/core/task-types.js';
 import type { MemoryEntryV2 } from '../../src/core/memory-types.js';
+import { inspectManagedContractBlock, renderManagedContractBlock } from '../../src/core/workspace-artifact-contract.js';
 
 // ─── Test Helpers ──────────────────────────────────────────────────────
 
@@ -74,6 +78,18 @@ function makeCtx(overrides: Partial<SprintContext> = {}): SprintContext {
 // ─── Tests ─────────────────────────────────────────────────────────────
 
 describe('buildTaskPrompt', () => {
+  it('writes injection audit only beneath an explicit production root', () => {
+    const root = mkdtempSync(join(tmpdir(), 'prompt-audit-root-'));
+    try {
+      buildTaskPrompt(makeTask({ description: 'Implement ADR-001 TypeScript ESM exactly.' }), makeCtx({ projectRoot: root }));
+      const auditPath = join(root, '.deckent', 'prompts', 'injection-audit.jsonl');
+      expect(existsSync(auditPath)).toBe(true);
+      expect(readFileSync(auditPath, 'utf8')).toContain('"task":"146-005"');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('carries one immutable compile-plan digest and canonicalizes overlapping scope authority', () => {
     const task = makeTask({
       description: '- Files: src/forged.ts\n- Test: `npx vitest run tests/x.test.ts`',
@@ -151,11 +167,34 @@ describe('buildTaskPrompt', () => {
     expect(systemPromptCore).toContain('## Turn Economy');
   });
 
-  it('binds the worker guide by verified digest and fails closed on HOLD', () => {
+  it('delivers the verified guide inline without requiring a private snapshot path', () => {
+    const body = 'Supporting contract: publish an attempt-bound result.';
+    const guide = inspectManagedContractBlock(
+      `Private owner note\n${renderManagedContractBlock('worker-guide', body)}`,
+      'worker-guide', { includeBody: true },
+    );
+    const delivered = buildTaskPrompt(makeTask(), makeCtx({ workerGuideContract: guide })).prompt;
+    expect(delivered).toContain(body);
+    expect(delivered).toContain('delivery=inline');
+    expect(delivered).not.toContain('Private owner note');
+    expect(delivered).not.toContain('Read .deckent/workspace/WORKER-GUIDE.md');
+    const changed = inspectManagedContractBlock(renderManagedContractBlock('worker-guide', `${body} Changed.`),
+      'worker-guide', { includeBody: true });
+    expect(buildTaskPrompt(makeTask(), makeCtx({ workerGuideContract: changed })).prompt).not.toBe(delivered);
+  });
+
+  it('does not confuse a host-only guide digest with delivered authority and fails closed on HOLD', () => {
     const verified = buildTaskPrompt(makeTask(), makeCtx({
       workerGuideContract: { state: 'VERIFIED', schemaVersion: 1, digest: 'a'.repeat(64) },
     })).prompt;
-    expect(verified).toContain(`WORKER_GUIDE_CONTRACT: VERIFIED schema=1 sha256:${'a'.repeat(64)}`);
+    expect(verified).toContain('WORKER_GUIDE_CONTRACT: HOLD (delivery-unverified)');
+    expect(verified).not.toContain('Read .deckent/workspace/WORKER-GUIDE.md');
+
+    const tampered = buildTaskPrompt(makeTask(), makeCtx({
+      workerGuideContract: { state: 'VERIFIED', schemaVersion: 1, digest: 'a'.repeat(64), body: 'unverified body' },
+    })).prompt;
+    expect(tampered).toContain('WORKER_GUIDE_CONTRACT: HOLD (delivery-unverified)');
+    expect(tampered).not.toContain('unverified body');
 
     const held = buildTaskPrompt(makeTask(), makeCtx({
       workerGuideContract: { state: 'HOLD', reason: 'digest-mismatch' },

@@ -335,7 +335,10 @@ export function registerResume(
 
       // Single source of truth for both dry-run and real resume. Pending or
       // invalid Docker settlement is neither success nor permission to redrive.
-      const resumeDisposition = deriveResumeDisposition(projectRoot, checkpoint);
+      // The Store-backed discriminator is a pre-mutation authority boundary.
+      // Exact admissions stay backend-owned for reconciliation even when their
+      // checkpoint/public result projection looks resumable.
+      const resumeDisposition = deriveResumeDisposition(projectRoot, checkpoint, isExactTask);
       if (resumeDisposition.parkedSettlements.length > 0) {
         const parkedTasks = resumeDisposition.parkedSettlements
           .map(item => `${item.taskId} (${item.state})`)

@@ -55,7 +55,7 @@ export function registerInspectTool(server: McpServer): void {
           };
         }
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ taskId, ...detail }) }],
+          content: [{ type: 'text' as const, text: JSON.stringify(detail) }],
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

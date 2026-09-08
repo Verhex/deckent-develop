@@ -1,9 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { KpiStore } from '../../src/core/kpi/kpi-store.js';
-import { deriveMeasurements, recordKpiMeasurements } from '../../src/core/kpi/collection.js';
+import {
+  deriveMeasurements,
+  recordKpiMeasurements,
+  recordTerminalSprintKpiMeasurements,
+} from '../../src/core/kpi/collection.js';
 import type { UsageTotals, SprintMetricsLike, TaskResultLike } from '../../src/core/kpi/collection.js';
 
 const TENANT = 'default';
@@ -184,13 +188,14 @@ describe('recordKpiMeasurements — end-to-end', () => {
     }
   });
 
-  it('pipeline is idempotent — calling twice yields same result, no duplicate rows', () => {
+  it('preserves the legacy raw append contract when called twice', () => {
     const dbPath = join(tmpDir, 'memory.db');
     recordKpiMeasurements(dbPath, SPRINT, TENANT, METRICS, RESULTS, USAGE, TS);
     recordKpiMeasurements(dbPath, SPRINT, TENANT, METRICS, RESULTS, USAGE, TS);
 
     const store = new KpiStore(dbPath);
     try {
+      expect(store.getSprintMeasurements(TENANT, SPRINT)).toHaveLength(22);
       const results = store.getResults(TENANT, 'sprint', SPRINT);
       const costKpi = results.find((r) => r.kpiId === 'cost_per_sprint');
       expect(costKpi!.value).toBeCloseTo(7, 10);
@@ -221,6 +226,277 @@ describe('recordKpiMeasurements — end-to-end', () => {
       expect(new Date(ms[0].ts).getFullYear()).toBeGreaterThanOrEqual(2026);
     } finally {
       store.close();
+    }
+  });
+});
+
+describe('recordTerminalSprintKpiMeasurements — terminal snapshot replay', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'terminal-kpi-collection-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('inserts the complete vector once and replays different capture metadata without appending', () => {
+    const dbPath = join(tmpDir, 'memory.db');
+    recordTerminalSprintKpiMeasurements(dbPath, SPRINT, TENANT, METRICS, RESULTS, USAGE, TS);
+
+    const before = (() => {
+      const store = new KpiStore(dbPath);
+      try { return store.getSprintMeasurements(TENANT, SPRINT); } finally { store.close(); }
+    })();
+    recordTerminalSprintKpiMeasurements(
+      dbPath,
+      SPRINT,
+      TENANT,
+      METRICS,
+      RESULTS,
+      { ...USAGE, unknownBillingTaskCount: 0 },
+      '2026-06-27T01:00:00.000Z',
+    );
+
+    const store = new KpiStore(dbPath);
+    try {
+      const after = store.getSprintMeasurements(TENANT, SPRINT);
+      expect(after).toHaveLength(11);
+      expect(after.map(row => row.id)).toEqual(before.map(row => row.id));
+      expect(after.map(row => row.ts)).toEqual(before.map(row => row.ts));
+      expect(store.getResults(TENANT, 'sprint', SPRINT)
+        .find(row => row.kpiId === 'cost_per_sprint')?.value).toBeCloseTo(7, 10);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('accepts a matching legacy vector with caller ids and timestamps', () => {
+    const dbPath = join(tmpDir, 'memory.db');
+    const legacy = deriveMeasurements(SPRINT, TENANT, METRICS, RESULTS, USAGE, TS)
+      .map((row, index) => ({
+        ...row,
+        id: `legacy-kpi-${index}`,
+        ts: `2025-01-01T00:00:${String(index).padStart(2, '0')}.000Z`,
+      }));
+    const seed = new KpiStore(dbPath);
+    try { seed.recordMeasurements(legacy); } finally { seed.close(); }
+
+    expect(() => recordTerminalSprintKpiMeasurements(
+      dbPath,
+      SPRINT,
+      TENANT,
+      METRICS,
+      RESULTS,
+      USAGE,
+      '2026-09-05T19:50:45.000Z',
+    )).not.toThrow();
+
+    const store = new KpiStore(dbPath);
+    try {
+      const rows = store.getSprintMeasurements(TENANT, SPRINT);
+      expect(rows).toHaveLength(11);
+      expect(rows.map(row => row.id)).toEqual(legacy.map(row => row.id));
+      expect(store.getResults(TENANT, 'sprint', SPRINT)
+        .find(row => row.kpiId === 'cost_per_sprint')?.value).toBeCloseTo(7, 10);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('holds divergent, partial, and duplicate existing history without changing any rows', () => {
+    const cases = [
+      {
+        name: 'divergent',
+        seed: deriveMeasurements(SPRINT, TENANT, { ...METRICS, tasksDone: 5 }, RESULTS, USAGE, TS),
+      },
+      {
+        name: 'partial',
+        seed: deriveMeasurements(SPRINT, TENANT, METRICS, RESULTS, USAGE, TS).slice(0, -1),
+      },
+      {
+        name: 'duplicate',
+        seed: (() => {
+          const rows = deriveMeasurements(SPRINT, TENANT, METRICS, RESULTS, USAGE, TS);
+          return [...rows, { ...rows[0]!, id: 'duplicate-history-row' }];
+        })(),
+      },
+    ];
+
+    for (const fixture of cases) {
+      const dbPath = join(tmpDir, `${fixture.name}.db`);
+      const seed = new KpiStore(dbPath);
+      try { seed.recordMeasurements(fixture.seed); } finally { seed.close(); }
+      const before = (() => {
+        const reader = new KpiStore(dbPath);
+        try { return reader.getSprintMeasurements(TENANT, SPRINT); } finally { reader.close(); }
+      })();
+
+      expect(() => recordTerminalSprintKpiMeasurements(
+        dbPath,
+        SPRINT,
+        TENANT,
+        METRICS,
+        RESULTS,
+        USAGE,
+        TS,
+      )).toThrow(expect.objectContaining({ code: 'KPI_TERMINAL_SNAPSHOT_HOLD' }));
+
+      const reader = new KpiStore(dbPath);
+      try {
+        expect(reader.getSprintMeasurements(TENANT, SPRINT)).toEqual(before);
+      } finally {
+        reader.close();
+      }
+    }
+  });
+
+  it('preserves the original typed KPI HOLD reason from the transactional store', () => {
+    const dbPath = join(tmpDir, 'typed-hold.db');
+    const partial = deriveMeasurements(SPRINT, TENANT, METRICS, RESULTS, USAGE, TS).slice(0, -1);
+    const seed = new KpiStore(dbPath);
+    try { seed.recordMeasurements(partial); } finally { seed.close(); }
+
+    expect(() => recordTerminalSprintKpiMeasurements(
+      dbPath,
+      SPRINT,
+      TENANT,
+      METRICS,
+      RESULTS,
+      USAGE,
+      TS,
+    )).toThrow(expect.objectContaining({
+      code: 'KPI_TERMINAL_SNAPSHOT_HOLD',
+      message: 'KPI_TERMINAL_SNAPSHOT_HOLD:existing-vector-cardinality-mismatch',
+    }));
+  });
+
+  it('wraps DB-open failure as a typed storage HOLD without creating a snapshot', () => {
+    const dbPath = join(tmpDir, 'missing-parent', 'memory.db');
+    let observed: unknown;
+    try {
+      recordTerminalSprintKpiMeasurements(
+        dbPath,
+        SPRINT,
+        TENANT,
+        METRICS,
+        RESULTS,
+        USAGE,
+        TS,
+      );
+    } catch (error: unknown) {
+      observed = error;
+    }
+
+    expect(observed).toMatchObject({
+      code: 'KPI_TERMINAL_SNAPSHOT_HOLD',
+      message: 'KPI_TERMINAL_SNAPSHOT_HOLD:storage-unavailable',
+    });
+    expect((observed as Error & { cause?: unknown }).cause).toBeInstanceOf(Error);
+    expect(existsSync(dbPath)).toBe(false);
+  });
+
+  it('wraps invalid database storage and preserves its bytes without appending', () => {
+    const dbPath = join(tmpDir, 'invalid-storage.db');
+    const original = Buffer.from('not-a-sqlite-database', 'utf8');
+    writeFileSync(dbPath, original);
+    let observed: unknown;
+    try {
+      recordTerminalSprintKpiMeasurements(
+        dbPath,
+        SPRINT,
+        TENANT,
+        METRICS,
+        RESULTS,
+        USAGE,
+        TS,
+      );
+    } catch (error: unknown) {
+      observed = error;
+    }
+
+    expect(observed).toMatchObject({
+      code: 'KPI_TERMINAL_SNAPSHOT_HOLD',
+      message: 'KPI_TERMINAL_SNAPSHOT_HOLD:storage-unavailable',
+    });
+    expect((observed as Error & { cause?: unknown }).cause).toBeInstanceOf(Error);
+    expect(readFileSync(dbPath)).toEqual(original);
+  });
+
+  it('isolates identical sprint ids by explicit tenant and rejects non-finite derived values', () => {
+    const dbPath = join(tmpDir, 'memory.db');
+    recordTerminalSprintKpiMeasurements(dbPath, SPRINT, 'tenant-a', METRICS, RESULTS, USAGE, TS);
+    recordTerminalSprintKpiMeasurements(dbPath, SPRINT, 'tenant-b', METRICS, RESULTS, USAGE, TS);
+
+    expect(() => recordTerminalSprintKpiMeasurements(
+      dbPath,
+      'sprint-non-finite',
+      'tenant-a',
+      { ...METRICS, tasksTotal: Number.NaN },
+      RESULTS,
+      USAGE,
+      TS,
+    )).toThrow(expect.objectContaining({ code: 'KPI_TERMINAL_SNAPSHOT_HOLD' }));
+
+    const store = new KpiStore(dbPath);
+    try {
+      expect(store.getSprintMeasurements('tenant-a', SPRINT)).toHaveLength(11);
+      expect(store.getSprintMeasurements('tenant-b', SPRINT)).toHaveLength(11);
+      expect(store.getSprintMeasurements('tenant-a', 'sprint-non-finite')).toEqual([]);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('holds missing authoritative terminal usage without minting a zero-valued snapshot', () => {
+    const dbPath = join(tmpDir, 'memory.db');
+    expect(() => recordTerminalSprintKpiMeasurements(
+      dbPath,
+      SPRINT,
+      TENANT,
+      METRICS,
+      RESULTS,
+      null,
+      TS,
+    )).toThrow(expect.objectContaining({
+      code: 'KPI_TERMINAL_SNAPSHOT_HOLD',
+      message: 'KPI_TERMINAL_SNAPSHOT_HOLD:authoritative-usage-unavailable',
+    }));
+
+    const store = new KpiStore(dbPath);
+    try {
+      expect(store.getSprintMeasurements(TENANT, SPRINT)).toEqual([]);
+    } finally {
+      store.close();
+    }
+  });
+
+  it('rejects incomplete, non-finite, negative, and unknown-billing usage before opening the DB', () => {
+    const invalidUsage: unknown[] = [
+      { costUsd: 7, inputTokens: 1000, outputTokens: 500 },
+      { ...USAGE, costUsd: Number.NaN },
+      { ...USAGE, inputTokens: Number.POSITIVE_INFINITY },
+      { ...USAGE, outputTokens: -1 },
+      { ...USAGE, unknownBillingTaskCount: 1 },
+      { ...USAGE, unknownBillingTaskCount: Number.NaN },
+    ];
+
+    for (const [index, usage] of invalidUsage.entries()) {
+      const dbPath = join(tmpDir, `invalid-usage-${index}.db`);
+      expect(() => recordTerminalSprintKpiMeasurements(
+        dbPath,
+        SPRINT,
+        TENANT,
+        METRICS,
+        RESULTS,
+        usage as UsageTotals,
+        TS,
+      )).toThrow(expect.objectContaining({
+        code: 'KPI_TERMINAL_SNAPSHOT_HOLD',
+        message: 'KPI_TERMINAL_SNAPSHOT_HOLD:authoritative-usage-invalid',
+      }));
+      expect(existsSync(dbPath)).toBe(false);
     }
   });
 });

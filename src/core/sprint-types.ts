@@ -1,7 +1,7 @@
 // ─── Sprint Domain Types ────────────────────────────────────────────────────
 // Split from types.ts — Sprint lifecycle, metrics, debt, memory, and brain context
 
-import type { Task, TaskEvaluation, ModelType, ProviderName } from './task-types.js';
+import type { Task, TaskEvaluation, ModelType, ProviderName, ProductionWiringPlanEvidenceV2 } from './task-types.js';
 import type { PromptGateResult } from './prompt-gate-types.js';
 import type { InvocationReceiptRef } from './invocation-receipt.js';
 import type { MemoryReadLimitsV1, MemoryReadScopeV1 } from './memory-read-contract.js';
@@ -88,6 +88,12 @@ export interface Sprint {
    * MCP plan response; a BLOCK halts the plan-confirm unless `--force-prompt-gate`.
    */
   promptGate?: PromptGateResult;
+  /**
+   * Open CRITICAL debts intentionally withheld because their original V2
+   * authority is unavailable or invalid. These are not resolved/skipped debt;
+   * the persisted plan exposes them for subsequent, owner-admitted repair.
+   */
+  debtInjectionHolds?: DebtInjectionHold[];
 }
 
 export interface SprintMetrics {
@@ -170,6 +176,19 @@ export interface DebtOriginScope {
   filesWrite: string[];
 }
 
+/**
+ * Read-time disposition of the origin authority retained with a debt row.
+ * This is diagnostic metadata only: the injector revalidates every authority
+ * and binding before it can produce a dispatchable task.
+ */
+export type DebtOriginWiringState = 'valid-v2' | 'legacy-unavailable' | 'invalid-origin';
+
+/** An unresolved debt deliberately withheld from priority-fix injection. */
+export interface DebtInjectionHold {
+  debtId: string;
+  reason: Exclude<DebtOriginWiringState, 'valid-v2'>;
+}
+
 export interface DebtItem {
   id: string;
   description: string;
@@ -184,6 +203,12 @@ export interface DebtItem {
   class?: DebtClass;
   /** Origin task scope inherited by the auto-injected fix task. Sprint 179 W1-1. */
   originScope?: DebtOriginScope;
+  /** Canonical V2 plan authority retained from the exact task that created this residual debt. */
+  originProductionWiring?: ProductionWiringPlanEvidenceV2;
+  /** Host digest binding that authority to the originating task and its writable scope. */
+  originProductionWiringBinding?: string;
+  /** Diagnostic disposition; never an execution permit. */
+  originWiringState?: DebtOriginWiringState;
 }
 
 // ─── Memory System (Blueprint 6) ────────────────────────────────────

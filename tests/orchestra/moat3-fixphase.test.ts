@@ -146,6 +146,11 @@ import { runFixPhase } from '../../src/orchestra/sprint-phases.js';
 import { spawnWorkers, waitForResults } from '../../src/orchestra/sprint-controller.js';
 import { evaluateWithRubric } from '../../src/orchestra/result-evaluator.js';
 import { writeEvent } from '../../src/orchestra/event-stream.js';
+import {
+  admitRepairQueueRecord,
+  createRepairQueueId,
+  readRepairQueueAuthority,
+} from '../../src/orchestra/repair-queue-authority.js';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -310,6 +315,81 @@ describe('FIX Phase — NOT_DISPATCHED re-dispatch execution (354-010)', () => {
     expect(reDispatchResultEvent()).toMatchObject({ attempted: 1, succeeded: 0, failed: 0, stillNotDispatched: 1 });
     // Retry budget is spent even though the round failed to dispatch again
     expect(existsSync(markerPath('354-778'))).toBe(true);
+  });
+
+  it('settles the repair queue when exact custody proves ordinal-2 zero provider work', async () => {
+    const task = makeTask({ id: '354-778-exact' });
+    const sprint = makeSprint([task]);
+    const evaluations = new Map<string, TaskEvaluation>([
+      [task.id, TaskEvaluation.NOT_DISPATCHED],
+    ]);
+    const exactRegistry = {
+      isExactTask: (taskId: string) => taskId === task.id,
+      readExactTerminalAuthority: () => ({ state: 'hold', reasonCode: 'NOT_DISPATCHED' }),
+      readTaskResultAuthority: () => ({ state: 'not-dispatched' }),
+      snapshotExactTerminalAuthorities: () => new Map(),
+    };
+    vi.mocked(waitForResults).mockResolvedValue([]);
+
+    await runFixPhase(
+      root,
+      sprint,
+      evaluations,
+      [],
+      makeConfig(),
+      undefined,
+      'v1',
+      undefined,
+      exactRegistry as never,
+    );
+
+    expect(evaluations.get(task.id)).toBe(TaskEvaluation.NOT_DISPATCHED);
+    expect(readRepairQueueAuthority(root).records).toEqual([
+      expect.objectContaining({ taskId: task.id, dispatchStatus: 'settled' }),
+    ]);
+  });
+
+  it('re-adopts and settles a durable redispatch admission after coordinator restart', async () => {
+    const task = makeTask({ id: '354-778-resume' });
+    const sprint = makeSprint([task]);
+    const evaluations = new Map<string, TaskEvaluation>([
+      [task.id, TaskEvaluation.NOT_DISPATCHED],
+    ]);
+    const admission = {
+      taskId: task.id,
+      sprintId: 'sprint-354',
+      birthClass: 'NOT_DISPATCHED_REDISPATCH' as const,
+      admittedAt: new Date().toISOString(),
+      attempt: { attemptId: task.id, ordinal: 2 },
+    };
+    admitRepairQueueRecord(root, {
+      ...admission,
+      queueId: createRepairQueueId(admission),
+    });
+    writeFileSync(markerPath(task.id), new Date().toISOString(), 'utf-8');
+    const exactRegistry = {
+      isExactTask: (taskId: string) => taskId === task.id,
+      readExactTerminalAuthority: () => ({ state: 'hold', reasonCode: 'NOT_DISPATCHED' }),
+      readTaskResultAuthority: () => ({ state: 'not-dispatched' }),
+      snapshotExactTerminalAuthorities: () => new Map(),
+    };
+
+    await runFixPhase(
+      root,
+      sprint,
+      evaluations,
+      [],
+      makeConfig(),
+      undefined,
+      'v1',
+      undefined,
+      exactRegistry as never,
+    );
+
+    expect(spawnWorkers).not.toHaveBeenCalled();
+    expect(readRepairQueueAuthority(root).records).toEqual([
+      expect.objectContaining({ taskId: task.id, dispatchStatus: 'settled' }),
+    ]);
   });
 
   it('second attempt with no result but a disk trace (.hb) is a real NO_GO, not a dispatch gap', async () => {

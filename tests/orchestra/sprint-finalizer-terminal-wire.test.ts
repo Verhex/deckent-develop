@@ -6,10 +6,14 @@ import { describe, expect, it, onTestFinished } from 'vitest';
 import { TaskEvaluation } from '../../src/core/types.js';
 import type { Task, TaskResult } from '../../src/core/types.js';
 import {
+  buildFinalizerSkillAttributionReceipts,
   buildFinalizerTerminalTruth,
   loadFinalizerAttemptTasks,
+  publishFinalizerTerminalSkillAttribution,
   projectFinalizerLogicalTasks,
 } from '../../src/orchestra/sprint-finalizer.js';
+import { writeSkillAttributionBatch } from '../../src/core/routing/skill-attribution.js';
+import type { PromptDeliveryAttribution } from '../../src/core/prompt-delivery-receipt.js';
 import { createHostPreDispatchNoGoResult } from '../../src/core/pre-dispatch-settlement.js';
 import { dirname } from "node:path";
 import { afterEach } from "vitest";
@@ -81,6 +85,60 @@ function result(
 }
 
 describe('finalizeSprint terminal truth wiring', () => {
+  it.each([
+    {
+      name: 'task-bearing',
+      evaluation: TaskEvaluation.DONE,
+      results: [result('487-digest', 'attempt-digest', 100, 10, true)],
+      notDispatchedSettlements: undefined,
+    },
+    {
+      name: 'zero-dispatch',
+      evaluation: TaskEvaluation.NOT_DISPATCHED,
+      results: [],
+      notDispatchedSettlements: new Map([['487-digest', {
+        state: 'FAILED' as const,
+        reasonCode: 'DISPATCH_EXHAUSTED' as const,
+      }]]),
+    },
+  ])('publishes a canonical skill-attribution settlement digest for the $name path', ({
+    evaluation,
+    results,
+    notDispatchedSettlements,
+  }) => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-finalizer-skill-attribution-'));
+    onTestFinished(() => rmSync(root, { recursive: true, force: true }));
+    const sprintTask = task('487-digest');
+    sprintTask.assignedSkills = ['api-design'];
+    sprintTask.routingMeta = {
+      routingVersion: 'v3',
+      skillDecisionDigest: `sha256:${'1'.repeat(64)}`,
+      skillEvidenceDigest: `sha256:${'2'.repeat(64)}`,
+    };
+    const truth = buildFinalizerTerminalTruth({
+      tasks: [sprintTask],
+      evaluations: new Map([[sprintTask.id, evaluation]]),
+      results,
+      ...(notDispatchedSettlements ? { notDispatchedSettlements } : {}),
+    });
+    expect(truth.logicalSettlementDigest).toMatch(/^[a-f0-9]{64}$/);
+    const delivery: PromptDeliveryAttribution = {
+      state: 'LEGACY_FALLBACK',
+      agentId: sprintTask.assignedAgent ?? null,
+      skillIds: ['api-design'],
+    };
+    const receipts = buildFinalizerSkillAttributionReceipts({
+      sprintId: 'sprint-487',
+      terminalTruth: truth,
+      attemptTasks: [sprintTask],
+      deliveryByAttempt: new Map([[sprintTask.id, delivery]]),
+    });
+
+    expect(receipts).toHaveLength(1);
+    expect(receipts[0]?.logicalSettlementDigest).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(() => writeSkillAttributionBatch(root, 'sprint-487', receipts)).not.toThrow();
+  });
+
   it('projects exhausted NOT_DISPATCHED as a settled failed lineage, not a receipt HOLD', () => {
     const tasks = [task('488-nd')];
     const truth = buildFinalizerTerminalTruth({
@@ -276,7 +334,13 @@ describe('finalizeSprint terminal truth wiring', () => {
     expect(finalizeSource).toContain('loadFinalizerAttemptTasks(projectRoot, sprint)');
     expect(finalizeSource).toContain('terminalTruth.usageTotals,\n  );');
     expect(finalizeSource).toContain('const usageTotals = terminalTruth.usageTotals;');
-    expect(finalizeSource).toContain('projectSprintWorkAttribution(logicalResults)');
+    expect(finalizeSource).toContain(
+      'const trustedWorkVector = projectFinalizerTrustedWorkVector(terminalTruth);',
+    );
+    expect(finalizeSource).toContain('buildFilesChangedCostSection(authoritativeResults, {');
+    expect(finalizeSource).toContain('trustedWork: trustedWorkVector,');
+    expect(finalizeSource).toContain('for (const work of trustedWorkVector.entries)');
+    expect(finalizeSource).not.toContain('projectSprintWorkAttribution(logicalResults)');
     expect(finalizeSource).toContain('buildAgentPerformance(attemptedSprint, logicalEvaluations, logicalResults)');
     expect(finalizeSource).toContain('terminalTruth,\n    );');
   });
@@ -392,6 +456,81 @@ afterEach(() => {
 });
 
 describe('controller terminal handoff — receipt authority', () => {
+    it('binds terminal skill attribution to the persisted semantic receipt while ignoring writtenAt replay drift', () => {
+        const root = mkdtempSync(join(tmpdir(), 'deckent-terminal-handoff-'));
+        temporaryRoots.push(root);
+        const sprintId = 'sprint-486';
+        const taskId = '486-001';
+        const sprintTask = task(taskId, sprintId);
+        const tasksDir = join(root, '.tasks');
+        mkdirSync(tasksDir, { recursive: true });
+        writeFileSync(join(tasksDir, `task-${taskId}.json`), JSON.stringify(sprintTask), 'utf-8');
+        const truth = buildFinalizerTerminalTruth({
+            tasks: [sprintTask],
+            evaluations: new Map([[taskId, TaskEvaluation.DONE]]),
+            results: [result(taskId, 'DONE')],
+            coordinatorEvidence: [coordinatorRetirementEvidence],
+        });
+        const publication = publishFencedSprintTerminalReceipt({
+            projectRoot: root,
+            sprint: { id: sprintId, number: 486, tasks: [sprintTask] } as Parameters<typeof publishFencedSprintTerminalReceipt>[0]['sprint'],
+            truth,
+            runId: 'run-486',
+            coordinatorGeneration: 2,
+            now: () => '2026-07-31T12:00:00.000Z',
+        });
+        const receipts = buildFinalizerSkillAttributionReceipts({
+            sprintId,
+            terminalTruth: truth,
+            attemptTasks: [sprintTask],
+            deliveryByAttempt: new Map([[taskId, {
+                state: 'LEGACY_FALLBACK',
+                agentId: sprintTask.assignedAgent ?? null,
+                skillIds: [],
+            }]]),
+        });
+
+        const first = publishFinalizerTerminalSkillAttribution({
+            projectRoot: root,
+            sprintId,
+            truth,
+            receiptPublication: publication,
+            receipts,
+        });
+        const receiptArtifactPath = join(
+            root,
+            '.deckent',
+            'recently-works',
+            `${sprintId}-terminal-receipt.json`,
+        );
+        expect(publication.artifactPath).toBe(receiptArtifactPath);
+        const artifact = JSON.parse(readFileSync(receiptArtifactPath, 'utf8'));
+        artifact.writtenAt = '2026-08-01T00:00:00.000Z';
+        writeFileSync(receiptArtifactPath, `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
+        const replay = publishFinalizerTerminalSkillAttribution({
+            projectRoot: root,
+            sprintId,
+            truth,
+            receiptPublication: publication,
+            receipts,
+        });
+
+        expect(first.state).toBe('written');
+        expect(replay.state).toBe('replayed');
+        expect(replay.path).toBe(first.path);
+        expect(replay.authority.terminalReceipt).toEqual(publication.receipt);
+
+        artifact.exactCustodyDigests = [{ taskId: 'sibling' }];
+        writeFileSync(receiptArtifactPath, `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
+        expect(() => publishFinalizerTerminalSkillAttribution({
+            projectRoot: root,
+            sprintId,
+            truth,
+            receiptPublication: publication,
+            receipts,
+        })).toThrow(/TERMINAL_RECEIPT_RESUME_AUTHORITY_HOLD/u);
+    });
+
     it('authorizes cleanup from a published receipt and carries the settled metrics forward', () => {
         const root = projectRoot();
         const artifactPath = publishReceipt({

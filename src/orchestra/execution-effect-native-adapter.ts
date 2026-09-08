@@ -424,12 +424,46 @@ export interface ExecutionEffectDockerSourceExecutorV1 {
   execute(input: ExecutionEffectDockerSourceInvocationV1): Promise<unknown>;
 }
 
+/** @internal Exact source embedded into the Docker helper; exported for fault-injection proof. */
+export const EXECUTION_EFFECT_DOCKER_SOURCE_FULL_WRITE_HELPER_SOURCE = String.raw`
+const writeExecutionEffectSourceFully = async (
+  fd, bytes, deadlineUnixMs, write = writeSync, now = Date.now,
+  wait = () => new Promise(resolve => setTimeout(resolve, 1)),
+) => {
+  let offset = 0;
+  while (offset < bytes.byteLength) {
+    if (now() > deadlineUnixMs) throw new Error('execution effect source write deadline exceeded');
+    let written;
+    try {
+      written = write(fd, bytes, offset, bytes.byteLength - offset);
+    } catch (error) {
+      const code = error && typeof error === 'object' ? error.code : null;
+      if (code === 'EINTR') continue;
+      if (code === 'EAGAIN' || code === 'EWOULDBLOCK') {
+        await wait();
+        continue;
+      }
+      throw error;
+    }
+    if (!Number.isSafeInteger(written) || written < 0 || written > bytes.byteLength - offset) {
+      throw new Error('execution effect source write progress invalid');
+    }
+    if (written === 0) {
+      await wait();
+      continue;
+    }
+    offset += written;
+  }
+};
+`;
+
 /* The helper emits source bytes only on fd 1 and a small authority receipt only
  * on fd 2. It closes every native handle before publishing the receipt. */
 const DOCKER_SOURCE_HELPER = String.raw`
 import { createHash } from 'node:crypto';
 import { writeSync } from 'node:fs';
 import { loadExecAuthorityNative } from '/app/dist/core/exec-authority-native.js';
+${EXECUTION_EFFECT_DOCKER_SOURCE_FULL_WRITE_HELPER_SOURCE}
 const canonical = value => Array.isArray(value) ? '[' + value.map(canonical).join(',') + ']'
   : value !== null && typeof value === 'object'
     ? '{' + Object.entries(value).sort(([a],[b]) => a < b ? -1 : a > b ? 1 : 0)
@@ -454,7 +488,7 @@ try {
   let chunkCount = 0;
   for (;;) {
     const chunk = native.effect.nextSourceChunk(source.handle, 'ACTIVE');
-    writeSync(1, chunk.bytes);
+    await writeExecutionEffectSourceFully(1, chunk.bytes, authority.deadlineUnixMs);
     chunkCount += 1;
     if (chunk.observedBytes === authority.byteLength) break;
   }
@@ -479,8 +513,9 @@ try {
     sourceObjectIdentityDigest: verified.sourceObjectIdentityDigest,
     chunkCount, invocationDigest: authority.invocationDigest,
   };
-  writeSync(2, Buffer.from(JSON.stringify({ ...body,
-    receiptDigest: domainDigest('execution-effect-docker-source-receipt-v1', body) }), 'utf8'));
+  await writeExecutionEffectSourceFully(2, Buffer.from(JSON.stringify({ ...body,
+    receiptDigest: domainDigest('execution-effect-docker-source-receipt-v1', body) }), 'utf8'),
+  authority.deadlineUnixMs);
 } finally {
   if (source) native.effect.closeHandle(source.handle);
   if (root) native.effect.closeHandle(root.handle);
@@ -1434,10 +1469,11 @@ function inspectNativeEntry(
   try {
     observed = authority.native.inspectEntry(root, path).entry;
   } catch (error) {
-    if (nativeCode(error) === 'ENOENT') {
+    const code = nativeCode(error);
+    if (code === 'ENOENT' || code === 'E_EXEC_AUTH_NATIVE_NOT_FOUND') {
       return createExecutionEffectLandingEntryStateV1({ entry: null });
     }
-    fail('NATIVE_EFFECT_UNCERTAIN', { operation: 'inspect-entry', code: nativeCode(error) });
+    fail('NATIVE_EFFECT_UNCERTAIN', { operation: 'inspect-entry', code });
   }
   const mode = Number.parseInt(observed.mode, 8);
   if (!Number.isSafeInteger(mode) || mode < 0 || mode > 0o777

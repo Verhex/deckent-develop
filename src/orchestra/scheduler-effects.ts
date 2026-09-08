@@ -36,6 +36,7 @@ import { join, dirname } from 'node:path';
 import type { Task, ResolvedConfig, TaskResult } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
 import { normalizeTaskResultShape, serializeTaskResultForDisk } from '../core/task-result-schema.js';
+import { canonicalTaskResultJson } from '../core/task-result-write-authority.js';
 import {
   isHostPreDispatchReasonCode,
   resolveHostPreDispatchFailureDisposition,
@@ -78,7 +79,11 @@ import {
 import {
   resolveTaskProvider, isTmuxProvider, isAdapterProvider, getProviderAdapterForTask,
 } from './sprint-utils.js';
-import type { SpawnBackend, SpawnBackendRecoveryReport } from './spawn-backend.js';
+import type {
+  SpawnBackend,
+  SpawnBackendExactRecoveryEntryV2,
+  SpawnBackendRecoveryReport,
+} from './spawn-backend.js';
 import { SpawnBackendFactory } from './spawn-backend.js';
 import { resolveReasoningEffort } from '../core/reasoning-effort.js';
 import {
@@ -127,16 +132,18 @@ import {
   projectExactAcceptedTaskResult,
   readAuthoritativeTaskResult,
 } from './task-result-authority.js';
-import type {
-  ExactAcceptedTaskTerminalAuthorityRead,
+import {
+  isCurrentExactAcceptedTaskTerminalAuthorityRead,
+  type ExactAcceptedTaskTerminalAuthorityRead,
 } from './evaluation-audit-trail.js';
 import type {
   RevalidateExactAcceptedResultTerminalAuthority,
   SettleExactAcceptedResult,
 } from './exact-accepted-result-terminal-authority.js';
-import type { DependencyResultEntry } from './prompt-god-template.js';
+import type { DependencyResultEntry, UpstreamHandoffEntry } from './prompt-god-template.js';
 import type { SchedulerDecision } from './scheduler-reducer.js';
 import { schedulerShadowJournalPath } from './scheduler-journal.js';
+import type { ExactAttemptIpcQuestionAuthorityState } from './ipc-registry.js';
 
 // ─── Fix-Task Routing-Field Inheritance ───────────────────────────────────
 // Relocated from sprint-spawner.ts `preserveFixTaskRoutingFields` (born-476,
@@ -310,6 +317,8 @@ type ExactNormalDockerRegistryEntry =
   | Readonly<{
       state: 'hold';
       reasonCode: string;
+      /** Safe, Store-verified capture summary for operator-facing HOLD readers. */
+      diagnosticReason?: string;
       backend: SpawnBackend | null;
       lifecycleOwner: TaskExecutionLifecycleOwnerV2 | null;
     }>;
@@ -339,6 +348,8 @@ function providerAdapterLifecycleOwner(
 export interface ExactNormalDockerDependencyContextV2 {
   readonly dependencyIds: readonly string[];
   readonly dependencyResults: ReadonlyMap<string, DependencyResultEntry>;
+  /** Store-reread terminal result handoffs; never sourced from public handoff files. */
+  readonly upstreamHandoffs: readonly UpstreamHandoffEntry[];
   readonly lineageAuthorities: readonly ExactAcceptedTaskResultAuthorityMetadata[];
 }
 
@@ -391,6 +402,7 @@ export interface ExactNormalDockerExecutionRegistryV2 {
   ): Promise<readonly SpawnBackendRecoveryReport[]>;
   readTaskResultAuthority(taskId: string): TaskResultAuthorityRead<TaskResult>;
   awaitTaskResultAuthority(taskId: string): Promise<TaskResultAuthorityRead<TaskResult>>;
+  resolveExactAttemptIpcAuthority(taskId: string): ExactAttemptIpcQuestionAuthorityState;
   dependencyContext(task: Task): ExactNormalDockerDependencyContextV2 | null;
 }
 
@@ -422,6 +434,57 @@ export function createExactNormalDockerExecutionRegistry(
     && preparationRef.dispatchRequestId === custodyRef.dispatchRequestId
     && preparationRef.admissionReceiptDigest === custodyRef.admissionReceiptDigest
     && preparationRef.admissionRefDigest === custodyRef.admissionRefDigest;
+  const captureDiagnosticReason = (
+    query: ExactDockerCustodyTerminalQueryV2,
+    diagnostic: unknown,
+  ): string | null => {
+    const ownRecord = (value: unknown, keys: readonly string[]): Record<string, unknown> | null => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)
+        || Object.getPrototypeOf(value) !== Object.prototype
+        || Object.keys(value).length !== keys.length
+        || !keys.every(key => Object.prototype.hasOwnProperty.call(value, key))) return null;
+      return value as Record<string, unknown>;
+    };
+    const digest = (value: unknown): value is string => typeof value === 'string'
+      && /^sha256:[a-f0-9]{64}$/u.test(value);
+    const root = ownRecord(diagnostic, [
+      'schemaVersion', 'kind', 'identity', 'admissionRefDigest',
+      'anchorObservationClass', 'anchorObservationReceiptDigest',
+      'anchorObservationEvidenceDigest', 'failure', 'observedAt',
+      'observationReceiptDigest', 'observationEvidenceDigest',
+    ]);
+    const failure = root === null ? null : ownRecord(root.failure, ['stage', 'code', 'operation']);
+    const captureHoldReasonByStage = Object.freeze({
+      WORKER_RESULT: 'WORKER_RESULT_CAPTURE_HOLD',
+      WORKER_IPC_QUESTION: 'WORKER_IPC_QUESTION_CAPTURE_HOLD',
+      // This is a worker-owned draft capture, but its public canonical HOLD is
+      // the landing-proposal boundary rather than a misleading WORKER_* root.
+      WORKER_LANDING_PROPOSAL: 'LANDING_PROPOSAL_CAPTURE_HOLD',
+    } as const);
+    const captureHoldReason = typeof failure?.stage === 'string'
+      && Object.prototype.hasOwnProperty.call(captureHoldReasonByStage, failure.stage)
+      ? captureHoldReasonByStage[failure.stage as keyof typeof captureHoldReasonByStage]
+      : null;
+    if (!root || !failure
+      || root.schemaVersion !== 1
+      || root.kind !== 'exact-docker-capture-diagnostic'
+      || JSON.stringify(root.identity) !== JSON.stringify(query.custodyRef.identity)
+      || root.admissionRefDigest !== query.custodyRef.admissionRefDigest
+      || root.anchorObservationClass !== 'PROVIDER_EXIT'
+      || !digest(root.anchorObservationReceiptDigest)
+      || !digest(root.anchorObservationEvidenceDigest)
+      || !digest(root.observationReceiptDigest)
+      || !digest(root.observationEvidenceDigest)
+      || typeof root.observedAt !== 'string'
+      || !Number.isFinite(Date.parse(root.observedAt))
+      || new Date(Date.parse(root.observedAt)).toISOString() !== root.observedAt
+      || captureHoldReason === null
+      || typeof failure.code !== 'string'
+      || !/^[A-Z][A-Z0-9_]{0,95}$/u.test(failure.code)
+      || typeof failure.operation !== 'string'
+      || !/^[a-z][a-z0-9-]{0,47}$/u.test(failure.operation)) return null;
+    return `${captureHoldReason}:${failure.code}:${failure.operation}`;
+  };
   const predecessorFromNotDispatched = (
     authority: TaskAttemptCustodyDispatchNotDispatchedAuthorityV2,
   ): ExactDockerCustodyPredecessorV2 | null => {
@@ -462,6 +525,74 @@ export function createExactNormalDockerExecutionRegistry(
       }),
     });
   };
+  const recoveryEntryIdentity = (
+    entry: SpawnBackendExactRecoveryEntryV2,
+  ) => {
+    try {
+      return entry.kind === 'not-dispatched'
+        ? entry.authority.admissionRef.identity
+        : entry.query.custodyRef.identity;
+    } catch {
+      return null;
+    }
+  };
+  const collapseRecoveredGenerationChains = (
+    recoveredEntries: readonly SpawnBackendExactRecoveryEntryV2[],
+  ): Readonly<{
+    latest: readonly SpawnBackendExactRecoveryEntryV2[];
+    heldTaskIds: readonly string[];
+  }> => {
+    const byTask = new Map<string, SpawnBackendExactRecoveryEntryV2[]>();
+    for (const entry of recoveredEntries) {
+      const group = byTask.get(entry.taskId) ?? [];
+      group.push(entry);
+      byTask.set(entry.taskId, group);
+    }
+    const latest: SpawnBackendExactRecoveryEntryV2[] = [];
+    const heldTaskIds: string[] = [];
+    for (const [taskId, group] of [...byTask].sort(([left], [right]) => left.localeCompare(right))) {
+      // Preserve the existing kind-specific validator and reason code for a
+      // single malformed recovery entry. Chain validation is only an
+      // additional boundary when more than one generation claims one task.
+      if (group.length === 1) {
+        latest.push(group[0]!);
+        continue;
+      }
+      const ordered = [...group].sort((left, right) => (
+        (recoveryEntryIdentity(left)?.generation ?? Number.MAX_SAFE_INTEGER)
+          - (recoveryEntryIdentity(right)?.generation ?? Number.MAX_SAFE_INTEGER)
+      ));
+      let valid = ordered.length > 0;
+      for (let index = 0; valid && index < ordered.length; index += 1) {
+        const current = ordered[index]!;
+        const identity = recoveryEntryIdentity(current);
+        const previous = index > 0 ? ordered[index - 1]! : null;
+        const previousIdentity = previous ? recoveryEntryIdentity(previous) : null;
+        valid = identity !== null
+          && identity.taskId === taskId
+          && (!previous || (
+            previous.kind === 'not-dispatched'
+            && previousIdentity !== null
+            && identity.schemaVersion === previousIdentity.schemaVersion
+            && identity.backend === previousIdentity.backend
+            && identity.projectRootSha256 === previousIdentity.projectRootSha256
+            && identity.projectId === previousIdentity.projectId
+            && identity.taskId === previousIdentity.taskId
+            && identity.attemptId === previousIdentity.attemptId
+            && identity.generation === previousIdentity.generation + 1
+          ));
+      }
+      if (!valid) {
+        heldTaskIds.push(taskId);
+        continue;
+      }
+      latest.push(ordered[ordered.length - 1]!);
+    }
+    return Object.freeze({
+      latest: Object.freeze(latest),
+      heldTaskIds: Object.freeze(heldTaskIds),
+    });
+  };
   const readTaskResultAuthority = (
     taskId: string,
   ): TaskResultAuthorityRead<TaskResult> => {
@@ -488,7 +619,7 @@ export function createExactNormalDockerExecutionRegistry(
         result: null,
         settlementRef: null,
         rawResultPath,
-        holdReason: entry.reasonCode,
+        holdReason: entry.diagnosticReason ?? entry.reasonCode,
       };
     }
     const acceptedAuthority = exactAcceptedAuthority(entry.query, entry.accepted);
@@ -510,7 +641,7 @@ export function createExactNormalDockerExecutionRegistry(
     });
     if (entry.state === 'hold') return Object.freeze({
       state: 'hold' as const,
-      reasonCode: entry.reasonCode,
+      reasonCode: entry.diagnosticReason ?? entry.reasonCode,
     });
     if (entry.state === 'pending' || entry.state === 'prepared') return Object.freeze({
       state: 'hold' as const,
@@ -536,6 +667,30 @@ export function createExactNormalDockerExecutionRegistry(
       expectedAcceptedAuthority: exactAcceptedAuthority(entry.query, entry.accepted),
       expectedTerminalAuthority: entry.terminal.terminalAuthority,
     });
+    let sameAcceptedResult = false;
+    if (current.state === 'current') {
+      try {
+        sameAcceptedResult = canonicalTaskResultJson(current.result)
+          === canonicalTaskResultJson(entry.accepted.result);
+      } catch {
+        sameAcceptedResult = false;
+      }
+    }
+    if (current.state === 'current' && (
+      !isCurrentExactAcceptedTaskTerminalAuthorityRead(
+        taskId,
+        entry.terminal.terminalAuthority,
+        current,
+      )
+      || !sameAcceptedResult
+    )) {
+      const hold = Object.freeze({
+        state: 'hold' as const,
+        reasonCode: 'exact-terminal-result-authority-mismatch',
+      });
+      entries.set(taskId, Object.freeze({ ...entry, terminal: hold }));
+      return hold;
+    }
     entries.set(taskId, Object.freeze({ ...entry, terminal: current }));
     return current;
   };
@@ -724,9 +879,15 @@ export function createExactNormalDockerExecutionRegistry(
           }));
           return;
         }
+        const captureDiagnostic = outcome.captureDiagnostic === undefined
+          ? null
+          : captureDiagnosticReason(query, outcome.captureDiagnostic);
         entries.set(taskId, Object.freeze({
           state: 'hold',
           reasonCode: outcome.reasonCode,
+          ...(outcome.captureDiagnostic === undefined
+            ? {}
+            : { diagnosticReason: captureDiagnostic ?? 'EXACT_CAPTURE_DIAGNOSTIC_INVALID' }),
           backend,
           lifecycleOwner: backend,
         }));
@@ -859,7 +1020,11 @@ export function createExactNormalDockerExecutionRegistry(
     },
     rehydrateRecovery(report: SpawnBackendRecoveryReport, backend: SpawnBackend): void {
       if (!recoveryOwners.has(backend.name)) recoveryOwners.set(backend.name, backend);
-      for (const recovered of report.exactEntries ?? []) {
+      const collapsed = collapseRecoveredGenerationChains(report.exactEntries ?? []);
+      for (const taskId of collapsed.heldTaskIds) {
+        this.registerHold(taskId, 'EXACT_RECOVERY_GENERATION_CHAIN_MISMATCH', backend);
+      }
+      for (const recovered of collapsed.latest) {
         if (recovered.kind === 'not-dispatched') {
           const predecessor = predecessorFromNotDispatched(recovered.authority);
           if (!predecessor || recovered.taskId !== predecessor.identity.taskId) {
@@ -983,28 +1148,65 @@ export function createExactNormalDockerExecutionRegistry(
       await terminalWaits.get(taskId);
       return readTaskResultAuthority(taskId);
     },
+    resolveExactAttemptIpcAuthority(taskId: string): ExactAttemptIpcQuestionAuthorityState {
+      const entry = entries.get(taskId);
+      if (entry?.state === 'not-dispatched') {
+        return Object.freeze({ state: 'not-dispatched', taskId, attemptCount: 0 });
+      }
+      if (entry?.state !== 'pending' && entry?.state !== 'accepted') {
+        return Object.freeze({
+          state: 'hold',
+          taskId,
+          reasonCode: 'PRIVATE_IPC_AUTHORITY_UNAVAILABLE',
+        });
+      }
+      if (!entry.backend.resolveExactAttemptIpcAuthority) {
+        return Object.freeze({
+          state: 'hold',
+          taskId,
+          reasonCode: 'PRIVATE_IPC_AUTHORITY_UNAVAILABLE',
+        });
+      }
+      return entry.backend.resolveExactAttemptIpcAuthority(entry.query);
+    },
     dependencyContext(task: Task): ExactNormalDockerDependencyContextV2 | null {
       const dependencyIds = [...new Set(
         (task.dependencies ?? []).filter((value): value is string => typeof value === 'string'),
       )];
       const dependencyResults = new Map<string, DependencyResultEntry>();
+      const upstreamHandoffs: UpstreamHandoffEntry[] = [];
       const lineageAuthorities: ExactAcceptedTaskResultAuthorityMetadata[] = [];
       for (const dependencyId of dependencyIds) {
         const entry = entries.get(dependencyId);
         const terminal = readExactTerminalAuthority(dependencyId);
         if (!entry || entry.state !== 'accepted' || terminal.state !== 'current') return null;
+        const terminalResult = terminal.result;
         dependencyResults.set(dependencyId, {
           verdict: terminal.evaluationReceipt.verdict,
-          filesChanged: entry.accepted.result.filesChanged.map(change => change.path),
-          linesAdded: entry.accepted.result.totalLinesAdded,
-          linesRemoved: entry.accepted.result.totalLinesRemoved,
-          notes: entry.accepted.result.notes,
+          filesChanged: terminalResult.filesChanged.map(change => change.path),
+          linesAdded: terminalResult.totalLinesAdded,
+          linesRemoved: terminalResult.totalLinesRemoved,
+          notes: terminalResult.notes,
         });
+        const artifacts = terminalResult.filesChanged
+          .map(change => change.path)
+          .filter(Boolean);
+        if (terminal.evaluationReceipt.verdict !== 'NO_GO' && artifacts.length > 0) {
+          Object.freeze(artifacts);
+          upstreamHandoffs.push(Object.freeze({
+            fromTaskId: dependencyId,
+            artifacts,
+            ...(typeof terminalResult.handoffNotes === 'string'
+              ? { notes: terminalResult.handoffNotes }
+              : {}),
+          }));
+        }
         lineageAuthorities.push(exactAcceptedAuthority(entry.query, entry.accepted));
       }
       return Object.freeze({
         dependencyIds: Object.freeze(dependencyIds),
         dependencyResults,
+        upstreamHandoffs: Object.freeze(upstreamHandoffs),
         lineageAuthorities: Object.freeze(lineageAuthorities),
       });
     },
@@ -1663,6 +1865,7 @@ export async function executeSpawnTask(
           publicationMode: 'deferred',
           dependencyIds: dependencyContext!.dependencyIds,
           dependencyResults: dependencyContext!.dependencyResults,
+          upstreamHandoffs: dependencyContext!.upstreamHandoffs,
           sink: compilationSink,
         }
       : undefined,

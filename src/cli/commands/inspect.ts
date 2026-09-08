@@ -78,22 +78,27 @@ export function formatInspectRunListing(payload: unknown, lang: string): string 
 
 export function formatInspectTaskDetail(payload: unknown, lang: string): string {
   const detail = record(payload);
-  const heartbeat = nested(detail, 'heartbeat');
+  const task = nested(detail, 'task');
+  const heartbeat = nested(detail, 'hb');
   const plan = nested(detail, 'plan');
   const result = nested(detail, 'result');
   const lineage = nested(detail, 'lineage');
+  const currentRun = nested(detail, 'currentRun');
   const heartbeatSummary = heartbeat['summary']
     ?? heartbeat['currentAction']
     ?? heartbeat['status']
     ?? detail['heartbeatSummary'];
   const fields: Array<[string, unknown]> = [
-    ['inspect.field.task_id', detail['taskId']],
-    ['inspect.field.status', detail['status']],
-    ['inspect.field.agent', detail['agent'] ?? detail['agentId']],
-    ['inspect.field.model', detail['model']],
+    ['inspect.field.task_id', detail['taskId'] ?? task['id']],
+    ['inspect.field.task_projection_status', detail['rawTaskProjectionStatus'] ?? task['status']],
+    ['inspect.field.agent', task['assignedAgent'] ?? task['agent']],
+    ['inspect.field.model', task['model']],
     ['inspect.field.heartbeat', heartbeatSummary],
     ['inspect.field.plan_truncated', detail['planTruncated'] ?? plan['truncated']],
     ['inspect.field.self_assessment', result['selfAssessment'] ?? detail['selfAssessment']],
+    ['inspect.field.current_run_lifecycle', currentRun['lifecycle']],
+    ['inspect.field.current_run_status', currentRun['status']],
+    ['inspect.field.current_run_cause', currentRun['reason']],
     ['inspect.field.lineage', lineage],
   ];
   const detailText = fields
@@ -116,32 +121,52 @@ export function formatInspectTaskDetail(payload: unknown, lang: string): string 
 
 export function formatInspectFollowStatus(payload: unknown, lang: string): string {
   const snapshot = record(payload);
+  const lifecycle = nested(snapshot, 'lifecycle');
   const workers = Array.isArray(snapshot['workers'])
     ? snapshot['workers'].length
     : snapshot['workerCount'];
   return getMessage('inspect.follow.run_status', lang, {
-    lifecycle: display(snapshot['lifecycle']),
+    lifecycle: display(lifecycle['lifecycle'] ?? snapshot['lifecycle']),
     phase: display(snapshot['phase']),
     workers: display(workers),
     revision: display(snapshot['revision']),
   });
 }
 
-export function formatInspectFollowTask(payload: unknown, taskId: string, lang: string): string {
+export function formatInspectFollowTask(
+  payload: unknown,
+  taskId: string,
+  lang: string,
+  currentRun: unknown = null,
+): string {
   const snapshot = record(payload);
-  const tasks = Array.isArray(snapshot['tasks']) ? snapshot['tasks'] as unknown[] : [];
-  const task = record(tasks.find((item) => record(item)['taskId'] === taskId));
-  const heartbeat = record(task['heartbeat']);
-  return getMessage('inspect.follow.task_status', lang, {
+  const workers = Array.isArray(snapshot['workers']) ? snapshot['workers'] as unknown[] : [];
+  const worker = record(workers.find((item) => record(item)['taskId'] === taskId));
+  const heartbeat = nested(worker, 'hb');
+  const boundRun = record(currentRun);
+  const snapshotRun = nested(snapshot, 'lifecycle');
+  const current = boundRun['sprintId'] !== null
+    && boundRun['sprintId'] !== undefined
+    && boundRun['sprintId'] === snapshotRun['sprintId']
+    ? snapshotRun
+    : {};
+  const key = Object.keys(current).length === 0
+    ? 'inspect.follow.task_status'
+    : 'inspect.follow.task_status_current_run';
+  return getMessage(key, lang, {
     taskId,
-    status: display(task['status']),
-    heartbeat: display(heartbeat['summary'] ?? heartbeat['currentAction'] ?? task['heartbeatSummary']),
+    status: display(worker['status']),
+    heartbeat: display(heartbeat['summary'] ?? heartbeat['currentAction']),
+    runLifecycle: display(current['lifecycle']),
+    runStatus: display(current['status']),
+    runCause: display(current['reason']),
     revision: display(snapshot['revision']),
   });
 }
 
 async function followInspector(
   taskId: string | undefined,
+  currentRun: unknown,
   root: string,
   lang: string,
   dependencies: InspectCommandDependencies,
@@ -174,7 +199,7 @@ async function followInspector(
       const onSnapshot = (snapshot: unknown): void => {
         const line = taskId === undefined
           ? formatInspectFollowStatus(snapshot, lang)
-          : formatInspectFollowTask(snapshot, taskId, lang);
+          : formatInspectFollowTask(snapshot, taskId, lang, currentRun);
         followOutput(`\r\u001b[2K${line}`);
       };
       observer = dependencies.observeSnapshot
@@ -205,7 +230,7 @@ export async function runInspectCommand(
     output(options.json
       ? JSON.stringify(payload, null, 2)
       : formatInspectRunListing(payload, lang));
-    return options.follow ? followInspector(undefined, root, lang, dependencies) : 0;
+    return options.follow ? followInspector(undefined, null, root, lang, dependencies) : 0;
   }
 
   const payload = await (dependencies.readTaskDetail ?? readRunInspectorTaskDetail)(root, taskId);
@@ -216,7 +241,9 @@ export async function runInspectCommand(
   output(options.json
     ? JSON.stringify(payload, null, 2)
     : formatInspectTaskDetail(payload, lang));
-  return options.follow ? followInspector(taskId, root, lang, dependencies) : 0;
+  return options.follow
+    ? followInspector(taskId, record(payload)['currentRun'], root, lang, dependencies)
+    : 0;
 }
 
 export function registerInspect(

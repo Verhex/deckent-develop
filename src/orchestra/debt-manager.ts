@@ -3,12 +3,14 @@
 import { writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { evaluateScopeGate, applyScopeResolutions } from '../core/scope-gate.js';
 import { TaskStatus, TaskEvaluation } from '../core/types.js';
 import type {
-  Task, TaskResult, Sprint, DecayResult,
+  Task, TaskResult, Sprint, DecayResult, DebtOriginScope, DebtOriginWiringState,
 } from '../core/types.js';
-import type { ModelType } from '../core/task-types.js';
+import type { ModelType, ProductionWiringPlanEvidenceV2 } from '../core/task-types.js';
+import { createProductionWiringPlanEvidence } from '../core/task-types.js';
 import {
   BRAIN_DIR, TASKS_DIR,
   MEMORY_DB_FILE,
@@ -574,6 +576,55 @@ export function isSuccessOnlyDebtNote(note: string | undefined): boolean {
   return DEBT_SUCCESS_SIGNAL_RE.test(note) && !DEBT_GAP_SIGNAL_RE.test(note);
 }
 
+type PersistedDebtOrigin = {
+  originScope: DebtOriginScope;
+  originWiringState: DebtOriginWiringState;
+  originProductionWiring?: ProductionWiringPlanEvidenceV2;
+  originProductionWiringBinding?: string;
+};
+
+/**
+ * Retain a canonical, paired V2 authority only when the producer task itself
+ * has a non-empty origin task id and writable surface. Older rows remain
+ * explicitly unavailable; malformed V2 input is recorded as diagnostic state,
+ * never converted into a broad fallback authority.
+ */
+function buildPersistedDebtOrigin(task: Task): PersistedDebtOrigin {
+  const originScope: DebtOriginScope = {
+    directories: [...(task.scope?.directories ?? [])],
+    filesWrite: [...(task.scope?.filesWrite ?? [])],
+  };
+  const hasTaskId = typeof task.id === 'string' && task.id.trim().length > 0;
+  const hasScope = [...originScope.directories, ...originScope.filesWrite]
+    .some(value => typeof value === 'string' && value.trim().length > 0);
+  if (task.productionWiring?.version !== 2) {
+    return { originScope, originWiringState: 'legacy-unavailable' };
+  }
+  if (!hasTaskId || !hasScope) {
+    return { originScope, originWiringState: 'invalid-origin' };
+  }
+  try {
+    const canonical = createProductionWiringPlanEvidence(task.productionWiring.contract);
+    if (canonical.contractDigest !== task.productionWiring.contractDigest
+      || canonical.hostProofProgramDigest !== task.productionWiring.hostProofProgramDigest) {
+      return { originScope, originWiringState: 'invalid-origin' };
+    }
+    return {
+      originScope,
+      originWiringState: 'valid-v2',
+      originProductionWiring: canonical,
+      originProductionWiringBinding: createHash('sha256').update(canonicalJson({
+        originTaskId: task.id,
+        originScope,
+        contractDigest: canonical.contractDigest,
+        hostProofProgramDigest: canonical.hostProofProgramDigest,
+      })).digest('hex'),
+    };
+  } catch {
+    return { originScope, originWiringState: 'invalid-origin' };
+  }
+}
+
 /**
  * Insert a debt-ledger row for a task, keyed by `debt-${task.id}` (idempotent
  * — a pre-existing row with the same id is never duplicated). Shared by both
@@ -671,10 +722,7 @@ function recordDebtEntry(
           : !residual && isSuccessOnlyDebtNote(String(result.notes ?? ''))
             ? 'success-echo'
             : 'standard',
-        originScope: {
-          directories: [...(task.scope?.directories ?? [])],
-          filesWrite: [...(task.scope?.filesWrite ?? [])],
-        },
+        ...buildPersistedDebtOrigin(task),
       },
     });
   } finally {

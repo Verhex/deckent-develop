@@ -70,7 +70,12 @@ export interface RunInspectorTaskPlan {
 }
 
 export interface RunInspectorTaskDetail {
+  readonly taskId: string;
   readonly task: Record<string, unknown>;
+  /** Mutable compatibility projection; never substitutes for canonical run truth. */
+  readonly rawTaskProjectionStatus: string | null;
+  /** Present only when this task is provably associated with the current canonical run. */
+  readonly currentRun: CanonicalRunStatus | null;
   readonly plan: RunInspectorTaskPlan | null;
   readonly result: Record<string, unknown> | null;
   readonly hb: RunInspectorHeartbeat | null;
@@ -585,10 +590,20 @@ export function readRunInspectorTaskDetail(
   const result = readJson(`${base}.result`);
   const logRelativePath = join(TASKS_DIR, `task-${taskId}.log`);
   const logPath = existsSync(join(projectRoot, logRelativePath)) ? logRelativePath : null;
-  const worker = buildRunInspectorSnapshot(projectRoot).workers
+  const snapshot = buildRunInspectorSnapshot(projectRoot);
+  const worker = snapshot.workers
     .find(entry => entry.taskId === taskId);
+  const lifecycle = snapshot.lifecycle;
+  const currentRun = text(task.id) === taskId
+    && text(task.sprintId) !== null
+    && text(task.sprintId) === lifecycle.sprintId
+    ? lifecycle
+    : null;
   return {
+    taskId,
     task,
+    rawTaskProjectionStatus: text(task.status),
+    currentRun,
     plan: cappedPlan(`${base}.plan`),
     result,
     hb: worker?.hb ?? null,

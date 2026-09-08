@@ -34,6 +34,9 @@ export type AcceptanceReconciliationReadResult = { readonly state: 'FOUND'; read
   | { readonly state: 'HOLD'; readonly reasonCode: 'CORRUPT_RECEIPT'; readonly message: string };
 export interface AcceptanceReconciliationStoreOptions {
   readonly dbPath?: string; readonly runtimeDirectory?: string; readonly platform?: NodeJS.Platform; readonly adoptLegacy?: boolean;
+  /** No authority/schema/legacy writes. SQLite may use WAL reader-lock sidecars;
+   * immutable=1 is deliberately not used because committed live WAL must remain visible. */
+  readonly readOnly?: boolean;
 }
 export interface AcceptanceReconciliationCursor {
   readonly tenantId: string; readonly projectId?: string; readonly afterSequence?: number; readonly limit?: number;
@@ -78,13 +81,18 @@ class BatchHold extends Error {
 /** SQLite WAL authority for the immutable PREPARED -> APPLIED reconciliation chain. */
 export class AcceptanceReconciliationStore {
   readonly #db: DatabaseType; readonly #legacyDirectory: string; #closed = false;
+  readonly #readOnly: boolean;
   constructor(projectRoot: string, options: AcceptanceReconciliationStoreOptions = {}) {
     const dbPath = options.dbPath ?? join(projectRoot, '.deckent', 'runtime', 'acceptance-reconciliation.db');
     this.#legacyDirectory = options.runtimeDirectory ?? join(projectRoot, '.deckent', 'runtime', 'acceptance-reconciliation', 'receipts');
-    mkdirSync(dirname(dbPath), { recursive: true, mode: 0o700 });
-    this.#db = new Database(dbPath); this.#db.pragma('journal_mode = WAL'); this.#db.pragma('synchronous = FULL');
-    this.#db.pragma('foreign_keys = ON'); this.#db.pragma('busy_timeout = 5000'); this.#initialize();
-    if (options.adoptLegacy !== false) this.adoptLegacyReceipts();
+    this.#readOnly = options.readOnly === true;
+    if (!this.#readOnly) mkdirSync(dirname(dbPath), { recursive: true, mode: 0o700 });
+    this.#db = new Database(dbPath, this.#readOnly ? { readonly: true, fileMustExist: true } : {});
+    if (!this.#readOnly) {
+      this.#db.pragma('journal_mode = WAL'); this.#db.pragma('synchronous = FULL');
+      this.#db.pragma('foreign_keys = ON'); this.#db.pragma('busy_timeout = 5000'); this.#initialize();
+      if (options.adoptLegacy !== false) this.adoptLegacyReceipts();
+    }
   }
   /** Idempotent process-boundary close; committed WAL transactions remain restart-readable. */
   close(): void {
@@ -95,6 +103,7 @@ export class AcceptanceReconciliationStore {
   keyFor(value: AcceptanceConfirmationReceipt): string { return keyFor(value); }
   append(input: AcceptanceReconciliationWrite): AcceptanceReconciliationWriteResult { return this.appendBatch([input])[0]!; }
   appendBatch(inputs: readonly AcceptanceReconciliationWrite[]): readonly AcceptanceReconciliationWriteResult[] {
+    if (this.#readOnly) throw new TypeError('ACCEPTANCE_RECONCILIATION_READ_ONLY');
     if (inputs.length === 0) return Object.freeze([]);
     const tx = this.#db.transaction((values: readonly AcceptanceReconciliationWrite[]) => values.map(value => {
       const result = this.#appendOne(value); if (result.state === 'HOLD') throw new BatchHold(result); return result;
@@ -143,6 +152,7 @@ export class AcceptanceReconciliationStore {
   }
   /** Lossless and idempotent: exact source bytes are copied into SQLite and the file is never deleted. */
   adoptLegacyReceipts(): AcceptanceReconciliationAdoptionResult {
+    if (this.#readOnly) throw new TypeError('ACCEPTANCE_RECONCILIATION_READ_ONLY');
     if (!existsSync(this.#legacyDirectory)) return { discovered: 0, adopted: 0, replayed: 0, invalid: 0 };
     const names = readdirSync(this.#legacyDirectory).filter(name => name.endsWith('.json')).sort();
     let adopted = 0; let replayed = 0; let invalid = 0;

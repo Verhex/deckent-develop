@@ -350,12 +350,14 @@ export interface MandatoryCrossVerifyInvocationFactory {
     readonly operationClass: CrossVerifyOperationClass;
     readonly timeoutMs: number;
     readonly verifierModel?: string;
+    readonly exactAcceptanceSource?: import('./exact-acceptance-evidence.js').ExactAcceptanceVerificationSourceV2;
   }): MandatoryCrossVerifyInvocationFactoryResult
     | Promise<MandatoryCrossVerifyInvocationFactoryResult>;
 }
 
 /** Options for {@link runCrossVerify}. */
 export interface RunCrossVerifyOptions {
+  readonly exactAcceptanceSource?: import('./exact-acceptance-evidence.js').ExactAcceptanceVerificationSourceV2;
   /**
    * Providers whose verifier eligibility was established by the caller.
    *
@@ -1471,6 +1473,7 @@ export async function runCrossVerify(
   // which is the author's true identity on the sprint path.
   const authorModel = opts.authorModel ?? task.model;
   const exactCompositionRequested = verificationRequired
+    || opts.exactAcceptanceSource !== undefined
     || opts.mandatoryInvocation !== undefined
     || opts.mandatoryInvocationFactory !== undefined;
   const persistExactDiagnostic = (
@@ -1531,6 +1534,7 @@ export async function runCrossVerify(
           operationClass: opts.operationClass ?? 'verify-implementation',
           timeoutMs: opts.timeoutMs ?? CROSS_VERIFY_TIMEOUT_MS,
           ...(opts.verifierModel ? { verifierModel: opts.verifierModel } : {}),
+          ...(opts.exactAcceptanceSource ? { exactAcceptanceSource: opts.exactAcceptanceSource } : {}),
         });
         if (composed.state === 'hold') {
           dispatchedVerifier = composed.verifierProvider;

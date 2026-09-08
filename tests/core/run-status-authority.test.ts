@@ -1,5 +1,5 @@
 import { describe, expect, it, onTestFinished } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -101,6 +101,11 @@ describe('canonical run status authority', () => {
       pid: 2_147_483_647,
       startToken: 'process-generation-failed',
     });
+    json(root, `.deckent/pids/${sprintId}.snapshot.json`, {
+      sprintId,
+      pid: 2_147_483_647,
+      startToken: 'process-generation-failed',
+    });
     json(root, `.deckent/${sprintId}-checkpoint.json`, { sprintId });
     savePlannedSprint(root, flowId, { revision: 1, sprint: { id: sprintId } });
     saveRunHandle(root, {
@@ -117,6 +122,10 @@ describe('canonical run status authority', () => {
       completionRecord: { flowId },
       error: 'worker exited',
     });
+    // Failure retirement removes liveness authority before the detached child
+    // publishes RUN_FAILED. The snapshot remains evidence-only and must still
+    // correlate that exact process generation to its terminal flow.
+    unlinkSync(join(root, `.deckent/pids/${sprintId}.pid`));
 
     expect(readCanonicalRunStatus(root)).toMatchObject({
       lifecycle: 'ABORTED',
@@ -124,7 +133,7 @@ describe('canonical run status authority', () => {
       resumable: false,
       sprintId,
       status: 'FAILED',
-      reason: 'flow-terminal-failed',
+      reason: 'worker exited',
       recoveryCommand: null,
     });
   });

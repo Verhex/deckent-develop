@@ -33,7 +33,8 @@ import type {
 import { getAgentRole } from '../core/agent-pool.js';
 import { validatePersonaTaskMatch } from './task-builder.js';
 import { sanitizeScope } from './scope-sanitizer.js';
-import { lintScopeSatisfiability } from './scope-satisfiability.js';
+import { lintScopeSatisfiability, lintCriterionEvidenceReadScope } from './scope-satisfiability.js';
+import { findContradictoryFileCriteria } from './planner-plan-contract.js';
 import { isRealPathCandidate } from '../core/task-builder-scope.js';
 import { getMessage } from '../cli/helpers/messages.js';
 import { compileCanonicalScope } from '../core/execution-write-scope-policy.js';
@@ -398,33 +399,41 @@ function lintScopeSilentDrop(task: Task, trackedRootFiles: ReadonlySet<string>, 
 }
 
 /** G1b (sprint-399 wiring): task-text ↔ write-authority satisfiability lint. */
-function lintSatisfiability(task: Task, trackedFiles: readonly string[], lang: string): PromptGateFinding[] {
+function lintSatisfiability(task: Task, trackedFiles: readonly string[] | undefined, lang: string): PromptGateFinding[] {
   const goCriteria = task.goNogo?.goCriteria ?? '';
   const description = task.description ?? '';
-  const findings = lintScopeSatisfiability({
+  const lint = trackedFiles && trackedFiles.length > 0
+    ? lintScopeSatisfiability : lintCriterionEvidenceReadScope;
+  const findings = lint({
     description,
     goCriteria,
     proofCommands: extractProofCommands(goCriteria, description),
     filesRead: task.scope?.filesRead ?? [],
     filesWrite: task.scope?.filesWrite ?? [],
     directories: task.scope?.directories ?? [],
-    trackedFiles,
+    trackedFiles: trackedFiles ?? [],
+    criteria: task.goNogo?.items,
   })
     // born-650: the satisfiability path-extraction regex greedily matches code tokens
     // ("Date.now/process.env" → "now/process.env") and money/number tokens
     // ("$2.23/4.25dk" → "23/4.25dk") as slash-qualified paths, producing false BLOCKs.
     // Drop any finding whose `path` does not look like a real file path — a genuinely
     // missing path ("src/core/x.ts") still passes the predicate and still blocks.
-    .filter(f => isRealPathCandidate(f.path));
+    .filter(f => f.code === 'CRITERION_EVIDENCE_NOT_READABLE' || isRealPathCandidate(f.path));
   const agentId = task.assignedAgent ?? 'generic';
   return findings.map(f => ({
     taskId: task.id,
     lint: 'scope-satisfiability' as const,
     level: f.severity === 'BLOCK' ? 'block' as const : 'warn' as const,
     agentId,
-    message: getMessage('prompt_gate.satisfiability_message', lang, { code: f.code, message: f.message }),
+    message: f.code === 'CRITERION_EVIDENCE_NOT_READABLE'
+      ? getMessage('prompt_gate.criterion_evidence_not_readable', lang,
+        { criterionId: f.criterionId ?? '', path: f.path })
+      : getMessage('prompt_gate.satisfiability_message', lang, { code: f.code, message: f.message }),
     suggestion:
-      f.code === 'PROOF_PATH_MISSING'
+      f.code === 'CRITERION_EVIDENCE_NOT_READABLE'
+        ? getMessage('prompt_gate.criterion_evidence_read_scope_fix', lang, { path: f.path })
+        : f.code === 'PROOF_PATH_MISSING'
         ? getMessage('prompt_gate.satisfiability_fix_proof_path_missing', lang, { path: f.path })
         : f.code === 'MENTIONED_NOT_WRITABLE'
           ? getMessage('prompt_gate.satisfiability_fix_mentioned_not_writable', lang, { path: f.path })
@@ -450,6 +459,12 @@ export function evaluatePromptGate(input: PromptGateInput): PromptGateResult {
 
   for (const task of input.tasks) {
     const agentId = task.assignedAgent ?? 'generic';
+    for (const conflict of findContradictoryFileCriteria(task.goNogo?.items)) {
+      findings.push({ taskId: task.id, agentId, lint: 'scope-satisfiability', level: 'block',
+        message: getMessage('prompt_gate.contradictory_file_criteria', lang, conflict),
+        suggestion: getMessage('prompt_gate.contradictory_file_criteria_fix', lang),
+      });
+    }
 
     const compiledScope = compileCanonicalScope({ scope: task.scope, inventory: input.trackedFiles });
     if (!compiledScope.ok) {
@@ -495,8 +510,10 @@ export function evaluatePromptGate(input: PromptGateInput): PromptGateResult {
     // no git signal → no findings, never a false block on e.g. a non-git workspace).
     if (input.trackedFiles && input.trackedFiles.length > 0 && trackedRootFiles) {
       findings.push(...lintScopeSilentDrop(task, trackedRootFiles, lang));
-      findings.push(...lintSatisfiability(task, input.trackedFiles, lang));
     }
+    // Typed acceptance/read compatibility is independent of Git discovery.
+    // The helper preserves the inventory gate for all legacy prose lints.
+    findings.push(...lintSatisfiability(task, input.trackedFiles, lang));
   }
 
   const blockers = findings.filter((f) => f.level === 'block');

@@ -64,6 +64,67 @@ describe('prompt-gate constants', () => {
   });
 });
 
+describe('typed acceptance scope gate', () => {
+  it.each([undefined, []])('blocks opposite exact presence predicates at final preview without inventory %j', trackedFiles => {
+    const candidate = task({ id: 'contradiction', goNogo: { goCriteria: 'works', noGoCriteria: 'fails', techDebtAcceptable: '',
+      items: ['go', 'no-go'].map(polarity => ({ id: polarity, polarity: polarity as 'go' | 'no-go',
+        statement: 'Semantic condition must not be inferred from a locator', evidenceRequirements: ['file:"src/core/x.ts"'] })) } });
+    const result = evaluatePromptGate({ tasks: [candidate], agentPool: pool(), trackedFiles });
+    expect(result.ok).toBe(false);
+    expect(result.blockers.some(finding => finding.message.includes('[CONTRADICTORY_FILE_CRITERIA]'))).toBe(true);
+    candidate.goNogo.items = candidate.goNogo.items!.map(entry => ({ ...entry,
+      evidenceRequirements: [`assertion:${JSON.stringify(entry.statement)}`] }));
+    expect(evaluatePromptGate({ tasks: [candidate], agentPool: pool(), trackedFiles }).blockers
+      .some(finding => finding.message.includes('[CONTRADICTORY_FILE_CRITERIA]'))).toBe(false);
+  });
+
+  const evidenceTask = () => task({ id: 'typed-evidence',
+    scope: { directories: ['docs/execution/canary'], filesRead: [], filesWrite: ['docs/execution/canary/CANARY-NOTE.md'] },
+    goNogo: { goCriteria: 'Readiness has concrete evidence', noGoCriteria: 'Unsupported result', techDebtAcceptable: '',
+      items: [{ id: 'go-health', polarity: 'go', statement: 'Readiness is supported',
+        evidenceRequirements: ['Health evidence from .brain/exports/summary.md'] }] },
+  });
+
+  it.each([undefined, [], ['docs/execution/canary/CANARY-NOTE.md']])(
+    'blocks typed evidence without depending on inventory %j', trackedFiles => {
+      const result = evaluatePromptGate({ tasks: [evidenceTask()], agentPool: pool(), trackedFiles });
+      expect(result.ok).toBe(false);
+      expect(result.blockers).toEqual([expect.objectContaining({ lint: 'scope-satisfiability',
+        message: expect.stringContaining('[CRITERION_EVIDENCE_NOT_READABLE] Criterion go-health') })]);
+      expect(result.blockers[0]!.message).toContain('.brain/exports/summary.md');
+    },
+  );
+
+  it('preserves explicit acknowledgment and localizes typed diagnostics', () => {
+    const result = evaluatePromptGate({ tasks: [evidenceTask()], agentPool: pool(),
+      acknowledgePromptGate: true, lang: 'tr' });
+    expect(result.ok).toBe(true);
+    expect(result.overrideApplied).toBe(true);
+    expect(result.blockers[0]!.message).toContain('go-health kriteri');
+    expect(result.blockers[0]!.suggestion).toContain('snapshot teslimini');
+  });
+
+  it('accepts declared read authority without treating it as physical delivery', () => {
+    const candidate = evidenceTask();
+    candidate.scope.filesRead = ['.brain/exports/summary.md'];
+    const result = evaluatePromptGate({ tasks: [candidate], agentPool: pool() });
+    expect(result.blockers).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it.each([undefined, []])('checks explicit root and extensionless file evidence with inventory %j', trackedFiles => {
+    const candidate = evidenceTask();
+    candidate.goNogo.items![0]!.evidenceRequirements = ['file:"README.md"', 'file:"Dockerfile"'];
+    const result = evaluatePromptGate({ tasks: [candidate], agentPool: pool(), trackedFiles });
+    expect(result.ok).toBe(false);
+    expect(result.blockers).toHaveLength(2);
+    expect(result.blockers[0]!.message).toContain('README.md');
+    expect(result.blockers[1]!.message).toContain('Dockerfile');
+    candidate.scope.filesRead = ['README.md', 'Dockerfile'];
+    expect(evaluatePromptGate({ tasks: [candidate], agentPool: pool(), trackedFiles }).ok).toBe(true);
+  });
+});
+
 describe('isConstructionTask', () => {
   it('documentation/architecture intent is never construction', () => {
     expect(isConstructionTask(task({ id: 'a', routingMeta: dna('documentation', 'document') }))).toBe(false);

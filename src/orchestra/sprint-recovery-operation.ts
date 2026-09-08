@@ -17,6 +17,7 @@ import { DEFAULT_LIFECYCLE_RECOVERY_CONFIG } from '../core/config-types.js';
 import { decideExecutionRecovery } from '../core/execution-recovery.js';
 import { previewFinalizeCleanup } from '../core/orphan-cleaner.js';
 import { readCanonicalRunStatus } from '../core/run-status-authority.js';
+import { publishCanonicalRunStatusReadModel } from '../core/run-status-read-model.js';
 import {
   resolveTaskArtifactArchiveDir,
   TASK_ARTIFACT_PRESERVED_SUBDIR,
@@ -33,6 +34,14 @@ import {
   type ExecutionRecoveryPlatform,
 } from './execution-recovery-adapter.js';
 import { createSprintRecoveryAdapter } from './recovery-adapters/sprint-recovery-adapter.js';
+import {
+  inspectExactDockerPlanningRecoveryHealth,
+  reconcileExactDockerPendingReservationsForSprint,
+  retainExactDockerCommittedUnsettledAttempt,
+  retainExactDockerStartedFailedAttempt,
+  type ExactDockerPlanningRecoveryHealth,
+  type ExactDockerReservationRecoveryReport,
+} from './spawn-backend-docker.js';
 import { readCheckpoint } from './sprint-checkpoint.js';
 import { runSelfAuditGate } from './sprint-finalizer.js';
 import {
@@ -49,6 +58,8 @@ import { createPreArchiveSnapshot, verifySnapshot } from './task-restoration.js'
 
 export type SprintRecoveryOperationErrorCode =
   | 'INVALID_SPRINT_ID'
+  | 'INVALID_DISPATCH_REQUEST_ID'
+  | 'RETENTION_MODE_CONFLICT'
   | 'ACTIVE_AUTHORITY'
   | 'APPROVAL_REQUIRED'
   | 'APPROVAL_MISMATCH'
@@ -68,6 +79,8 @@ export class SprintRecoveryOperationError extends Error {
 }
 
 export interface SprintRecoveryReport {
+  startedFailedAttempt?: Awaited<ReturnType<typeof retainExactDockerStartedFailedAttempt>>;
+  committedUnsettledAttempt?: Awaited<ReturnType<typeof retainExactDockerCommittedUnsettledAttempt>>;
   identity: SprintRecoverySettlementIdentity;
   audit: { overallGate: 'PASS' | 'GATE_FAILURE' | 'SKIPPED' };
   orphanIpcDirs: string[];
@@ -75,6 +88,15 @@ export interface SprintRecoveryReport {
   staleSpawnLocksCleaned: number;
   taskFilesArchived: number;
   taskFilesPreserved: number;
+  exactCustodyReservations: {
+    readonly pendingBeforeAdmission: number;
+    readonly heldAdmissionGraphs: number;
+    readonly unresolvedBeforeRecovery: number;
+    readonly admittedFromStagedSnapshot: number;
+    readonly retiredBeforeAdmission: number;
+    readonly quarantinedHistoricalAdmissions: number;
+    readonly receiptDigest: string | null;
+  };
   artifactPolicy: {
     readonly policyVersion: typeof RECOVERY_ARTIFACT_POLICY_VERSION;
     readonly archiveManifests: readonly ForceArchiveManifestV1[];
@@ -92,6 +114,10 @@ export interface SprintRecoveryReport {
 }
 
 export interface SprintRecoveryOperationOptions {
+  readonly startedFailedDispatchRequestId?: string;
+  readonly exactStartedFailedRecovery?: typeof retainExactDockerStartedFailedAttempt;
+  readonly committedUnsettledDispatchRequestId?: string;
+  readonly exactCommittedUnsettledRecovery?: typeof retainExactDockerCommittedUnsettledAttempt;
   readonly dryRun?: boolean;
   readonly skipAudit?: boolean;
   /**
@@ -104,6 +130,12 @@ export interface SprintRecoveryOperationOptions {
   readonly approval?: SprintRecoverySettlementApproval;
   readonly terminationPolicy?: CoordinatorTerminationPolicy;
   readonly terminationDeps?: VerifiedTerminateDeps;
+  /** Test seam over the production exact-custody recovery boundary. */
+  readonly exactCustodyRecovery?: typeof reconcileExactDockerPendingReservationsForSprint;
+  /** Read-only test seam over the production pre-recovery Store scan. */
+  readonly exactCustodyInspection?: typeof inspectExactDockerPlanningRecoveryHealth;
+  /** Test seam; production publishes only the canonical derived status read model. */
+  readonly publishCanonicalRunStatusReadModel?: typeof publishCanonicalRunStatusReadModel;
 }
 
 export interface SprintCoordinatorContainmentOptions {
@@ -470,9 +502,176 @@ export async function runSprintRecoveryOperation(
   assertSprintId(sprintId);
   const identity = readSprintRecoverySettlementIdentity(root, sprintId);
   const authorityBeforeMutation = readCanonicalRunStatus(root, { sprintIdHint: sprintId });
+  if (opts.startedFailedDispatchRequestId !== undefined
+    && opts.committedUnsettledDispatchRequestId !== undefined) {
+    throw new SprintRecoveryOperationError('RETENTION_MODE_CONFLICT', { sprintId });
+  }
+  if (opts.committedUnsettledDispatchRequestId !== undefined) {
+    const dispatchRequestId = opts.committedUnsettledDispatchRequestId;
+    if (!/^dreq-[a-f0-9]{64}$/u.test(dispatchRequestId)) {
+      throw new SprintRecoveryOperationError('INVALID_DISPATCH_REQUEST_ID', { sprintId });
+    }
+    const approval = opts.approval;
+    if (!opts.dryRun && !approval) throw new SprintRecoveryOperationError('APPROVAL_REQUIRED', { sprintId });
+    if (!opts.dryRun && (!approval!.approvalRef || !approval!.idempotencyKey
+      || !sameIdentity(approval!.identity, identity))) {
+      throw new SprintRecoveryOperationError('APPROVAL_MISMATCH', { sprintId });
+    }
+    const assertFreshFence = (): void => {
+      if (!sameIdentity(identity, readSprintRecoverySettlementIdentity(root, sprintId))
+        || (!opts.dryRun && !sameIdentity(approval!.identity, identity))) {
+        throw new SprintRecoveryOperationError('APPROVAL_MISMATCH', { sprintId });
+      }
+      const freshAuthority = readCanonicalRunStatus(root);
+      if (freshAuthority.active || freshAuthority.coordinator === 'alive') {
+        throw new SprintRecoveryOperationError('ACTIVE_AUTHORITY', { sprintId });
+      }
+    };
+    if (!opts.dryRun) {
+      if (authorityBeforeMutation.active || authorityBeforeMutation.coordinator === 'alive') {
+        throw new SprintRecoveryOperationError('ACTIVE_AUTHORITY', { sprintId });
+      }
+      assertFreshFence();
+      let signalVetoed = false;
+      try {
+        await containSprintRecoveryCoordinator(root, sprintId, {
+          expectedIdentity: identity, terminationPolicy: opts.terminationPolicy,
+          terminationDeps: {
+            ...opts.terminationDeps,
+            kill: () => {
+              signalVetoed = true;
+              throw new SprintRecoveryOperationError('ACTIVE_AUTHORITY', { sprintId });
+            },
+          },
+        });
+      } finally {
+        if (signalVetoed) throw new SprintRecoveryOperationError('ACTIVE_AUTHORITY', { sprintId });
+      }
+      assertFreshFence();
+    }
+    const committedUnsettledAttempt = await (opts.exactCommittedUnsettledRecovery
+      ?? retainExactDockerCommittedUnsettledAttempt)({
+      projectRoot: root, sprintId, dispatchRequestId, dryRun: opts.dryRun === true,
+      recoveryAuthority: {
+        executionId: identity.executionId, taskId: identity.taskId, attemptId: identity.attemptId,
+        fenceToken: identity.fenceToken,
+        approvalRef: approval?.approvalRef ?? 'preview-only',
+        idempotencyKey: approval?.idempotencyKey ?? 'preview-only',
+      },
+      beforePublish: assertFreshFence,
+    });
+    if (!opts.dryRun) {
+      // Retention is intentionally not a terminal settlement: do not archive,
+      // finalize, or alter task/checkpoint/custody evidence. Refresh only the
+      // derived status projection after the exact retention boundary and a
+      // second authority fence have both succeeded.
+      assertFreshFence();
+      const authority = readCanonicalRunStatus(root, { sprintIdHint: sprintId });
+      (opts.publishCanonicalRunStatusReadModel ?? publishCanonicalRunStatusReadModel)(root, {
+        authority,
+      });
+    }
+    return {
+      identity, committedUnsettledAttempt, audit: { overallGate: 'SKIPPED' }, orphanIpcDirs: [],
+      staleLocksCleaned: 0, staleSpawnLocksCleaned: 0, taskFilesArchived: 0, taskFilesPreserved: 0,
+      exactCustodyReservations: { pendingBeforeAdmission: 0, heldAdmissionGraphs: 0,
+        unresolvedBeforeRecovery: 0, admittedFromStagedSnapshot: 0, retiredBeforeAdmission: 0,
+        quarantinedHistoricalAdmissions: 0, receiptDigest: null },
+      artifactPolicy: { policyVersion: RECOVERY_ARTIFACT_POLICY_VERSION, archiveManifests: [],
+        checkpoint: checkpointPolicyDisposition(root, sprintId, identity) },
+      remediation: null,
+    };
+  }
+  if (opts.startedFailedDispatchRequestId !== undefined) {
+    const dispatchRequestId = opts.startedFailedDispatchRequestId;
+    if (!/^dreq-[a-f0-9]{64}$/u.test(dispatchRequestId)) {
+      throw new SprintRecoveryOperationError('INVALID_DISPATCH_REQUEST_ID', { sprintId });
+    }
+    const approval = opts.approval;
+    if (!opts.dryRun && !approval) throw new SprintRecoveryOperationError('APPROVAL_REQUIRED', { sprintId });
+    if (!opts.dryRun && (!approval!.approvalRef || !approval!.idempotencyKey
+      || !sameIdentity(approval!.identity, identity))) {
+      throw new SprintRecoveryOperationError('APPROVAL_MISMATCH', { sprintId });
+    }
+    const assertFreshFence = (): void => {
+      if (!sameIdentity(identity, readSprintRecoverySettlementIdentity(root, sprintId))
+        || (!opts.dryRun && !sameIdentity(approval!.identity, identity))) {
+        throw new SprintRecoveryOperationError('APPROVAL_MISMATCH', { sprintId });
+      }
+      const freshAuthority = readCanonicalRunStatus(root);
+      if (freshAuthority.active || freshAuthority.coordinator === 'alive') {
+        throw new SprintRecoveryOperationError('ACTIVE_AUTHORITY', { sprintId });
+      }
+    };
+    if (!opts.dryRun) {
+      // No worker termination authority: backend proves the exact attempt stopped.
+      if (authorityBeforeMutation.active || authorityBeforeMutation.coordinator === 'alive') {
+        throw new SprintRecoveryOperationError('ACTIVE_AUTHORITY', { sprintId });
+      }
+      assertFreshFence();
+      let signalVetoed = false;
+      try {
+        await containSprintRecoveryCoordinator(root, sprintId, {
+          expectedIdentity: identity, terminationPolicy: opts.terminationPolicy,
+          terminationDeps: {
+            ...opts.terminationDeps,
+            kill: () => {
+              signalVetoed = true;
+              throw new SprintRecoveryOperationError('ACTIVE_AUTHORITY', { sprintId });
+            },
+          },
+        });
+      } finally {
+        // The termination helper catches signal errors; retain the veto even
+        // if its next observation finds that the process exited independently.
+        if (signalVetoed) throw new SprintRecoveryOperationError('ACTIVE_AUTHORITY', { sprintId });
+      }
+      assertFreshFence();
+    }
+    const startedFailedAttempt = await (opts.exactStartedFailedRecovery ?? retainExactDockerStartedFailedAttempt)({
+      projectRoot: root, sprintId, dispatchRequestId, dryRun: opts.dryRun === true,
+      recoveryAuthority: {
+        executionId: identity.executionId, taskId: identity.taskId, attemptId: identity.attemptId,
+        fenceToken: identity.fenceToken,
+        approvalRef: approval?.approvalRef ?? 'preview-only',
+        idempotencyKey: approval?.idempotencyKey ?? 'preview-only',
+      },
+      beforePublish: assertFreshFence,
+    });
+    return {
+      identity, startedFailedAttempt, audit: { overallGate: 'SKIPPED' }, orphanIpcDirs: [],
+      staleLocksCleaned: 0, staleSpawnLocksCleaned: 0, taskFilesArchived: 0, taskFilesPreserved: 0,
+      exactCustodyReservations: { pendingBeforeAdmission: 0, heldAdmissionGraphs: 0,
+        unresolvedBeforeRecovery: 0, admittedFromStagedSnapshot: 0, retiredBeforeAdmission: 0,
+        quarantinedHistoricalAdmissions: 0, receiptDigest: null },
+      artifactPolicy: { policyVersion: RECOVERY_ARTIFACT_POLICY_VERSION, archiveManifests: [],
+        checkpoint: checkpointPolicyDisposition(root, sprintId, identity) },
+      remediation: null,
+    };
+  }
   const checkpointDisposition = checkpointPolicyDisposition(root, sprintId, identity);
   const preview = previewFinalizeCleanup(root, sprintId);
   const archiveManifests = taskArchiveManifests(root, sprintId, preview, identity);
+  let exactCustodyInspection: ExactDockerPlanningRecoveryHealth;
+  try {
+    exactCustodyInspection = (opts.exactCustodyInspection
+      ?? inspectExactDockerPlanningRecoveryHealth)(root);
+  } catch (error) {
+    throw new SprintRecoveryOperationError('SETTLEMENT_FAILED', {
+      sprintId,
+      disposition: 'HOLD',
+      reason: error instanceof Error ? error.message : String(error),
+    });
+  }
+  const sprintNumber = sprintId.slice('sprint-'.length);
+  const pendingExactCustody = exactCustodyInspection.unresolved.filter(entry => (
+    entry.reasonCode === 'ADMISSION_RECONCILIATION_REQUIRED'
+    && entry.taskId.startsWith(`${sprintNumber}-`)
+  ));
+  const heldExactCustody = exactCustodyInspection.unresolved.filter(entry => (
+    entry.reasonCode === 'ADMISSION_GRAPH_HOLD'
+    && entry.taskId.startsWith(`${sprintNumber}-`)
+  ));
   const report: SprintRecoveryReport = {
     identity,
     audit: { overallGate: 'SKIPPED' },
@@ -481,6 +680,15 @@ export async function runSprintRecoveryOperation(
     staleSpawnLocksCleaned: 0,
     taskFilesArchived: 0,
     taskFilesPreserved: 0,
+    exactCustodyReservations: {
+      pendingBeforeAdmission: pendingExactCustody.length,
+      heldAdmissionGraphs: heldExactCustody.length,
+      unresolvedBeforeRecovery: pendingExactCustody.length + heldExactCustody.length,
+      admittedFromStagedSnapshot: 0,
+      retiredBeforeAdmission: 0,
+      quarantinedHistoricalAdmissions: 0,
+      receiptDigest: exactCustodyInspection.recoveryListReceiptDigest,
+    },
     artifactPolicy: {
       policyVersion: RECOVERY_ARTIFACT_POLICY_VERSION,
       archiveManifests,
@@ -522,6 +730,45 @@ export async function runSprintRecoveryOperation(
   if (opts.intent === 'FINALIZE_CONTAINMENT') {
     return report;
   }
+
+  let exactCustodyRecovery: ExactDockerReservationRecoveryReport;
+  try {
+    exactCustodyRecovery = (opts.exactCustodyRecovery
+      ?? reconcileExactDockerPendingReservationsForSprint)({
+      projectRoot: root,
+      sprintId,
+      recoveryAuthority: {
+        executionId: identity.executionId,
+        taskId: identity.taskId,
+        attemptId: identity.attemptId,
+        fenceToken: identity.fenceToken,
+        approvalRef: opts.approval.approvalRef,
+        idempotencyKey: opts.approval.idempotencyKey,
+      },
+      reconciledAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    throw new SprintRecoveryOperationError('SETTLEMENT_FAILED', {
+      sprintId,
+      disposition: 'HOLD',
+      reason: error instanceof Error ? error.message : String(error),
+    });
+  }
+  report.exactCustodyReservations = {
+    pendingBeforeAdmission: pendingExactCustody.length,
+    heldAdmissionGraphs: heldExactCustody.length,
+    unresolvedBeforeRecovery: pendingExactCustody.length + heldExactCustody.length,
+    admittedFromStagedSnapshot: exactCustodyRecovery.reconciled.filter(
+      entry => entry.state === 'admitted',
+    ).length,
+    retiredBeforeAdmission: exactCustodyRecovery.reconciled.filter(
+      entry => entry.state === 'retired-before-admission',
+    ).length,
+    quarantinedHistoricalAdmissions: exactCustodyRecovery.reconciled.filter(
+      entry => entry.state === 'quarantined-historical-admission',
+    ).length,
+    receiptDigest: exactCustodyRecovery.recoveryListReceiptDigest,
+  };
 
   const authority = readCanonicalRunStatus(root);
   if (
@@ -569,7 +816,13 @@ export async function runSprintRecoveryOperation(
       // Task-14 policy preserves exact checkpoint bytes until an explicit
       // distinct successor or terminal receipt owns retirement.
       clearCheckpoint: () => undefined,
-      clearPid: id => clearPid(root, id),
+      // A preserved checkpoint can only remain honest if the exact failed
+      // coordinator generation stays correlatable to its durable RunFlow
+      // terminal event. Retire live `.pid` authority, but retain the paired
+      // snapshot as evidence until checkpoint supersession owns both.
+      clearPid: id => clearPid(root, id, {
+        preserveSnapshot: checkpointDisposition.disposition === 'preserved',
+      }),
       clearMatchingSprintState: id => {
         const state = readSprintState(root);
         if (state?.sprintId === id) clearSprintState(root);

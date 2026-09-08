@@ -31,8 +31,13 @@ import type { LiveFooterState, LiveFooterProviderState, LiveFooterAuthState } fr
 import { readWorkerProgress, type ProgressReaderFs, type WorkerProgressSummary } from './progress-reader.js';
 import {
   readCanonicalRunStatusReadModel,
+  runStatusReadModelMatchesAuthority,
   type CanonicalRunStatusReadModel,
 } from '../../core/run-status-read-model.js';
+import {
+  readCanonicalRunStatus,
+  type CanonicalRunStatus,
+} from '../../core/run-status-authority.js';
 
 // ─── fs seam ────────────────────────────────────────────────────────────────
 
@@ -102,6 +107,9 @@ interface RawJobRecord {
 export interface StateFeedInput {
   /** Validated persisted lifecycle/logical-work authority. */
   runStatusReadModel?: CanonicalRunStatusReadModel | null;
+  /** Fresh canonical lifecycle authority. When present it vetoes a stale
+   * persisted projection and all legacy sprint/heartbeat activity. */
+  runStatusAuthority?: CanonicalRunStatus | null;
   sprintState: RawSprintState | null;
   /** One raw parsed object per readable task-<id>.hb file. */
   heartbeats: RawHeartbeat[];
@@ -263,6 +271,7 @@ function resolveWorkerCurrentAction(
 export function computeLiveFooterState(input: StateFeedInput): StateFeedState {
   const {
     runStatusReadModel,
+    runStatusAuthority,
     sprintState,
     heartbeats,
     finishedTaskIds,
@@ -273,26 +282,55 @@ export function computeLiveFooterState(input: StateFeedInput): StateFeedState {
   } = input;
   const state: StateFeedState = {};
 
-  if (runStatusReadModel) {
+  const readModelMatches = runStatusReadModel !== undefined
+    && runStatusReadModel !== null
+    && (
+      runStatusAuthority === undefined
+      || runStatusAuthority === null
+      || runStatusReadModelMatchesAuthority(runStatusReadModel, runStatusAuthority)
+    );
+  const trustedReadModel = readModelMatches ? runStatusReadModel : null;
+
+  if (trustedReadModel) {
     state.statusReadModel = {
       state: 'persisted',
-      revision: runStatusReadModel.revision,
-      modelDigest: runStatusReadModel.modelDigest,
+      revision: trustedReadModel.revision,
+      modelDigest: trustedReadModel.modelDigest,
     };
+  } else if (runStatusReadModel && runStatusAuthority) {
+    state.statusReadModel = { state: 'unavailable-or-stale' };
   }
+
+  const effectiveAuthority = runStatusAuthority ?? trustedReadModel?.authority;
+  if (
+    effectiveAuthority
+    && effectiveAuthority.lifecycle !== 'ACTIVE'
+    && effectiveAuthority.lifecycle !== 'IDLE'
+  ) {
+    state.runStatus = {
+      lifecycle: effectiveAuthority.lifecycle,
+      ...(effectiveAuthority.sprintId ? { sprintId: effectiveAuthority.sprintId } : {}),
+      ...(effectiveAuthority.reason ? { reason: effectiveAuthority.reason } : {}),
+      ...(effectiveAuthority.recoveryCommand
+        ? { recoveryCommand: effectiveAuthority.recoveryCommand }
+        : {}),
+    };
+    return state;
+  }
+  if (effectiveAuthority?.lifecycle === 'IDLE') return state;
 
   const heartbeatTaskIds = heartbeats
     .map((hb) => (typeof hb.taskId === 'string' ? hb.taskId : null))
     .filter((id): id is string => id !== null);
-  const modelActiveAttemptIds = runStatusReadModel
+  const modelActiveAttemptIds = trustedReadModel
     ? new Set(
-        runStatusReadModel.logicalProgress.lineages
+        trustedReadModel.logicalProgress.lineages
           .filter(lineage => lineage.status === 'active')
           .flatMap(lineage => lineage.attemptIds),
       )
     : null;
-  const lifecycleAllowsWorkers = !runStatusReadModel
-    || runStatusReadModel.authority.lifecycle === 'ACTIVE';
+  const lifecycleAllowsWorkers = !effectiveAuthority
+    || effectiveAuthority.lifecycle === 'ACTIVE';
   const activeTaskIds = lifecycleAllowsWorkers
     ? heartbeatTaskIds.filter(id => (
         !finishedTaskIds.has(id)
@@ -310,7 +348,7 @@ export function computeLiveFooterState(input: StateFeedInput): StateFeedState {
     }
   }
 
-  const modelAuthority = runStatusReadModel?.authority;
+  const modelAuthority = effectiveAuthority;
   const lifecycleHasRun = modelAuthority
     ? modelAuthority.lifecycle === 'ACTIVE'
       || modelAuthority.lifecycle === 'PAUSED'
@@ -377,6 +415,9 @@ export interface StateFeedOptions {
   /** Canonical read-model seam for hermetic adapters/tests. Production uses
    * the persisted reader; supplying raw sprint-state is never a substitute. */
   readRunStatusReadModel?: (projectRoot: string) => CanonicalRunStatusReadModel | null;
+  /** Fresh canonical lifecycle seam. Production always reads it directly;
+   * fs-fake tests opt in explicitly to avoid crossing the fake boundary. */
+  readRunStatusAuthority?: (projectRoot: string) => CanonicalRunStatus;
   /** The flowId of a currently-watched detached run-handle
    *  (`DetachedSpawnResult.flowId`, detached-start.ts) to correlate
    *  against — see `StateFeedState.completion`. When omitted (every caller
@@ -480,9 +521,33 @@ export function readLiveFooterState(options: StateFeedOptions): StateFeedState {
   } catch {
     runStatusReadModelInvalid = true;
   }
+  let runStatusAuthority: CanonicalRunStatus | null = null;
+  let runStatusAuthorityInvalid = false;
+  const authorityReader = options.readRunStatusAuthority
+    ?? (options.fs === undefined ? readCanonicalRunStatus : undefined);
+  if (authorityReader) {
+    try {
+      runStatusAuthority = authorityReader(options.projectRoot);
+    } catch {
+      runStatusAuthorityInvalid = true;
+    }
+  }
+  const readModelEvidencePresent = runStatusReadModelInvalid
+    || fs.existsSync(join(options.projectRoot, RUN_STATUS_READ_MODEL_FILE))
+    || sprintState !== null;
+  let runStatusReadModelStale = false;
+  if (
+    runStatusReadModel
+    && runStatusAuthority
+    && !runStatusReadModelMatchesAuthority(runStatusReadModel, runStatusAuthority)
+  ) {
+    runStatusReadModel = null;
+    runStatusReadModelStale = true;
+  }
   if (
     !runStatusReadModel
-    && (runStatusReadModelInvalid || fs.existsSync(join(options.projectRoot, RUN_STATUS_READ_MODEL_FILE)) || sprintState !== null)
+    && !runStatusAuthority
+    && (readModelEvidencePresent || runStatusAuthorityInvalid)
   ) {
     return { statusReadModel: { state: 'unavailable-or-stale' } };
   }
@@ -491,8 +556,9 @@ export function readLiveFooterState(options: StateFeedOptions): StateFeedState {
   const workerProgress = readWorkerProgress(tasksDir, { fs: options.progressFs });
   const jobRecords = options.flowId ? readJobRecords(fs, join(options.projectRoot, JOBS_DIR)) : undefined;
 
-  return computeLiveFooterState({
+  const state = computeLiveFooterState({
     runStatusReadModel,
+    runStatusAuthority,
     sprintState,
     heartbeats,
     finishedTaskIds,
@@ -501,6 +567,14 @@ export function readLiveFooterState(options: StateFeedOptions): StateFeedState {
     jobRecords,
     flowId: options.flowId,
   });
+  if (
+    runStatusReadModelStale
+    || (!runStatusReadModel && readModelEvidencePresent)
+    || runStatusAuthorityInvalid
+  ) {
+    state.statusReadModel = { state: 'unavailable-or-stale' };
+  }
+  return state;
 }
 
 /**

@@ -703,6 +703,71 @@ describe('pauseSprint + resumeSprint roundtrip', () => {
     unregisterWorkerChannel(task.id);
   });
 
+  it('keeps a recovered historical terminal authority out of a fresh sprint checkpoint', async () => {
+    const task = makeTask('725-001', TaskStatus.PENDING);
+    const sprint = makeSprint([task]);
+    const historicalTaskId = '724-001';
+    const registry = {
+      isExactTask: (taskId: string) => taskId === historicalTaskId,
+      reconcileExactLifecycle: vi.fn(async () => []),
+      snapshotExactTerminalAuthorities: () => new Map([[historicalTaskId, {
+        state: 'current' as const,
+        terminalAuthority: {
+          acceptedAuthority: { identity: { taskId: historicalTaskId } },
+        },
+      }]]),
+    } as unknown as ExactNormalDockerExecutionRegistryV2;
+
+    await pauseSprintExact(projectRoot, sprint, 'owner pause', 'manual-pause', registry);
+
+    const checkpoint = sprintCheckpoint.readCheckpoint(projectRoot, sprint.id);
+    expect(checkpoint?.taskStates?.map(state => state.id)).toEqual([task.id]);
+    expect(checkpoint?.taskStates?.[0]?.exactTerminalAuthority).toBeUndefined();
+  });
+
+  it('still rejects a missing terminal authority for an exact current-sprint task', async () => {
+    const task = makeTask('725-missing', TaskStatus.DONE);
+    const sprint = makeSprint([task]);
+    const registry = {
+      isExactTask: (taskId: string) => taskId === task.id,
+      reconcileExactLifecycle: vi.fn(async () => []),
+      snapshotExactTerminalAuthorities: () => new Map(),
+      readTaskResultAuthority: () => ({
+        state: 'not-dispatched' as const,
+        result: null,
+        settlementRef: null,
+        rawResultPath: join(projectRoot, '.tasks', `task-${task.id}.result`),
+        attemptCount: 0,
+      }),
+    } as unknown as ExactNormalDockerExecutionRegistryV2;
+
+    await expect(pauseSprintExact(
+      projectRoot,
+      sprint,
+      'owner pause',
+      'manual-pause',
+      registry,
+    )).rejects.toThrow(`EXACT_LIFECYCLE_CHECKPOINT_AUTHORITY_MISSING:${task.id}`);
+  });
+
+  it('still rejects a held terminal authority for an exact current-sprint task', async () => {
+    const task = makeTask('725-held', TaskStatus.PAUSED);
+    const sprint = makeSprint([task]);
+    const registry = {
+      isExactTask: (taskId: string) => taskId === task.id,
+      reconcileExactLifecycle: vi.fn(async () => []),
+      snapshotExactTerminalAuthorities: () => new Map([[task.id, {
+        state: 'hold' as const,
+        reasonCode: 'terminal-store-reread-failed',
+      }]]),
+      readTaskResultAuthority: () => ({ state: 'authority-hold' as const }),
+    } as unknown as ExactNormalDockerExecutionRegistryV2;
+
+    await expect(resumeSprintExact(projectRoot, sprint, registry)).rejects.toThrow(
+      `EXACT_LIFECYCLE_CHECKPOINT_AUTHORITY_HOLD:${task.id}:terminal-store-reread-failed`,
+    );
+  });
+
   it('keeps a reconciliable exact accepted attempt EXECUTING on resume', async () => {
     const task = makeTask('002', TaskStatus.PAUSED);
     const sprint = makeSprint([task]);

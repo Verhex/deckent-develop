@@ -1,10 +1,44 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os'; import { join } from 'node:path';
 import Database from 'better-sqlite3'; import { afterEach, describe, expect, it } from 'vitest';
 import { applyAcceptanceConfirmationReceipt, prepareAcceptanceConfirmationReceipt,
   createAcceptanceConfirmationTerminalEvent } from '../../src/core/acceptance-confirmation-contract.js';
 import { AcceptanceReconciliationStore } from '../../src/core/acceptance-reconciliation-store.js';
+
+describe('acceptance reconciliation read-only authority', () => {
+  it('does not create missing storage', () => {
+    const project = root();
+    expect(() => new AcceptanceReconciliationStore(project, { readOnly: true })).toThrow();
+    expect(existsSync(join(project, '.deckent'))).toBe(false);
+  });
+  it.each([false, true])('reads durable authority without publication while writer-open=%s', writerOpen => {
+    const project = root();
+    const receipts = pair();
+    const writer = new AcceptanceReconciliationStore(project);
+    writer.appendBatch([receipts.prepared, receipts.applied].map(confirmationReceipt =>
+      ({ confirmationReceipt, debtProjectionDigest: digest('debt') })));
+    if (!writerOpen) writer.close();
+    const dbPath = join(project, '.deckent', 'runtime', 'acceptance-reconciliation.db');
+    const before = readFileSync(dbPath);
+    const runtime = join(project, '.deckent', 'runtime');
+    const beforeNames = readdirSync(runtime);
+    const walBefore = existsSync(`${dbPath}-wal`) ? readFileSync(`${dbPath}-wal`) : null;
+    const reader = new AcceptanceReconciliationStore(project, { readOnly: true });
+    expect(reader.read(reader.keyFor(receipts.applied))).toMatchObject({ state: 'FOUND',
+      receipt: { state: 'APPLIED', confirmationReceipt: receipts.applied } });
+    expect(() => reader.append({ confirmationReceipt: receipts.applied, debtProjectionDigest: digest('debt') }))
+      .toThrow('ACCEPTANCE_RECONCILIATION_READ_ONLY');
+    expect(() => reader.adoptLegacyReceipts()).toThrow('ACCEPTANCE_RECONCILIATION_READ_ONLY');
+    reader.close();
+    expect(readFileSync(dbPath)).toEqual(before);
+    // Reader-lock sidecars are SQLite bookkeeping, not new receipt authority.
+    expect(readdirSync(runtime).filter(name => !beforeNames.includes(name))
+      .every(name => name === 'acceptance-reconciliation.db-wal' || name === 'acceptance-reconciliation.db-shm')).toBe(true);
+    if (walBefore && existsSync(`${dbPath}-wal`)) expect(readFileSync(`${dbPath}-wal`)).toEqual(walBefore);
+    if (writerOpen) writer.close();
+  });
+});
 const roots: string[] = []; const digest = (v: string) => createHash('sha256').update(v).digest('hex');
 function root() { const v = mkdtempSync(join(tmpdir(), 'reconciliation-db-')); roots.push(v); return v; }
 function pair(tenantId = 'tenant-a', ordinal = 0) {

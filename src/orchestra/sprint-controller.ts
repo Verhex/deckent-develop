@@ -28,7 +28,11 @@ import type {
 import { DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG } from '../core/types.js';
 import type { PromptGateResult } from '../core/prompt-gate-types.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
-import type { MandatoryCrossVerifyInvocationFactory } from './cross-verify-runner.js';
+import { runCrossVerify, type MandatoryCrossVerifyInvocationFactory } from './cross-verify-runner.js';
+import { confirmExactAcceptance } from './acceptance-confirmation-composition.js';
+import { readExactAcceptanceVerificationSourceV2 } from './exact-acceptance-evidence.js';
+import { resolveXverifyAdjudicationPurposeProfile } from '../core/execution-budget-policy.js';
+import { resolveApprovalLifecyclePolicy } from '../core/approval-lifecycle-policy.js';
 import {
   createCrossVerifyProductionIngressAuthority,
   createLiveDockerCrossVerifyExecutionProfileAuthority,
@@ -163,6 +167,7 @@ import {
   readCheckpoint,
   writePhaseCheckpoint,
   restoreSprintFromCheckpoint,
+  type SprintCheckpoint,
 } from './sprint-checkpoint.js';
 import { terminalizeCompletedCheckpointRun } from './completed-checkpoint-terminalizer.js';
 
@@ -170,7 +175,7 @@ import { terminalizeCompletedCheckpointRun } from './completed-checkpoint-termin
 import { eventBus } from './event-bus.js';
 
 // ─── Notify (DECKENT→USER:NOTIFY wire — Hot Fix H6) ─────────────
-import { notify, notifyAsync } from '../core/notify.js';
+import { notifyAsync } from '../core/notify.js';
 
 // ─── Directives Protection Baseline (Sprint 177 Task 5) ──────────
 import { getActiveDirectivesProtection } from '../nervous/observer.js';
@@ -207,7 +212,12 @@ import { getChannelRegistry } from './ipc-registry.js';
 import {
   routeSprintTasksForExecution as routeSprintTasksImpl,
 } from './sprint-spawner.js';
-import { retireFailedSpawnAuthority } from './spawn-failure-authority.js';
+import type { WorkerDispatchEvidence } from './sprint-spawner.js';
+import {
+  containAndRetireFailedExecutionAuthority,
+  retireFailedPrePlanAuthority,
+  retireFailedSpawnAuthority,
+} from './spawn-failure-authority.js';
 import {
   createExactNormalDockerExecutionRegistry,
   type ExactNormalDockerExecutionRegistryV2,
@@ -227,6 +237,58 @@ export { readContext, planSprint, confirmDraftTasks, cleanupDraftTasks } from '.
 
 // --- sprint-spawner.ts ---
 export { spawnWorkers, respawnEligibleTasks, validateTaskDependencies, routeSprintTasks } from './sprint-spawner.js';
+
+export type OwnerExecutionNotificationPhase = 'spawn' | 'fix';
+
+export interface OwnerExecutionNotificationProjection {
+  readonly id: string;
+  readonly kind: 'sprint-started' | 'fix-started' | 'paused';
+  readonly titleKey:
+    | 'sprint.notify_started_title'
+    | 'sprint.notify_fix_started_title'
+    | 'sprint.notify_no_dispatch_title';
+  readonly summaryKey:
+    | 'sprint.notify_started_summary'
+    | 'sprint.notify_fix_started_summary'
+    | 'sprint.notify_no_dispatch_summary';
+  readonly params: Readonly<Record<string, string>>;
+}
+
+/**
+ * Pure connector-notification decision. It intentionally does not model the
+ * internal Nervous `SPRINT_STARTED` lifecycle event: that event marks the
+ * PLAN→SPAWN transition, while this projection may claim worker execution only
+ * from concrete dispatch evidence.
+ */
+export function projectOwnerExecutionNotification(
+  sprintId: string,
+  phase: OwnerExecutionNotificationPhase,
+  dispatchEvidence: readonly WorkerDispatchEvidence[],
+): OwnerExecutionNotificationProjection | null {
+  if (phase === 'fix' && dispatchEvidence.length === 0) return null;
+  if (phase === 'spawn' && dispatchEvidence.length === 0) {
+    return {
+      id: `sprint-dispatch-held:${sprintId}`,
+      kind: 'paused',
+      titleKey: 'sprint.notify_no_dispatch_title',
+      summaryKey: 'sprint.notify_no_dispatch_summary',
+      params: { sprintId },
+    };
+  }
+  const providerReleases = String(dispatchEvidence.filter(evidence => evidence.providerReleased).length);
+  const isFix = phase === 'fix';
+  return {
+    id: `${isFix ? 'fix-started' : 'sprint-started'}:${sprintId}`,
+    kind: isFix ? 'fix-started' : 'sprint-started',
+    titleKey: isFix ? 'sprint.notify_fix_started_title' : 'sprint.notify_started_title',
+    summaryKey: isFix ? 'sprint.notify_fix_started_summary' : 'sprint.notify_started_summary',
+    params: {
+      sprintId,
+      workers: String(dispatchEvidence.length),
+      providerReleases,
+    },
+  };
+}
 
 // --- sprint-lifecycle.ts ---
 export {
@@ -1256,6 +1318,8 @@ export async function waitForResults(
         ipcExecutionMode: 'normal-docker' as const,
         isExactTaskAuthority: (taskId: string) =>
           spawnOpts.exactDockerRegistry!.isExactTask(taskId),
+        resolveExactAttemptIpcAuthority: (taskId: string) =>
+          spawnOpts.exactDockerRegistry!.resolveExactAttemptIpcAuthority(taskId),
       }
     : spawnOpts;
   return trace('wait_results', () =>
@@ -1296,9 +1360,10 @@ function snapshotExactCheckpointAuthorities(
   registry: ExactNormalDockerExecutionRegistryV2,
   sprint: Sprint,
 ): ReadonlyMap<string, ExactAcceptedResultTerminalAuthorityV2> {
+  const sprintTaskIds = new Set(sprint.tasks.map(task => task.id));
   const checkpointAuthorities = new Map<string, ExactAcceptedResultTerminalAuthorityV2>();
   for (const [taskId, authority] of snapshotExactTerminalAuthorities(registry)) {
-    if (authority.state === 'current') {
+    if (sprintTaskIds.has(taskId) && authority.state === 'current') {
       checkpointAuthorities.set(taskId, authority.terminalAuthority);
     }
   }
@@ -1312,6 +1377,57 @@ function snapshotExactCheckpointAuthorities(
     }
   }
   return checkpointAuthorities;
+}
+
+/**
+ * @internal Production-wired completed-recovery seam. Fresh Store authority
+ * must be durably checkpointed before terminalization can publish or clean up.
+ */
+export async function terminalizeRecoveredCompleteCheckpoint(
+  projectRoot: string,
+  recoveredSprint: Sprint,
+  staleCheckpoint: SprintCheckpoint,
+  config: ResolvedConfig,
+  registry: ExactNormalDockerExecutionRegistryV2,
+): Promise<Sprint> {
+  if (staleCheckpoint.sprintId !== recoveredSprint.id
+    || recoveredSprint.status !== SprintStatus.EVALUATING
+    || recoveredSprint.phase !== SprintPhase.EVALUATE) {
+    throw new DeckentError(
+      'DECKENT_E077',
+      `COMPLETED_CHECKPOINT_RECOVERY_AUTHORITY_MISSING:${recoveredSprint.id}`,
+    );
+  }
+  const checkpointSprint: Sprint = {
+    ...recoveredSprint,
+    startedAt: recoveredSprint.startedAt
+      ?? staleCheckpoint.sprintStartedAt
+      ?? staleCheckpoint.timestamp,
+    executionMode: recoveredSprint.executionMode ?? staleCheckpoint.executionMode,
+    skipCleanup: recoveredSprint.skipCleanup ?? staleCheckpoint.skipCleanup,
+  };
+  const checkpoint = writePhaseCheckpoint(
+    projectRoot,
+    checkpointSprint,
+    checkpointSprint.phase,
+    undefined,
+    undefined,
+    snapshotExactCheckpointAuthorities(registry, checkpointSprint),
+  );
+  if (!checkpoint) {
+    throw new DeckentError(
+      'DECKENT_E077',
+      `COMPLETED_CHECKPOINT_RECOVERY_AUTHORITY_MISSING:${recoveredSprint.id}`,
+    );
+  }
+  return terminalizeCompletedCheckpointRun(
+    projectRoot,
+    checkpoint,
+    config,
+    checkpoint.executionMode,
+    ({ taskId }) => registry.readExactTerminalAuthority(taskId),
+    (taskId: string) => registry.isExactTask(taskId),
+  );
 }
 
 function writeExactPhaseCheckpoint(
@@ -1353,6 +1469,13 @@ function seedExactNotDispatchedEvaluations(
   }
 }
 
+function exactRecoveryDiagnosticToken(reason: unknown): string {
+  return typeof reason === 'string'
+    && /^[A-Za-z0-9_:-]{1,160}$/u.test(reason)
+    ? reason
+    : 'reason-unavailable';
+}
+
 /** @internal Exported for cold-restart fan-in behavior tests. */
 export async function settleRecoveredExactTerminalAuthorities(
   registry: ExactNormalDockerExecutionRegistryV2,
@@ -1366,9 +1489,12 @@ export async function settleRecoveredExactTerminalAuthorities(
         acceptedAuthority: resultAuthority.exactAcceptedAuthority,
       });
       if (settled.state !== 'settled') {
+        const reason = exactRecoveryDiagnosticToken(
+          'reasonCode' in settled ? settled.reasonCode : undefined,
+        );
         throw new DeckentError(
           'DECKENT_E077',
-          `EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD:${taskId}:${settled.state}`,
+          `EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD:${taskId}:${settled.state}:${reason}`,
         );
       }
       const current = registry.readExactTerminalAuthority(taskId);
@@ -1380,9 +1506,12 @@ export async function settleRecoveredExactTerminalAuthorities(
       }
       continue;
     }
+    const diagnostic = resultAuthority.state === 'authority-hold'
+      ? `:${exactRecoveryDiagnosticToken(resultAuthority.holdReason)}`
+      : '';
     throw new DeckentError(
       'DECKENT_E077',
-      `EXACT_RECOVERY_ATTEMPT_HOLD:${taskId}:${resultAuthority.state}`,
+      `EXACT_RECOVERY_ATTEMPT_HOLD:${taskId}:${resultAuthority.state}${diagnostic}`,
     );
   }
 }
@@ -2277,7 +2406,17 @@ export async function runSprint(
         dockerTimeoutSeconds: config.docker_timeout,
         dockerMemoryLimit: config.worker_memory_limit,
       });
-  const recoveryReport = await reconcileSpawnBackendBeforeRestore(recoveryBackend);
+  let recoveryReport: SpawnBackendRecoveryReport | null;
+  try {
+    recoveryReport = await reconcileSpawnBackendBeforeRestore(recoveryBackend);
+  } catch (error) {
+    // Startup reconciliation runs before the new Sprint, PID authority or any
+    // provider effect exists. Retain every prior-run artifact, but never leave
+    // this coordinator's own planning lock behind when fail-closed recovery
+    // rejects the start.
+    retireFailedPrePlanAuthority(projectRoot);
+    throw error;
+  }
   if (recoveryReport) {
     exactDockerRegistry.rehydrateRecovery(recoveryReport, recoveryBackend);
     await settleRecoveredExactTerminalAuthorities(exactDockerRegistry);
@@ -2286,11 +2425,13 @@ export async function runSprint(
   // ═══ State Recovery on Brain Restart (Sprint 162 — Task T-004) ════
   // Pair with T-002 (checkpoint loop) and T-001 (exception handler).
   // If the previous Brain process left a sprint-state.json behind,
-  // attempt to restore from the latest checkpoint. Fail-soft: any error
-  // falls through to the normal PLAN path.
+  // attempt to restore from the latest checkpoint. Discovery remains
+  // fail-soft, but once completed-recovery terminalization begins its errors
+  // must propagate: falling through would plan over unsettled terminal work.
   let isResumeEvaluate = false;
   let recoveredSprint: Sprint | null = null;
   const resumeResults: TaskResult[] = [];
+  let completedRecoveryTerminalizationEntered = false;
   try {
     const prevState = readSprintState(projectRoot);
     const prevSprintId = prevState?.sprintId;
@@ -2301,22 +2442,23 @@ export async function runSprint(
       });
       if (recovery.restored) {
         if (recovery.action === 'complete') {
-          emitSprintEvent('SPRINT_RESUME_COMPLETE', { sprintId: prevSprintId });
-          const checkpoint = readCheckpoint(projectRoot, prevSprintId);
-          if (!checkpoint) {
+          completedRecoveryTerminalizationEntered = true;
+          const restoredSprint = recovery.restoredSprint;
+          const staleCheckpoint = readCheckpoint(projectRoot, prevSprintId);
+          if (!restoredSprint || !staleCheckpoint) {
             throw new DeckentError(
               'DECKENT_E077',
               `COMPLETED_CHECKPOINT_RECOVERY_AUTHORITY_MISSING:${prevSprintId}`,
             );
           }
-          const completed = await terminalizeCompletedCheckpointRun(
+          const completed = await terminalizeRecoveredCompleteCheckpoint(
             projectRoot,
-            checkpoint,
+            restoredSprint,
+            staleCheckpoint,
             config,
-            checkpoint.executionMode,
-            ({ taskId }) => exactDockerRegistry.readExactTerminalAuthority(taskId),
-            (taskId: string) => exactDockerRegistry.isExactTask(taskId),
+            exactDockerRegistry,
           );
+          emitSprintEvent('SPRINT_RESUME_COMPLETE', { sprintId: prevSprintId });
           releaseSprintLock(projectRoot);
           clearActiveSprint();
           return completed;
@@ -2352,6 +2494,7 @@ export async function runSprint(
       }
     }
   } catch (e) {
+    if (completedRecoveryTerminalizationEntered) throw e;
     if (e instanceof DeckentError && e.code === 'DECKENT_E077') throw e;
     debugLog('runSprint:stateRecovery', e);
   }
@@ -2384,6 +2527,34 @@ export async function runSprint(
     });
     return crossVerifyInvocationFactory;
   };
+  if (spawnBackend instanceof DockerSpawnBackend) {
+    spawnBackend.setExactAcceptanceConfirmationRunner(async ({ source, enforcement }) => {
+      const current = readExactAcceptanceVerificationSourceV2(source);
+      if (current.state !== 'ready') return { state: 'hold', reasonCode: current.reasonCode };
+      const profile = resolveXverifyAdjudicationPurposeProfile({ policy: config.execution_budget });
+      if (profile.state !== 'available') return { state: 'hold', reasonCode: profile.reasonCode };
+      const ceiling = Math.min(profile.profile.maxVerificationsPerSprint,
+        config.cross_verify?.max_verifications_per_sprint ?? profile.profile.maxVerificationsPerSprint);
+      if (!Number.isSafeInteger(ceiling) || ceiling < 1 || evaluationRuntimeState.verificationsDispatched >= ceiling) {
+        return { state: 'hold', reasonCode: 'exact-confirmation-verification-ceiling' };
+      }
+      const factory = await ensureCrossVerifyInvocationFactory();
+      return confirmExactAcceptance({ projectRoot, source, enforcement,
+        lifecycle: config.approval?.lifecycle ?? resolveApprovalLifecyclePolicy(),
+        runVerifier: () => {
+          if (evaluationRuntimeState.verificationsDispatched >= ceiling) {
+            throw new TypeError('EXACT_CONFIRMATION_VERIFICATION_CEILING');
+          }
+          evaluationRuntimeState.verificationsDispatched += 1;
+          return runCrossVerify(projectRoot, current.task, current.result,
+            TaskEvaluation.GO_WITH_TECH_DEBT, config, {
+            mandatoryInvocationFactory: factory, exactAcceptanceSource: source,
+            timeoutMs: profile.profile.maxWallClockSeconds * 1000,
+          });
+        },
+      });
+    });
+  }
 
   /**
    * Start the one coordinator snapshot writer shared by fresh and resumed
@@ -2755,16 +2926,6 @@ export async function runSprint(
     // Sprint 177 fix: prevents restoring a stale sprint's directives on sprint boundary.
     try { getActiveDirectivesProtection()?.updateBaseline(); } catch (e) { debugLog('runSprint:directivesBaseline', e); }
 
-    // DECKENT→USER:NOTIFY (Hot Fix H6) — fire-and-forget, fail-safe
-    try {
-      void notify(
-        'sprint-started',
-        sprint.id,
-        `Sprint ${sprint.id} başladı`,
-        `${sprint.tasks.length} task planlandı`,
-      );
-    } catch (e) { debugLog('runSprint:notify:sprint-started', e); }
-
     // Phase 2: SPAWN
     let spawnPhaseResult: Awaited<ReturnType<typeof runSpawnPhase>>;
     try {
@@ -2794,7 +2955,11 @@ export async function runSprint(
       }
       throw error;
     }
-    const { taskQueue, scanInterval: initialScanInterval } = spawnPhaseResult;
+    const {
+      taskQueue,
+      scanInterval: initialScanInterval,
+      dispatchEvidence,
+    } = spawnPhaseResult;
     scanInterval = initialScanInterval;
 
     // Start heartbeat daemon for sprint duration (opt-out: opts.enableHeartbeatDaemon === false)
@@ -2839,21 +3004,27 @@ export async function runSprint(
     // Nervous System: SPAWN→EXECUTE
     emitPhaseChange(SprintPhase.SPAWN, SprintPhase.EXECUTE, sprint.id);
 
-    // 671-005 closure: durable owner notification — sprint started (once, after
-    // a successful SPAWN). Best-effort; never blocks the run.
+    // Owner-facing execution truth starts only at an admitted worker dispatch.
+    // SPAWN may finish with no work (HOLD/NOT_DISPATCHED); neither the phase
+    // transition nor an in-memory EXECUTING status proves provider execution.
     try {
       const startLang = detectLang(projectRoot);
-      enqueueOwnerNotification(projectRoot, {
-        id: `sprint-started:${sprint.id}`,
-        kind: 'sprint-started',
-        sprintId: sprint.id,
-        title: getMessage('sprint.notify_started_title', startLang, { sprintId: sprint.id }),
-        message: getMessage('sprint.notify_started_summary', startLang, {
-          sprintId: sprint.id, tasks: String(sprint.tasks.length),
-        }),
-        lang: startLang,
-        createdAt: new Date().toISOString(),
-      });
+      const notification = projectOwnerExecutionNotification(
+        sprint.id,
+        'spawn',
+        dispatchEvidence,
+      );
+      if (notification) {
+        enqueueOwnerNotification(projectRoot, {
+          id: notification.id,
+          kind: notification.kind,
+          sprintId: sprint.id,
+          title: getMessage(notification.titleKey, startLang, notification.params),
+          message: getMessage(notification.summaryKey, startLang, notification.params),
+          lang: startLang,
+          createdAt: new Date().toISOString(),
+        });
+      }
     } catch (e) { debugLog('runSprint:notify:sprint-started', e); }
 
     // Dependency release authority is established at result-ingest time. The
@@ -2963,10 +3134,21 @@ export async function runSprint(
         config,
       );
     } catch (err) {
-      if (
-        err instanceof ProviderExecutionIngressHoldError
-        || (err instanceof DeckentError && err.code === 'DECKENT_E077')
-      ) throw err;
+      const isPrivateIpcFatalHold = err instanceof DeckentError
+        && err.code === 'DECKENT_E077'
+        && err.message.includes('Normal Docker IPC HOLD:');
+      if (err instanceof ProviderExecutionIngressHoldError || isPrivateIpcFatalHold) {
+        // EXECUTE admission can fail after a Docker worker exists. Prove exact
+        // containment first; only then retire live coordinator authority.
+        // A containment HOLD deliberately leaves authority visible rather than
+        // projecting false ABORTED state over a possibly-live effect.
+        await containAndRetireFailedExecutionAuthority(
+          projectRoot,
+          sprint.id,
+          exactDockerRegistry,
+        );
+        throw err;
+      }
       // EXECUTE-ERROR-SURFACE (born-453, sprint-351 live case — sibling of the
       // 350-002 finalize fix): this catch used to swallow a mid-EXECUTE throw
       // into a dashboard line that the COMPLETE-time dashboard overwrite then
@@ -3438,22 +3620,8 @@ export async function runSprint(
   // Nervous System: EVALUATE→FIX
   emitPhaseChange(SprintPhase.EVALUATE, SprintPhase.FIX, sprint.id);
 
-  // 671-005 closure: durable owner notification — FIX phase entered (the id is
-  // sprint-scoped, so repeated FIX rounds stay a single durable record).
-  try {
-    const fixLang = detectLang(projectRoot);
-    enqueueOwnerNotification(projectRoot, {
-      id: `fix-started:${sprint.id}`,
-      kind: 'fix-started',
-      sprintId: sprint.id,
-      title: getMessage('sprint.notify_fix_started_title', fixLang, { sprintId: sprint.id }),
-      message: getMessage('sprint.notify_fix_started_summary', fixLang, { sprintId: sprint.id }),
-      lang: fixLang,
-      createdAt: new Date().toISOString(),
-    });
-  } catch (e) { debugLog('runSprint:notify:fix-started', e); }
-
   // Phase 5: FIX
+  let fixDispatchNotified = false;
   const fixPhaseFailure = await runFixPhase(
     projectRoot,
     sprint,
@@ -3464,6 +3632,28 @@ export async function runSprint(
     routingVersionForFix,
     spawnBackend,
     exactDockerRegistry,
+    (evidence) => {
+      if (fixDispatchNotified) return;
+      const notification = projectOwnerExecutionNotification(
+        sprint.id,
+        'fix',
+        [evidence],
+      );
+      if (!notification) return;
+      fixDispatchNotified = true;
+      try {
+        const fixLang = detectLang(projectRoot);
+        enqueueOwnerNotification(projectRoot, {
+          id: notification.id,
+          kind: notification.kind,
+          sprintId: sprint.id,
+          title: getMessage(notification.titleKey, fixLang, notification.params),
+          message: getMessage(notification.summaryKey, fixLang, notification.params),
+          lang: fixLang,
+          createdAt: new Date().toISOString(),
+        });
+      } catch (e) { debugLog('runSprint:notify:fix-started', e); }
+    },
   );
 
   // Phase-transition checkpoint: FIX complete
@@ -3582,7 +3772,14 @@ export async function runSprint(
     releaseSprintLock(projectRoot);
     clearActiveSprint();
     try { clearPid(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:repair-quiescence:clearPid', e); }
-    return sprint;
+    // Returning a non-paused Sprint object lets detached callers mistake this
+    // protective drain barrier for successful completion. Surface a typed
+    // terminal failure after leadership/resources are retired so RunFlow can
+    // persist RUN_FAILED instead of fabricating RUN_COMPLETED.
+    throw new DeckentError(
+      'DECKENT_E077',
+      `REPAIR_QUIESCENCE_DRAIN_REQUIRED:${repairQuiescence.reason}:${repairQuiescence.pendingQueueCount}`,
+    );
   }
   await prepareExactSprintLifecycle(exactDockerRegistry, 'contain');
   if (applyCascadeCircuitBreaker(

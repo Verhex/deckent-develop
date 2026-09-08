@@ -199,6 +199,52 @@ describe('run inspector read model', () => {
     });
   });
 
+  it('keeps stale task projection status distinct from the matching current run cause', () => {
+    const projectRoot = root();
+    write(projectRoot, '.deckent/sprint-state.json', {
+      sprintId: 'sprint-722', phase: 'COMPLETE', status: 'FAILED',
+    });
+    write(projectRoot, '.tasks/task-722-001.json', {
+      id: '722-001', sprintId: 'sprint-722', status: 'EXECUTING', description: 'Stale task projection',
+    });
+
+    const detail = readRunInspectorTaskDetail(projectRoot, '722-001');
+    expect(detail?.rawTaskProjectionStatus).toBe('EXECUTING');
+    expect(detail?.currentRun).toMatchObject({
+      sprintId: 'sprint-722', lifecycle: 'ABORTED', status: 'FAILED',
+    });
+  });
+
+  it('does not attribute current run truth to a historical task', () => {
+    const projectRoot = root();
+    write(projectRoot, '.deckent/sprint-state.json', {
+      sprintId: 'sprint-722', phase: 'EXECUTE', status: 'EXECUTING',
+    });
+    write(projectRoot, '.tasks/task-721-001.json', {
+      id: '721-001', sprintId: 'sprint-721', status: 'FAILED', description: 'Historical task',
+    });
+
+    const detail = readRunInspectorTaskDetail(projectRoot, '721-001');
+    expect(detail?.rawTaskProjectionStatus).toBe('FAILED');
+    expect(detail?.currentRun).toBeNull();
+  });
+
+  it('rejects a forged task prefix, explicit other sprint, and task-id mismatch', () => {
+    const projectRoot = root();
+    write(projectRoot, '.deckent/sprint-state.json', {
+      sprintId: 'sprint-722', phase: 'EXECUTE', status: 'EXECUTING',
+    });
+    write(projectRoot, '.tasks/task-722-forged.json', {
+      id: 'other-task-id', sprintId: 'sprint-722', status: 'EXECUTING',
+    });
+    write(projectRoot, '.tasks/task-722-other.json', {
+      id: '722-other', sprintId: 'sprint-721', status: 'EXECUTING',
+    });
+
+    expect(readRunInspectorTaskDetail(projectRoot, '722-forged')?.currentRun).toBeNull();
+    expect(readRunInspectorTaskDetail(projectRoot, '722-other')?.currentRun).toBeNull();
+  });
+
   it('returns the last default or overridden number of log lines', () => {
     const projectRoot = root();
     write(projectRoot, '.tasks/task-544-001.json', { id: '544-001', description: 'Task' });

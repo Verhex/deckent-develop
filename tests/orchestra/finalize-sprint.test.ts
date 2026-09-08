@@ -265,7 +265,7 @@ vi.mock('../../src/agents/worker-ipc.js', () => {
 
 // ─── Imports (after mocks) ───────────────────────────────────────────
 
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { finalizeSprint } from '../../src/orchestra/sprint-controller.js';
@@ -298,6 +298,8 @@ function createTestTask(id: string, title: string = `Task ${id}`): Task {
     title,
     description: `Description for ${title}`,
     model: 'sonnet',
+    provider: 'codex',
+    authMode: 'subscription',
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
@@ -327,6 +329,13 @@ function createTestResult(taskId: string, passed: boolean = true, coverage: numb
     coverage,
     selfAssessment: passed ? 'DONE' : 'NO_GO',
     notes: 'test result',
+    tokenUsage: {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      provider: 'codex',
+      model: 'sonnet',
+    },
     testVerification: { applicability: 'REQUIRED', outcome: 'PASSED', commands: ['fixture-check'] },
     criteriaEvidence: [],
     techDebtCriterionIds: [],
@@ -411,6 +420,31 @@ describe('finalizeSprint', () => {
     // calculateMetrics now receives the LOGICAL projections (rebuilt sprint/eval/
     // result views + DB-first debt), not the raw caller arguments.
     expect(vi.mocked(calculateMetrics)).toHaveBeenCalledTimes(1);
+  });
+
+  it('holds unknown terminal billing authority after receipt but before archive', async () => {
+    const task = createTestTask('042-unknown-usage');
+    delete task.provider;
+    delete task.authMode;
+    const sprint = createTestSprint([task]);
+    const result = createTestResult(task.id);
+
+    await expect(finalizeSprint(
+      PROJECT_ROOT,
+      sprint,
+      new Map([[task.id, TaskEvaluation.DONE]]),
+      [result],
+    )).rejects.toThrow(/KPI_TERMINAL_SNAPSHOT_HOLD/u);
+
+    expect(existsSync(join(
+      PROJECT_ROOT,
+      '.deckent',
+      'recently-works',
+      'sprint-042-terminal-receipt.json',
+    ))).toBe(true);
+    expect(existsSync(join(PROJECT_ROOT, '.tasks', `task-${task.id}.json`))).toBe(true);
+    expect(existsSync(join(PROJECT_ROOT, '.deckent', 'runtime', 'jobs', 'sprint-042.json')))
+      .toBe(false);
   });
 
   it('should set sprint.metrics', async () => {

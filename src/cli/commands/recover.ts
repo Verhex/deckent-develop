@@ -132,7 +132,7 @@ export type RecoveryReport = SprintRecoveryReport;
 export async function runRecovery(
   root: string,
   sprintId: string,
-  opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean },
+  opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; retainStartedFailed?: string; retainCommittedUnsettled?: string },
   lang: string,
 ): Promise<RecoveryReport> {
   try {
@@ -140,6 +140,8 @@ export async function runRecovery(
     return await runSprintRecoveryOperation(root, sprintId, {
       dryRun: opts.dryRun,
       skipAudit: opts.skipAudit,
+      startedFailedDispatchRequestId: opts.retainStartedFailed,
+      committedUnsettledDispatchRequestId: opts.retainCommittedUnsettled,
       ...(!opts.dryRun
         ? {
             approval: {
@@ -154,6 +156,7 @@ export async function runRecovery(
     if (!(error instanceof SprintRecoveryOperationError)) throw error;
     const key = {
       INVALID_SPRINT_ID: 'recover.invalid_sprint_id',
+      INVALID_DISPATCH_REQUEST_ID: 'recover.invalid_dispatch_request_id',
       ACTIVE_AUTHORITY: 'recover.active_authority_refused',
       APPROVAL_REQUIRED: 'recover.approval_required',
       APPROVAL_MISMATCH: 'recover.approval_mismatch',
@@ -161,6 +164,7 @@ export async function runRecovery(
       ARCHIVE_INCOMPLETE: 'recover.archive_incomplete',
       SETTLEMENT_AUTHORITY_MISSING: 'recover.settlement_authority_missing',
       SETTLEMENT_FAILED: 'recover.settlement_failed',
+      RETENTION_MODE_CONFLICT: 'recover.retention_modes_conflict',
     }[error.code] ?? 'recover.internal_error';
     throw new DeckentError(`E_RECOVER_${error.code}`, getMessage(key, lang, {
       ...error.details,
@@ -177,16 +181,37 @@ export function registerRecover(program: Command): void {
     .option('--force', getMessage('recover.force_option', registerLang))
     .option('--skip-audit', getMessage('recover.skip_audit_option', registerLang))
     .option('--restore-tasks', getMessage('recover.restore_tasks_option', registerLang))
+    .option('--retain-started-failed <dispatch-request-id>', getMessage('recover.retain_started_failed_option', registerLang))
+    .option('--retain-committed-unsettled <dispatch-request-id>', getMessage('recover.retain_committed_unsettled_option', registerLang))
     .option('--resume', getMessage('recover.resume_option', registerLang))
     .option('--auto-approve', getMessage('recover.auto_approve_option', registerLang), false)
     .option('--force-scope', getMessage('recover.force_scope_option', registerLang), false)
     .option('--json', getMessage('recover.json_option', registerLang))
-    .action(async (sprintId: string, opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; restoreTasks?: boolean; resume?: boolean; autoApprove?: boolean; forceScope?: boolean; json?: boolean }) => {
+    .action(async (sprintId: string, opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; restoreTasks?: boolean; resume?: boolean; autoApprove?: boolean; forceScope?: boolean; json?: boolean; retainStartedFailed?: string; retainCommittedUnsettled?: string }) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);
 
       try {
         assertCanonicalSprintId(sprintId, lang);
+        if (opts.retainStartedFailed !== undefined) {
+          if (!/^dreq-[a-f0-9]{64}$/u.test(opts.retainStartedFailed)) {
+            throw new DeckentError('E_RECOVER_INVALID_DISPATCH_REQUEST_ID', getMessage('recover.invalid_dispatch_request_id', lang));
+          }
+          if (opts.resume || opts.restoreTasks) {
+            throw new DeckentError('E_RECOVER_RETENTION_CONFLICT', getMessage('recover.retain_started_failed_conflict', lang));
+          }
+        }
+        if (opts.retainCommittedUnsettled !== undefined) {
+          if (!/^dreq-[a-f0-9]{64}$/u.test(opts.retainCommittedUnsettled)) {
+            throw new DeckentError('E_RECOVER_INVALID_DISPATCH_REQUEST_ID', getMessage('recover.invalid_dispatch_request_id', lang));
+          }
+          if (opts.resume || opts.restoreTasks) {
+            throw new DeckentError('E_RECOVER_RETENTION_CONFLICT', getMessage('recover.retain_committed_unsettled_conflict', lang));
+          }
+        }
+        if (opts.retainStartedFailed !== undefined && opts.retainCommittedUnsettled !== undefined) {
+          throw new DeckentError('E_RECOVER_RETENTION_MODE_CONFLICT', getMessage('recover.retention_modes_conflict', lang));
+        }
         if (opts.dryRun && opts.restoreTasks) {
           throw new DeckentError('E_RECOVER_DRY_RUN_RESTORE_CONFLICT', getMessage('recover.dry_run_restore_conflict', lang));
         }
@@ -256,8 +281,19 @@ export function registerRecover(program: Command): void {
             staleSpawnLocksCleaned: report.staleSpawnLocksCleaned,
             taskFilesArchived: report.taskFilesArchived,
             taskFilesPreserved: report.taskFilesPreserved,
+            exactCustodyReservations: report.exactCustodyReservations ?? {
+              pendingBeforeAdmission: 0,
+              heldAdmissionGraphs: 0,
+              unresolvedBeforeRecovery: 0,
+              admittedFromStagedSnapshot: 0,
+              retiredBeforeAdmission: 0,
+              quarantinedHistoricalAdmissions: 0,
+              receiptDigest: null,
+            },
             artifactPolicy: report.artifactPolicy,
             remediation: report.remediation,
+            ...(report.startedFailedAttempt ? { startedFailedAttempt: report.startedFailedAttempt } : {}),
+            ...(report.committedUnsettledAttempt ? { committedUnsettledAttempt: report.committedUnsettledAttempt } : {}),
           }));
           return;
         }
@@ -267,6 +303,18 @@ export function registerRecover(program: Command): void {
           print(getMessage('recover.separator', lang));
 
           const report = await runRecovery(root, sprintId, { ...opts, dryRun: true }, lang);
+          if (report.startedFailedAttempt) {
+            print(getMessage('recover.started_failed_result', lang, { state: report.startedFailedAttempt.state,
+              dispatchRequestId: report.startedFailedAttempt.dispatchRequestId,
+              evidenceDigest: report.startedFailedAttempt.evidenceDigest }));
+            return;
+          }
+          if (report.committedUnsettledAttempt) {
+            print(getMessage('recover.committed_unsettled_result', lang, { state: report.committedUnsettledAttempt.state,
+              dispatchRequestId: report.committedUnsettledAttempt.dispatchRequestId,
+              evidenceDigest: report.committedUnsettledAttempt.evidenceDigest }));
+            return;
+          }
 
           if (report.audit.overallGate !== 'SKIPPED') {
             print(getMessage('recover.audit_gate', lang, { gate: report.audit.overallGate }));
@@ -275,6 +323,11 @@ export function registerRecover(program: Command): void {
           print(getMessage('recover.preview_stale_locks', lang, { count: String(report.staleLocksCleaned) }));
           print(getMessage('recover.preview_stale_spawnlocks', lang, { count: String(report.staleSpawnLocksCleaned) }));
           print(getMessage('recover.preview_task_files', lang, { count: String(report.taskFilesArchived) }));
+          print(getMessage('recover.preview_exact_custody', lang, {
+            count: String(report.exactCustodyReservations?.pendingBeforeAdmission ?? 0),
+            held: String(report.exactCustodyReservations?.heldAdmissionGraphs ?? 0),
+            unresolved: String(report.exactCustodyReservations?.unresolvedBeforeRecovery ?? 0),
+          }));
           print(getMessage('recover.checkpoint_disposition', lang, {
             disposition: report.artifactPolicy.checkpoint.disposition,
             digest: report.artifactPolicy.checkpoint.digest ?? '-',
@@ -287,12 +340,18 @@ export function registerRecover(program: Command): void {
 
         // Interactive confirmation (unless --force)
         if (!opts.force) {
-          print(getMessage('recover.confirm_header', lang, { sprintId }));
-          print(getMessage('recover.confirm_remove_ipc', lang));
-          print(getMessage('recover.confirm_clear_locks', lang));
-          print(getMessage('recover.confirm_archive_tasks', lang));
-          print(getMessage('recover.confirm_preserve_active', lang));
-          print(getMessage('recover.confirm_hint', lang));
+          if (opts.retainStartedFailed) {
+            print(getMessage('recover.retain_started_failed_confirm', lang, { dispatchRequestId: opts.retainStartedFailed }));
+          } else if (opts.retainCommittedUnsettled) {
+            print(getMessage('recover.retain_committed_unsettled_confirm', lang, { dispatchRequestId: opts.retainCommittedUnsettled }));
+          } else {
+            print(getMessage('recover.confirm_header', lang, { sprintId }));
+            print(getMessage('recover.confirm_remove_ipc', lang));
+            print(getMessage('recover.confirm_clear_locks', lang));
+            print(getMessage('recover.confirm_archive_tasks', lang));
+            print(getMessage('recover.confirm_preserve_active', lang));
+            print(getMessage('recover.confirm_hint', lang));
+          }
 
           const readline = await import('node:readline/promises');
           const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -307,6 +366,18 @@ export function registerRecover(program: Command): void {
 
         print(getMessage('recover.recovering', lang, { sprintId }));
         const report = await runRecovery(root, sprintId, opts, lang);
+        if (report.startedFailedAttempt) {
+          print(getMessage('recover.started_failed_result', lang, { state: report.startedFailedAttempt.state,
+            dispatchRequestId: report.startedFailedAttempt.dispatchRequestId,
+            evidenceDigest: report.startedFailedAttempt.evidenceDigest }));
+          return;
+        }
+        if (report.committedUnsettledAttempt) {
+          print(getMessage('recover.committed_unsettled_result', lang, { state: report.committedUnsettledAttempt.state,
+            dispatchRequestId: report.committedUnsettledAttempt.dispatchRequestId,
+            evidenceDigest: report.committedUnsettledAttempt.evidenceDigest }));
+          return;
+        }
 
         print(getMessage('recover.separator', lang));
         if (report.audit.overallGate !== 'SKIPPED') {
@@ -318,6 +389,13 @@ export function registerRecover(program: Command): void {
         print(getMessage('recover.result_task_files', lang, {
           archived: String(report.taskFilesArchived),
           preserved: String(report.taskFilesPreserved),
+        }));
+        print(getMessage('recover.result_exact_custody', lang, {
+          admitted: String(report.exactCustodyReservations?.admittedFromStagedSnapshot ?? 0),
+          retired: String(report.exactCustodyReservations?.retiredBeforeAdmission ?? 0),
+          quarantined: String(
+            report.exactCustodyReservations?.quarantinedHistoricalAdmissions ?? 0,
+          ),
         }));
         print(getMessage('recover.checkpoint_disposition', lang, {
           disposition: report.artifactPolicy.checkpoint.disposition,

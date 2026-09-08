@@ -49,4 +49,15 @@ describe('workspace artifact contract', () => {
       state: 'HOLD', reason: 'missing',
     });
   });
+
+  it('delivers only the verified managed body from the inspected bytes when requested', () => {
+    const block = renderManagedContractBlock('worker-guide', 'canonical body');
+    const content = `Owner-private preface\n${block}\nOwner-private notes`;
+    const inspected = inspectManagedContractBlock(content, 'worker-guide', { includeBody: true });
+    expect(inspected).toMatchObject({ state: 'VERIFIED', body: 'canonical body' });
+    expect(JSON.stringify(inspected)).not.toContain('Owner-private');
+    expect(inspectManagedContractBlock(content, 'worker-guide')).not.toHaveProperty('body');
+    expect(inspectManagedContractBlock(content.replace('canonical body', 'tampered'), 'worker-guide',
+      { includeBody: true })).toEqual({ state: 'HOLD', reason: 'digest-mismatch' });
+  });
 });

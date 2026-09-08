@@ -277,7 +277,7 @@ export function inspectWorkerGuideContract(projectRoot: string): ManagedContract
   const path = join(projectRoot, getWorkspaceArtifactDescriptor('worker-guide').path);
   if (!existsSync(path)) return { state: 'HOLD', reason: 'missing' };
   try {
-    return inspectManagedContractBlock(readFileSync(path, 'utf8'), 'worker-guide');
+    return inspectManagedContractBlock(readFileSync(path, 'utf8'), 'worker-guide', { includeBody: true });
   } catch {
     return { state: 'HOLD', reason: 'missing' };
   }

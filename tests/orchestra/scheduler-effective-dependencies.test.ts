@@ -298,5 +298,28 @@ describe('SCHED1 pinning: DONE <id>-fix now satisfies <id> in idle-rescan + resp
 
       expect(backend.spawned).toContain('resp-dep');
     });
+
+    it.each([TaskStatus.PENDING, TaskStatus.PAUSED])(
+      'does not respawn a %s task after its durable NOT_DISPATCHED round is spent',
+      async status => {
+        const task = makeTask(`resp-spent-${status.toLowerCase()}`, { status });
+        persist([task]);
+        writeFileSync(
+          join(root, '.tasks', `task-${task.id}.redispatch-attempted`),
+          '2026-09-04T18:29:16.984Z',
+        );
+        const backend = makeBackend();
+
+        const spawned = await respawnEligibleTasks(
+          root,
+          makeSprint([task]),
+          makeFullConfig(),
+          { spawnBackend: backend },
+        );
+
+        expect(spawned).toEqual([]);
+        expect(backend.spawned).toEqual([]);
+      },
+    );
   });
 });

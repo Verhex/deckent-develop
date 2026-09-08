@@ -27,6 +27,7 @@ import {
 import { TaskStatus } from '../../src/core/types.js';
 import type { Task, PlannerTask, CreateTaskParams } from '../../src/core/types.js';
 import { buildParametricModel, modelRegistry } from '../../src/core/model-registry.js';
+import { terminalNativeProviderWiringPlanFixture } from '../helpers/production-wiring-plan-fixture.js';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -42,6 +43,7 @@ function makeBaseParams(overrides: Partial<CreateTaskParams> = {}): CreateTaskPa
     dependencies: [],
     goNogo: { goCriteria: 'tests pass', noGoCriteria: 'tests fail', techDebtAcceptable: 'minor' },
     sprintId: 'sprint-025',
+    productionWiring: terminalNativeProviderWiringPlanFixture(),
     ...overrides,
   };
 }
@@ -633,10 +635,12 @@ describe('buildWorkerPrompt', () => {
     expect(prompt).toContain('NO_GO');
   });
 
-  it('references WORKER-GUIDE.md instead of embedding boilerplate', () => {
+  it('delivers the verified worker guide inline without requiring a host path', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('.deckent/workspace/WORKER-GUIDE.md');
+    expect(prompt).toMatch(/WORKER_GUIDE_CONTRACT: VERIFIED schema=1 sha256:[a-f0-9]{64} delivery=inline/u);
+    expect(prompt).toContain('The supporting contract is delivered below; no host workspace path is required.');
+    expect(prompt).not.toContain('.deckent/workspace/WORKER-GUIDE.md');
   });
 
   it('does not embed heartbeat JSON template (moved to WORKER-GUIDE.md)', () => {
@@ -2472,10 +2476,10 @@ describe('buildWorkerPrompt — ADR injection', () => {
       mkdirSync(join(rootFixture, '.brain'), { recursive: true });
       store = new MemoryStore(join(rootFixture, '.brain', 'memory.db'));
       store.insert({
-        id: 'adr-999',
+        id: 'ADR-G-999',
         type: 'adr',
         title: 'Fixture Marker ADR',
-        content: '# ADR-999: Fixture Marker\n\n**Status:** accepted\n\nFIXTURE_ADR_MARKER_CONTENT_XYZ.\n',
+        content: '# ADR-G-999: Fixture Marker\n\n**Status:** accepted\n\nFIXTURE_ADR_MARKER_CONTENT_XYZ.\n',
         status: 'accepted',
         sprint_id: 'sprint-999',
         sprint_num: 999,
@@ -2495,9 +2499,9 @@ describe('buildWorkerPrompt — ADR injection', () => {
       // cwd has NO .brain/memory.db — a cwd-based read finds nothing here.
       process.chdir(cwdFixture);
 
-      // Task text explicitly references ADR-999 so it force-includes with a
+      // Task text explicitly references ADR-G-999 so it force-includes with a
       // full (non-condensed) body, regardless of relevance scoring.
-      const task = makeTask({ description: 'Implements ADR-999 fixture behavior.' });
+      const task = makeTask({ description: 'Implements ADR-G-999 fixture behavior memory.' });
       const prompt = buildWorkerPrompt(task, undefined, undefined, rootFixture);
 
       expect(prompt).toContain('FIXTURE_ADR_MARKER_CONTENT_XYZ');

@@ -34,7 +34,7 @@ import type { ModelTier } from '../core/model-equivalence.js';
 import { evaluateScopeGate } from '../core/scope-gate.js';
 import { mirrorTestPath } from '../core/task-builder-scope.js';
 import { renderWorkerDodChecklist } from '../core/worker-dod-contract.js';
-import type { ManagedContractInspection } from '../core/workspace-artifact-contract.js';
+import { WORKSPACE_ARTIFACT_SCHEMA_VERSION, workspaceArtifactDigest, type ManagedContractInspection } from '../core/workspace-artifact-contract.js';
 import type { ToolAllowlistResult } from '../core/tool-allowlist.js';
 import { sanitizeReadScope, sanitizeScope } from './scope-sanitizer.js';
 import { truncateAtParagraph, logInjectionAudit } from './task-builder.js';
@@ -2538,8 +2538,14 @@ function renderSegments(input: RenderInput): PromptSegment[] {
   };
 
   // Stable cognitive/policy prefix: no task-variable segment may precede these.
+  const guideDelivered = workerGuideContract?.state === 'VERIFIED'
+    && workerGuideContract.schemaVersion === WORKSPACE_ARTIFACT_SCHEMA_VERSION
+    && typeof workerGuideContract.body === 'string'
+    && workspaceArtifactDigest(workerGuideContract.body) === workerGuideContract.digest;
   const workerGuideAuthority = workerGuideContract?.state === 'VERIFIED'
-    ? `WORKER_GUIDE_CONTRACT: VERIFIED schema=${workerGuideContract.schemaVersion} sha256:${workerGuideContract.digest}. Read .deckent/workspace/WORKER-GUIDE.md as the digest-bound supporting contract.`
+    ? guideDelivered
+      ? `WORKER_GUIDE_CONTRACT: VERIFIED schema=${workerGuideContract.schemaVersion} sha256:${workerGuideContract.digest} delivery=inline. The supporting contract is delivered below; no host workspace path is required.\n\n${workerGuideContract.body}`
+      : 'WORKER_GUIDE_CONTRACT: HOLD (delivery-unverified). Follow the inline heartbeat, result, scope and Definition-of-Done contracts in this compiled prompt.'
     : workerGuideContract?.state === 'HOLD'
       ? `WORKER_GUIDE_CONTRACT: HOLD (${workerGuideContract.reason}). Do not treat .deckent/workspace/WORKER-GUIDE.md as authority; follow the inline heartbeat, result, scope and Definition-of-Done contracts in this compiled prompt.`
       : 'WORKER_GUIDE_CONTRACT: UNRESOLVED_BY_CALLER. The inline contracts in this compiled prompt remain authoritative.';

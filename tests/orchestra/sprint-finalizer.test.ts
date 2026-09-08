@@ -414,6 +414,8 @@ function makeSettledTask(taskId: string): Sprint['tasks'][number] {
     title: `Task ${taskId}`,
     description: '',
     model: 'sonnet',
+    provider: 'codex',
+    authMode: 'subscription',
     effort: 'normal',
     priority: 'NORMAL',
     reason: '',
@@ -464,6 +466,13 @@ function settledFixture(sprint: Sprint): {
       coverage: 90,
       selfAssessment: 'DONE',
       notes: '',
+      tokenUsage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        provider: 'codex',
+        model: 'sonnet',
+      },
       workAttribution: {
         state: 'VERIFIED' as const,
         attemptId,
@@ -647,7 +656,7 @@ describe('sprint-finalizer — tryCodeVerifiedDone wire integration', () => {
     });
   });
 
-  it('probes tryCodeVerifiedDone diagnostically for NO_GO tasks only, then fails closed', async () => {
+  it('fails the outcome gate before running downstream code diagnostics', async () => {
     const sprint = makeSprint('sprint-137');
     sprint.tasks = [nogoTask('137-001'), makeSettledTask('137-002')];
     const evaluations = new Map<string, TaskEvaluation>([
@@ -661,9 +670,8 @@ describe('sprint-finalizer — tryCodeVerifiedDone wire integration', () => {
       finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true }),
     ).rejects.toThrow(/TERMINAL_/);
 
-    // The diagnostic probe still ran for the NO_GO task and only for it.
-    expect(mockTryCode).toHaveBeenCalledWith('137-001', PROJECT_ROOT);
-    expect(mockTryCode).not.toHaveBeenCalledWith('137-002', PROJECT_ROOT);
+    // Receipt/projection diagnostics cannot run ahead of terminal eligibility.
+    expect(mockTryCode).not.toHaveBeenCalled();
   });
 
   it('never mutates a NO_GO verdict, even when the probe reports verified=true', async () => {
@@ -1133,25 +1141,33 @@ describe('sprint-finalizer — triple-link relations (Task 143-007)', () => {
     expect(metrics).toBeDefined();
   });
 
-  it('skips triple-link when memory.db cannot exist (KPI ring failed)', async () => {
+  it('holds before archive/triple-link when terminal KPI storage is unavailable', async () => {
     // Real-fs discovery: simply deleting memory.db no longer produces the skip —
     // the KPI ring (recordKpiMeasurements → real KpiStore) runs BEFORE triple-link
     // and CREATES the DB. The gate's false branch is only reachable when that ring
-    // fails; make `.brain` a FILE so KpiStore creation throws (swallowed, fail-safe)
-    // and the DB genuinely cannot exist at the gate.
+    // fails; make `.brain` a FILE so the strict terminal collector cannot open
+    // its DB. Legacy recordSprintKpis remains fail-soft, but the terminal path
+    // must retain the receipt/task and refuse cleanup.
     rmSync(join(PROJECT_ROOT, '.brain'), { recursive: true, force: true });
     writeFileSync(join(PROJECT_ROOT, '.brain'), '');
 
     const sprint = makeSprint('sprint-143');
     const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, {
+    await expect(finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, {
       skipDecay: true,
       skipHooks: true,
       skipMemoryExport: true,
-    });
+    })).rejects.toThrow(/KPI_TERMINAL_SNAPSHOT_HOLD/u);
 
     expect(mockInsertRelation).not.toHaveBeenCalled();
+    expect(existsSync(join(PROJECT_ROOT, '.tasks', 'task-sprint-143-main.json'))).toBe(true);
+    expect(existsSync(join(
+      PROJECT_ROOT,
+      '.deckent',
+      'recently-works',
+      'sprint-143-terminal-receipt.json',
+    ))).toBe(true);
   });
 });
 

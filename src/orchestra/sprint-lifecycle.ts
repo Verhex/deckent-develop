@@ -195,6 +195,7 @@ function exactLifecycleCheckpointAuthorities(
   registry: ExactNormalDockerExecutionRegistryV2 | undefined,
 ): ReadonlyMap<string, ExactAcceptedResultTerminalAuthorityV2> | undefined {
   if (!registry) return undefined;
+  const sprintTaskIds = new Set(sprint.tasks.map(task => task.id));
   const current = new Map<string, ExactAcceptedResultTerminalAuthorityV2>();
   for (const [taskId, authority] of registry.snapshotExactTerminalAuthorities()) {
     if (authority.state !== 'current') {
@@ -204,6 +205,7 @@ function exactLifecycleCheckpointAuthorities(
         `EXACT_LIFECYCLE_CHECKPOINT_AUTHORITY_HOLD:${taskId}:${authority.reasonCode}`,
       );
     }
+    if (!sprintTaskIds.has(taskId)) continue;
     current.set(taskId, authority.terminalAuthority);
   }
   for (const task of sprint.tasks) {

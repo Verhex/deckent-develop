@@ -1,13 +1,21 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
 import {
   TaskStatus, TaskEvaluation, SprintPhase, SprintStatus, DebtPriority, AgentStatus,
+  createProductionWiringPlanEvidenceV2,
 } from '../../src/core/types.js';
 import type {
   Task, TaskResult, Sprint, SprintMetrics, DebtItem, ResolvedConfig, PatternEntry,
 } from '../../src/core/types.js';
 import { MEMORY_MAX_LINES, SPRINT_LOG_MAX_LINES } from '../../src/core/constants.js';
+import { canonicalJson } from '../../src/core/audit-writer.js';
+import { resolveMemoryReadLimitsForConsumer } from '../../src/core/config.js';
+import { injectCriticalDebtTasks } from '../../src/orchestra/sprint-planner.js';
+import {
+  terminalNativeProviderWiringContractFixture,
+} from '../helpers/production-wiring-plan-fixture.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
@@ -31,6 +39,10 @@ vi.mock('node:fs', async (importOriginal) => {
     statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
     appendFileSync: vi.fn(),
     renameSync: vi.fn(),
+    openSync: vi.fn(() => 101),
+    fsyncSync: vi.fn(),
+    closeSync: vi.fn(),
+    linkSync: vi.fn(),
     // Sprint 139 async I/O migration: sprint-finalizer and other modules use
     // `import { promises as fsPromises } from 'node:fs'`. Bind async impls via
     // `vi.fn(async () => ...)` so vi.clearAllMocks preserves them.
@@ -289,7 +301,8 @@ const actualMemoryStoreModule = await vi.importActual<
 >('../../src/core/memory-store.js');
 import {
   readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, statSync,
-  appendFileSync, renameSync, promises as fsPromisesNs,
+  appendFileSync, renameSync, openSync, fsyncSync, closeSync, linkSync,
+  promises as fsPromisesNs,
 } from 'node:fs';
 import {
   stat as fspStat, writeFile as fspWriteFile, readFile as fspReadFile,
@@ -334,10 +347,48 @@ const mockedFspStat = vi.mocked(fspStat);
 const mockedFspWriteFile = vi.mocked(fspWriteFile);
 const mockedAppendFileSync = vi.mocked(appendFileSync);
 const mockedRenameSync = vi.mocked(renameSync);
+const mockedOpenSync = vi.mocked(openSync);
+const mockedFsyncSync = vi.mocked(fsyncSync);
+const mockedCloseSync = vi.mocked(closeSync);
+const mockedLinkSync = vi.mocked(linkSync);
 const mockedMemoryStore = vi.mocked(MemoryStore);
 const mockedReadMemoryView = vi.mocked(readMemoryView);
 const mockedRenderMemoryReadView = vi.mocked(renderMemoryReadView);
 const mockedResolveMemoryRequiredIds = vi.mocked(resolveMemoryRequiredIds);
+
+// Complete the registry-owned fixture once while the hoisted fs spy delegates
+// to the real tracked harness. Individual tests restore their historical fs
+// behavior in beforeEach without weakening the captured authority.
+mockedReadFileSync.mockImplementation(actualFs.readFileSync as never);
+mockedOpenSync.mockImplementation(actualFs.openSync as never);
+mockedCloseSync.mockImplementation(actualFs.closeSync as never);
+const BROAD_SOURCE_WIRING_CONTRACT = terminalNativeProviderWiringContractFixture();
+const BROAD_SOURCE_WIRING_PLAN = createProductionWiringPlanEvidenceV2(
+  BROAD_SOURCE_WIRING_CONTRACT,
+);
+mockedOpenSync.mockImplementation(() => 101);
+mockedCloseSync.mockImplementation(() => undefined);
+
+function criticalDebtFixture(): DebtItem {
+  const originTaskId = 't-1';
+  const originScope = {
+    directories: ['src/fixture/'],
+    filesWrite: ['src/fixture/debt.ts'],
+  };
+  return {
+    id: 'debt-1', description: 'critical debt', originTaskId, originSprintId: 's-1',
+    priority: DebtPriority.CRITICAL, sprintsOpen: 3, resolved: false, createdAt: '',
+    originScope,
+    originProductionWiring: BROAD_SOURCE_WIRING_PLAN,
+    originProductionWiringBinding: createHash('sha256').update(canonicalJson({
+      originTaskId,
+      originScope,
+      contractDigest: BROAD_SOURCE_WIRING_PLAN.contractDigest,
+      hostProofProgramDigest: BROAD_SOURCE_WIRING_PLAN.hostProofProgramDigest,
+    })).digest('hex'),
+    originWiringState: 'valid-v2',
+  };
+}
 
 // ─── Real-filesystem passthrough (FAZ4A-S5, sprint-controller.test.ts pattern) ──
 // runSprint's PLAN phase (a) opens the provider-execution-observation SQLite
@@ -351,6 +402,17 @@ const mockedResolveMemoryRequiredIds = vi.mocked(resolveMemoryRequiredIds);
 // root; the fs spies stay in place but pass through to the real
 // implementations, so `mocked*.mock.calls` assertions keep working.
 function useRealFileSystem(): void {
+  const writeDeferredExactTaskProjection = async (
+    path: unknown,
+    data: unknown,
+    options?: unknown,
+  ): Promise<void> => {
+    // Normal Docker owns the canonical no-clobber publication after run-policy
+    // and prompt authority are bound. Do not pre-create the legacy planner byte
+    // here: doing so would correctly conflict with that later exact payload.
+    if (/\/\.tasks\/task-[^/]+\.json$/u.test(String(path).replaceAll('\\', '/'))) return;
+    await actualFsp.writeFile(path as never, data as never, options as never);
+  };
   mockedReadFileSync.mockImplementation(actualFs.readFileSync as never);
   mockedWriteFileSync.mockImplementation(((path: unknown, data: unknown, options?: unknown) => {
     actualFs.writeFileSync(path as never, data as never, options as never);
@@ -384,14 +446,18 @@ function useRealFileSystem(): void {
   mockedStatSync.mockImplementation(actualFs.statSync as never);
   mockedAppendFileSync.mockImplementation(actualFs.appendFileSync as never);
   mockedRenameSync.mockImplementation(actualFs.renameSync as never);
+  mockedOpenSync.mockImplementation(actualFs.openSync as never);
+  mockedFsyncSync.mockImplementation(actualFs.fsyncSync as never);
+  mockedCloseSync.mockImplementation(actualFs.closeSync as never);
+  mockedLinkSync.mockImplementation(actualFs.linkSync as never);
   vi.mocked(fsPromisesNs.readFile).mockImplementation(actualFs.promises.readFile as never);
-  vi.mocked(fsPromisesNs.writeFile).mockImplementation(actualFs.promises.writeFile as never);
+  vi.mocked(fsPromisesNs.writeFile).mockImplementation(writeDeferredExactTaskProjection as never);
   vi.mocked(fsPromisesNs.mkdir).mockImplementation(actualFs.promises.mkdir as never);
   vi.mocked(fsPromisesNs.appendFile).mockImplementation(actualFs.promises.appendFile as never);
   vi.mocked(fsPromisesNs.access).mockImplementation(actualFs.promises.access as never);
   vi.mocked(fsPromisesNs.stat).mockImplementation(actualFs.promises.stat as never);
   vi.mocked(fspReadFile).mockImplementation(actualFsp.readFile as never);
-  mockedFspWriteFile.mockImplementation(actualFsp.writeFile as never);
+  mockedFspWriteFile.mockImplementation(writeDeferredExactTaskProjection as never);
   vi.mocked(fspMkdir).mockImplementation(actualFsp.mkdir as never);
   mockedFspStat.mockImplementation(actualFsp.stat as never);
   vi.mocked(fspAccess).mockImplementation(actualFsp.access as never);
@@ -432,6 +498,17 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
   };
 }
 
+function productionDirective(title: string, file = 'src/index.ts'): string {
+  return [
+    `## Görev 1: ${title}`,
+    `- Dosya: ${file}`,
+    `- Kapsam: ${file.slice(0, file.lastIndexOf('/') + 1)}`,
+    `- ProductionWiring: ${JSON.stringify(BROAD_SOURCE_WIRING_CONTRACT)}`,
+    '',
+    title,
+  ].join('\n');
+}
+
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
     id: '001-001',
@@ -444,6 +521,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
     dependencies: [],
     goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: 'minor' },
+    productionWiring: BROAD_SOURCE_WIRING_PLAN,
     status: TaskStatus.PENDING,
     sprintId: 'sprint-001',
     createdAt: '2026-03-16T00:00:00.000Z',
@@ -500,9 +578,10 @@ function freshRunRoot(): string {
   RUN_ROOT = actualFs.mkdtempSync(join(tmpdir(), 'deckent-brain-run-'));
   actualFs.mkdirSync(join(RUN_ROOT, '.tasks'), { recursive: true });
   actualFs.mkdirSync(join(RUN_ROOT, '.deckent', 'pids'), { recursive: true });
-  // memory.db must EXIST so DB-first paths open the (mocked) MemoryStore.
+  // Initialize a real schema: normal-Docker prompt compilation performs the
+  // same bounded DB-first memory query as production after task admission.
   actualFs.mkdirSync(join(RUN_ROOT, '.brain'), { recursive: true });
-  actualFs.writeFileSync(join(RUN_ROOT, '.brain', 'memory.db'), '', 'utf-8');
+  new actualMemoryStoreModule.MemoryStore(join(RUN_ROOT, '.brain', 'memory.db')).close();
   return RUN_ROOT;
 }
 
@@ -595,7 +674,11 @@ function setupRealSprint(opts: {
       status: 0, stdout: isLsFiles ? 'src/index.ts\n' : '', stderr: '', pid: 1, signal: null, output: [],
     } as never;
   });
-  actualFs.writeFileSync(join(RUN_ROOT, 'DIRECTIVES.md'), opts.directives ?? 'Build the system', 'utf-8');
+  actualFs.writeFileSync(
+    join(RUN_ROOT, 'DIRECTIVES.md'),
+    opts.directives ?? productionDirective('Build the system'),
+    'utf-8',
+  );
   const results = opts.results ?? new Map([['001-001', makeRunResult()]]);
   for (const [taskId, json] of results) {
     actualFs.writeFileSync(join(RUN_ROOT, '.tasks', `task-${taskId}.result`), json, 'utf-8');
@@ -647,6 +730,10 @@ beforeEach(() => {
   mockedUnlinkSync.mockImplementation(() => undefined);
   mockedAppendFileSync.mockImplementation(() => undefined);
   mockedRenameSync.mockImplementation(() => undefined);
+  mockedOpenSync.mockImplementation(() => 101);
+  mockedFsyncSync.mockImplementation(() => undefined);
+  mockedCloseSync.mockImplementation(() => undefined);
+  mockedLinkSync.mockImplementation(() => undefined);
   vi.mocked(fsPromisesNs.readFile).mockImplementation((async () => '') as never);
   vi.mocked(fsPromisesNs.writeFile).mockImplementation(async () => undefined);
   vi.mocked(fsPromisesNs.mkdir).mockImplementation((async () => undefined) as never);
@@ -834,7 +921,6 @@ describe('readContext', () => {
     expect(ctx.debt).toHaveLength(1);
     expect(ctx.debt[0]?.id).toBe('debt-1');
     expect(ctx.debt[0]?.priority).toBe('NORMAL');
-    mockDbEntries.clear();
   });
 
   it('returns empty tasks when .tasks/ does not exist', () => {
@@ -1014,6 +1100,21 @@ describe('planSprint', () => {
     };
   }
 
+  function pinPlannerMemoryContext<T extends ReturnType<typeof makeContext>>(context: T): T & {
+    memorySelectionRevisionDigest: `sha256:${string}`;
+    memoryReadInputDigest: `sha256:${string}`;
+    memoryReadLimits: ReturnType<typeof resolveMemoryReadLimitsForConsumer>;
+    memoryReadLanguage: string;
+  } {
+    return {
+      ...context,
+      memorySelectionRevisionDigest: `sha256:${'7'.repeat(64)}`,
+      memoryReadInputDigest: `sha256:${createHash('sha256').update(context.directives, 'utf8').digest('hex')}`,
+      memoryReadLimits: resolveMemoryReadLimitsForConsumer(config, 'planner'),
+      memoryReadLanguage: config.language,
+    };
+  }
+
   it('reselects bounded memory when directives change after context capture', async () => {
     mockedExistsSync.mockImplementation(path => String(path).endsWith('/.brain/memory.db'));
     const ctx = {
@@ -1058,13 +1159,46 @@ describe('planSprint', () => {
   });
 
   it('creates priority fix tasks for CRITICAL debt', async () => {
-    const ctx = makeContext('');
-    ctx.debt = [{
-      id: 'debt-1', description: 'critical debt', originTaskId: 't-1', originSprintId: 's-1',
-      priority: DebtPriority.CRITICAL, sprintsOpen: 3, resolved: false, createdAt: '',
-    }];
-    const sprint = await planSprint(ROOT, config, ctx, recommendation);
+    const ctx = pinPlannerMemoryContext(makeContext(''));
+    ctx.debt = [criticalDebtFixture()];
+    expect(injectCriticalDebtTasks(ctx.debt, 'sprint-001', config.activeModeConfig.default_model, 1, TaskStatus.PENDING))
+      .toMatchObject({ tasks: [expect.objectContaining({ isPriorityFix: true })], held: [] });
+    const sprint = await planSprint(ROOT, { ...config, debt_preflight_enabled: false }, ctx, recommendation);
+    expect(sprint.debtInjectionHolds).toEqual([]);
     expect(sprint.tasks.some(t => t.isPriorityFix)).toBe(true);
+  });
+
+  it('keeps normal directive work while surfacing legacy and malformed CRITICAL debt holds', async () => {
+    const ctx = pinPlannerMemoryContext(makeContext(productionDirective('Build held-debt sibling')));
+    ctx.debt = [
+      {
+        id: 'debt-legacy', description: 'legacy actionable gap', originTaskId: 't-legacy', originSprintId: 's-1',
+        priority: DebtPriority.CRITICAL, sprintsOpen: 2, resolved: false, createdAt: '',
+      },
+      {
+        ...criticalDebtFixture(),
+        id: 'debt-malformed',
+        originProductionWiringBinding: 'not-the-canonical-origin-binding',
+      },
+    ];
+
+    const sprint = await planSprint(
+      ROOT,
+      { ...config, debt_preflight_enabled: false },
+      ctx,
+      recommendation,
+      { mode: 'structured' },
+    );
+
+    expect(sprint.tasks).toEqual([
+      expect.objectContaining({ title: 'Build held-debt sibling', isPriorityFix: undefined }),
+    ]);
+    expect(sprint.debtInjectionHolds).toEqual([
+      { debtId: 'debt-legacy', reason: 'legacy-unavailable' },
+      { debtId: 'debt-malformed', reason: 'invalid-origin' },
+    ]);
+    // Held debt never enters the skipped/resolved path.
+    expect(mockMemoryStore.upsert).not.toHaveBeenCalled();
   });
 
   it('plans all tasks regardless of maxWorkers (queue mechanism handles parallelism)', async () => {
@@ -1089,7 +1223,10 @@ describe('planSprint', () => {
   });
 
   it('extracts scope from directive paths', async () => {
-    const ctx = makeContext('Create src/utils/hello.ts in src/utils/');
+    const ctx = makeContext(productionDirective(
+      'Create src/utils/hello.ts in src/utils/',
+      'src/utils/hello.ts',
+    ));
     const sprint = await planSprint(ROOT, config, ctx, recommendation);
     const task = sprint.tasks[0];
     expect(task?.scope.directories).toContain('src/utils');
@@ -1120,6 +1257,7 @@ describe('planSprint', () => {
         effort: 'normal' as const, priority: 'HIGH' as const, reason: 'AI decided',
         scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
         dependencies: [], goNogo: { goCriteria: 'Pass', noGoCriteria: 'Fail', techDebtAcceptable: 'Minor' },
+        productionWiring: BROAD_SOURCE_WIRING_PLAN,
       }],
       reasoning: 'AI reasoning here',
     });
@@ -1152,7 +1290,7 @@ describe('planSprint', () => {
 
   // ─── AI Post-Validation Fallback Tests ─────────────────────────────
   const structuredDirective12 = Array.from({ length: 12 }, (_, i) =>
-    `## Görev ${i + 1}: Task ${i + 1}\n- Dosya: src/file${i}.ts\n- Kapsam: src/\n\nDescription ${i + 1}`
+    `## Görev ${i + 1}: Task ${i + 1}\n- Dosya: tests/file${i}.test.ts\n- Kapsam: tests/\n\nDescription ${i + 1}`
   ).join('\n\n');
 
   function makeAiResult(count: number) {
@@ -1160,7 +1298,7 @@ describe('planSprint', () => {
       tasks: Array.from({ length: count }, (_, i) => ({
         title: `AI Task ${i + 1}`, description: `From AI ${i + 1}`, model: 'claude-sonnet-5' as const,
         effort: 'normal' as const, priority: 'NORMAL' as const, reason: 'AI decided',
-        scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+        scope: { directories: ['tests/'], filesRead: [], filesWrite: [] },
         dependencies: [], goNogo: { goCriteria: 'Pass', noGoCriteria: 'Fail', techDebtAcceptable: 'Minor' },
       })),
       reasoning: 'AI reasoning',
@@ -1185,7 +1323,7 @@ describe('planSprint', () => {
 
   it('mode=auto falls back when AI returns fewer tasks (5 vs 10)', async () => {
     const directive10 = Array.from({ length: 10 }, (_, i) =>
-      `## Görev ${i + 1}: Task ${i + 1}\n- Kapsam: src/\n\nDesc ${i + 1}`
+      `## Görev ${i + 1}: Task ${i + 1}\n- Kapsam: tests/\n\nDesc ${i + 1}`
     ).join('\n\n');
     mockedCallBrainPlanner.mockReturnValue(makeAiResult(5));
     const ctx = makeContext(directive10);
@@ -1213,7 +1351,7 @@ describe('planSprint', () => {
   it('fallback sets planningMode to "fallback"', async () => {
     mockedCallBrainPlanner.mockReturnValue(makeAiResult(3));
     const directive5 = Array.from({ length: 5 }, (_, i) =>
-      `## Görev ${i + 1}: Task ${i + 1}\n- Kapsam: src/\n\nDesc ${i + 1}`
+      `## Görev ${i + 1}: Task ${i + 1}\n- Kapsam: tests/\n\nDesc ${i + 1}`
     ).join('\n\n');
     const ctx = makeContext(directive5);
     const sprint = await planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
@@ -1223,14 +1361,17 @@ describe('planSprint', () => {
   it('CRITICAL debt tasks are preserved alongside fallback tasks', async () => {
     mockedCallBrainPlanner.mockReturnValue(makeAiResult(2));
     const directive4 = Array.from({ length: 4 }, (_, i) =>
-      `## Görev ${i + 1}: Task ${i + 1}\n- Kapsam: src/\n\nDesc ${i + 1}`
+      `## Görev ${i + 1}: Task ${i + 1}\n- Kapsam: tests/\n\nDesc ${i + 1}`
     ).join('\n\n');
-    const ctx = makeContext(directive4);
-    ctx.debt = [{
-      id: 'debt-1', description: 'critical debt', originTaskId: 't-1', originSprintId: 's-1',
-      priority: DebtPriority.CRITICAL, sprintsOpen: 3, resolved: false, createdAt: '',
-    }];
-    const sprint = await planSprint(ROOT, config, ctx, recommendation, { mode: 'auto' });
+    const ctx = pinPlannerMemoryContext(makeContext(directive4));
+    ctx.debt = [criticalDebtFixture()];
+    const sprint = await planSprint(
+      ROOT,
+      { ...config, debt_preflight_enabled: false },
+      ctx,
+      recommendation,
+      { mode: 'auto' },
+    );
     expect(sprint.planningMode).toBe('fallback');
     expect(sprint.tasks.some(t => t.isPriorityFix)).toBe(true);
     // 1 debt + 4 structured = 5
@@ -1345,20 +1486,31 @@ describe('spawnWorkers', () => {
 });
 
 describe('waitForResults', () => {
+  const waitForLegacyResults = (
+    sprint: Sprint,
+    timeoutMs: number,
+  ): ReturnType<typeof waitForResults> => waitForResults(
+    ROOT,
+    sprint,
+    timeoutMs,
+    undefined,
+    { ipcExecutionMode: 'legacy-non-docker' },
+  );
+
   it('returns immediately when all results exist', async () => {
     const sprint = makeSprint();
     mockedExistsSync.mockImplementation(path => !String(path).includes('task-result-settlements'));
     mockedReadFileSync.mockReturnValue(JSON.stringify(makeResult()));
     mockedFspStat.mockResolvedValue({ isFile: () => true } as never);
 
-    const results = await waitForResults(ROOT, sprint, 1000);
+    const results = await waitForLegacyResults(sprint, 1000);
     expect(results).toHaveLength(1);
     expect(results[0]?.taskId).toBe('001-001');
   });
 
   it('returns empty array when no results and timeout=1', async () => {
     const sprint = makeSprint();
-    const results = await waitForResults(ROOT, sprint, 1);
+    const results = await waitForLegacyResults(sprint, 1);
     expect(results).toEqual([]);
   });
 
@@ -1373,7 +1525,7 @@ describe('waitForResults', () => {
     // Tolerant-parse wave (2026-08-18): an unparseable .result no longer
     // vanishes silently — it surfaces as a synthetic typed NO_GO so FIX can
     // see it (RESULT_JSON_PARSE_FAILURE marker).
-    const results = await waitForResults(ROOT, sprint, 1);
+    const results = await waitForLegacyResults(sprint, 1);
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
       taskId: '001-001',
@@ -1396,7 +1548,7 @@ describe('waitForResults', () => {
       return '';
     });
 
-    const results = await waitForResults(ROOT, sprint, 1000);
+    const results = await waitForLegacyResults(sprint, 1000);
     expect(results).toHaveLength(2);
   });
 
@@ -1414,7 +1566,7 @@ describe('waitForResults', () => {
     });
     mockedExistsSync.mockImplementation(path => String(path).includes('001-001.result'));
 
-    const results = await waitForResults(ROOT, sprint, 1);
+    const results = await waitForLegacyResults(sprint, 1);
     expect(results).toHaveLength(1);
     expect(results[0]?.taskId).toBe('001-001');
   });
@@ -1425,7 +1577,7 @@ describe('waitForResults', () => {
     mockedFspStat.mockResolvedValue({ isFile: () => true } as never);
     mockedReadFileSync.mockReturnValue(JSON.stringify(makeResult()));
 
-    const results = await waitForResults(ROOT, sprint, 1000);
+    const results = await waitForLegacyResults(sprint, 1000);
     expect(results).toHaveLength(1);
   });
 
@@ -1441,7 +1593,7 @@ describe('waitForResults', () => {
     });
     mockedReadFileSync.mockReturnValue(JSON.stringify(makeResult()));
 
-    const promise = waitForResults(ROOT, sprint, 30_000);
+    const promise = waitForLegacyResults(sprint, 30_000);
     // Advance past the first poll interval
     await vi.advanceTimersByTimeAsync(15_001);
     vi.useRealTimers();
@@ -1452,7 +1604,7 @@ describe('waitForResults', () => {
 
   it('returns Promise (is async)', () => {
     const sprint = makeSprint();
-    const returnValue = waitForResults(ROOT, sprint, 1);
+    const returnValue = waitForLegacyResults(sprint, 1);
     expect(returnValue).toBeInstanceOf(Promise);
     return returnValue; // let vitest await it
   });

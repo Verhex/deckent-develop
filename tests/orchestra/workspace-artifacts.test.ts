@@ -69,6 +69,7 @@ describe('initializeWorkspaceArtifacts', () => {
     expect(guide).not.toContain('tokenUsage.provider');
     expect(guide).not.toMatch(/≥80|50–79|<50/);
     expect(inspectWorkerGuideContract(root).state).toBe('VERIFIED');
+    expect(inspectWorkerGuideContract(root)).toHaveProperty('body', expect.stringContaining('Engine-aligned lifecycle'));
 
     expect(identity).toContain('Language Authority: detected');
     expect(identity).toContain('Platform: runtime-resolved');

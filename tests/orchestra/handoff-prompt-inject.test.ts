@@ -267,4 +267,77 @@ describe('buildWorkerPrompt — upstream handoff wire (opt-in)', () => {
     // id-sorted (278-001-to-278-099 < 278-002-to-278-099): from 278-001 precedes from 278-002.
     expect(prompt.indexOf('from 278-001')).toBeLessThan(prompt.indexOf('from 278-002'));
   });
+
+  it('injects caller-supplied exact terminal handoffs without a mutable handoff file', () => {
+    const r = setupRoot({ enabled: true, inject_handoffs: true });
+    const prompt = buildWorkerPrompt(
+      makeTask({ id: '278-099' }),
+      undefined,
+      undefined,
+      r,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        publicationMode: 'deferred',
+        upstreamHandoffs: [{
+          fromTaskId: '278-001',
+          artifacts: ['src/core/config.ts'],
+          notes: 'terminal-authority note',
+        }],
+      },
+    );
+
+    expect(prompt).toContain(HANDOFF_HEADER);
+    expect(prompt).toContain(
+      '- from 278-001: artifacts [src/core/config.ts], note: terminal-authority note',
+    );
+  });
+
+  it('treats an exact empty handoff snapshot as authoritative over stale host projections', () => {
+    const r = setupRoot({ enabled: true, inject_handoffs: true });
+    createReadyHandoff(r, '278-stale', '278-099', ['src/core/stale.ts'], 'must not inject');
+
+    const prompt = buildWorkerPrompt(
+      makeTask({ id: '278-099' }),
+      undefined,
+      undefined,
+      r,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { publicationMode: 'deferred', upstreamHandoffs: [] },
+    );
+
+    expect(prompt).not.toContain(HANDOFF_HEADER);
+    expect(prompt).not.toContain('278-stale');
+    expect(prompt).not.toContain('must not inject');
+  });
+
+  it('keeps worker_comms disablement authoritative over supplied exact handoffs', () => {
+    const r = setupRoot({ enabled: false, inject_handoffs: true });
+    const prompt = buildWorkerPrompt(
+      makeTask({ id: '278-099' }),
+      undefined,
+      undefined,
+      r,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        publicationMode: 'deferred',
+        upstreamHandoffs: [{
+          fromTaskId: '278-001',
+          artifacts: ['src/core/config.ts'],
+          notes: 'disabled note',
+        }],
+      },
+    );
+
+    expect(prompt).not.toContain(HANDOFF_HEADER);
+    expect(prompt).not.toContain('disabled note');
+  });
 });

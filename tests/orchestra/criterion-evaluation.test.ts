@@ -70,6 +70,16 @@ function makeResult(over: Partial<TaskResult> = {}): TaskResult {
 }
 
 describe('evaluateGoNogoCriteria — deterministic kernel', () => {
+  it('keeps semantic GO and NO_GO undecidable despite the referenced file existing', () => {
+    const outcome = evaluateGoNogoCriteria(makeTask((['go', 'no-go'] as const).map(polarity =>
+      createGoNoGoCriterionItem({ polarity, statement: 'Semantic snapshot comparison',
+        evidenceRequirements: [{ kind: 'assertion', value: 'Compare docs/delivered.md against the admitted snapshot' }] }))),
+    makeResult(), root)!;
+    expect(outcome.decided).toBe(0);
+    expect(outcome.items.every(item => item.mode === 'llm' && item.status === 'undecidable')).toBe(true);
+    expect(outcome.decisiveNoGo).toBe(false);
+  });
+
   it('decides a file-path go requirement from disk/result evidence', () => {
     const outcome = evaluateGoNogoCriteria(makeTask([
       createGoNoGoCriterionItem({

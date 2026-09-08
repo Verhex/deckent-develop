@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -14,7 +14,7 @@ describe('force recovery checkpoint preservation', () => {
   const roots: string[] = [];
   afterEach(() => roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })));
 
-  function fixture(): { root: string; checkpointPath: string } {
+  function fixture(): { root: string; checkpointPath: string; snapshotPath: string } {
     const root = mkdtempSync(join(tmpdir(), 'recover-checkpoint-policy-'));
     roots.push(root);
     mkdirSync(join(root, '.deckent'), { recursive: true });
@@ -34,7 +34,16 @@ describe('force recovery checkpoint preservation', () => {
       timestamp: '2026-08-22T00:00:00.000Z', completedTasks: [],
       pendingTasks: ['595-014'], activeWorkers: [], brainPhase: 'EXECUTE', eventStreamOffset: 4,
     }, null, 2));
-    return { root, checkpointPath };
+    const snapshotPath = join(root, '.deckent', 'pids', 'sprint-595.snapshot.json');
+    mkdirSync(join(root, '.deckent', 'pids'), { recursive: true });
+    writeFileSync(snapshotPath, JSON.stringify({
+      sprintId: 'sprint-595',
+      pid: 595_014,
+      startToken: 'failed-run-generation',
+      startedAt: '2026-08-22T00:00:00.000Z',
+      lastHeartbeat: '2026-08-22T00:00:05.000Z',
+    }));
+    return { root, checkpointPath, snapshotPath };
   }
 
   it('reports the same digest-bound preservation disposition in dry-run and apply', async () => {
@@ -82,6 +91,22 @@ describe('force recovery checkpoint preservation', () => {
     expect(readFileSync(destination, 'utf8')).toBe(residueBytes);
     expect(() => readFileSync(residuePath)).toThrow();
     expect(readFileSync(checkpointPath)).toBeTruthy();
+  });
+
+  it('keeps the evidence-only process snapshot while checkpoint supersession is pending', async () => {
+    const { root, checkpointPath, snapshotPath } = fixture();
+    const snapshotBefore = readFileSync(snapshotPath);
+    const identity = readSprintRecoverySettlementIdentity(root, 'sprint-595');
+
+    const report = await runSprintRecoveryOperation(root, 'sprint-595', {
+      skipAudit: true,
+      approval: { approvalRef: 'test:force', idempotencyKey: 'exact', identity },
+    });
+
+    expect(report.artifactPolicy.checkpoint.disposition).toBe('preserved');
+    expect(readFileSync(checkpointPath)).toBeTruthy();
+    expect(readFileSync(snapshotPath)).toEqual(snapshotBefore);
+    expect(existsSync(join(root, '.deckent', 'pids', 'sprint-595.pid'))).toBe(false);
   });
 
   it('fails closed when source bytes drift after manifest authorization', async () => {

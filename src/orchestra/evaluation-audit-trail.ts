@@ -67,6 +67,11 @@ import {
   type ExactAcceptedTaskResultAuthorityMetadata,
   type ExactTaskResultAuthorityMetadata,
 } from './task-result-authority.js';
+import { createExactAcceptanceVerificationSourceV2, readExactAcceptanceVerificationSourceV2 } from './exact-acceptance-evidence.js';
+import { readAppliedAcceptanceConfirmation } from './acceptance-confirmation-composition.js';
+import { verifyExactLlmAcceptanceDecision } from '../core/acceptance-decision-authority.js';
+import { acceptanceConfirmationDigest, deriveAcceptanceConfirmationId, parseAcceptanceConfirmationLineage,
+  type AcceptanceConfirmationAppliedReceipt } from '../core/acceptance-confirmation-contract.js';
 import {
   evaluateExactAcceptedResultWithRubric,
   gateProductionWiringVerdict,
@@ -404,6 +409,35 @@ export interface ExactTaskAcceptanceDecisionSnapshotV2 {
   readonly confirmationReceiptDigest: Sha256Digest | null;
 }
 
+function resolveExactAppliedConfirmation(
+  input: SettleExactAcceptedTaskEvaluationInput,
+  enforcement: AcceptanceEnforcementResult,
+  baselineEvaluation: EvaluationResult,
+): { enforcement: AcceptanceEnforcementResult; receipt: AcceptanceConfirmationAppliedReceipt | null } | null {
+  const route = enforcement.routeClaim;
+  if (!route) return { enforcement, receipt: null };
+  const source = createExactAcceptanceVerificationSourceV2({ ...input, routeClaim: route });
+  const fresh = readExactAcceptanceVerificationSourceV2(source);
+  if (fresh.state !== 'ready') return null;
+  const receipt = readAppliedAcceptanceConfirmation({ projectRoot: input.projectRoot, routeClaim: route,
+    verifyAuthority: decision => verifyExactLlmAcceptanceDecision(input.projectRoot, decision, fresh.binding) });
+  if (!receipt) return null;
+  const { pendingConfirmation: _pending, ...rest } = enforcement;
+  const accepted = receipt.terminalEvent.decision === 'ACCEPTED';
+  return { receipt, enforcement: {
+    ...rest,
+    evaluation: { ...baselineEvaluation, decision: accepted ? baselineEvaluation.decision : 'NO_GO',
+      ...(!accepted ? { rubricScores: [...baselineEvaluation.rubricScores, {
+        criterion: `acceptance:confirmation:${receipt.confirmationId}`, score: 0, passed: false,
+        reason: 'EXACT_ACCEPTANCE_CONFIRMATION_REJECTED',
+      }] } : {}),
+    },
+    settlement: reduceAcceptanceSettlement({ sourceVerdict: 'UNDECIDABLE', matrixDecision: enforcement.outcome,
+      confirmation: { status: 'AUTHENTICATED', receipt, expired: false } }),
+    postRubricCause: accepted ? 'acceptance-policy:confirmed' : 'acceptance-policy:rejected',
+  } };
+}
+
 export interface ExactTaskFinalizerReceiptV2 {
   readonly schemaVersion: 2;
   readonly kind: 'exact-task-finalizer-receipt-v2';
@@ -559,6 +593,14 @@ function exactTerminalTimestamp(value: unknown): value is string {
   return typeof value === 'string'
     && value.length > 0
     && Number.isFinite(Date.parse(value));
+}
+
+function exactTerminalHostTimestampAtOrAfter(...lowerBounds: readonly string[]): string {
+  const parsed = lowerBounds.map(value => Date.parse(value));
+  if (parsed.length === 0 || parsed.some(value => !Number.isFinite(value))) {
+    throw new TypeError('Exact terminal causal timestamp authority is invalid');
+  }
+  return new Date(Math.max(Date.now(), ...parsed)).toISOString();
 }
 
 function exactTerminalDigest(value: unknown): value is Sha256Digest {
@@ -765,6 +807,7 @@ function createExactTaskEvaluationReceipt(input: {
   readonly result: TaskResultV2;
   readonly rubricEvaluation: EvaluationResult;
   readonly enforcement: AcceptanceEnforcementResult;
+  readonly confirmationReceipt?: AcceptanceConfirmationAppliedReceipt | null;
   readonly providerExitAuthorityDigest: Sha256Digest;
   readonly dispatchAdmissionRefDigest: Sha256Digest;
   readonly effectLandingReceiptDigest: Sha256Digest;
@@ -789,7 +832,7 @@ function createExactTaskEvaluationReceipt(input: {
     enforced: input.enforcement.enforced,
     postRubricCause: input.enforcement.postRubricCause ?? null,
     routeClaim: input.enforcement.routeClaim ?? null,
-    confirmationReceiptDigest: null,
+    confirmationReceiptDigest: input.confirmationReceipt ? `sha256:${input.confirmationReceipt.receiptDigest}` : null,
   }, input.policy);
   const body = Object.freeze({
     schemaVersion: 2 as const,
@@ -961,6 +1004,19 @@ function parseExactEvaluationSnapshot(
   return value as EvaluationResult;
 }
 
+function isExactAcceptanceRouteClaim(value: unknown): value is AcceptanceRouteClaim {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || !hasExactAuthorityKeys(value, ['schemaVersion', 'confirmationId', 'lineage',
+      'evaluationDigest', 'sourceVerdict', 'adapter', 'claimDigest'])) return false;
+  const row = value as Record<string, unknown>;
+  const parsed = parseAcceptanceConfirmationLineage(row.lineage);
+  if (!parsed.ok || row.schemaVersion !== 2 || row.sourceVerdict !== 'UNDECIDABLE'
+    || row.adapter !== 'llm' || row.confirmationId !== deriveAcceptanceConfirmationId(parsed.value)
+    || row.evaluationDigest !== parsed.value.evaluationDigest) return false;
+  const { claimDigest, ...unsigned } = row;
+  return claimDigest === acceptanceConfirmationDigest(unsigned);
+}
+
 function parseExactAcceptanceDecisionSnapshot(
   value: unknown,
   policy: TaskAttemptCustodyPolicyV2,
@@ -981,8 +1037,9 @@ function parseExactAcceptanceDecisionSnapshot(
   if (
     typeof record.enforced !== 'boolean'
     || (record.postRubricCause !== null && typeof record.postRubricCause !== 'string')
-    || record.routeClaim !== null
-    || record.confirmationReceiptDigest !== null
+    || (record.routeClaim !== null && !isExactAcceptanceRouteClaim(record.routeClaim))
+    || (record.confirmationReceiptDigest !== null && !exactTerminalDigest(record.confirmationReceiptDigest))
+    || ((record.routeClaim === null) !== (record.confirmationReceiptDigest === null))
     || outcome === null
     || typeof outcome !== 'object'
     || Array.isArray(outcome)
@@ -1488,11 +1545,12 @@ export function readExactAcceptedTaskTerminalAuthority(input: {
       acceptedAuthority: input.acceptedAuthority,
       jsonBounds: input.policy.jsonBounds,
     });
-    if (
-      reenforced.state !== 'applied'
-      || reenforced.enforcement.pendingConfirmation !== undefined
-      || reenforced.enforcement.routeClaim !== undefined
-    ) return { state: 'hold', reasonCode: 'terminal-acceptance-revalidation-mismatch' };
+    if (reenforced.state !== 'applied') return { state: 'hold', reasonCode: 'terminal-acceptance-revalidation-mismatch' };
+    const appliedConfirmation = resolveExactAppliedConfirmation({ projectRoot: input.projectRoot,
+      acceptedAuthority: input.acceptedAuthority, custodyStore: input.custodyStore, policy: input.policy },
+    reenforced.enforcement, revalidatedEvaluation);
+    if (!appliedConfirmation) return { state: 'hold', reasonCode: 'terminal-acceptance-confirmation-unavailable' };
+    const finalEnforcement = appliedConfirmation.enforcement;
     const rubricEvaluation = evaluationReceipt.rubricEvaluationSnapshot;
     const terminalEvaluation = evaluationReceipt.evaluationSnapshot;
     const acceptanceDecision = evaluationReceipt.acceptanceDecision;
@@ -1522,16 +1580,16 @@ export function readExactAcceptedTaskTerminalAuthority(input: {
       || !exactCanonicalEqual(rubricEvaluation, revalidatedEvaluation, input.policy)
       || !exactCanonicalEqual(
         terminalEvaluation,
-        reenforced.enforcement.evaluation,
+        finalEnforcement.evaluation,
         input.policy,
       )
       || !exactCanonicalEqual(acceptanceDecision, {
-        outcome: reenforced.enforcement.outcome,
-        settlement: reenforced.enforcement.settlement,
-        enforced: reenforced.enforcement.enforced,
-        postRubricCause: reenforced.enforcement.postRubricCause ?? null,
-        routeClaim: null,
-        confirmationReceiptDigest: null,
+        outcome: finalEnforcement.outcome,
+        settlement: finalEnforcement.settlement,
+        enforced: finalEnforcement.enforced,
+        postRubricCause: finalEnforcement.postRubricCause ?? null,
+        routeClaim: finalEnforcement.routeClaim ?? null,
+        confirmationReceiptDigest: appliedConfirmation.receipt ? `sha256:${appliedConfirmation.receipt.receiptDigest}` : null,
       }, input.policy)
       || acceptanceDecision.outcome.kind !== resolveCanonicalTaskKind(taskAuthority.task)
       || acceptanceDecision.outcome.verdict !== sourceVerdict
@@ -1540,7 +1598,9 @@ export function readExactAcceptedTaskTerminalAuthority(input: {
         reduceAcceptanceSettlement({
           sourceVerdict,
           matrixDecision: acceptanceDecision.outcome,
-          confirmation: { status: 'MISSING' },
+          confirmation: appliedConfirmation.receipt
+            ? { status: 'AUTHENTICATED', receipt: appliedConfirmation.receipt, expired: false }
+            : { status: 'MISSING' },
         }),
         input.policy,
       )
@@ -1548,7 +1608,7 @@ export function readExactAcceptedTaskTerminalAuthority(input: {
         acceptanceDecision.postRubricCause !== null
         || !exactCanonicalEqual(rubricEvaluation, terminalEvaluation, input.policy)
       ))
-      || (acceptanceDecision.enforced === true && (
+      || (acceptanceDecision.enforced === true && appliedConfirmation.receipt === null && (
         acceptanceDecision.outcome.action !== 'REJECT'
         || terminalEvaluation.decision !== 'NO_GO'
         || acceptanceDecision.postRubricCause === null
@@ -1754,10 +1814,9 @@ export function settleExactAcceptedTaskEvaluation(
     if (acceptance.state === 'hold') {
       return { state: 'hold', reasonCode: `acceptance-${acceptance.reasonCode}` };
     }
-    if (
-      acceptance.enforcement.pendingConfirmation !== undefined
-      && acceptance.enforcement.routeClaim !== undefined
-    ) {
+    const appliedConfirmation = resolveExactAppliedConfirmation(input, acceptance.enforcement, settledEvaluation);
+    if (!appliedConfirmation && acceptance.enforcement.pendingConfirmation !== undefined
+      && acceptance.enforcement.routeClaim !== undefined) {
       return Object.freeze({
         state: 'route-required',
         enforcement: acceptance.enforcement as AcceptanceEnforcementResult & Required<Pick<
@@ -1766,10 +1825,8 @@ export function settleExactAcceptedTaskEvaluation(
         >>,
       });
     }
-    if (
-      acceptance.enforcement.pendingConfirmation !== undefined
-      || acceptance.enforcement.routeClaim !== undefined
-    ) return { state: 'hold', reasonCode: 'acceptance-route-authority-incomplete' };
+    if (!appliedConfirmation) return { state: 'hold', reasonCode: 'acceptance-route-authority-incomplete' };
+    const finalEnforcement = appliedConfirmation.enforcement;
     const artifactKey = exactTerminalArtifactKey(acceptedAuthority.identity, input.policy);
     const acceptedArtifact = input.custodyStore.readArtifactReceipt({
       identity: acceptedAuthority.identity,
@@ -1832,7 +1889,8 @@ export function settleExactAcceptedTaskEvaluation(
         taskAuthority,
         result,
         rubricEvaluation: settledEvaluation,
-        enforcement: acceptance.enforcement,
+        enforcement: finalEnforcement,
+        confirmationReceipt: appliedConfirmation.receipt,
         providerExitAuthorityDigest: providerExit.authority.authorityDigest,
         dispatchAdmissionRefDigest: providerExit.authority.dispatchAdmissionRefDigest,
         effectLandingReceiptDigest: effectLanding.landing.landing.receiptDigest,
@@ -1880,13 +1938,14 @@ export function settleExactAcceptedTaskEvaluation(
       if (persistedEvaluationChain !== null) {
         return { state: 'hold', reasonCode: 'evaluation-chain-without-artifact' };
       }
-      const evaluatedAt = new Date().toISOString();
+      const evaluatedAt = exactTerminalHostTimestampAtOrAfter(acceptedChain.occurredAt);
       evaluationReceipt = createExactTaskEvaluationReceipt({
         authority: acceptedAuthority,
         taskAuthority,
         result,
         rubricEvaluation: settledEvaluation,
-        enforcement: acceptance.enforcement,
+        enforcement: finalEnforcement,
+        confirmationReceipt: appliedConfirmation.receipt,
         providerExitAuthorityDigest: providerExit.authority.authorityDigest,
         dispatchAdmissionRefDigest: providerExit.authority.dispatchAdmissionRefDigest,
         effectLandingReceiptDigest: effectLanding.landing.landing.receiptDigest,
@@ -1990,7 +2049,7 @@ export function settleExactAcceptedTaskEvaluation(
       if (persistedFinalizerChain !== null) {
         return { state: 'hold', reasonCode: 'finalizer-chain-without-artifact' };
       }
-      const finalizedAt = new Date().toISOString();
+      const finalizedAt = exactTerminalHostTimestampAtOrAfter(evaluationChain.occurredAt);
       const finalizerReceipt = createExactTaskFinalizerReceipt({
         identity: acceptedAuthority.identity,
         admissionReceiptDigest: acceptedAuthority.admissionReceiptDigest,
@@ -2101,7 +2160,7 @@ export function settleExactAcceptedTaskEvaluation(
       if (persistedSettlementChain !== null) {
         return { state: 'hold', reasonCode: 'settlement-chain-without-artifact' };
       }
-      const settledAt = new Date().toISOString();
+      const settledAt = exactTerminalHostTimestampAtOrAfter(finalizerChain.occurredAt);
       settlement = createTaskResultSettlementV2({
         custodyStore: input.custodyStore,
         policy: input.policy,
@@ -2205,7 +2264,7 @@ export function settleExactAcceptedTaskEvaluation(
       if (persistedArchiveChain !== null) {
         return { state: 'hold', reasonCode: 'archive-chain-without-artifact' };
       }
-      const archivedAt = new Date().toISOString();
+      const archivedAt = exactTerminalHostTimestampAtOrAfter(settlementChain.occurredAt);
       archiveArtifact = input.custodyStore.publishHostArtifact({
         identity: acceptedAuthority.identity,
         policy: input.policy,
@@ -2242,7 +2301,7 @@ export function settleExactAcceptedTaskEvaluation(
     return Object.freeze({
       state: 'settled',
       authority: current.terminalAuthority,
-      enforcement: acceptance.enforcement,
+      enforcement: finalEnforcement,
       settlementRef,
       settlementDigest,
     });

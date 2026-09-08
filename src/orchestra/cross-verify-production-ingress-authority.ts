@@ -68,6 +68,8 @@ import type {
 import { prepareDockerExecutionLanding } from './execution-landing-coordinator.js';
 import type { DockerSpawnBackend } from './spawn-backend-docker.js';
 import { bootstrapCrossVerifyRuntimeV2 } from './cross-verify-runtime-bootstrap.js';
+import { readExactAcceptanceVerificationSourceV2,
+  type ExactAcceptanceVerificationSourceV2 } from './exact-acceptance-evidence.js';
 import { budgetFingerprint as computeBudgetFingerprint } from './runtime-budget-monitor.js';
 
 const TASKS_DIR = '.tasks';
@@ -617,11 +619,21 @@ implements MandatoryCrossVerifyInvocationFactory {
     readonly operationClass: CrossVerifyOperationClass;
     readonly timeoutMs: number;
     readonly verifierModel?: string;
+    readonly exactAcceptanceSource?: ExactAcceptanceVerificationSourceV2;
   }): Promise<MandatoryCrossVerifyInvocationFactoryResult> {
     if (input.config.cross_verify?.enabled !== true) {
       return hold('xverify_disabled', input.task.id);
     }
-    const producerSettlement = resolveProducerSettlementBinding({
+    const exactSource = input.exactAcceptanceSource
+      ? readExactAcceptanceVerificationSourceV2(input.exactAcceptanceSource) : null;
+    if (exactSource && (exactSource.state !== 'ready'
+      || canonicalJson(exactSource.task) !== canonicalJson(input.task)
+      || canonicalJson(exactSource.result) !== canonicalJson(input.result))) {
+      return hold('xverify_exact_acceptance_source_mismatch', input.task.id);
+    }
+    const producerSettlement: ProducerSettlementBinding = exactSource?.state === 'ready'
+      ? { state: 'ready', digest: `sha256:${exactSource.binding.bindingDigest}` }
+      : resolveProducerSettlementBinding({
       projectRoot: input.projectRoot,
       task: input.task,
       result: input.result,
@@ -955,6 +967,7 @@ implements MandatoryCrossVerifyInvocationFactory {
         fenceTokenHash,
         runtimeImageRef: profile.immutableImageRef,
         producerSettlementDigest: producerSettlement.digest,
+        ...(input.exactAcceptanceSource ? { exactAcceptanceSource: input.exactAcceptanceSource } : {}),
       });
       if (bootstrap.state === 'hold') {
         return selectedHold(bootstrap.reasonCode, bootstrap.detail);

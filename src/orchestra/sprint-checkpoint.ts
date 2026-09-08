@@ -6,7 +6,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { DECKENT_DIR, TASKS_DIR, BRAIN_DIR, RECENT_WORKS_DIR } from '../core/constants.js';
+import { DECKENT_DIR, TASKS_DIR, RECENT_WORKS_DIR } from '../core/constants.js';
 import { debugLog, readJsonSafe } from '../core/utils.js';
 import { checkWorkerLiveness } from './worker-liveness.js';
 import type { Sprint } from '../core/types.js';
@@ -15,7 +15,7 @@ import type { Task } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
 import type { Heartbeat } from '../core/types.js';
 import type { TaskResult } from '../core/types.js';
-import { writeSprintState, readSprintState } from './sprint-utils.js';
+import { writeSprintState } from './sprint-utils.js';
 // SCHED2 checkpoint-v2 (born-634/635 dilim-2) — cascade-skip on restore reuses
 // the sprint-411 scheduler-state helper (fix-aggregation-aware terminal-failure
 // set) instead of re-deriving the born-610 vocabulary locally.
@@ -60,6 +60,7 @@ import {
   taskStatusForTerminalResult,
 } from '../core/task-terminal-outcome.js';
 import { DeckentError } from '../core/errors.js';
+import { verifySprintArchiveTerminal } from '../core/sprint-archive.js';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -130,6 +131,8 @@ export interface SprintCheckpoint {
   checkpointNumber: number;
   /** ISO 8601 timestamp of when this checkpoint was written */
   timestamp: string;
+  /** Original sprint start, preserved independently from checkpoint write time. */
+  sprintStartedAt?: string;
   /** Task IDs that have reached a terminal state */
   completedTasks: string[];
   /** Task IDs that have not yet started */
@@ -361,6 +364,7 @@ export function writeCheckpoint(
       sprintId: sprint.id,
       checkpointNumber,
       timestamp: new Date().toISOString(),
+      ...(sprint.startedAt ? { sprintStartedAt: sprint.startedAt } : {}),
       completedTasks,
       pendingTasks,
       activeWorkers,
@@ -543,36 +547,21 @@ export function cleanupCheckpointFiles(projectRoot: string, sprintId: string): v
 }
 
 /**
- * Heuristic: has the given sprint already completed its finalize cycle?
+ * Has the given sprint completed its strongly verified terminal archive cycle?
  *
- * A finalized sprint that left a checkpoint behind must never re-trigger the
- * "complete" restore path (the ghost-finalize bug). Signals — any one wins:
- *   1. `.deckent/sprint-state.json` is stamped COMPLETE for this sprint —
- *      written by persistFinalSprintState at the end of finalizeSprint.
- *   2. The sprint-log `.brain/sprints/<sprintId>.md` exists — writeRetrospective
- *      produces it alongside the memory.db `retro` entry, so its presence is
- *      the on-disk mirror of "retro written / sprint finalized".
- *
- * Fail-safe: any read error is treated as "not finalized" (false) so a genuine
- * crash-recovery (sprint-state still ACTIVE/EVALUATING, no sprint-log yet) is
- * never mistaken for a finished sprint and keeps its existing recovery path.
+ * Mutable sprint-state or a retrospective log cannot authorize checkpoint
+ * deletion. Only the canonical terminal receipt, sealed archive, applied
+ * receipt, manifest and detached Brain projection together prove that the
+ * finalize cycle completed. Verification failure preserves the checkpoint so
+ * recovery cannot manufacture a fresh PLAN over unsettled work.
  */
 export function isSprintFinalized(projectRoot: string, sprintId: string): boolean {
-  // Signal 1: sprint-state.json COMPLETE for THIS sprint
   try {
-    const state = readSprintState(projectRoot);
-    if (state && state.sprintId === sprintId && state.status === SprintStatus.COMPLETE) {
-      return true;
-    }
-  } catch (e) { debugLog('sprint-checkpoint:isSprintFinalized:state', e); }
-
-  // Signal 2: sprint-log markdown exists (on-disk mirror of memory.db retro)
-  try {
-    const sprintLogPath = join(projectRoot, BRAIN_DIR, 'sprints', `${sprintId}.md`);
-    if (existsSync(sprintLogPath)) return true;
-  } catch (e) { debugLog('sprint-checkpoint:isSprintFinalized:log', e); }
-
-  return false;
+    return verifySprintArchiveTerminal(projectRoot, sprintId).ok;
+  } catch (e) {
+    debugLog('sprint-checkpoint:isSprintFinalized:archive', e);
+    return false;
+  }
 }
 
 // ─── Dep Graph Resume (Task 030) ─────────────────────────────────────
@@ -1026,14 +1015,16 @@ export function deriveResumableTaskIds(
   projectRoot: string,
   checkpoint: Pick<SprintCheckpoint, 'pendingTasks' | 'activeWorkers' | 'taskStates'>
     & Partial<Pick<SprintCheckpoint, 'sprintId'>>,
+  isExactTask?: IsCheckpointExactTask,
 ): string[] {
-  return deriveResumeDisposition(projectRoot, checkpoint).resumableIds;
+  return deriveResumeDisposition(projectRoot, checkpoint, isExactTask).resumableIds;
 }
 
 export function deriveResumeDisposition(
   projectRoot: string,
   checkpoint: Pick<SprintCheckpoint, 'pendingTasks' | 'activeWorkers' | 'taskStates'>
     & Partial<Pick<SprintCheckpoint, 'sprintId'>>,
+  isExactTask?: IsCheckpointExactTask,
 ): ResumeDisposition {
   const ids: string[] = [];
   const parkedSettlements: ResumeDisposition['parkedSettlements'] = [];
@@ -1041,6 +1032,15 @@ export function deriveResumeDisposition(
   const consider = (id: string, checkpointProvesResumable = false): void => {
     if (seen.has(id)) return;
     seen.add(id);
+    // Store-backed exact ownership is deliberately checked before public
+    // projections. Any exact admission remains backend-owned until the
+    // existing reconciliation path establishes NOT_DISPATCHED or terminal
+    // authority; it must never fall through to legacy reset/redispatch solely
+    // because a checkpoint or public result is absent/stale.
+    if (resolveCheckpointExactTaskDisposition(id, isExactTask) === 'exact') {
+      parkedSettlements.push({ taskId: id, state: 'pending-settlement' });
+      return;
+    }
     const authority = readResumeTaskResultAuthority(projectRoot, id);
     if (authority.state === 'terminal') return;
     if (
@@ -1299,6 +1299,11 @@ export function buildPreplannedResumeSprint(
     if (!task) throw new Error(`Durable task file is missing or unreadable for ${taskId}`);
 
     if (resumable.has(taskId)) {
+      if (resolveCheckpointExactTaskDisposition(taskId, isExactTask) === 'exact') {
+        throw createExecutionAuthorityError(
+          `Task ${taskId} exact checkpoint attempt must be reconciled before resume`,
+        );
+      }
       task.status = TaskStatus.PENDING;
       delete task.assignedWorker;
       return task;
@@ -1368,7 +1373,7 @@ export function buildPreplannedResumeSprint(
     phase: SprintPhase.PLAN,
     tasks,
     workers: [],
-    startedAt: checkpoint.timestamp,
+    startedAt: checkpoint.sprintStartedAt ?? checkpoint.timestamp,
     executionMode: checkpoint.executionMode,
     skipCleanup: checkpoint.skipCleanup,
   };
@@ -1845,8 +1850,7 @@ export function restoreSprintFromCheckpoint(
   }
 
   // Sprint 159 forensic: preserve startedAt across restart.
-  const startedAt = (cp as SprintCheckpoint & { sprintStartedAt?: string }).sprintStartedAt
-    ?? cp.timestamp;
+  const startedAt = cp.sprintStartedAt ?? cp.timestamp;
 
   // Classify active workers against the host settlement authority. A raw
   // worker-writable `.result` is terminal only on the legacy non-Docker path;
@@ -1926,17 +1930,18 @@ export function restoreSprintFromCheckpoint(
   });
   const action: RestoreAction = fullyTerminal ? 'complete' : 'resume-evaluate';
 
-  const resumedPhase = action === 'complete' ? SprintPhase.COMPLETE : SprintPhase.EVALUATE;
-  const resumedStatus = action === 'complete' ? SprintStatus.COMPLETE : SprintStatus.EVALUATING;
-
   const restoredSprint: Sprint = {
     id: sprintId,
     number: parseSprintNumber(sprintId),
-    status: resumedStatus,
-    phase: resumedPhase,
+    // `action: complete` is terminalization eligibility, not publication.
+    // COMPLETE becomes visible only after the outer terminal receipt commits.
+    status: SprintStatus.EVALUATING,
+    phase: SprintPhase.EVALUATE,
     tasks,
     workers: [],
     startedAt,
+    executionMode: cp.executionMode,
+    skipCleanup: cp.skipCleanup,
   };
 
   // Sync sprint-state.json so observers see the resumed phase.

@@ -8,9 +8,10 @@ import { acceptanceConfirmationDigest, deriveAcceptanceConfirmationId,
 import { resolveApprovalLifecyclePolicy } from '../../src/core/approval-lifecycle-policy.js';
 import { createAcceptanceConfirmationRequest, settleConfirmation } from '../../src/core/confirmation-store.js';
 import { MemoryStore } from '../../src/core/memory-store.js';
-import { openAcceptanceConfirmationComposition } from '../../src/orchestra/acceptance-confirmation-composition.js';
+import { openAcceptanceConfirmationComposition, readAppliedAcceptanceConfirmation } from '../../src/orchestra/acceptance-confirmation-composition.js';
+import type { AcceptanceRouteClaim } from '../../src/orchestra/acceptance-enforcement.js';
 import type { AcceptanceRouteRecord } from '../../src/orchestra/acceptance-confirmation-service.js';
-const roots: string[] = []; const clock = () => new Date('2026-08-22T12:00:00.000Z');
+const cleanups: Array<() => void> = []; const clock = () => new Date('2026-08-22T12:00:00.000Z');
 const hash = (value: string) => acceptanceConfirmationDigest(value);
 const brokerKey = 'broker-mac-test-key-that-is-at-least-32-bytes';
 function brokerReceipt(confirmationId: string, verdict: 'CONFIRMED' | 'FAILED'): string {
@@ -26,7 +27,8 @@ function verifyBrokerAuthority(decision: {
   return actual.length === canonical.length && timingSafeEqual(actual, canonical);
 }
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), 'acceptance-composition-')); roots.push(root);
+  const root = mkdtempSync(join(tmpdir(), 'acceptance-composition-'));
+  cleanups.push(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(root, '.brain'), { recursive: true }); new MemoryStore(join(root, '.brain', 'memory.db')).close();
   const lineage: AcceptanceConfirmationLineage = { tenantId: 'tenant-a', projectId: 'project-a',
     attemptId: 'attempt-1', generation: 1, sprintId: 'sprint-616', taskId: '616-008',
@@ -39,9 +41,14 @@ function fixture() {
       evidenceDigest: hash('evidence'), revisionDigest: hash('revision') }, acceptanceLineage: lineage,
   }, { tenantId: lineage.tenantId, projectId: lineage.projectId,
     lifecycle: resolveApprovalLifecyclePolicy({ enabled: true }), clock });
-  return { root, route: { confirmationId, lineage, sourceVerdict: 'UNDECIDABLE' } as AcceptanceRouteRecord };
+  const readDebt = (id: string) => {
+    const memory = new MemoryStore(join(root, '.brain', 'memory.db'));
+    try { return memory.getById(id); }
+    finally { memory.close(); }
+  };
+  return { root, readDebt, route: { confirmationId, lineage, sourceVerdict: 'UNDECIDABLE' } as AcceptanceRouteRecord };
 }
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); });
 describe('acceptance confirmation production composition', () => {
   it('settles only through the production decideAndSettle adapter with broker MAC authority', async () => {
     const f = fixture();
@@ -59,6 +66,17 @@ describe('acceptance confirmation production composition', () => {
     });
     expect(applied).toMatchObject({ state: 'DONE', replayed: false,
       receipt: { state: 'APPLIED', preparedReceiptDigest: expect.any(String) } });
+    const unsigned = { schemaVersion: 2 as const, confirmationId: f.route.confirmationId,
+      lineage: f.route.lineage, evaluationDigest: f.route.lineage.evaluationDigest,
+      sourceVerdict: 'UNDECIDABLE' as const, adapter: 'human' as const };
+    const routeClaim: AcceptanceRouteClaim = { ...unsigned, claimDigest: acceptanceConfirmationDigest(unsigned) };
+    expect(readAppliedAcceptanceConfirmation({ projectRoot: f.root, routeClaim,
+      verifyAuthority: verifyBrokerAuthority })).toMatchObject({ state: 'APPLIED' });
+    expect(readAppliedAcceptanceConfirmation({ projectRoot: f.root, routeClaim,
+      verifyAuthority: () => false })).toBeNull();
+    expect(readAppliedAcceptanceConfirmation({ projectRoot: f.root,
+      routeClaim: { ...routeClaim, lineage: { ...routeClaim.lineage, generation: 2 } },
+      verifyAuthority: verifyBrokerAuthority })).toBeNull();
     await expect(composition.decideAndSettle({
       confirmationId: f.route.confirmationId, verdict: 'CONFIRMED', decidedBy: 'human',
       reason: 'authenticated broker decision', authorityReceipt,
@@ -79,9 +97,8 @@ describe('acceptance confirmation production composition', () => {
       state: 'DENIED', reasonCode: 'AUTHORITY_VERIFICATION_FAILED',
       receiptRef: `${f.route.confirmationId}:prepared`,
     });
-    const memory = new MemoryStore(join(f.root, '.brain', 'memory.db'));
-    expect(memory.getById(`debt-${f.route.confirmationId}`)).toMatchObject({ status: 'active' });
-    memory.close(); composition.close();
+    expect(f.readDebt(`debt-${f.route.confirmationId}`)).toMatchObject({ status: 'active' });
+    composition.close();
   });
   it('owns real stores and closes deterministically', async () => {
     const f = fixture(); const composition = openAcceptanceConfirmationComposition({ projectRoot: f.root,
@@ -102,7 +119,6 @@ describe('acceptance confirmation production composition', () => {
       tenantId: 'tenant-b', projectId: 'project-a', lifecycle: resolveApprovalLifecyclePolicy({ enabled: true }),
       clock, verifyAuthority: () => true });
     await expect(composition.createAndRoute(f.route)).resolves.toMatchObject({ state: 'HOLD', reasonCode: 'COMPOSITION_AUTHORITY_MISMATCH' });
-    const memory = new MemoryStore(join(f.root, '.brain', 'memory.db'));
-    expect(memory.getById(`debt-${f.route.confirmationId}`)).toBeNull(); memory.close(); composition.close();
+    expect(f.readDebt(`debt-${f.route.confirmationId}`)).toBeNull(); composition.close();
   });
 });

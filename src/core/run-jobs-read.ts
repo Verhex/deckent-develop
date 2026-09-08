@@ -84,13 +84,28 @@ function readSprintProcessIdentity(
   root: string,
   sprintId: string,
 ): SprintProcessIdentity | undefined {
-  try {
-    return JSON.parse(
-      readFileSync(join(root, '.deckent', 'pids', `${sprintId}.pid`), 'utf-8'),
-    ) as SprintProcessIdentity;
-  } catch {
-    return undefined;
+  // `.pid` is live coordinator authority. Failure retirement removes it
+  // before the detached child records RUN_FAILED, while retaining the exact
+  // generation snapshot as evidence-only correlation material. A snapshot
+  // can prove which flow terminated; it cannot make a coordinator live.
+  for (const suffix of ['.pid', '.snapshot.json'] as const) {
+    try {
+      const identity = JSON.parse(
+        readFileSync(join(root, '.deckent', 'pids', `${sprintId}${suffix}`), 'utf-8'),
+      ) as SprintProcessIdentity;
+      if (
+        typeof identity.pid === 'number'
+        && Number.isInteger(identity.pid)
+        && identity.pid > 0
+        && nonEmpty(identity.startToken) !== undefined
+      ) {
+        return identity;
+      }
+    } catch {
+      // Try the evidence-only snapshot after an absent/malformed live record.
+    }
   }
+  return undefined;
 }
 
 function terminalEventClosure(
@@ -124,8 +139,9 @@ function terminalEventClosure(
 /**
  * Join a Sprint to the terminal execution truth of its exact RunFlow process.
  * Sprint correlation alone is insufficient: both PID and non-empty start token
- * must match the Sprint coordinator record, preventing PID reuse or an older
- * flow for the same Sprint from becoming lifecycle authority.
+ * must match the live coordinator record or its retained failure snapshot,
+ * preventing PID reuse or an older flow for the same Sprint from becoming
+ * lifecycle authority.
  */
 export function readRunFlowTerminalClosureForSprint(
   root: string,

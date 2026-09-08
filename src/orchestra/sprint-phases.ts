@@ -274,6 +274,7 @@ import {
   cleanup,
 } from './sprint-controller.js';
 import type { RunSprintOptions } from './sprint-controller.js';
+import type { WorkerDispatchEvidence } from './sprint-spawner.js';
 import { normalizeTaskResultShape, serializeTaskResultForDisk } from '../core/task-result-schema.js';
 
 
@@ -1543,6 +1544,20 @@ export interface PlanPhaseResult {
 export interface SpawnPhaseResult {
   taskQueue: Task[];
   scanInterval: ReturnType<typeof setInterval> | null;
+  /** Concrete dispatches admitted during this SPAWN attempt; never task-state inference. */
+  dispatchEvidence: readonly WorkerDispatchEvidence[];
+}
+
+/**
+ * Only the attempt which completed SPAWN may publish owner-facing dispatch
+ * evidence. A retried attempt's evidence is forensic-only: using it after a
+ * later successful zero-work attempt would fabricate a worker-start claim.
+ */
+export function projectSuccessfulSpawnAttemptEvidence(
+  attemptSucceeded: boolean,
+  attemptDispatchEvidence: readonly WorkerDispatchEvidence[],
+): readonly WorkerDispatchEvidence[] {
+  return attemptSucceeded ? Object.freeze([...attemptDispatchEvidence]) : Object.freeze([]);
 }
 
 /**
@@ -1655,6 +1670,7 @@ export async function runSpawnPhase(
 ): Promise<SpawnPhaseResult> {
   let scanInterval: ReturnType<typeof setInterval> | null = null;
   let taskQueue: Task[] = [];
+  let dispatchEvidence: readonly WorkerDispatchEvidence[] = Object.freeze([]);
   let spawnAttempts = 0;
   // RECOVERY-DO-DOGFOOD: every attempt's error is retained so the terminal
   // message can name ALL of them. Previously only the last survived, and a
@@ -1662,6 +1678,7 @@ export async function runSpawnPhase(
   const spawnAttemptErrors: unknown[] = [];
 
   while (spawnAttempts < 2) {
+    const attemptDispatchEvidence: WorkerDispatchEvidence[] = [];
     try {
       // Sprint 161 Task 2 (T-003): SPAWN entry — phase reflects on disk
       // immediately so observers can distinguish PLAN→SPAWN transition
@@ -1695,6 +1712,7 @@ export async function runSpawnPhase(
           : {}),
         ...(exactDockerRegistry ? { exactDockerRegistry } : {}),
         ...(exactTaskProjectionAdmission ? { exactTaskProjectionAdmission } : {}),
+        onWorkerDispatched: (evidence) => { attemptDispatchEvidence.push(evidence); },
       });
       // Spawn succeeded — promote to ACTIVE and re-persist.
       persistPhaseTransition(projectRoot, sprint, SprintPhase.SPAWN, SprintStatus.ACTIVE);
@@ -1718,8 +1736,12 @@ export async function runSpawnPhase(
         // `deckent audit` daemon, whose scan loop IS its reason to stay alive.
         scanInterval?.unref?.();
       } catch (e) { debugLog('runSpawnPhase:startScanLoop', e); }
+      dispatchEvidence = projectSuccessfulSpawnAttemptEvidence(true, attemptDispatchEvidence);
       break;
     } catch (err) {
+      // Failed-attempt evidence must never cross the retry boundary into a
+      // later zero-work SPAWN result or its connector notification.
+      dispatchEvidence = projectSuccessfulSpawnAttemptEvidence(false, attemptDispatchEvidence);
       if (err instanceof ProviderExecutionIngressHoldError) {
         if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
         throw err;
@@ -1759,7 +1781,7 @@ export async function runSpawnPhase(
     }
   }
 
-  return { taskQueue, scanInterval };
+  return { taskQueue, scanInterval, dispatchEvidence };
 }
 
 
@@ -3525,8 +3547,26 @@ export async function runFixPhase(
   routingVersionForFix: string,
   spawnBackend: SpawnBackend | undefined,
   exactDockerRegistry?: ExactNormalDockerExecutionRegistryV2,
+  onRepairDispatched?: (evidence: WorkerDispatchEvidence) => void,
 ): Promise<FixPhaseFailureOutcome | undefined> {
   try {
+    // Recovery processes do not inherit the in-memory queue-id map from the
+    // coordinator that admitted a repair. Re-adopt the durable, sprint-scoped
+    // NOT_DISPATCHED admission before reading exact custody so a canonical
+    // resume can terminalize the original queue record instead of stranding it
+    // behind process lifetime.
+    const owningSprintId = getCurrentSprintId(projectRoot) ?? sprint.id;
+    const sprintTaskIds = new Set(sprint.tasks.map(task => task.id));
+    const repairQueueIds = new Map(
+      readRepairQueueAuthority(projectRoot).records
+        .filter(record =>
+          record.sprintId === owningSprintId
+          && record.birthClass === 'NOT_DISPATCHED_REDISPATCH'
+          && record.dispatchStatus !== 'settled'
+          && sprintTaskIds.has(record.taskId),
+        )
+        .map(record => [record.taskId, record.queueId] as const),
+    );
     if (exactDockerRegistry) {
       const current = new Map<string, ExactAcceptedTaskTerminalAuthorityRead>();
       for (const task of sprint.tasks) {
@@ -3629,7 +3669,6 @@ export async function runFixPhase(
     // the verdict cache spans them so each attempt is scored exactly once (the
     // post-wave loops reuse it instead of re-running the rubric).
     const fixVerdicts = new Map<string, { evaluation: TaskEvaluation; rubric: EvaluationResult }>();
-    const repairQueueIds = new Map<string, string>();
     const admitRepair = (
       task: Task,
       birthClass: RepairBirthClass,
@@ -3656,6 +3695,12 @@ export async function runFixPhase(
       if (!queueId) return;
       transitionRepairQueueRecord(projectRoot, queueId, 'dispatched');
     };
+    const reportRepairDispatch = (evidence: WorkerDispatchEvidence): void => {
+      markRepairDispatched(evidence.taskId);
+      try {
+        onRepairDispatched?.(evidence);
+      } catch (e) { debugLog('runFixPhase:onRepairDispatched', e); }
+    };
     const markRepairSettled = (taskId: string): void => {
       const queueId = repairQueueIds.get(taskId);
       if (!queueId) return;
@@ -3664,6 +3709,18 @@ export async function runFixPhase(
       if (current?.dispatchStatus === 'queued') markRepairDispatched(taskId);
       transitionRepairQueueRecord(projectRoot, queueId, 'settled');
     };
+    // A resumed coordinator may arrive after the exact attempt already became
+    // terminal. Bind that durable terminal truth back to the durable repair
+    // admission before any new FIX work is considered. `current` proves a
+    // provider attempt settled; `not-dispatched` proves zero provider work.
+    for (const taskId of repairQueueIds.keys()) {
+      if (!exactDockerRegistry?.isExactTask(taskId)) continue;
+      const terminal = exactDockerRegistry.readExactTerminalAuthority(taskId);
+      const resultAuthority = exactDockerRegistry.readTaskResultAuthority(taskId);
+      if (terminal.state === 'current' || resultAuthority.state === 'not-dispatched') {
+        markRepairSettled(taskId);
+      }
+    }
     const evaluateFixIngest = async (
       ingestTask: Task,
       ingestResult: TaskResult,
@@ -3995,10 +4052,8 @@ export async function runFixPhase(
         attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
         providerAuthority: opts?.providerAuthority,
         exactDockerRegistry,
+        onWorkerDispatched: reportRepairDispatch,
       });
-      for (const task of fixTasks) {
-        if (task.status === TaskStatus.EXECUTING) markRepairDispatched(task.id);
-      }
       // The collector owns the FIX wave's overflow queue after the initial
       // spawn pass. It keeps FIFO order while planDispatch admits queued tasks
       // as worker slots open and their dependencies become satisfying.
@@ -4286,10 +4341,8 @@ export async function runFixPhase(
             attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
             providerAuthority: opts?.providerAuthority,
             exactDockerRegistry,
+            onWorkerDispatched: reportRepairDispatch,
           });
-          for (const task of eligible) {
-            if (task.status === TaskStatus.EXECUTING) markRepairDispatched(task.id);
-          }
           // Hand this wave's overflow to the same slot- and dependency-aware
           // collector dispatcher used by the main FIX wave.
           publishSchedulerSpawnSkips(
@@ -4332,6 +4385,14 @@ export async function runFixPhase(
               // worker actually ran and crashed — a real NO_GO, not a dispatch gap.
               const evidence = gatherDispatchTraceEvidence(projectRoot, rTask.id);
               if (classifyMissingResultDispatch(evidence) === 'NOT_DISPATCHED') {
+                // The exact backend already proved zero provider work and
+                // durably terminalized this admitted repair attempt. Project
+                // that authority into the repair queue before quiescence; a
+                // missing public worker result is expected for this branch.
+                const exactRead = exactDockerRegistry?.readTaskResultAuthority(rTask.id);
+                if (exactRead?.state === 'not-dispatched') {
+                  markRepairSettled(rTask.id);
+                }
                 stillNotDispatched += 1;
                 evaluations.set(rTask.id, TaskEvaluation.NOT_DISPATCHED);
               } else {
@@ -4430,6 +4491,7 @@ export async function runFixPhase(
           attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
           providerAuthority: opts?.providerAuthority,
           exactDockerRegistry,
+          onWorkerDispatched: reportRepairDispatch,
         },
         );
         if (postFixSpawnedIds.length === 0) break;

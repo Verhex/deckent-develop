@@ -5,6 +5,7 @@ import {
   isExactAcceptedResultTerminalAuthorityV2,
   type ExactAcceptedResultTerminalAuthorityV2,
 } from '../../src/orchestra/exact-accepted-result-terminal-authority.js';
+import { isCurrentExactAcceptedTaskTerminalAuthorityRead } from '../../src/orchestra/evaluation-audit-trail.js';
 import type {
   ExactAcceptedTaskResultAuthorityMetadata,
   ExactTaskResultAuthorityMetadata,
@@ -127,6 +128,46 @@ describe('exact accepted-result terminal authority parser', () => {
         },
       },
     }, accepted)).toBe(false);
+  });
+
+  it('rejects stale or sibling terminal rereads before dependency data can be consumed', () => {
+    const { accepted, authority } = fixture('900-001', 'attempt-a', 'DONE');
+    const currentRead = (terminalAuthority: ExactAcceptedResultTerminalAuthorityV2) => ({
+      state: 'current' as const,
+      terminalAuthority,
+      terminalResultAuthority: terminalAuthority.terminalResultAuthority,
+      evaluationReceipt: { verdict: 'DONE' as const },
+      finalizerReceipt: { verdict: 'DONE' as const },
+      result: {
+        taskId: terminalAuthority.acceptedAuthority.identity.taskId,
+        attemptCustody: { identity: terminalAuthority.acceptedAuthority.identity },
+      },
+      projectedResult: { taskId: terminalAuthority.acceptedAuthority.identity.taskId },
+    });
+    const stale = {
+      ...authority,
+      terminalResultAuthority: {
+        ...authority.terminalResultAuthority,
+        settlementDigest: digest('d'),
+      },
+    };
+    const sibling = fixture('900-001', 'attempt-b', 'DONE').authority;
+
+    expect(isCurrentExactAcceptedTaskTerminalAuthorityRead(
+      accepted.identity.taskId,
+      authority,
+      currentRead(authority) as never,
+    )).toBe(true);
+    expect(isCurrentExactAcceptedTaskTerminalAuthorityRead(
+      accepted.identity.taskId,
+      authority,
+      currentRead(stale) as never,
+    )).toBe(false);
+    expect(isCurrentExactAcceptedTaskTerminalAuthorityRead(
+      accepted.identity.taskId,
+      authority,
+      currentRead(sibling) as never,
+    )).toBe(false);
   });
 
   it('rejects a foreign terminal-decision schema or kind even when receipts match', () => {

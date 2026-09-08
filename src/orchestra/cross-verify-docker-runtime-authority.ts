@@ -27,7 +27,8 @@ import {
   type TaskResultSettlementRefV1,
 } from '../core/task-result-settlement.js';
 import { canonicalJson } from '../core/audit-writer.js';
-import { CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX } from '../core/cross-verify-prompt.js';
+import { frameTerminalAdjudicationProtocol } from '../core/cross-verify-prompt.js';
+export { frameTerminalAdjudicationProtocol } from '../core/cross-verify-prompt.js';
 import { createExecutionAuthorityError } from '../core/errors.js';
 import type { SpawnBackendOptions } from './spawn-backend.js';
 import {
@@ -246,40 +247,6 @@ function hold(
       detail,
     }),
   };
-}
-
-const TERMINAL_VERDICT_LINE = /^VERDICT:\s*(?:REFUTED|CONFIRMED|UNCLEAR)\s+.+$/iu;
-
-/**
- * Frame the host-observed terminal adjudication protocol from settlement notes,
- * fail-closed on ambiguity. Exactly ONE terminal `VERDICT:` line is mandatory;
- * at most ONE machine-readable `XVERIFY_RESPONSE_JSON:` line is allowed. Any
- * missing or duplicated marker of either kind returns null so the host derives
- * UNCLEAR rather than silently trusting the first/last of an ambiguous set.
- *
- *  - one response + one verdict (response first) → the v2 two-line protocol, so
- *    parseCrossVerifyAdjudicationOutputV2 receives its object.
- *  - zero response + one verdict → the single-line v1 protocol fallback.
- *  - duplicated response, duplicated verdict, missing verdict, or a response
- *    after its verdict → null (fail-closed).
- */
-export function frameTerminalAdjudicationProtocol(notes: string): string | null {
-  const lines = notes.trim().split(/\r?\n/u)
-    .map((line: string) => line.trim())
-    .filter((line: string) => line.length > 0);
-  const verdictLines = lines.filter((line: string) => TERMINAL_VERDICT_LINE.test(line));
-  if (verdictLines.length !== 1) return null;
-  const verdictLine = verdictLines[0]!;
-  const responseLines = lines.filter(
-    (line: string) => line.startsWith(CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX),
-  );
-  if (responseLines.length > 1) return null;
-  if (responseLines.length === 1) {
-    const responseLine = responseLines[0]!;
-    if (lines.indexOf(responseLine) >= lines.indexOf(verdictLine)) return null;
-    return `${responseLine}\n${verdictLine}`;
-  }
-  return verdictLine;
 }
 
 function terminalProtocolFromSettlement(

@@ -62,6 +62,7 @@ import {
   deriveProductionWiringApplicability,
   type ProductionWiringPlanEvidence,
   type ProductionWiringResultEvidence,
+  type Task,
 } from '../../src/core/task-types.js';
 import {
   createTaskResultSettlementV2,
@@ -70,7 +71,7 @@ import {
   type TaskResultSettlementV2,
   type TaskResultSettlementV2ArchivePayload,
 } from '../../src/core/task-result-settlement.js';
-import { createExactNormalTaskApprovedMaterialV3 } from '../../src/orchestra/exact-evaluation-policy-authority.js';
+import { createExactNormalTaskApprovedMaterialV3, type ExactEvaluationPolicyConfig } from '../../src/orchestra/exact-evaluation-policy-authority.js';
 
 function rawSha256(bytes: Uint8Array): Sha256Digest {
   return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
@@ -119,6 +120,7 @@ interface FixturePublicationSession {
 
 /** Simulation-only adapter. It cannot be cited as POSIX or Windows native proof. */
 export class InMemoryTaskAttemptCustodyAdapter implements TaskAttemptCustodyAdapter {
+  constructor(private readonly successfulMount = false) {}
   readonly platform = 'posix' as const;
   readonly files = new Map<string, FixtureMemoryFile>();
   readonly directories = new Map<string, TaskAttemptCustodyDirectoryProof>();
@@ -207,6 +209,19 @@ export class InMemoryTaskAttemptCustodyAdapter implements TaskAttemptCustodyAdap
   }): Promise<TaskAttemptCustodyBackendMountTransferReceipt> {
     if (!this.backendMountCapabilities.has(input.capability)) {
       throw new TaskAttemptCustodyHold('CAPABILITY_UNVERIFIED', 'resolve-mount');
+    }
+    if (this.successfulMount) {
+      return createTaskAttemptCustodyBackendMountTransferReceipt({
+        state: 'CONSUMED', rootId: input.root.rootId, scopeDigest: input.scopeDigest,
+        effectOpDigest: input.effectOpDigest, attemptId: input.attemptId, generation: input.generation,
+        backend: 'docker', backendExecutionId: 'c'.repeat(64),
+        backendImageDigest: `sha256:${'1'.repeat(64)}`,
+        backendAuthorityLabelDigest: `sha256:${'2'.repeat(64)}`,
+        taskSnapshotMountEvidenceDigest: `sha256:${'3'.repeat(64)}`,
+        workerOutputMountEvidenceDigest: `sha256:${'4'.repeat(64)}`,
+        backendBootstrapProbeEvidenceDigest: `sha256:${'5'.repeat(64)}`,
+        daemonMountReceiptDigest: `sha256:${'6'.repeat(64)}`, cleanupEvidenceDigest: null,
+      });
     }
     return createTaskAttemptCustodyBackendMountTransferReceipt({
       state: 'CLEANUP_UNCONFIRMED',
@@ -302,7 +317,7 @@ export class InMemoryTaskAttemptCustodyAdapter implements TaskAttemptCustodyAdap
       sha256: rawSha256(input.bytes),
       byteLength: input.bytes.byteLength,
       volumeId: input.root.volumeId,
-      fileId: `fixture:${input.relativePath}`,
+      fileId: `fixture:${createHash('sha256').update(input.relativePath).digest('hex')}`,
       linkCount: 1,
       privacyEvidenceDigest: `sha256:${'3'.repeat(64)}`,
       durabilityEvidenceDigest: `sha256:${'4'.repeat(64)}`,
@@ -500,7 +515,7 @@ export class InMemoryTaskAttemptCustodyAdapter implements TaskAttemptCustodyAdap
       sha256: rawSha256(bytes),
       byteLength: bytes.byteLength,
       volumeId: TEST_ROOT_PROOF.volumeId,
-      fileId: `fixture:${relativePath}`,
+      fileId: `fixture:${createHash('sha256').update(relativePath).digest('hex')}`,
       linkCount: 1,
       privacyEvidenceDigest: `sha256:${'3'.repeat(64)}`,
       durabilityEvidenceDigest: `sha256:${'4'.repeat(64)}`,
@@ -579,7 +594,25 @@ export interface TaskResultSettlementV2Fixture extends TaskResultAcceptedV2Fixtu
   readonly archiveChain: ReturnType<TaskAttemptCustodyStore['appendChain']>;
 }
 
+export interface TaskResultFixtureEffect {
+  readonly effectLandingBinding: ReturnType<typeof createTaskAttemptEffectLandingBindingV2>;
+  readonly effectLandingChain: ReturnType<TaskAttemptCustodyStore['appendChain']>;
+  readonly releasedAt: string;
+}
+
 export interface TaskResultSettlementV2FixtureOptions {
+  readonly reserveDispatch?: boolean;
+  readonly projectRoot?: string;
+  readonly taskOverrides?: Partial<Task>;
+  readonly evaluationConfig?: ExactEvaluationPolicyConfig;
+  readonly filesChanged?: readonly string[];
+  readonly effectProducer?: (input: {
+    readonly store: TaskAttemptCustodyStore;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly identity: TaskAttemptCustodyIdentityV2;
+    readonly admission: ReturnType<TaskAttemptCustodyStore['createAdmission']>;
+    readonly dispatchAdmission?: ReturnType<TaskAttemptCustodyStore['reserveDispatchAdmission']>;
+  }) => TaskResultFixtureEffect | Promise<TaskResultFixtureEffect>;
   readonly tailArtifactKey?: string;
   readonly archiveCapturedAt?: string;
   readonly terminal?: 'full' | 'accepted-only';
@@ -597,6 +630,12 @@ const taskResultSettlementV2FixtureCache = new Map<
 >();
 
 export function createTaskResultSettlementV2Fixture(
+  options: TaskResultSettlementV2FixtureOptions & {
+    readonly terminal: 'accepted-only';
+    readonly effectProducer: (input: Parameters<NonNullable<TaskResultSettlementV2FixtureOptions['effectProducer']>>[0]) => Promise<TaskResultFixtureEffect>;
+  },
+): Promise<TaskResultAcceptedV2Fixture>;
+export function createTaskResultSettlementV2Fixture(
   options: TaskResultSettlementV2FixtureOptions & { readonly terminal: 'accepted-only' },
 ): TaskResultAcceptedV2Fixture;
 export function createTaskResultSettlementV2Fixture(
@@ -605,7 +644,7 @@ export function createTaskResultSettlementV2Fixture(
 
 export function createTaskResultSettlementV2Fixture(
   options: TaskResultSettlementV2FixtureOptions = {},
-): TaskResultSettlementV2Fixture | TaskResultAcceptedV2Fixture {
+): TaskResultSettlementV2Fixture | TaskResultAcceptedV2Fixture | Promise<TaskResultAcceptedV2Fixture> {
   const cacheKey = fixtureCanonicalJson({
     tailArtifactKey: options.tailArtifactKey ?? null,
     archiveCapturedAt: options.archiveCapturedAt ?? null,
@@ -613,14 +652,19 @@ export function createTaskResultSettlementV2Fixture(
     attemptId: options.attemptId ?? null,
     productionWiring: options.productionWiring ?? null,
     productionWiringEvidence: options.productionWiringEvidence ?? null,
+    projectRoot: options.projectRoot ?? null,
+    taskOverrides: options.taskOverrides ?? null,
+    evaluationConfig: options.evaluationConfig ?? null,
+    filesChanged: options.filesChanged ?? null,
+    reserveDispatch: options.reserveDispatch ?? false,
   });
-  const cached = taskResultSettlementV2FixtureCache.get(cacheKey);
+  const cached = options.effectProducer ? undefined : taskResultSettlementV2FixtureCache.get(cacheKey);
   if (cached) return cached;
   const tailArtifactKey = options.tailArtifactKey ?? 'primary';
   const archiveCapturedAt = options.archiveCapturedAt ?? '2026-08-30T20:11:00.000Z';
-  const canonicalProjectRoot = '/fixture/project';
+  const canonicalProjectRoot = options.projectRoot ?? '/fixture/project';
   const projectRootSha256 = createHash('sha256').update(canonicalProjectRoot).digest('hex');
-  const adapter = new InMemoryTaskAttemptCustodyAdapter();
+  const adapter = new InMemoryTaskAttemptCustodyAdapter(options.reserveDispatch === true);
   const store = TaskAttemptCustodyStore.open({
     adapter,
     absoluteRoot: '/fixture/host-custody',
@@ -629,19 +673,20 @@ export function createTaskResultSettlementV2Fixture(
     create: true,
   });
   const policy = createTaskResultSettlementV2TestPolicy();
-  const identity: TaskAttemptCustodyIdentityV2 = {
+  let identity: TaskAttemptCustodyIdentityV2 = {
     schemaVersion: 2,
     backend: 'docker',
     projectRootSha256,
     projectId: 'fixture-project',
     taskId: 'fixture-001',
     attemptId: options.attemptId ?? '123e4567-e89b-42d3-a456-426614174000',
-    generation: 4,
+    generation: options.reserveDispatch ? 1 : 4,
   };
   let predecessorIdentity: TaskAttemptCustodyIdentityV2 | null = null;
   let predecessorDigest: Sha256Digest | null = null;
   let admission: ReturnType<TaskAttemptCustodyStore['createAdmission']> | null = null;
-  const taskScope = options.productionWiring === undefined
+  let dispatchAdmission: ReturnType<TaskAttemptCustodyStore['reserveDispatchAdmission']> | undefined;
+  const taskScope = options.taskOverrides?.scope ?? (options.productionWiring === undefined
     ? Object.freeze({
         directories: Object.freeze(['tests/helpers']),
         filesRead: Object.freeze(['tests/helpers/input.ts']),
@@ -651,7 +696,7 @@ export function createTaskResultSettlementV2Fixture(
         directories: Object.freeze(['src/orchestra']),
         filesRead: Object.freeze(['src/orchestra/input.ts']),
         filesWrite: Object.freeze(['src/orchestra/output.ts']),
-      });
+      }));
   for (let generation = 1; generation <= identity.generation; generation += 1) {
     const generationIdentity = { ...identity, generation };
     const dispatchTask = Object.freeze({
@@ -690,6 +735,7 @@ export function createTaskResultSettlementV2Fixture(
       ...(options.productionWiring === undefined
         ? {}
         : { productionWiring: options.productionWiring }),
+      ...options.taskOverrides,
     });
     const lineage = Object.freeze({ generation, predecessorDigest });
     const dispatchSha256 = rawSha256(canonicalTaskAttemptCustodyJson(dispatchTask, policy.jsonBounds));
@@ -698,19 +744,17 @@ export function createTaskResultSettlementV2Fixture(
       task: dispatchTask,
       dispatchTaskMaterialDigest: dispatchSha256,
       policy,
+      ...(options.evaluationConfig ? { config: options.evaluationConfig } : {}),
     });
     const approvedSha256 = rawSha256(canonicalTaskAttemptCustodyJson(approved, policy.jsonBounds));
     const lineageSha256 = rawSha256(canonicalTaskAttemptCustodyJson(lineage, policy.jsonBounds));
-    admission = store.createAdmission({
-      identity: generationIdentity,
-      policy,
-      admittedAt: `2026-08-30T20:00:0${generation - 1}.000Z`,
-      predecessorDigest,
-      predecessorIdentity,
-      taskSnapshot: Object.freeze({
+    const dispatchRequestId = options.reserveDispatch
+      ? `dreq-${createHash('sha256').update(`${canonicalProjectRoot}:${tailArtifactKey}`).digest('hex')}`
+      : `fixture-dispatch-request-${generation}`;
+    const taskSnapshot = Object.freeze({
         schemaVersion: 2,
         kind: 'exact-docker-dispatch-snapshot',
-        dispatchRequestId: `fixture-dispatch-request-${generation}`,
+        dispatchRequestId,
         projectId: identity.projectId,
         taskId: identity.taskId,
         material: Object.freeze({
@@ -721,9 +765,23 @@ export function createTaskResultSettlementV2Fixture(
           lineage,
           lineageSha256,
         }),
-        dispatch: Object.freeze({ backend: 'docker', fixture: true }),
-      }),
-    });
+        dispatch: Object.freeze({ backend: 'docker', fixture: true,
+          ...(options.taskOverrides?.provider ? { provider: options.taskOverrides.provider } : {}),
+        }),
+      });
+    if (options.reserveDispatch) {
+      dispatchAdmission = store.reserveDispatchAdmission({
+        dispatchRequestId, dispatchRequestMaterial: { approvedSha256, dispatchSha256, lineageSha256 },
+        taskId: identity.taskId, taskSnapshot, policy,
+        reservedAt: '2026-08-30T20:00:00.000Z', predecessor: null,
+      });
+      admission = dispatchAdmission.admission;
+      identity = dispatchAdmission.ref.identity;
+    } else {
+      admission = store.createAdmission({ identity: generationIdentity, policy,
+        admittedAt: `2026-08-30T20:00:0${generation - 1}.000Z`, predecessorDigest,
+        predecessorIdentity, taskSnapshot });
+    }
     predecessorIdentity = generationIdentity;
     predecessorDigest = admission.receiptDigest;
   }
@@ -731,11 +789,11 @@ export function createTaskResultSettlementV2Fixture(
   const canonicalV1 = validateTaskResult({
     taskId: identity.taskId,
     workerId: 'worker-fixture-001',
-    provider: 'fixture-provider',
+    provider: options.taskOverrides?.provider ?? 'fixture-provider',
     model: 'fixture-model',
     attempt: 2,
-    filesChanged: [],
-    totalLinesAdded: 0,
+    filesChanged: (options.filesChanged ?? []).map(path => ({ path, status: 'modified', linesAdded: 1, linesRemoved: 0 })),
+    totalLinesAdded: options.filesChanged?.length ?? 0,
     totalLinesRemoved: 0,
     diskVerified: true,
     tokenUsage: {
@@ -810,8 +868,8 @@ export function createTaskResultSettlementV2Fixture(
     baselineRef: `task-attempt-custody-provider-exit:${providerExitObservationReceiptDigest}#scope-baseline:sha256:${baselineSha256}`,
     baselineSha256,
     scopeDigest,
-    filesChanged: Object.freeze([]),
-    totalLinesAdded: 0,
+    filesChanged: Object.freeze((options.filesChanged ?? []).map(path => ({ path, status: 'modified', linesAdded: 1, linesRemoved: 0 }))),
+    totalLinesAdded: options.filesChanged?.length ?? 0,
     totalLinesRemoved: 0,
     reasonCode: 'NONE' as const,
   });
@@ -831,6 +889,11 @@ export function createTaskResultSettlementV2Fixture(
     capturedAt: providerExitObservedAt,
     bytes: canonicalTaskAttemptCustodyJson(hostWorkAttribution, policy.jsonBounds),
   });
+  const effect = options.effectProducer
+    ? options.effectProducer({ store, policy, identity, admission,
+      ...(dispatchAdmission ? { dispatchAdmission } : {}),
+    })
+    : (() => {
   const effectAttempt = Object.freeze({
     projectId: identity.projectId,
     taskId: identity.taskId,
@@ -1234,6 +1297,9 @@ export function createTaskResultSettlementV2Fixture(
     effectDecisionDigest: effectLandingReceipt.effectDecisionDigest,
     transactionDigest: effectLandingReceipt.transactionDigest,
   });
+  return { effectLandingBinding, effectLandingChain, releasedAt };
+  })();
+  const finishEffects = ({ effectLandingBinding, effectLandingChain, releasedAt }: TaskResultFixtureEffect): TaskResultAcceptedV2Fixture | TaskResultSettlementV2Fixture => {
   const result = createProductionTaskResultV2({
     result: canonicalV1.value as unknown as Record<string, unknown>,
     attemptCustody: {
@@ -1291,7 +1357,7 @@ export function createTaskResultSettlementV2Fixture(
     acceptedResultChain,
   });
   if (options.terminal === 'accepted-only') {
-    taskResultSettlementV2FixtureCache.set(cacheKey, acceptedFixture);
+    if (!options.effectProducer) taskResultSettlementV2FixtureCache.set(cacheKey, acceptedFixture);
     return acceptedFixture;
   }
   const evaluationArtifact = store.publishHostArtifact({
@@ -1403,6 +1469,8 @@ export function createTaskResultSettlementV2Fixture(
     archiveArtifact,
     archiveChain,
   });
-  taskResultSettlementV2FixtureCache.set(cacheKey, fixture);
+  if (!options.effectProducer) taskResultSettlementV2FixtureCache.set(cacheKey, fixture);
   return fixture;
+  };
+  return effect instanceof Promise ? effect.then(finishEffects) : finishEffects(effect);
 }

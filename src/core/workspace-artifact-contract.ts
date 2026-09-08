@@ -145,12 +145,13 @@ export function renderManagedContractBlock(id: WorkspaceArtifactId, body: string
 }
 
 export type ManagedContractInspection =
-  | { state: 'VERIFIED'; schemaVersion: number; digest: string }
+  | { state: 'VERIFIED'; schemaVersion: number; digest: string; body?: string }
   | { state: 'HOLD'; reason: 'missing' | 'invalid-id' | 'schema-mismatch' | 'digest-mismatch' };
 
 export function inspectManagedContractBlock(
   content: string,
   expectedId: WorkspaceArtifactId,
+  options: { includeBody?: boolean } = {},
 ): ManagedContractInspection {
   CONTRACT_RE.lastIndex = 0;
   let sawContract = false;
@@ -163,7 +164,11 @@ export function inspectManagedContractBlock(
     }
     const actual = workspaceArtifactDigest(match[4]!.trim());
     if (actual !== match[3]) return { state: 'HOLD', reason: 'digest-mismatch' };
-    return { state: 'VERIFIED', schemaVersion, digest: actual };
+    // Delivery uses precisely the bytes just verified, never a second filesystem read.
+    // Default inspection remains metadata-only for existing consumers.
+    return { state: 'VERIFIED', schemaVersion, digest: actual,
+      ...(options.includeBody ? { body: match[4]!.trim() } : {}),
+    };
   }
   return { state: 'HOLD', reason: sawContract ? 'invalid-id' : 'missing' };
 }

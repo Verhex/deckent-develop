@@ -10,6 +10,7 @@
 //     actually consumed are declared in the minimal *Like interfaces.
 
 import { BASE_MEASURES } from './measure-catalog.js';
+import { DeckentError } from '../errors.js';
 import { KpiStore } from './kpi-store.js';
 import type { MeasurementInput } from './kpi-store.js';
 import { loadKpiDefinitions } from './kpi-definitions.js';
@@ -134,5 +135,87 @@ export function recordKpiMeasurements(
     computeSprintKpis(store, defs, tenantId, sprintId);
   } finally {
     store.close();
+  }
+}
+
+/**
+ * Record the terminal sprint KPI vector exactly once for a tenant+sprint.
+ *
+ * Unlike the legacy append pipeline above, this is the terminal-publication
+ * seam: an exact semantic replay reuses the already-published raw vector, while
+ * partial or divergent history fails closed in {@link KpiStore}. Rollups and KPI
+ * results are recomputed on both first publication and replay so missing derived
+ * projections can be repaired without appending another raw measurement.
+ */
+export function recordTerminalSprintKpiMeasurements(
+  dbPath: string,
+  sprintId: string,
+  tenantId: string,
+  metrics: SprintMetricsLike,
+  results: readonly TaskResultLike[],
+  usage: UsageTotals | null | undefined,
+  ts?: string,
+): void {
+  if (usage === null || usage === undefined) {
+    throw new DeckentError(
+      'KPI_TERMINAL_SNAPSHOT_HOLD',
+      'KPI_TERMINAL_SNAPSHOT_HOLD:authoritative-usage-unavailable',
+      'Supply receipt-backed terminal usage totals before publishing the sprint KPI snapshot.',
+    );
+  }
+  const requiredUsage = [usage.costUsd, usage.inputTokens, usage.outputTokens, usage.cacheRead];
+  if (
+    requiredUsage.some(value => typeof value !== 'number' || !Number.isFinite(value) || value < 0)
+    || (usage.unknownBillingTaskCount !== undefined && usage.unknownBillingTaskCount !== 0)
+  ) {
+    throw new DeckentError(
+      'KPI_TERMINAL_SNAPSHOT_HOLD',
+      'KPI_TERMINAL_SNAPSHOT_HOLD:authoritative-usage-invalid',
+      'Supply finite, non-negative, fully billed terminal usage totals before publishing the sprint KPI snapshot.',
+    );
+  }
+  const capturedAt = ts ?? new Date().toISOString();
+  const measurements = deriveMeasurements(sprintId, tenantId, metrics, results, usage, capturedAt);
+
+  let store: KpiStore | undefined;
+  let primaryError: unknown;
+  try {
+    store = new KpiStore(dbPath);
+    store.recordTerminalSprintMeasurements(tenantId, sprintId, measurements);
+    const defs = loadKpiDefinitions();
+    computeSprintKpis(store, defs, tenantId, sprintId);
+  } catch (error: unknown) {
+    primaryError = error;
+  } finally {
+    if (store) {
+      try {
+        store.close();
+      } catch (error: unknown) {
+        // A close failure must not replace the transaction/rollup failure that
+        // explains whether terminal publication committed or held.
+        primaryError ??= error;
+      }
+    }
+  }
+
+  if (primaryError !== undefined) {
+    if (
+      primaryError instanceof DeckentError
+      && primaryError.code === 'KPI_TERMINAL_SNAPSHOT_HOLD'
+    ) {
+      throw primaryError;
+    }
+    const hold = new DeckentError(
+      'KPI_TERMINAL_SNAPSHOT_HOLD',
+      'KPI_TERMINAL_SNAPSHOT_HOLD:storage-unavailable',
+      'Restore the terminal KPI storage boundary, then replay the same terminal snapshot.',
+    );
+    Object.defineProperty(hold, 'cause', {
+      value: primaryError,
+      enumerable: false,
+      configurable: false,
+      writable: false,
+    });
+    throw hold;
   }
 }

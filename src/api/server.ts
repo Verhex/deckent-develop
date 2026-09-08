@@ -1386,7 +1386,7 @@ async function handleRequest(
         sendError(res, SPRINT_TASK_ID_RE.test(taskId) ? 404 : 403, 'task not found');
         return;
       }
-      sendJson(res, { taskId, ...detail });
+      sendJson(res, detail);
       return;
     }
 

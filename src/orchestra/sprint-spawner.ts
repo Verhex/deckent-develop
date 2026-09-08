@@ -649,6 +649,18 @@ export function prioritizePendingFixTasks(tasks: readonly Task[]): Task[] {
 }
 
 /**
+ * Evidence emitted only after the worker invocation crosses its real dispatch
+ * boundary. `providerReleased` is deliberately separate from task state: exact
+ * Docker proves it with RELEASED + provider-start acceptance, while legacy
+ * dispatch has no equivalent custody receipt.
+ */
+export interface WorkerDispatchEvidence {
+  readonly taskId: string;
+  readonly provider: string;
+  readonly providerReleased: boolean;
+}
+
+/**
  * Spawn worker agents for sprint tasks via the configured backend.
  * Respects max_workers limit; excess tasks are returned as a queue.
  * @param projectRoot - Project root directory
@@ -669,6 +681,8 @@ export async function spawnWorkers(
     exactPlanAuthority?: ExactPlanSpawnAuthority;
     exactDockerRegistry?: ExactNormalDockerExecutionRegistryV2;
     exactTaskProjectionAdmission?: ExactTaskProjectionAdmissionV2;
+    /** Called only after a concrete worker dispatch is admitted. */
+    onWorkerDispatched?: (evidence: WorkerDispatchEvidence) => void;
   },
 ): Promise<Task[]> {
   const backend = spawnOpts?.spawnBackend;
@@ -1055,6 +1069,13 @@ export async function spawnWorkers(
       }
       spawnedThisWave += 1;
       spawnedTasks.push(task);
+      try {
+        spawnOpts.onWorkerDispatched?.({
+          taskId: disposition.taskId,
+          provider: disposition.provider ?? resolveTaskProvider(task),
+          providerReleased: disposition.exactDispatchOutcome?.kind === 'released',
+        });
+      } catch (e) { debugLog('spawnWorkers:onWorkerDispatched', e); }
       continue;
     }
 
@@ -1606,6 +1627,13 @@ export async function spawnWorkers(
 
     spawnedThisWave++;
     spawnedTasks.push(task);
+    try {
+      spawnOpts?.onWorkerDispatched?.({
+        taskId: task.id,
+        provider: taskProvider,
+        providerReleased: false,
+      });
+    } catch (e) { debugLog('spawnWorkers:onWorkerDispatched', e); }
   }
 
   const agents: AgentInfo[] = spawnedTasks.map(task => ({
@@ -1660,6 +1688,8 @@ export async function respawnEligibleTasks(
     providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
     exactDockerRegistry?: ExactNormalDockerExecutionRegistryV2;
     exactTaskProjectionAdmission?: ExactTaskProjectionAdmissionV2;
+    /** Called only after a concrete dependency-respawn dispatch is admitted. */
+    onWorkerDispatched?: (evidence: WorkerDispatchEvidence) => void;
   },
   onWaveTransition?: (durationMs: number, fromWave: string, toWave: string) => void,
 ): Promise<string[]> {
@@ -1706,9 +1736,27 @@ export async function respawnEligibleTasks(
 
   // Build dependency graph for enforcement (Sprint 139 Task 028)
   const graph = buildDependencyGraph(sprint.tasks, /* includeCollisions */ true);
-  const pendingIds = sprint.tasks
-    .filter(t => t.status === TaskStatus.PENDING || t.status === TaskStatus.PAUSED)
-    .map(t => t.id);
+  const pendingIds: string[] = [];
+  for (const task of sprint.tasks) {
+    if (task.status !== TaskStatus.PENDING && task.status !== TaskStatus.PAUSED) continue;
+    // A NOT_DISPATCHED repair receives exactly one re-dispatch round.  The
+    // marker is written before that round, so every generic respawn ingress
+    // must honor it as a durable budget fence; otherwise the postfix scanner
+    // silently creates a third provider-attempt generation.
+    if (existsSync(join(
+      projectRoot,
+      TASKS_DIR,
+      `task-${task.id}.redispatch-attempted`,
+    ))) {
+      passSkips.push(describeSpawnSkip(
+        task,
+        'spawn-retry-held',
+        'the durable NOT_DISPATCHED re-dispatch budget is exhausted',
+      ));
+      continue;
+    }
+    pendingIds.push(task.id);
+  }
 
   const enforcement = enforceWaveDependency(graph, pendingIds, new Set(doneTasks));
 
@@ -1896,6 +1944,13 @@ export async function respawnEligibleTasks(
 
     spawnedThisWave++;
     spawnedTaskIds.push(task.id);
+    try {
+      spawnOpts?.onWorkerDispatched?.({
+        taskId: disposition.taskId,
+        provider: disposition.provider ?? resolveTaskProvider(task),
+        providerReleased: disposition.exactDispatchOutcome?.kind === 'released',
+      });
+    } catch (e) { debugLog('respawnEligibleTasks:onWorkerDispatched', e); }
   }
 
   const waveDuration = Date.now() - waveStart;

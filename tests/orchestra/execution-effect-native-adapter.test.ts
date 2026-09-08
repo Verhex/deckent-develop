@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto';
+import { spawn } from 'node:child_process';
 import { readFileSync, writeSync } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
@@ -37,6 +39,7 @@ import {
 } from '../../src/orchestra/execution-effect-landing-coordinator.js';
 import {
   EXECUTION_EFFECT_DOCKER_WORKSPACE_CAPTURE_HELPER_DIGEST,
+  EXECUTION_EFFECT_DOCKER_SOURCE_FULL_WRITE_HELPER_SOURCE,
   captureExecutionEffectDockerWorkspaceManifestV1,
   createExecutionEffectDockerWorkspaceCaptureReceiptV1,
   createExecutionEffectDockerSourceReceiptV1,
@@ -53,6 +56,7 @@ import type {
   ExecAuthorityNativeEffectHandle,
   ExecAuthorityNativeState,
 } from '../../src/core/exec-authority-native.js';
+import { loadExecAuthorityNative } from '../../src/core/exec-authority-native.js';
 import { InMemoryTaskAttemptCustodyAdapter } from '../helpers/task-result-settlement-v2-fixture.js';
 
 const temporaryDirectories: string[] = [];
@@ -94,6 +98,64 @@ function canonicalBytes(value: unknown): Buffer {
   return Buffer.from(canonical(value), 'utf8');
 }
 
+async function runDocker(
+  args: readonly string[],
+  options: Readonly<{ allowFailure?: boolean; timeoutMs?: number }> = {},
+): Promise<Readonly<{
+  stdout: string;
+  stderr: string;
+}>> {
+  return await new Promise((resolve, reject) => {
+    const child = spawn('docker', [...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) child.kill('SIGKILL');
+    }, options.timeoutMs ?? 30_000);
+    child.stdout.on('data', (chunk: Buffer) => stdout.push(Buffer.from(chunk)));
+    child.stderr.on('data', (chunk: Buffer) => stderr.push(Buffer.from(chunk)));
+    child.once('error', error => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.once('close', (code, signal) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      const errorText = Buffer.concat(stderr).toString('utf8');
+      if (!options.allowFailure && (code !== 0 || signal !== null)) {
+        reject(new Error(`docker command failed (${String(code)}/${String(signal)}): ${errorText}`));
+        return;
+      }
+      resolve({ stdout: Buffer.concat(stdout).toString('utf8'), stderr: errorText });
+    });
+  });
+}
+
+function deterministicSourceBytes(size: number): Buffer {
+  const bytes = Buffer.allocUnsafe(size);
+  for (let index = 0; index < size; index += 1) bytes[index] = (index * 31 + 7) % 251;
+  return bytes;
+}
+
+type FullWrite = (
+  fd: number,
+  bytes: Uint8Array,
+  deadlineUnixMs: number,
+  write?: (fd: number, bytes: Uint8Array, offset: number, length: number) => number,
+  now?: () => number,
+  wait?: () => Promise<void>,
+) => Promise<void>;
+
+function fullWriteUnderTest(): FullWrite {
+  return runInNewContext(
+    `${EXECUTION_EFFECT_DOCKER_SOURCE_FULL_WRITE_HELPER_SOURCE}\nwriteExecutionEffectSourceFully;`,
+  ) as FullWrite;
+}
+
 function artifactLimits(maxBytes: number): Record<
   TaskAttemptCustodyArtifactClass,
   TaskAttemptCustodyArtifactLimit
@@ -110,6 +172,7 @@ function artifactLimits(maxBytes: number): Record<
 
 interface FakeNativeOptions {
   readonly closeFailure?: boolean;
+  readonly missingEntryCode?: 'ENOENT' | 'E_EXEC_AUTH_NATIVE_NOT_FOUND' | 'E_EXEC_AUTH_NATIVE_OPERATION';
   readonly separationFailure?: boolean;
   readonly separationDirectorySize?: string;
   readonly separationDirectoryLinkCount?: string;
@@ -155,7 +218,9 @@ function fakeNative(options: FakeNativeOptions = {}): FakeNativeControl {
     inspectEntry: (_root, path) => {
       const file = projectFiles.get(path);
       if (!file) {
-        const error = Object.assign(new Error('absent'), { code: 'ENOENT' });
+        const error = Object.assign(new Error('absent'), {
+          code: options.missingEntryCode ?? 'E_EXEC_AUTH_NATIVE_NOT_FOUND',
+        });
         throw error;
       }
       return Object.freeze({
@@ -410,7 +475,16 @@ function dockerExecutor(
 async function adapterFixture(
   bytes: Uint8Array,
   options: Readonly<{
+    canonicalProjectRoot?: string;
+    clockNow?: string;
+    entryPath?: string;
+    imageDigest?: Sha256Digest;
+    imageReference?: string;
+    maxChunkBytes?: number;
     native?: FakeNativeControl;
+    loadNative?: () => ExecAuthorityNativeState;
+    useDefaultDependencies?: boolean;
+    volumeName?: string;
     docker?: ExecutionEffectDockerSourceExecutorV1;
     store?: (base: ExecutionEffectStagedContentStoreV1) => ExecutionEffectStagedContentStoreV1;
     platform?: ExecutionEffectNativeAdapterFactoryInputV1['platform'];
@@ -428,7 +502,7 @@ async function adapterFixture(
     contentDigest: Sha256Digest;
   }>;
 }>> {
-  const maxChunkBytes = 4;
+  const maxChunkBytes = options.maxChunkBytes ?? 4;
   const policy = createTaskAttemptCustodyPolicy({
     schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
     metadataMaxBytes: 64 * 1024,
@@ -439,7 +513,7 @@ async function adapterFixture(
     artifactLimits: artifactLimits(maxChunkBytes),
   });
   const sequence = ++fixtureSequence;
-  const canonicalProjectRoot = '/fixture/project';
+  const canonicalProjectRoot = options.canonicalProjectRoot ?? '/fixture/project';
   const custodyAdapter = new InMemoryTaskAttemptCustodyAdapter();
   const store = TaskAttemptCustodyStore.open({
     adapter: custodyAdapter,
@@ -471,9 +545,9 @@ async function adapterFixture(
     attemptId: identity.attemptId,
     generation: identity.generation,
   });
-  const imageDigest = sha256('image');
+  const imageDigest = options.imageDigest ?? sha256('image');
   const resource = createExecutionEffectWorkspaceResourceV1({
-    volumeName: `deckent-effect-${sequence}`,
+    volumeName: options.volumeName ?? `deckent-effect-${sequence}`,
     imageDigest,
     labelsDigest: sha256('labels'),
     mountPlanDigest: sha256('mount-plan'),
@@ -514,10 +588,11 @@ async function adapterFixture(
   const native = options.native ?? fakeNative();
   const baseStore = store as unknown as ExecutionEffectStagedContentStoreV1;
   const entry = Object.freeze({
-    path: 'src/result.txt', kind: 'regular-file' as const, mode: 0o644,
+    path: options.entryPath ?? 'src/result.txt', kind: 'regular-file' as const, mode: 0o644,
     size: bytes.byteLength, contentDigest: sha256(bytes),
   });
   const landingIntentDigest = sha256(`landing-intent-${sequence}`);
+  const clockNow = options.clockNow ?? '2026-09-01T10:01:00.000Z';
   const input: ExecutionEffectNativeAdapterFactoryInputV1 = {
     platform: options.platform ?? 'wsl',
     canonicalProjectRoot,
@@ -532,7 +607,7 @@ async function adapterFixture(
       state: 'SEALED',
       workspaceOwnerUid: process.getuid?.() ?? 1000,
       workspaceOwnerGid: process.getgid?.() ?? 1000,
-      imageReference: `deckent/runtime@${imageDigest}`,
+      imageReference: options.imageReference ?? `deckent/runtime@${imageDigest}`,
       imageDigest,
       volumeName: resource.volumeName,
       volumeNameDigest: resource.volumeNameDigest,
@@ -550,8 +625,8 @@ async function adapterFixture(
     })]),
     store: options.store?.(baseStore) ?? baseStore,
     clock: {
-      nowIso: () => '2026-09-01T10:01:00.000Z',
-      nowUnixMs: () => Date.parse('2026-09-01T10:01:00.000Z'),
+      nowIso: () => clockNow,
+      nowUnixMs: () => Date.parse(clockNow),
     },
     limits: {
       maxStagedChunkBytes: maxChunkBytes,
@@ -562,10 +637,11 @@ async function adapterFixture(
       dockerReceiptMaxBytes: 64 * 1024,
     },
   };
-  const result = await createExecutionEffectLandingNativeAdapterV1(input, {
-    loadNative: () => native.state,
+  const dependencies = options.useDefaultDependencies ? undefined : {
+    loadNative: options.loadNative ?? (() => native.state),
     docker: options.docker ?? dockerExecutor(bytes),
-  });
+  };
+  const result = await createExecutionEffectLandingNativeAdapterV1(input, dependencies);
   if (result.state !== 'READY') throw new Error(`fixture HOLD: ${result.code}`);
   return {
     adapter: result.adapter,
@@ -920,6 +996,200 @@ describe('execution effect native adapter', () => {
     });
     expect(result).toMatchObject({ state: 'HOLD', code: 'PLATFORM_UNSUPPORTED' });
   });
+
+  it('maps the canonical native missing-entry code to an absent project preimage', async () => {
+    const fixture = await adapterFixture(Buffer.from('source'));
+    expect(fixture.adapter.inspectProjectEntry('src/new-file.ts')).toEqual(
+      createExecutionEffectLandingEntryStateV1({ entry: null }),
+    );
+  });
+
+  it('retains Node ENOENT compatibility for an absent project preimage', async () => {
+    const fixture = await adapterFixture(Buffer.from('source'), {
+      native: fakeNative({ missingEntryCode: 'ENOENT' }),
+    });
+    expect(fixture.adapter.inspectProjectEntry('src/new-file.ts')).toEqual(
+      createExecutionEffectLandingEntryStateV1({ entry: null }),
+    );
+  });
+
+  it('keeps non-not-found native inspection failures fail-closed', async () => {
+    const fixture = await adapterFixture(Buffer.from('source'), {
+      native: fakeNative({ missingEntryCode: 'E_EXEC_AUTH_NATIVE_OPERATION' }),
+    });
+    expect(() => fixture.adapter.inspectProjectEntry('src/new-file.ts')).toThrow(
+      'EXECUTION_EFFECT_NATIVE_ADAPTER_HOLD:NATIVE_EFFECT_UNCERTAIN',
+    );
+  });
+
+  it('writes every source and receipt byte after finite short writes', async () => {
+    const bytes = Buffer.from('partial-write-proof');
+    const observed: Buffer[] = [];
+    await fullWriteUnderTest()(2, bytes, 100, (_fd, source, offset, length) => {
+      const written = Math.min(3, length);
+      observed.push(Buffer.from(source).subarray(offset, offset + written));
+      return written;
+    }, () => 100, async () => {});
+    expect(Buffer.concat(observed).equals(bytes)).toBe(true);
+  });
+
+  it('retries interrupted, backpressured, and zero-progress writes without dropping bytes', async () => {
+    const bytes = Buffer.from('retry-proof');
+    const observed: Buffer[] = [];
+    const sequence: Array<'EINTR' | 'EAGAIN' | 0 | 'write'> = ['EINTR', 'EAGAIN', 0, 'write'];
+    let waits = 0;
+    await fullWriteUnderTest()(1, bytes, 100, (_fd, source, offset, length) => {
+      const action = sequence.shift();
+      if (action === 'EINTR' || action === 'EAGAIN') {
+        throw Object.assign(new Error(action), { code: action });
+      }
+      if (action === 0) return 0;
+      observed.push(Buffer.from(source).subarray(offset, offset + length));
+      return length;
+    }, () => 100, async () => { waits += 1; });
+    expect(waits).toBe(2);
+    expect(Buffer.concat(observed).equals(bytes)).toBe(true);
+  });
+
+  it('bounds persistent source-write backpressure by the existing deadline', async () => {
+    const now = [100, 101];
+    let waits = 0;
+    await expect(fullWriteUnderTest()(1, Buffer.from('blocked'), 100, () => {
+      throw Object.assign(new Error('again'), { code: 'EWOULDBLOCK' });
+    }, () => now.shift() ?? 101, async () => { waits += 1; })).rejects.toThrow(
+      'execution effect source write deadline exceeded',
+    );
+    expect(waits).toBe(1);
+  });
+
+  it('rejects invalid progress and preserves non-retryable write failures', async () => {
+    const writeFully = fullWriteUnderTest();
+    await expect(writeFully(1, Buffer.from('invalid'), 100, () => 99, () => 100))
+      .rejects.toThrow('execution effect source write progress invalid');
+    const failure = Object.assign(new Error('write failed'), { code: 'EIO' });
+    await expect(writeFully(1, Buffer.from('failure'), 100, () => { throw failure; }, () => 100))
+      .rejects.toBe(failure);
+  });
+
+  it.runIf(process.platform === 'linux')(
+    'reads ADD and REPLACE preimages through the real native project adapter', async () => {
+      const projectRoot = await mkdtemp(join(tmpdir(), 'deckent-effect-native-project-'));
+      temporaryDirectories.push(projectRoot);
+      await mkdir(join(projectRoot, 'src'));
+      const existingBytes = Buffer.from('existing source\n');
+      await writeFile(join(projectRoot, 'src/existing.ts'), existingBytes, { mode: 0o644 });
+      await chmod(join(projectRoot, 'src/existing.ts'), 0o644);
+
+      const fixture = await adapterFixture(Buffer.from('staged source'), {
+        canonicalProjectRoot: projectRoot,
+        loadNative: loadExecAuthorityNative,
+      });
+      const absent = createExecutionEffectLandingEntryStateV1({ entry: null });
+
+      expect(fixture.adapter.inspectProjectEntry('src/new-file.ts')).toEqual(absent);
+      expect(fixture.adapter.inspectProjectEntry('new-directory')).toEqual(absent);
+      expect(fixture.adapter.inspectProjectEntry('new-directory/nested.ts')).toEqual(absent);
+      expect(fixture.adapter.inspectProjectEntry('src/existing.ts')).toMatchObject({
+        state: 'PRESENT',
+        entry: {
+          path: 'src/existing.ts',
+          kind: 'regular-file',
+          mode: 0o644,
+          size: existingBytes.byteLength,
+          contentDigest: sha256(existingBytes),
+        },
+        linkCount: 1,
+      });
+    },
+  );
+
+  it.runIf(process.platform === 'linux'
+    && process.env.DECKENT_REAL_DOCKER_EFFECT_SOURCE_TEST === '1')(
+    'transfers a large multi-chunk source through the real Docker and native adapters', async () => {
+      const imageReference = process.env.DECKENT_REAL_DOCKER_IMAGE ?? 'deckent-worker:latest';
+      const inspected = await runDocker([
+        'image', 'inspect', imageReference, '--format', '{{index .RepoDigests 0}}',
+      ]);
+      const pinnedImageReference = inspected.stdout.trim();
+      const imageDigest = pinnedImageReference.slice(
+        pinnedImageReference.lastIndexOf('@') + 1,
+      ) as Sha256Digest;
+      expect(pinnedImageReference).toMatch(/^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$/u);
+      expect(imageDigest).toMatch(/^sha256:[a-f0-9]{64}$/u);
+
+      const sequence = ++fixtureSequence;
+      const volumeName = `deckent-effect-source-test-${process.pid}-${sequence}`;
+      const populationContainer = `${volumeName}-populate`;
+      let volumeCreated = false;
+      try {
+        await runDocker(['volume', 'create', volumeName]);
+        volumeCreated = true;
+        const sourceBytes = deterministicSourceBytes(527_378);
+        const sourcePath = 'src/large-source.ts';
+        const ownerUid = process.getuid?.() ?? 1000;
+        const ownerGid = process.getgid?.() ?? 1000;
+        const populateScript = String.raw`
+          import { chmodSync, chownSync, mkdirSync, writeFileSync } from 'node:fs';
+          const size = Number(process.argv[1]);
+          const uid = Number(process.argv[2]);
+          const gid = Number(process.argv[3]);
+          const bytes = Buffer.allocUnsafe(size);
+          for (let index = 0; index < size; index += 1) bytes[index] = (index * 31 + 7) % 251;
+          mkdirSync('/workspace/src', { recursive: true, mode: 0o755 });
+          writeFileSync('/workspace/src/large-source.ts', bytes, { mode: 0o644 });
+          chmodSync('/workspace/src/large-source.ts', 0o644);
+          chownSync('/workspace', uid, gid);
+          chownSync('/workspace/src', uid, gid);
+          chownSync('/workspace/src/large-source.ts', uid, gid);
+        `;
+        await runDocker([
+          'run', '--rm', '--name', populationContainer,
+          '--network', 'none', '--user', '0:0',
+          '--mount', `type=volume,src=${volumeName},dst=/workspace`,
+          pinnedImageReference, 'node', '--input-type=module', '-e', populateScript,
+          String(sourceBytes.byteLength), String(ownerUid), String(ownerGid),
+        ]);
+
+        for (const maxChunkBytes of [64 * 1024 * 1024, 64 * 1024]) {
+          const projectRoot = await mkdtemp(join(tmpdir(), 'deckent-effect-source-project-'));
+          temporaryDirectories.push(projectRoot);
+          const fixture = await adapterFixture(sourceBytes, {
+            canonicalProjectRoot: projectRoot,
+            clockNow: new Date().toISOString(),
+            entryPath: sourcePath,
+            imageDigest,
+            imageReference: pinnedImageReference,
+            maxChunkBytes,
+            useDefaultDependencies: true,
+            volumeName,
+          });
+          const staged = await fixture.adapter.stageSource({
+            path: fixture.entry.path,
+            entry: fixture.entry,
+            workspaceIdentityDigest: fixture.adapter.capability.workspaceIdentityDigest,
+            landingIntentDigest: fixture.landingIntentDigest,
+          });
+          const captured = staged.chunks.map(chunk => fixture.input.store.readVerifiedArtifact({
+            identity: fixture.input.identity,
+            policy: fixture.input.policy,
+            artifactClass: 'execution-effect-staged-content',
+            artifactKey: chunk.artifactKey,
+            receiptDigest: chunk.artifactReceiptDigest,
+          }));
+          expect(captured.every(value => value !== null)).toBe(true);
+          const capturedBytes = Buffer.concat(captured.map(value => Buffer.from(value!.bytes)));
+          expect(staged.chunks).toHaveLength(Math.ceil(sourceBytes.byteLength / maxChunkBytes));
+          expect(staged.contentDigest).toBe(sha256(sourceBytes));
+          expect(capturedBytes.equals(sourceBytes)).toBe(true);
+          expect(fixture.adapter.verifyStagedSource(staged)).toBe(true);
+        }
+      } finally {
+        await runDocker(['rm', '-f', populationContainer], { allowFailure: true });
+        if (volumeCreated) await runDocker(['volume', 'rm', '-f', volumeName]);
+      }
+    },
+    120_000,
+  );
 
   it('streams Docker bytes through native ingress and durable Store chunks', async () => {
     const bytes = Buffer.from('abcdefghij');

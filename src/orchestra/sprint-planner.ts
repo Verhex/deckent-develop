@@ -20,12 +20,16 @@ import {
 
 // ─── Core (type imports) ───────────────────────────────────────────
 import type {
-  Task, TaskScope, Sprint, DebtItem,
+  Task, TaskScope, Sprint, DebtItem, DebtOriginScope, DebtInjectionHold,
   ResolvedConfig,
   BrainContext, SprintSizeRecommendation,
   BrainPlanningMode, PlannerResult, ProviderName,
   ModelType, TaskEffort, PlannerProof, PlannerProofResolutionReason,
 } from '../core/types.js';
+import {
+  createProductionWiringPlanEvidence,
+  type ProductionWiringPlanEvidenceV2,
+} from '../core/task-types.js';
 
 import {
   BRAIN_DIR, TASKS_DIR, DIRECTIVES_FILE,
@@ -49,6 +53,7 @@ import {
   type MemoryReadViewV1,
 } from '../core/memory-read-contract.js';
 import { attendedExecutionProjectId } from '../core/attended-execution-approval.js';
+import { canonicalJson } from '../core/audit-writer.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { getNextSprintId, readJsonSafe, debugLog } from '../core/utils.js';
@@ -285,6 +290,74 @@ function readPlannerMemoryContext(
   }
 }
 
+type DebtOriginValidation =
+  | { state: 'valid-v2'; originTaskId: string; originScope: DebtOriginScope; authority: ProductionWiringPlanEvidenceV2; binding: string }
+  | { state: 'legacy-unavailable' }
+  | { state: 'invalid-origin' };
+
+function readNonemptyOriginScope(value: unknown): DebtOriginScope | undefined {
+  if (value === null || Array.isArray(value) || typeof value !== 'object') return undefined;
+  const record = value as Record<string, unknown>;
+  const directories = record['directories'];
+  const filesWrite = record['filesWrite'];
+  if (!Array.isArray(directories) || !Array.isArray(filesWrite)
+    || !directories.every(entry => typeof entry === 'string' && entry.trim().length > 0)
+    || !filesWrite.every(entry => typeof entry === 'string' && entry.trim().length > 0)
+    || directories.length + filesWrite.length === 0) return undefined;
+  return { directories: [...directories], filesWrite: [...filesWrite] };
+}
+
+/**
+ * Reconstruct only a paired, canonical V2 debt origin. The stored state is
+ * diagnostic: it may preserve a producer-observed invalid origin, but can
+ * never authorize injection on its own.
+ */
+function validateDebtOriginWiring(input: {
+  originTaskId: unknown;
+  originScope?: unknown;
+  originProductionWiring?: unknown;
+  originProductionWiringBinding?: unknown;
+  originWiringState?: unknown;
+}): DebtOriginValidation {
+  const hasAuthority = input.originProductionWiring !== undefined;
+  const hasBinding = input.originProductionWiringBinding !== undefined;
+  if (!hasAuthority && !hasBinding) {
+    return input.originWiringState === 'invalid-origin'
+      ? { state: 'invalid-origin' }
+      : { state: 'legacy-unavailable' };
+  }
+  if (!hasAuthority || !hasBinding
+    || typeof input.originTaskId !== 'string' || input.originTaskId.trim().length === 0
+    || typeof input.originProductionWiringBinding !== 'string') {
+    return { state: 'invalid-origin' };
+  }
+  const originScope = readNonemptyOriginScope(input.originScope);
+  if (!originScope || input.originProductionWiring === null
+    || Array.isArray(input.originProductionWiring)
+    || typeof input.originProductionWiring !== 'object') return { state: 'invalid-origin' };
+  const candidate = input.originProductionWiring as Partial<ProductionWiringPlanEvidenceV2>;
+  if (candidate.version !== 2 || candidate.contract?.version !== 2
+    || typeof candidate.contractDigest !== 'string'
+    || typeof candidate.hostProofProgramDigest !== 'string') return { state: 'invalid-origin' };
+  try {
+    const authority = createProductionWiringPlanEvidence(candidate.contract);
+    if (authority.contractDigest !== candidate.contractDigest
+      || authority.hostProofProgramDigest !== candidate.hostProofProgramDigest) {
+      return { state: 'invalid-origin' };
+    }
+    const binding = createHash('sha256').update(canonicalJson({
+      originTaskId: input.originTaskId,
+      originScope,
+      contractDigest: authority.contractDigest,
+      hostProofProgramDigest: authority.hostProofProgramDigest,
+    })).digest('hex');
+    if (input.originProductionWiringBinding !== binding) return { state: 'invalid-origin' };
+    return { state: 'valid-v2', originTaskId: input.originTaskId, originScope, authority, binding };
+  } catch {
+    return { state: 'invalid-origin' };
+  }
+}
+
 function projectPlannerLegacyContext(selectedEntries: readonly MemoryReadEntryV1[]): Pick<BrainContext,
   'retro' | 'debt' | 'patterns' | 'decisions' | 'projectIdentity'> {
   const selected = selectedEntries.map(({ entry, reasons }) => ({ entry, reasons }));
@@ -305,35 +378,35 @@ function projectPlannerLegacyContext(selectedEntries: readonly MemoryReadEntryV1
     .filter(({ entry }) => entry.type === 'debt' && entry.status !== 'resolved')
     .map(({ entry }) => {
       let metadata: Record<string, unknown>;
+      let invalidMetadata = false;
       try {
         const parsed = JSON.parse(entry.metadata || '{}') as unknown;
         if (parsed === null || Array.isArray(parsed) || typeof parsed !== 'object') throw new Error('invalid-metadata');
         metadata = parsed as Record<string, unknown>;
       } catch {
-        throw new BrainError('MEMORY_READ_CONTEXT_HOLD:INVALID_DEBT_METADATA', SprintPhase.PLAN);
+        // A debt ledger row is untrusted recovery input. Keep the individual
+        // residual visible and fail closed at its own injection boundary;
+        // never let one corrupt origin metadata blob suppress unrelated plan
+        // work by turning the whole PLAN context into a global HOLD.
+        metadata = {};
+        invalidMetadata = true;
       }
       const debtClass = metadata['class'];
-      const originScope = metadata['originScope'];
       const validDebtClass = debtClass === 'verified-no-result'
         || debtClass === 'timeout-partial'
         || debtClass === 'success-echo'
         || debtClass === 'standard'
         ? debtClass
         : undefined;
-      const originScopeRecord = originScope !== null && !Array.isArray(originScope) && typeof originScope === 'object'
-        ? originScope as Record<string, unknown>
-        : null;
-      const originDirectories = originScopeRecord?.['directories'];
-      const originFilesWrite = originScopeRecord?.['filesWrite'];
-      const validOriginScope = Array.isArray(originDirectories)
-        && originDirectories.every((value: unknown) => typeof value === 'string')
-        && Array.isArray(originFilesWrite)
-        && originFilesWrite.every((value: unknown) => typeof value === 'string')
-        ? {
-            directories: [...originDirectories] as string[],
-            filesWrite: [...originFilesWrite] as string[],
-          }
-        : undefined;
+      const origin: DebtOriginValidation = invalidMetadata
+        ? { state: 'invalid-origin' }
+        : validateDebtOriginWiring({
+            originTaskId: metadata['originTaskId'],
+            originScope: metadata['originScope'],
+            originProductionWiring: metadata['originProductionWiring'],
+            originProductionWiringBinding: metadata['originProductionWiringBinding'],
+            originWiringState: metadata['originWiringState'],
+          });
       return {
         id: entry.id,
         description: entry.content || entry.title,
@@ -347,7 +420,10 @@ function projectPlannerLegacyContext(selectedEntries: readonly MemoryReadEntryV1
         resolvedInSprintId: undefined,
         createdAt: entry.created_at,
         class: validDebtClass,
-        originScope: validOriginScope,
+        originScope: origin.state === 'valid-v2' ? origin.originScope : undefined,
+        originProductionWiring: origin.state === 'valid-v2' ? origin.authority : undefined,
+        originProductionWiringBinding: origin.state === 'valid-v2' ? origin.binding : undefined,
+        originWiringState: origin.state,
       } satisfies DebtItem;
     });
   return { retro, debt, patterns, decisions, projectIdentity };
@@ -1274,6 +1350,7 @@ export async function planSprint(
     planningMode: usedMode,
     plannerProof,
     promptGate,
+    debtInjectionHolds: injected.held,
   };
 }
 
@@ -1442,14 +1519,11 @@ export interface DebtInjectionResult {
    * not close real debt forever. Count this array's length for reporting.
    */
   skippedNoop: string[];
-}
-
-/**
- * Build the broad legacy fallback scope used when a debt item carries no
- * `originScope` (e.g. older debt rows persisted before Sprint 179 W1-1).
- */
-function legacyFallbackScope(): TaskScope {
-  return { directories: ['src/'], filesRead: [], filesWrite: ['src/'] };
+  /**
+   * Actionable debts retained OPEN because their paired V2 origin cannot be
+   * reconstructed. These IDs never enter the resolved/skipped path.
+   */
+  held: DebtInjectionHold[];
 }
 
 // born-603 (396-003): a fix-wave task (`<id>-fix` / `<id>-xfix`) that
@@ -1487,13 +1561,13 @@ function isHonestNoopFixWaveEcho(item: DebtItem): boolean {
  *  - born-603 (Sprint 396): honest no-op fix-wave echo (see
  *    {@link isHonestNoopFixWaveEcho}) → skip WITHOUT resolving (tracked in
  *    `skippedNoop`, not `skipped` — see {@link DebtInjectionResult}).
- *  - `originScope` present → inherit `directories` + `filesWrite`; when exact
+ *  - valid paired V2 origin → inherit `directories` + `filesWrite`; when exact
  *    `filesWrite` targets exist, `filesRead` mirrors `directories` as context.
  *    A directory-only fix keeps `filesRead` empty so every backend recognizes
  *    the established directory-fallback WRITE authority instead of silently
  *    reclassifying the fix as inspection-only.
- *  - `originScope` absent → broad legacy fallback `src/` (matches behaviour
- *    expected of pre-W1-1 debt rows so they still get a fix attempt).
+ *  - legacy or malformed origin → retain the debt as a typed hold. It is never
+ *    widened into a broad `src/` task and never resolved as a skip.
  */
 export function injectCriticalDebtTasks(
   debt: DebtItem[],
@@ -1505,6 +1579,7 @@ export function injectCriticalDebtTasks(
   const tasks: Task[] = [];
   const skipped: string[] = [];
   const skippedNoop: string[] = [];
+  const held: DebtInjectionHold[] = [];
   let seq = startingSeq;
 
   for (const item of debt) {
@@ -1540,24 +1615,24 @@ export function injectCriticalDebtTasks(
       continue;
     }
 
-    const hasOriginScope = !!item.originScope
-      && (item.originScope.directories.length > 0 || item.originScope.filesWrite.length > 0);
-
-    const scope: TaskScope = hasOriginScope
-      ? {
-          directories: [...item.originScope!.directories],
-          // Directories already provide navigation context. Exact read scope
-          // must instead carry the original targets themselves so a debt worker
-          // can observe an already-satisfied protected/root-file residual even
-          // when the prompt sanitizer correctly withholds WRITE authority.
-          filesRead: [...item.originScope!.filesWrite],
-          filesWrite: [...item.originScope!.filesWrite],
-        }
-      : legacyFallbackScope();
-
-    const scopeNote = hasOriginScope
-      ? `Origin scope inherited (directories=[${scope.directories.join(', ')}], filesWrite=[${scope.filesWrite.join(', ')}]).`
-      : 'No origin scope on debt — broad legacy fallback (src/) applied.';
+    // Do not trust a read-time metadata state, cached contract, or caller-made
+    // DebtItem. Reconstruct the exact origin binding at the final producer of
+    // dispatchable priority tasks.
+    const origin = validateDebtOriginWiring(item);
+    if (origin.state !== 'valid-v2') {
+      held.push({ debtId: item.id, reason: origin.state });
+      continue;
+    }
+    const scope: TaskScope = {
+      directories: [...origin.originScope.directories],
+      // Directories already provide navigation context. Exact read scope must
+      // instead carry the original targets themselves so a debt worker can
+      // observe an already-satisfied protected/root-file residual even when
+      // the prompt sanitizer correctly withholds WRITE authority.
+      filesRead: [...origin.originScope.filesWrite],
+      filesWrite: [...origin.originScope.filesWrite],
+    };
+    const scopeNote = `Origin scope inherited (directories=[${scope.directories.join(', ')}], filesWrite=[${scope.filesWrite.join(', ')}]).`;
 
     // born-603: `item.description` now carries the full debt note (mapper
     // change in readContext) rather than an 80-char-sliced title, so keep the
@@ -1608,8 +1683,9 @@ export function injectCriticalDebtTasks(
       },
       sprintId,
       isPriorityFix: true,
-      fixForTaskId: item.originTaskId,
+      fixForTaskId: origin.originTaskId,
       initialStatus,
+      productionWiring: origin.authority,
     }, seq++);
     const compiledFixScope = compileCanonicalScope({ scope: fixTask.scope });
     if (!compiledFixScope.ok) {
@@ -1626,5 +1702,5 @@ export function injectCriticalDebtTasks(
     tasks.push(fixTask);
   }
 
-  return { tasks, nextSeq: seq, skipped, skippedNoop };
+  return { tasks, nextSeq: seq, skipped, skippedNoop, held };
 }

@@ -679,6 +679,18 @@ export interface FilesChangedCostSummary {
   attributionExcluded: number;
 }
 
+/** Finalizer-projected work, already reduced from verified terminal attempts. */
+export interface TrustedFilesChangedWorkVector {
+  readonly entries: readonly Readonly<{
+    readonly logicalTaskId: string;
+    readonly attemptId: string;
+    readonly filesChanged: readonly string[];
+    readonly linesAdded: number;
+    readonly linesRemoved: number;
+  }>[];
+  readonly attributionExcluded: number;
+}
+
 /**
  * Aggregate the REAL files-changed and cost fields from collected results so the
  * metrics table can show ground truth instead of the hardcoded-0 placeholders
@@ -694,28 +706,40 @@ export interface FilesChangedCostSummary {
  */
 export function computeFilesChangedAndCost(
   results: readonly FilesChangedCostContributor[],
-  opts: { requireVerifiedAttribution?: boolean } = {},
+  opts: {
+    requireVerifiedAttribution?: boolean;
+    trustedWork?: TrustedFilesChangedWorkVector;
+  } = {},
 ): FilesChangedCostSummary {
   const files = new Set<string>();
   let linesAdded = 0;
   let linesRemoved = 0;
   let costUsd = 0;
-  let attributionExcluded = 0;
+  let attributionExcluded = opts.trustedWork?.attributionExcluded ?? 0;
+  if (opts.trustedWork) {
+    for (const work of opts.trustedWork.entries) {
+      for (const path of work.filesChanged) files.add(path);
+      linesAdded += work.linesAdded;
+      linesRemoved += work.linesRemoved;
+    }
+  }
   for (const r of results) {
-    const attributionAccepted = opts.requireVerifiedAttribution !== true
-      || r?.workAttribution?.state === 'VERIFIED';
-    if (attributionAccepted) {
-      for (const f of r?.filesChanged ?? []) {
-        if (typeof f === 'string' && f) files.add(f);
+    if (!opts.trustedWork) {
+      const attributionAccepted = opts.requireVerifiedAttribution !== true
+        || r?.workAttribution?.state === 'VERIFIED';
+      if (attributionAccepted) {
+        for (const f of r?.filesChanged ?? []) {
+          if (typeof f === 'string' && f) files.add(f);
+        }
+        if (typeof r?.linesAdded === 'number' && Number.isFinite(r.linesAdded)) linesAdded += r.linesAdded;
+        if (typeof r?.linesRemoved === 'number' && Number.isFinite(r.linesRemoved)) linesRemoved += r.linesRemoved;
+      } else if (
+        (r?.filesChanged?.length ?? 0) > 0
+        || (typeof r?.linesAdded === 'number' && r.linesAdded > 0)
+        || (typeof r?.linesRemoved === 'number' && r.linesRemoved > 0)
+      ) {
+        attributionExcluded += 1;
       }
-      if (typeof r?.linesAdded === 'number' && Number.isFinite(r.linesAdded)) linesAdded += r.linesAdded;
-      if (typeof r?.linesRemoved === 'number' && Number.isFinite(r.linesRemoved)) linesRemoved += r.linesRemoved;
-    } else if (
-      (r?.filesChanged?.length ?? 0) > 0
-      || (typeof r?.linesAdded === 'number' && r.linesAdded > 0)
-      || (typeof r?.linesRemoved === 'number' && r.linesRemoved > 0)
-    ) {
-      attributionExcluded += 1;
     }
     const usd = r?.cost?.usd;
     if (typeof usd === 'number' && Number.isFinite(usd)) costUsd += usd;
@@ -746,6 +770,8 @@ export interface FilesChangedCostSectionOptions {
   helperCostUsd?: number;
   requireVerifiedAttribution?: boolean;
   attributionWarning?: string;
+  /** Trusted terminal-attempt work vector supplied by the finalizer. */
+  trustedWork?: TrustedFilesChangedWorkVector;
 }
 
 /**
@@ -761,6 +787,7 @@ export function buildFilesChangedCostSection(
 ): string {
   const s = computeFilesChangedAndCost(results, {
     requireVerifiedAttribution: opts?.requireVerifiedAttribution,
+    trustedWork: opts?.trustedWork,
   });
   const lines = [
     '## Files Changed & Cost',

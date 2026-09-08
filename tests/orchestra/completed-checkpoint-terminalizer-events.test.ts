@@ -1,10 +1,10 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CHANNELS, readEvents, reconstructState, writeEvent } from '../../src/core/event-stream.js';
-import { SprintPhase, SprintStatus, TaskEvaluation } from '../../src/core/types.js';
+import { SprintPhase, SprintStatus, TaskEvaluation, TaskStatus } from '../../src/core/types.js';
 
 const mockBuildPreplannedResumeSprint = vi.fn();
 const mockReadResumeTaskResultAuthority = vi.fn();
@@ -47,6 +47,11 @@ vi.mock('../../src/orchestra/sprint-phases.js', () => ({
 
 import { terminalizeCompletedCheckpointRun } from '../../src/orchestra/completed-checkpoint-terminalizer.js';
 import { SprintTerminalArchivePublicationError } from '../../src/orchestra/sprint-finalizer.js';
+import {
+  readCheckpoint,
+  restoreSprintFromCheckpoint,
+  writeCheckpoint,
+} from '../../src/orchestra/sprint-checkpoint.js';
 
 const roots: string[] = [];
 
@@ -409,6 +414,155 @@ describe('completed-checkpoint recovery event path', () => {
     expect(readEvents(root, checkpoint.sprintId)[1]?.payload).toMatchObject({
       source: 'store-revalidated-exact-terminal-authority',
     });
+  });
+
+  it('terminalizes the fresh canonical exact checkpoint instead of the stale restored checkpoint', async () => {
+    const root = makeRoot();
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    const task = {
+      id: '901-001',
+      sprintId: checkpoint.sprintId,
+      title: 'Recovered exact terminal',
+      description: 'Must carry fresh T11 authority into terminalization',
+      model: 'test-model',
+      effort: 'normal',
+      priority: 'NORMAL',
+      reason: 'test',
+      scope: { directories: [], filesRead: [], filesWrite: [] },
+      dependencies: [],
+      goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
+      status: TaskStatus.DONE,
+    };
+    const sprint = {
+      id: checkpoint.sprintId,
+      number: 901,
+      status: SprintStatus.ACTIVE,
+      phase: SprintPhase.EVALUATE,
+      tasks: [task],
+      workers: [],
+      startedAt: checkpoint.timestamp,
+      executionMode: checkpoint.executionMode,
+      skipCleanup: checkpoint.skipCleanup,
+    };
+    writeFileSync(
+      join(root, '.tasks', `task-${task.id}.json`),
+      JSON.stringify(task),
+      'utf-8',
+    );
+    const staleCheckpoint = writeCheckpoint(root, sprint as never, 12);
+    const terminalAuthority = exactTerminalAuthority(task.id, 'DONE');
+    const projectedResult = {
+      taskId: task.id,
+      workerId: `w-${task.id}`,
+      filesChanged: [],
+      linesAdded: 0,
+      linesRemoved: 0,
+      testsPassed: true,
+      coverage: 100,
+      selfAssessment: TaskEvaluation.DONE,
+      notes: 'Store-projected exact result',
+    };
+    const current = {
+      state: 'current' as const,
+      terminalAuthority,
+      terminalResultAuthority: terminalAuthority.terminalResultAuthority,
+      evaluationReceipt: { verdict: TaskEvaluation.DONE },
+      finalizerReceipt: { verdict: TaskEvaluation.DONE },
+      result: {
+        taskId: task.id,
+        attemptCustody: { identity: terminalAuthority.acceptedAuthority.identity },
+      },
+      projectedResult,
+    } as never;
+    const terminalAuthorities = new Map([[task.id, current]]);
+    const isExactTask = (taskId: string) => taskId === task.id;
+
+    const restored = restoreSprintFromCheckpoint(root, checkpoint.sprintId, {
+      terminalAuthorities,
+      isExactTask,
+    });
+    expect(restored).toMatchObject({
+      action: 'complete',
+      restoredSprint: { status: SprintStatus.EVALUATING, phase: SprintPhase.EVALUATE },
+    });
+    expect(staleCheckpoint?.taskStates?.[0]?.exactTerminalAuthority).toBeUndefined();
+
+    const revalidate = vi.fn(({ expectedTerminalAuthority }) => (
+      expectedTerminalAuthority === terminalAuthority
+        ? current
+        : { state: 'hold', reasonCode: 'stale-checkpoint-authority' }
+    ));
+    const registry = {
+      snapshotExactTerminalAuthorities: () => terminalAuthorities,
+      isExactTask,
+    };
+    const actualController = await vi.importActual<
+      typeof import('../../src/orchestra/sprint-controller.js')
+    >('../../src/orchestra/sprint-controller.js');
+
+    await actualController.terminalizeRecoveredCompleteCheckpoint(
+      root,
+      restored.restoredSprint!,
+      staleCheckpoint!,
+      { auth_mode: 'subscription', language: 'en' } as never,
+      {
+        ...registry,
+        readExactTerminalAuthority: (taskId: string) => revalidate({
+          taskId,
+          expectedTerminalAuthority: terminalAuthority,
+        }),
+      } as never,
+    );
+
+    const canonicalCheckpoint = readCheckpoint(root, checkpoint.sprintId);
+    expect(canonicalCheckpoint?.taskStates?.[0]?.exactTerminalAuthority)
+      .toEqual(terminalAuthority);
+    expect(revalidate).toHaveBeenCalledWith({
+      taskId: task.id,
+      expectedTerminalAuthority: terminalAuthority,
+    });
+    expect(mockReadResumeTaskResultAuthority).not.toHaveBeenCalled();
+    expect(mockFinalizeSprint).toHaveBeenCalledWith(
+      root,
+      expect.any(Object),
+      new Map([[task.id, TaskEvaluation.DONE]]),
+      [projectedResult],
+      expect.objectContaining({ exactTerminalAuthorities: terminalAuthorities }),
+    );
+    expect(JSON.parse(readFileSync(join(root, '.tasks', `task-${task.id}.json`), 'utf-8')))
+      .toMatchObject({ status: TaskStatus.DONE });
+
+    const failedRoot = makeRoot();
+    mkdirSync(join(failedRoot, '.tasks'), { recursive: true });
+    writeFileSync(
+      join(failedRoot, '.tasks', `task-${task.id}.json`),
+      JSON.stringify(task),
+      'utf-8',
+    );
+    const failedStaleCheckpoint = writeCheckpoint(failedRoot, sprint as never, 12);
+    const failedRestore = restoreSprintFromCheckpoint(failedRoot, checkpoint.sprintId, {
+      terminalAuthorities,
+      isExactTask,
+    });
+    mkdirSync(join(
+      failedRoot,
+      '.deckent',
+      `${checkpoint.sprintId}-checkpoint.json.tmp`,
+    ));
+    mockFinalizeSprint.mockClear();
+
+    await expect(actualController.terminalizeRecoveredCompleteCheckpoint(
+      failedRoot,
+      failedRestore.restoredSprint!,
+      failedStaleCheckpoint!,
+      { auth_mode: 'subscription', language: 'en' } as never,
+      {
+        ...registry,
+        readExactTerminalAuthority: () => current,
+      } as never,
+    )).rejects.toThrow(/Exact terminal checkpoint persistence failed/u);
+    expect(mockFinalizeSprint).not.toHaveBeenCalled();
+    expect(readCheckpoint(failedRoot, checkpoint.sprintId)).toEqual(failedStaleCheckpoint);
   });
 
   it('holds a completed checkpoint when exact custody exists without its Store reference', async () => {

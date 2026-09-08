@@ -383,7 +383,7 @@ describe('exact production-wiring host settlement', () => {
       custodyStore: fixture.store,
       policy: fixture.policy,
     });
-    expect(settled).toMatchObject({ state: 'settled' });
+    expect(settled, JSON.stringify(settled)).toMatchObject({ state: 'settled' });
     if (settled.state !== 'settled') return;
     const terminal = readExactAcceptedTaskTerminalAuthority({
       projectRoot: '/fixture/project',

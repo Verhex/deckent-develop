@@ -18,6 +18,7 @@ import {
   type StateFeedInput,
 } from '../../src/cli/helpers/run-state-feed.js';
 import type { CanonicalRunStatusReadModel } from '../../src/core/run-status-read-model.js';
+import type { CanonicalRunStatus } from '../../src/core/run-status-authority.js';
 
 // ─── fake fs seam ────────────────────────────────────────────────────────────
 
@@ -88,6 +89,40 @@ function activeReadModel(phase = 'EXECUTE'): CanonicalRunStatusReadModel {
   } as CanonicalRunStatusReadModel;
 }
 
+function abortedAuthority(): CanonicalRunStatus {
+  return {
+    schemaVersion: 1,
+    lifecycle: 'ABORTED',
+    active: false,
+    resumable: false,
+    sprintId: 'sprint-714',
+    phase: 'EXECUTE',
+    status: 'FAILED',
+    reason: 'Normal Docker IPC HOLD: PRIVATE_IPC_AUTHORITY_UNAVAILABLE',
+    recoveryCommand: null,
+    finalizeCommand: null,
+    coordinator: 'absent',
+    conflicts: [],
+  };
+}
+
+function orphanedAuthority(): CanonicalRunStatus {
+  return {
+    schemaVersion: 1,
+    lifecycle: 'ORPHANED',
+    active: false,
+    resumable: true,
+    sprintId: 'sprint-716',
+    phase: 'FIX',
+    status: 'FIXING',
+    reason: 'coordinator-dead',
+    recoveryCommand: 'deckent recover sprint-716 --resume',
+    finalizeCommand: null,
+    coordinator: 'absent',
+    conflicts: [],
+  };
+}
+
 function readActiveFeed(fs: StateFeedFs): ReturnType<typeof readLiveFooterState> {
   return readLiveFooterState({
     projectRoot: ROOT,
@@ -148,6 +183,57 @@ describe('computeLiveFooterState — pure core', () => {
       state: 'persisted',
       revision: 9,
       modelDigest: 'a'.repeat(64),
+    });
+  });
+
+  it('uses fresh ABORTED authority to veto a stale ACTIVE read model and running projection', () => {
+    const state = computeLiveFooterState({
+      ...baseInput(),
+      runStatusReadModel: activeReadModel('SPAWN'),
+      runStatusAuthority: abortedAuthority(),
+      sprintState: {
+        sprintId: 'sprint-714',
+        phase: 'SPAWN',
+        startedAt: '2026-09-04T11:07:49.000Z',
+        taskIds: ['714-001'],
+      },
+      heartbeats: [{ taskId: '714-001' }],
+    });
+
+    expect(state.running).toBeUndefined();
+    expect(state.startedAt).toBeUndefined();
+    expect(state.workers).toBeUndefined();
+    expect(state.next).toBeUndefined();
+    expect(state.runStatus).toEqual({
+      lifecycle: 'ABORTED',
+      sprintId: 'sprint-714',
+      reason: 'Normal Docker IPC HOLD: PRIVATE_IPC_AUTHORITY_UNAVAILABLE',
+    });
+  });
+
+  it('uses fresh ORPHANED/dead authority to veto a stale FIXING projection', () => {
+    const state = computeLiveFooterState({
+      ...baseInput(),
+      runStatusReadModel: activeReadModel('FIX'),
+      runStatusAuthority: orphanedAuthority(),
+      sprintState: {
+        sprintId: 'sprint-716',
+        phase: 'FIX',
+        startedAt: '2026-09-04T11:07:49.000Z',
+        taskIds: ['716-001'],
+      },
+      heartbeats: [{ taskId: '716-001' }],
+    });
+
+    expect(state.running).toBeUndefined();
+    expect(state.startedAt).toBeUndefined();
+    expect(state.workers).toBeUndefined();
+    expect(state.next).toBeUndefined();
+    expect(state.runStatus).toEqual({
+      lifecycle: 'ORPHANED',
+      sprintId: 'sprint-716',
+      reason: 'coordinator-dead',
+      recoveryCommand: 'deckent recover sprint-716 --resume',
     });
   });
 
@@ -267,6 +353,22 @@ describe('readLiveFooterState — fs-fake seam', () => {
     expect(state.next).toBe('354-003');
     expect(state.provider).toBeUndefined();
     expect(state.auth).toBeUndefined();
+  });
+
+  it('marks a stale persisted model and projects fresh terminal authority', () => {
+    const fs = makeFakeFs({
+      [SPRINT_STATE]: sprintStateJson({ sprintId: 'sprint-714', phase: 'SPAWN' }),
+    });
+    const state = readLiveFooterState({
+      projectRoot: ROOT,
+      fs,
+      readRunStatusReadModel: () => activeReadModel('SPAWN'),
+      readRunStatusAuthority: () => abortedAuthority(),
+    });
+
+    expect(state.statusReadModel).toEqual({ state: 'unavailable-or-stale' });
+    expect(state.runStatus?.lifecycle).toBe('ABORTED');
+    expect(state.running).toBeUndefined();
   });
 
   it('a corrupt sprint-state.json degrades to absent, not a thrown error', () => {

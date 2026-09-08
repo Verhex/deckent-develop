@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { types as nodeTypes } from 'node:util';
 import {
   closeSync,
   constants as fsConstants,
@@ -23,6 +24,10 @@ import {
 import { createJsonFileFirstWriterWins, createRawFileFirstWriterWins } from './approval-file-cas.js';
 import { canonicalJson } from './audit-writer.js';
 import { CROSS_VERIFY_RAW_OUTPUT_MAX_BYTES as canonicalCrossVerifyRawOutputMaxBytes } from './cross-verify-response-limits.js';
+import {
+  parseExactAcceptanceVerificationBindingV2,
+  type ExactAcceptanceEvidenceReadPortV2,
+} from './exact-acceptance-verification-contract.js';
 import {
   assertTaskResultSettlementRef,
   readTaskResultSettlementActiveClaim,
@@ -130,6 +135,8 @@ export interface CrossVerifyEvidenceClaimV1 extends TaskResultSettlementRefV1 {
   readonly claimedAt: string;
   readonly relativePaths: readonly string[];
   readonly limits: CrossVerifyEvidenceLimitsV1;
+  /** Present only for an opaque, freshly verified exact-custody byte source. */
+  readonly immutableSourceBindingDigest?: string;
 }
 
 export interface CrossVerifyEvidenceClaimEnvelopeV1 {
@@ -212,12 +219,14 @@ export interface ClaimCrossVerifyEvidenceSnapshotInput {
   readonly fenceTokenHash: string;
   readonly relativePaths: readonly string[];
   readonly limits?: Partial<CrossVerifyEvidenceLimitsV1>;
+  readonly immutableSource?: ExactAcceptanceEvidenceReadPortV2;
 }
 
 export interface CaptureCrossVerifyEvidenceSnapshotInput {
   readonly projectRoot: string;
   readonly settlementRef: TaskResultSettlementRefV1;
   readonly claim: CrossVerifyEvidenceClaimEnvelopeV1;
+  readonly immutableSource?: ExactAcceptanceEvidenceReadPortV2;
 }
 
 export interface WriteCrossVerifyVerdictReceiptInput {
@@ -914,6 +923,7 @@ function parseClaimEnvelope(
     'claimedAt',
     'relativePaths',
     'limits',
+    ...(Object.hasOwn(claim, 'immutableSourceBindingDigest') ? ['immutableSourceBindingDigest'] : []),
   ];
   if (
     !hasExactKeys(claim, claimKeys)
@@ -933,6 +943,9 @@ function parseClaimEnvelope(
   }
   assertRecordSettlementRef(claim, ref);
   assertReceiptDigest(claim.fenceTokenHash, 'claim.fenceTokenHash');
+  if (Object.hasOwn(claim, 'immutableSourceBindingDigest')) {
+    assertReceiptDigest(claim.immutableSourceBindingDigest, 'claim.immutableSourceBindingDigest');
+  }
   const limits = normalizeLimits(
     claim.limits as unknown as CrossVerifyEvidenceLimitsV1,
   );
@@ -1332,6 +1345,73 @@ export function readCrossVerifyEvidenceClaimReceipt(
   return claim;
 }
 
+function readImmutableSource(
+  projectRoot: string,
+  source: ExactAcceptanceEvidenceReadPortV2 | undefined,
+  relativePaths: readonly string[],
+  limits: CrossVerifyEvidenceLimitsV1,
+): { bindingDigest: string; bytes: ReadonlyMap<string, Buffer> } | null {
+  if (source === undefined) return null;
+  // Only an explicit in-process host port can cross this seam. JSON, getters,
+  // proxies and caller-supplied raw byte arrays do not become read authority.
+  if (!source || typeof source !== 'object' || nodeTypes.isProxy(source)
+    || Object.getPrototypeOf(source) !== Object.prototype
+    || Reflect.ownKeys(source).length !== 1) {
+    throw new CrossVerifyEvidenceBrokerError('AUTHORITY_MISMATCH', 'Immutable evidence requires a host read capability');
+  }
+  const read = Object.getOwnPropertyDescriptor(source, 'read');
+  if (!read || !('value' in read) || typeof read.value !== 'function' || nodeTypes.isProxy(read.value)) {
+    throw new CrossVerifyEvidenceBrokerError('AUTHORITY_MISMATCH', 'Immutable evidence read capability is not a plain callable authority');
+  }
+  const fresh: unknown = Reflect.apply(read.value, undefined, []);
+  if (!fresh || typeof fresh !== 'object' || nodeTypes.isProxy(fresh)) {
+    throw new CrossVerifyEvidenceBrokerError('AUTHORITY_MISMATCH', 'Immutable evidence reader returned no authority');
+  }
+  const state = Object.getOwnPropertyDescriptor(fresh, 'state');
+  const bindingValue = Object.getOwnPropertyDescriptor(fresh, 'binding');
+  const evidenceValue = Object.getOwnPropertyDescriptor(fresh, 'evidence');
+  const binding = bindingValue && 'value' in bindingValue
+    ? parseExactAcceptanceVerificationBindingV2(bindingValue.value) : null;
+  const evidence: unknown = evidenceValue && 'value' in evidenceValue ? evidenceValue.value : null;
+  if (!state || !('value' in state) || state.value !== 'ready' || !binding
+    || !Array.isArray(evidence) || nodeTypes.isProxy(evidence)
+    || evidence.length > limits.maxFiles || Reflect.ownKeys(evidence).length !== evidence.length + 1
+    || binding.acceptedAuthority.identity.projectRootSha256 !== sha256(canonicalProjectRoot(projectRoot))) {
+    throw new CrossVerifyEvidenceBrokerError('AUTHORITY_MISMATCH', 'Immutable evidence source has no matching fresh custody authority');
+  }
+  assertDigest(binding.bindingDigest, 'immutableSourceBindingDigest');
+  const bytes = new Map<string, Buffer>();
+  let total = 0;
+  for (let index = 0; index < evidence.length; index++) {
+    const item = Object.getOwnPropertyDescriptor(evidence, String(index));
+    const entry: unknown = item && 'value' in item ? item.value : null;
+    if (!entry || typeof entry !== 'object' || nodeTypes.isProxy(entry)) {
+      throw new CrossVerifyEvidenceBrokerError('AUTHORITY_MISMATCH', 'Immutable evidence entry is not data');
+    }
+    const pathValue = Object.getOwnPropertyDescriptor(entry, 'relativePath');
+    const byteValue = Object.getOwnPropertyDescriptor(entry, 'bytes');
+    if (!pathValue || !('value' in pathValue) || typeof pathValue.value !== 'string'
+      || !byteValue || !('value' in byteValue) || nodeTypes.isProxy(byteValue.value)
+      || !(byteValue.value instanceof Uint8Array)) {
+      throw new CrossVerifyEvidenceBrokerError('AUTHORITY_MISMATCH', 'Immutable evidence entry contains unverified accessors or bytes');
+    }
+    const path = assertCrossVerifyEvidenceRelativePath(pathValue.value);
+    const content = byteValue.value;
+    if (bytes.has(path) || content.byteLength > limits.maxFileBytes || bytes.size >= limits.maxFiles) {
+      throw new CrossVerifyEvidenceBrokerError('EVIDENCE_LIMIT_EXCEEDED', 'Immutable evidence source violates exact bounded file authority');
+    }
+    total += content.byteLength;
+    if (total > limits.maxTotalBytes) {
+      throw new CrossVerifyEvidenceBrokerError('EVIDENCE_LIMIT_EXCEEDED', 'Immutable evidence source exceeds its aggregate ceiling');
+    }
+    bytes.set(path, Buffer.from(content));
+  }
+  if (canonicalJson([...bytes.keys()].sort()) !== canonicalJson([...relativePaths].sort())) {
+    throw new CrossVerifyEvidenceBrokerError('AUTHORITY_MISMATCH', 'Immutable evidence source must exactly cover the claimed paths');
+  }
+  return { bindingDigest: binding.bindingDigest, bytes };
+}
+
 export function claimCrossVerifyEvidenceSnapshotAtomic(
   input: ClaimCrossVerifyEvidenceSnapshotInput,
 ): CrossVerifyEvidenceClaimEnvelopeV1 {
@@ -1345,6 +1425,7 @@ export function claimCrossVerifyEvidenceSnapshotAtomic(
     input.relativePaths,
     limits.maxFiles,
   );
+  const immutable = readImmutableSource(input.projectRoot, input.immutableSource, relativePaths, limits);
   const claim: CrossVerifyEvidenceClaimV1 = {
     ...input.settlementRef,
     brokerVersion: CROSS_VERIFY_EVIDENCE_BROKER_VERSION,
@@ -1354,6 +1435,7 @@ export function claimCrossVerifyEvidenceSnapshotAtomic(
     claimedAt,
     relativePaths,
     limits,
+    ...(immutable ? { immutableSourceBindingDigest: immutable.bindingDigest } : {}),
   };
   const envelope: CrossVerifyEvidenceClaimEnvelopeV1 = {
     claimSha256: sha256(canonicalJson(claim)),
@@ -1441,6 +1523,23 @@ export function readCrossVerifyEvidenceReceipt(
   return evidence;
 }
 
+/** Read exact immutable snapshot bytes, never the mutable project-relative source. */
+export function readCrossVerifyEvidenceBlobBytes(
+  projectRoot: string,
+  ref: TaskResultSettlementRefV1,
+  relativePath: string,
+): Uint8Array {
+  assertCrossVerifyEvidenceRelativePath(relativePath);
+  const evidence = readCrossVerifyEvidenceReceipt(projectRoot, ref);
+  const entry = evidence.manifest.entries.find(item => item.relativePath === relativePath);
+  if (!entry) {
+    throw new CrossVerifyEvidenceBrokerError('AUTHORITY_MISMATCH', 'Exact evidence path is absent from the immutable snapshot');
+  }
+  const authority = resolveAuthorityDirectories(projectRoot, ref, { createBroker: false, createBlobs: false });
+  const blob = readBlobForEntry(authority, ref, evidence.manifest.claimSha256, entry);
+  return Uint8Array.from(Buffer.from(blob.receipt.contentBase64, 'base64'));
+}
+
 export function captureCrossVerifyEvidenceSnapshotAtomic(
   input: CaptureCrossVerifyEvidenceSnapshotInput,
 ): CrossVerifyEvidenceReceiptEnvelopeV1 {
@@ -1459,6 +1558,11 @@ export function captureCrossVerifyEvidenceSnapshotAtomic(
       'Cross-verify evidence capture does not match the durable first-writer claim',
     );
   }
+  const immutable = readImmutableSource(input.projectRoot, input.immutableSource,
+    durableClaim.claim.relativePaths, durableClaim.claim.limits);
+  if (durableClaim.claim.immutableSourceBindingDigest !== immutable?.bindingDigest) {
+    throw new CrossVerifyEvidenceBrokerError('AUTHORITY_MISMATCH', 'Immutable evidence source cannot be omitted, added, or replaced after claim');
+  }
   assertCurrentFence(
     input.settlementRef,
     durableClaim.claim.fenceTokenHash,
@@ -1476,6 +1580,12 @@ export function captureCrossVerifyEvidenceSnapshotAtomic(
   );
   if (existing !== null) {
     for (const entry of existing.manifest.entries) {
+      if (immutable) {
+        const content = immutable.bytes.get(entry.relativePath);
+        if (!content || content.byteLength !== entry.byteLength || sha256(content) !== entry.contentSha256) {
+          throw new CrossVerifyEvidenceBrokerError('SOURCE_CHANGED', 'Fresh immutable evidence no longer matches the pinned snapshot');
+        }
+      }
       readBlobForEntry(
         authority,
         input.settlementRef,
@@ -1501,7 +1611,7 @@ export function captureCrossVerifyEvidenceSnapshotAtomic(
       input.settlementRef,
       durableClaim.claim.fenceTokenHash,
     );
-    const content = readPinnedBoundedFile(
+    const content = immutable ? immutable.bytes.get(relativePath) ?? null : readPinnedBoundedFile(
       canonicalProjectRoot(input.projectRoot),
       relativePath,
       durableClaim.claim.limits.maxFileBytes,
@@ -1575,6 +1685,14 @@ export function captureCrossVerifyEvidenceSnapshotAtomic(
     input.settlementRef,
     durableClaim.claim.fenceTokenHash,
   );
+  if (immutable) {
+    const fresh = readImmutableSource(input.projectRoot, input.immutableSource,
+      durableClaim.claim.relativePaths, durableClaim.claim.limits);
+    if (!fresh || fresh.bindingDigest !== immutable.bindingDigest
+      || [...immutable.bytes].some(([path, bytes]) => !fresh.bytes.get(path)?.equals(bytes))) {
+      throw new CrossVerifyEvidenceBrokerError('SOURCE_CHANGED', 'Immutable custody evidence changed during snapshot capture');
+    }
+  }
   const manifest: CrossVerifyEvidenceManifestV1 = {
     ...input.settlementRef,
     brokerVersion: CROSS_VERIFY_EVIDENCE_BROKER_VERSION,

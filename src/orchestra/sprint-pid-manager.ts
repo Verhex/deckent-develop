@@ -197,16 +197,34 @@ export function readPid(root: string, sprintId: string): number | null {
   }
 }
 
+export interface ClearSprintPidOptions {
+  /**
+   * Keep the generation-bound snapshot as non-live correlation evidence.
+   * The `.pid` file is the liveness authority; a snapshot without it can
+   * never authorize signalling or project an ACTIVE coordinator.
+   */
+  readonly preserveSnapshot?: boolean;
+}
+
 /**
- * Remove the PID file for a sprint (called on clean shutdown).
+ * Remove the PID file for a sprint (called on clean shutdown). By default the
+ * paired snapshot is also removed. Fatal detached execution paths may retain
+ * that snapshot solely to correlate the exact process generation to a
+ * subsequently published terminal RunFlow event.
  */
-export function clearPid(root: string, sprintId: string): void {
+export function clearPid(
+  root: string,
+  sprintId: string,
+  options: ClearSprintPidOptions = {},
+): void {
   const filePath = pidFilePath(root, sprintId);
   try {
     if (existsSync(filePath)) {
       unlinkSync(filePath);
     }
   } catch { /* non-fatal */ }
+
+  if (options.preserveSnapshot === true) return;
 
   // Also clean up snapshot file
   const snapPath = snapshotFilePath(root, sprintId);

@@ -10,7 +10,15 @@ import {
   type PromptDeliveryReceipt,
 } from '../core/prompt-delivery-receipt.js';
 import { DeckentError } from '../core/errors.js';
-import { existsSync, readdirSync, readFileSync, appendFileSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
+import {
+  existsSync,
+  readdirSync,
+  readFileSync,
+  appendFileSync,
+  mkdirSync,
+  writeFileSync,
+  renameSync,
+} from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import type {
@@ -2868,6 +2876,8 @@ export interface WorkerPromptCompilationOptionsV2 {
   readonly publicationMode?: 'compatibility' | 'deferred';
   readonly dependencyIds?: readonly string[];
   readonly dependencyResults?: ReadonlyMap<string, DependencyResultEntry>;
+  /** Exact terminal-authority-bound handoffs. Presence (including empty) disables host-file fallback. */
+  readonly upstreamHandoffs?: readonly UpstreamHandoffEntry[];
   readonly sink?: WorkerPromptCompilationSinkV2;
 }
 
@@ -3044,9 +3054,21 @@ export function buildWorkerPrompt(
   // when worker_comms.enabled && inject_shared. Best-effort; undefined when off.
   const sharedContext = readSharedContext(task, projectRoot);
 
-  // Sprint 278 COMM-1 (278-004): inject executed upstream handoffs targeting this
-  // task when worker_comms.enabled && inject_handoffs. Best-effort; undefined when off.
-  const upstreamHandoffs = readUpstreamHandoffs(task, projectRoot);
+  // Exact Docker supplies Store-reread terminal handoffs directly. The legacy
+  // compatibility path keeps reading ready HandoffProtocol projections. Both
+  // remain gated by worker_comms.enabled && inject_handoffs.
+  const workerComms = effectiveConfig?.worker_comms ?? readWorkerCommsConfig(projectRoot);
+  const handoffInjectionEnabled = workerComms?.enabled === true
+    && (workerComms.inject_handoffs ?? true) !== false;
+  const upstreamHandoffs = !handoffInjectionEnabled
+    ? undefined
+    : compilationOptions?.upstreamHandoffs !== undefined
+      ? compilationOptions.upstreamHandoffs.map(entry => ({
+          fromTaskId: entry.fromTaskId,
+          artifacts: [...entry.artifacts],
+          ...(entry.notes !== undefined ? { notes: entry.notes } : {}),
+        }))
+      : readUpstreamHandoffs(task, projectRoot);
 
   // WP-14: read the live pre-existing-failure count from this sprint's baseline
   // snapshot (written by the sprint controller at sprint start) so the prompt's

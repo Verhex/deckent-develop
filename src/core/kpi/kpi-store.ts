@@ -17,6 +17,7 @@
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType, Statement } from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
+import { canonicalJson } from '../audit-writer.js';
 import { DeckentError } from '../errors.js';
 import type { MeasureKind, KpiGrain, KpiStatus } from './types.js';
 
@@ -297,6 +298,101 @@ export class KpiStore {
     insertAll(rows);
   }
 
+  /**
+   * Publish one immutable terminal measurement vector for a tenant+sprint.
+   *
+   * The legacy {@link recordMeasurements} API intentionally remains append-only.
+   * This terminal-only seam instead takes an EXCLUSIVE SQLite transaction before
+   * reading the scope, so concurrent first writers cannot both observe an empty
+   * vector. An exact semantic replay is a no-op; any partial, duplicate, or
+   * divergent history fails closed without changing existing measurements.
+   * Generated ids and capture timestamps are publication metadata and therefore
+   * are deliberately excluded from the replay comparison.
+   */
+  recordTerminalSprintMeasurements(
+    tenantId: string,
+    sprintId: string,
+    rows: readonly MeasurementInput[],
+  ): void {
+    KpiStore.assertTenant(tenantId);
+    if (typeof sprintId !== 'string' || sprintId.trim() === '') {
+      throw KpiStore.terminalSnapshotHold('invalid-sprint-scope');
+    }
+    if (rows.length === 0) {
+      throw KpiStore.terminalSnapshotHold('empty-input-vector');
+    }
+
+    const expected = new Map<string, ReturnType<typeof KpiStore.toTerminalSemanticMeasurement>>();
+    const explicitIds = new Set<string>();
+    for (const row of rows) {
+      if (row.tenantId !== tenantId || row.sprintId !== sprintId) {
+        throw KpiStore.terminalSnapshotHold('mixed-input-scope');
+      }
+      if (
+        typeof row.measureId !== 'string' || row.measureId.length === 0
+        || typeof row.unit !== 'string' || row.unit.length === 0
+        || (row.kind !== 'counter' && row.kind !== 'gauge' && row.kind !== 'ratio')
+        || !Number.isFinite(row.value)
+      ) {
+        throw KpiStore.terminalSnapshotHold('invalid-input-measurement');
+      }
+      if (expected.has(row.measureId)) {
+        throw KpiStore.terminalSnapshotHold('duplicate-input-measurement');
+      }
+      if (row.id !== undefined) {
+        if (explicitIds.has(row.id)) {
+          throw KpiStore.terminalSnapshotHold('duplicate-input-id');
+        }
+        explicitIds.add(row.id);
+      }
+      expected.set(row.measureId, KpiStore.toTerminalSemanticMeasurement(row));
+    }
+
+    const compareOrInsert = this.db.transaction(() => {
+      const existing = this.stmtSelectSprintMeasurements.all({
+        tenant_id: tenantId,
+        sprint_id: sprintId,
+      }) as MeasurementDbRow[];
+
+      if (existing.length === 0) {
+        for (const row of rows) {
+          this.stmtInsertMeasurement.run({
+            id: row.id ?? randomUUID(),
+            tenant_id: row.tenantId,
+            measure_id: row.measureId,
+            value: row.value,
+            kind: row.kind,
+            unit: row.unit,
+            sprint_id: row.sprintId,
+            task_id: row.taskId ?? null,
+            ts: row.ts ?? null,
+            tags: KpiStore.serializeTags(row.tags),
+          });
+        }
+        return;
+      }
+
+      const observed = new Map<string, ReturnType<typeof KpiStore.toTerminalSemanticMeasurement>>();
+      for (const row of existing) {
+        if (observed.has(row.measure_id)) {
+          throw KpiStore.terminalSnapshotHold('duplicate-existing-measurement');
+        }
+        observed.set(row.measure_id, KpiStore.toTerminalSemanticMeasurement(row));
+      }
+      if (existing.length !== expected.size) {
+        throw KpiStore.terminalSnapshotHold('existing-vector-cardinality-mismatch');
+      }
+      for (const [measureId, semantic] of expected) {
+        const existingSemantic = observed.get(measureId);
+        if (existingSemantic === undefined || canonicalJson(existingSemantic) !== canonicalJson(semantic)) {
+          throw KpiStore.terminalSnapshotHold('existing-vector-semantic-mismatch');
+        }
+      }
+    });
+
+    compareOrInsert.exclusive();
+  }
+
   /** All raw measurements for a (tenant, sprint), ordered by capture time. */
   getSprintMeasurements(tenantId: string, sprintId: string): MeasurementRow[] {
     KpiStore.assertTenant(tenantId);
@@ -454,5 +550,62 @@ export class KpiStore {
       ts: r.ts,
       tags,
     };
+  }
+
+  private static serializeTags(tags: Record<string, unknown> | undefined): string {
+    try {
+      const serialized = JSON.stringify(tags ?? {});
+      if (serialized === undefined) {
+        throw new Error('tags are not JSON-serializable');
+      }
+      return serialized;
+    } catch {
+      throw KpiStore.terminalSnapshotHold('invalid-input-tags');
+    }
+  }
+
+  private static toTerminalSemanticMeasurement(
+    row: MeasurementInput | MeasurementDbRow,
+  ): {
+    measureId: string;
+    value: number;
+    kind: string;
+    unit: string;
+    taskId: string | null;
+    tags: unknown;
+  } {
+    if ('measure_id' in row) {
+      let tags: unknown;
+      try {
+        tags = JSON.parse(row.tags);
+      } catch {
+        throw KpiStore.terminalSnapshotHold('invalid-existing-tags');
+      }
+      return {
+        measureId: row.measure_id,
+        value: row.value,
+        kind: row.kind,
+        unit: row.unit,
+        taskId: row.task_id,
+        tags,
+      };
+    }
+
+    return {
+      measureId: row.measureId,
+      value: row.value,
+      kind: row.kind,
+      unit: row.unit,
+      taskId: row.taskId ?? null,
+      tags: JSON.parse(KpiStore.serializeTags(row.tags)) as unknown,
+    };
+  }
+
+  private static terminalSnapshotHold(reason: string): DeckentError {
+    return new DeckentError(
+      'KPI_TERMINAL_SNAPSHOT_HOLD',
+      `KPI_TERMINAL_SNAPSHOT_HOLD:${reason}`,
+      'Preserve the tenant+sprint measurement history and resolve the conflicting terminal snapshot.',
+    );
   }
 }

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { Worker } from 'node:worker_threads';
 import { KpiStore } from '../../src/core/kpi/kpi-store.js';
 import type { MeasurementInput, ResultInput } from '../../src/core/kpi/kpi-store.js';
 
@@ -14,6 +15,7 @@ const SPRINT = 'sprint-330';
 
 function meas(overrides: Partial<MeasurementInput> = {}): MeasurementInput {
   return {
+    id: overrides.id,
     tenantId: overrides.tenantId ?? TENANT_A,
     measureId: overrides.measureId ?? 'cost_usd',
     value: overrides.value ?? 1,
@@ -65,6 +67,158 @@ describe('KpiStore — measurements', () => {
     expect(rows[0].id).toBeTruthy(); // auto UUID
     expect(rows[1].tags).toEqual({ phase: 'retro' });
     expect(rows[0].tags).toEqual({});
+  });
+});
+
+describe('KpiStore — terminal sprint measurement snapshot', () => {
+  const terminalVector = (): MeasurementInput[] => [
+    meas({
+      id: 'terminal-cost',
+      measureId: 'cost_usd',
+      value: 7,
+      ts: '2026-06-26T10:00:01.000Z',
+      tags: { authority: { version: 1, source: 'terminal' }, settled: true },
+    }),
+    meas({
+      id: 'terminal-tasks',
+      measureId: 'tasks_total',
+      value: 6,
+      kind: 'counter',
+      unit: 'count',
+      ts: '2026-06-26T10:00:01.000Z',
+    }),
+  ];
+
+  it('inserts once and accepts a semantic replay while preserving original ids and timestamps', () => {
+    const first = terminalVector();
+    store.recordTerminalSprintMeasurements(TENANT_A, SPRINT, first);
+    store.recordTerminalSprintMeasurements(TENANT_A, SPRINT, [
+      {
+        ...first[0]!,
+        id: 'ignored-replay-id',
+        ts: '2026-09-05T19:50:45.000Z',
+        tags: { settled: true, authority: { source: 'terminal', version: 1 } },
+      },
+      { ...first[1]!, id: 'ignored-replay-task-id', ts: '2026-09-05T19:50:45.000Z' },
+    ]);
+
+    const rows = store.getSprintMeasurements(TENANT_A, SPRINT);
+    expect(rows).toHaveLength(2);
+    expect(rows.map(row => row.id)).toEqual(['terminal-cost', 'terminal-tasks']);
+    expect(rows.every(row => row.ts === '2026-06-26T10:00:01.000Z')).toBe(true);
+  });
+
+  it('rejects mixed scope, duplicate input, and non-finite values before publication', () => {
+    const valid = terminalVector();
+    const attempts: MeasurementInput[][] = [
+      [valid[0]!, { ...valid[1]!, tenantId: TENANT_B }],
+      [valid[0]!, { ...valid[0]!, id: 'duplicate-measure-id' }],
+      [{ ...valid[0]!, value: Number.POSITIVE_INFINITY }, valid[1]!],
+    ];
+
+    for (const rows of attempts) {
+      expect(() => store.recordTerminalSprintMeasurements(TENANT_A, SPRINT, rows))
+        .toThrow(expect.objectContaining({ code: 'KPI_TERMINAL_SNAPSHOT_HOLD' }));
+      expect(store.getSprintMeasurements(TENANT_A, SPRINT)).toEqual([]);
+      expect(store.getSprintMeasurements(TENANT_B, SPRINT)).toEqual([]);
+    }
+  });
+
+  it.each([
+    ['measure identity', (row: MeasurementInput) => ({ ...row, measureId: 'cost_reference_usd' })],
+    ['value', (row: MeasurementInput) => ({ ...row, value: row.value + 1 })],
+    ['kind', (row: MeasurementInput) => ({ ...row, kind: 'counter' as const })],
+    ['unit', (row: MeasurementInput) => ({ ...row, unit: 'cents' })],
+    ['task identity', (row: MeasurementInput) => ({ ...row, taskId: 'task-foreign' })],
+    ['tags', (row: MeasurementInput) => ({ ...row, tags: { authority: { version: 2 } } })],
+  ])('holds a replay with divergent %s and preserves the published vector', (_field, mutate) => {
+    const first = terminalVector();
+    store.recordTerminalSprintMeasurements(TENANT_A, SPRINT, first);
+    const before = store.getSprintMeasurements(TENANT_A, SPRINT);
+    const replay = [mutate(first[0]!), first[1]!];
+
+    expect(() => store.recordTerminalSprintMeasurements(TENANT_A, SPRINT, replay))
+      .toThrow(expect.objectContaining({ code: 'KPI_TERMINAL_SNAPSHOT_HOLD' }));
+    expect(store.getSprintMeasurements(TENANT_A, SPRINT)).toEqual(before);
+  });
+
+  it('keeps tenant scopes independent for the same sprint identity', () => {
+    const tenantA = terminalVector();
+    const tenantB = terminalVector().map(row => ({
+      ...row,
+      id: `tenant-b-${row.id}`,
+      tenantId: TENANT_B,
+      value: row.value + 10,
+    }));
+    store.recordTerminalSprintMeasurements(TENANT_A, SPRINT, tenantA);
+    store.recordTerminalSprintMeasurements(TENANT_B, SPRINT, tenantB);
+
+    expect(store.getSprintMeasurements(TENANT_A, SPRINT).map(row => row.value)).toEqual([7, 6]);
+    expect(store.getSprintMeasurements(TENANT_B, SPRINT).map(row => row.value)).toEqual([17, 16]);
+  });
+
+  it('serializes concurrent first writers so a matching loser replays without overwrite', async () => {
+    const dbPath = join(tmpDir, 'concurrent-terminal.db');
+    const concurrentStore = new KpiStore(dbPath);
+    const rows = terminalVector();
+    const worker = new Worker(`
+      const { parentPort, workerData } = require('node:worker_threads');
+      const Database = require('better-sqlite3');
+      const db = new Database(workerData.dbPath);
+      db.pragma('journal_mode = WAL');
+      const insert = db.prepare(\`
+        INSERT INTO kpi_measurements (
+          id, tenant_id, measure_id, value, kind, unit, sprint_id, task_id, ts, tags
+        ) VALUES (
+          @id, @tenant_id, @measure_id, @value, @kind, @unit, @sprint_id, @task_id, @ts, @tags
+        )
+      \`);
+      db.exec('BEGIN EXCLUSIVE');
+      for (const row of workerData.rows) insert.run(row);
+      parentPort.postMessage('locked');
+      setTimeout(() => {
+        db.exec('COMMIT');
+        db.close();
+        parentPort.postMessage('committed');
+      }, 150);
+    `, {
+      eval: true,
+      workerData: {
+        dbPath,
+        rows: rows.map(row => ({
+          id: row.id,
+          tenant_id: row.tenantId,
+          measure_id: row.measureId,
+          value: row.value,
+          kind: row.kind,
+          unit: row.unit,
+          sprint_id: row.sprintId,
+          task_id: row.taskId ?? null,
+          ts: row.ts,
+          tags: JSON.stringify(row.tags ?? {}),
+        })),
+      },
+    });
+    const locked = new Promise<void>((resolve, reject) => {
+      worker.on('message', message => { if (message === 'locked') resolve(); });
+      worker.once('error', reject);
+    });
+    const committed = new Promise<void>((resolve, reject) => {
+      worker.on('message', message => { if (message === 'committed') resolve(); });
+      worker.once('error', reject);
+    });
+
+    try {
+      await locked;
+      concurrentStore.recordTerminalSprintMeasurements(TENANT_A, SPRINT, rows);
+      await committed;
+      const persisted = concurrentStore.getSprintMeasurements(TENANT_A, SPRINT);
+      expect(persisted).toHaveLength(2);
+      expect(persisted.map(row => row.id)).toEqual(['terminal-cost', 'terminal-tasks']);
+    } finally {
+      await worker.terminate();
+      concurrentStore.close();
+    }
   });
 });
 
@@ -193,6 +347,8 @@ describe('KpiStore — tenant isolation (security)', () => {
 describe('KpiStore — tenant guard (no tenant-less path)', () => {
   it('throws on empty/blank tenant id across read and write paths', () => {
     expect(() => store.recordMeasurements([meas({ tenantId: '' })])).toThrow(/tenant/i);
+    expect(() => store.recordTerminalSprintMeasurements('', SPRINT, [meas({ tenantId: '' })]))
+      .toThrow(expect.objectContaining({ code: 'KPI_TENANT_REQUIRED' }));
     expect(() => store.getSprintMeasurements('', SPRINT)).toThrow(/tenant/i);
     expect(() => store.foldSprintRollups('   ', SPRINT)).toThrow(/tenant/i);
     expect(() => store.getRollupValues('', 'sprint', SPRINT)).toThrow(/tenant/i);

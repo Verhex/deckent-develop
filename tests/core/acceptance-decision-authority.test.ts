@@ -9,7 +9,7 @@ vi.mock('../../src/core/cross-verify-evidence-broker.js', () => ({ readCrossVeri
   crossVerifyVerdictReceiptRef: broker.ref }));
 import { readLlmAcceptanceDecisionBinding, verifyLlmAcceptanceDecision,
   writeLlmAcceptanceDecisionBindingFirstWriterWins } from '../../src/core/acceptance-decision-authority.js';
-const roots: string[] = []; const hash = (s: string) => acceptanceConfirmationDigest(s);
+const cleanup: Array<() => void> = []; const hash = (s: string) => acceptanceConfirmationDigest(s);
 const lineage: AcceptanceConfirmationLineage = { tenantId: 'tenant-a', projectId: 'project-a',
   taskId: '619-001-xverify', attemptId: 'attempt-a', generation: 1, sprintId: '619',
   evaluationDigest: hash('e'), resultDigest: hash('r'), policyDigest: hash('p'), sourceDigest: hash('s') };
@@ -18,10 +18,11 @@ const settlementRef = { schemaVersion: 1 as const, taskId: 'xverify-execution-ta
   projectRootSha256: 'a'.repeat(64), attemptId: 'xverify-attempt' };
 const receiptRef = `cross-verify-verdict:sha256:${'b'.repeat(64)}`;
 const envelope = { verdictReceiptSha256: 'b'.repeat(64), receipt: { ...settlementRef, effectiveVerdict: 'CONFIRMED' } };
-afterEach(() => { vi.clearAllMocks(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+afterEach(() => { vi.clearAllMocks(); for (const remove of cleanup.splice(0)) remove(); });
 describe('durable LLM acceptance decision authority', () => {
   it('indexes an exact FWW binding and verifies it after a restart-style fresh read', () => {
-    const root = mkdtempSync(join(tmpdir(), 'llm-authority-')); roots.push(root);
+    const root = mkdtempSync(join(tmpdir(), 'llm-authority-'));
+    cleanup.push(() => rmSync(root, { recursive: true, force: true }));
     broker.read.mockReturnValue(envelope); broker.ref.mockReturnValue(receiptRef);
     const first = writeLlmAcceptanceDecisionBindingFirstWriterWins({ projectRoot: root, confirmationId,
       lineage, verdict: 'CONFIRMED', receiptRef, settlementRef });
@@ -30,7 +31,8 @@ describe('durable LLM acceptance decision authority', () => {
     expect(broker.read).toHaveBeenCalledTimes(2);
   });
   it('fails closed for corruption, foreign lineage, mismatch, and replay substitution', () => {
-    const root = mkdtempSync(join(tmpdir(), 'llm-authority-')); roots.push(root);
+    const root = mkdtempSync(join(tmpdir(), 'llm-authority-'));
+    cleanup.push(() => rmSync(root, { recursive: true, force: true }));
     broker.read.mockReturnValue(envelope); broker.ref.mockReturnValue(receiptRef);
     writeLlmAcceptanceDecisionBindingFirstWriterWins({ projectRoot: root, confirmationId,
       lineage, verdict: 'CONFIRMED', receiptRef, settlementRef });

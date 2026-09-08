@@ -148,6 +148,31 @@ describe('spawnWorkers — C0c wire (Sprint 168 W2.5)', () => {
     }
   }
 
+  it('reports dispatch evidence only after a worker is actually admitted', async () => {
+    const task = createTask('716-DISPATCH-EVIDENCE', ['src/dispatch-evidence.ts']);
+    persistTasks([task]);
+    const backend = makeMockBackend();
+    const evidence: Array<{ taskId: string; provider: string; providerReleased: boolean }> = [];
+
+    const originalCwd = process.cwd();
+    process.chdir(testRoot);
+    try {
+      await spawnWorkers(testRoot, makeSprint('sprint-716', [task]), makeConfig(), {
+        spawnBackend: backend,
+        onWorkerDispatched: (boundary) => evidence.push(boundary),
+      });
+    } finally {
+      process.chdir(originalCwd);
+    }
+
+    expect(backend.calls.map(call => call.taskId)).toEqual(['716-DISPATCH-EVIDENCE']);
+    expect(evidence).toEqual([{
+      taskId: '716-DISPATCH-EVIDENCE',
+      provider: 'claude',
+      providerReleased: false,
+    }]);
+  });
+
   it('blocks initial sprint dispatch when attended authority is only a raw reference', async () => {
     const task = createTask('168-ATTENDED-RAW', []);
     task.budgetPolicy = {

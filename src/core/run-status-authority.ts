@@ -340,7 +340,7 @@ function readCanonicalRunStatusBase(
         sprintId,
         phase,
         status: 'FAILED',
-        reason: 'flow-terminal-failed',
+        reason: flowTerminal.error ?? 'flow-terminal-failed',
         recoveryCommand: null,
         finalizeCommand: null,
         coordinator,

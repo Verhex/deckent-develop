@@ -3,6 +3,7 @@
 // Sprint 139 Task 030: dep graph resume restore tests added.
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import { mkdirSync, rmSync, existsSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -21,6 +22,7 @@ import {
   readResumeTaskResultAuthority,
   buildPreplannedResumeSprint,
   restoreSprintFromCheckpoint,
+  isSprintFinalized,
 } from '../../src/orchestra/sprint-checkpoint.js';
 import type { SprintCheckpoint } from '../../src/orchestra/sprint-checkpoint.js';
 import { SprintPhase, SprintStatus, TaskStatus } from '../../src/core/types.js';
@@ -40,6 +42,7 @@ import {
 } from '../../src/core/task-result-settlement.js';
 import type { ExactAcceptedResultTerminalAuthorityV2 } from '../../src/orchestra/exact-accepted-result-terminal-authority.js';
 import type { ExactAcceptedTaskTerminalAuthorityRead } from '../../src/orchestra/evaluation-audit-trail.js';
+import { sealSprintArchiveTerminal } from '../../src/core/sprint-archive.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -294,6 +297,180 @@ describe('writeCheckpoint + readCheckpoint', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
+  it('keeps a restored exact terminal as a non-COMPLETE candidate until its fresh checkpoint authority is durable', () => {
+    const root = makeTempDir();
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    const task = makeMinimalTask('138-906', TaskStatus.DONE);
+    task.sprintId = 'sprint-138';
+    writeFileSync(join(root, '.tasks', `task-${task.id}.json`), JSON.stringify(task), 'utf-8');
+    const oldCheckpoint = writeCheckpoint(root, makeMinimalSprint([task]), 7);
+    const terminalAuthority = exactCheckpointAuthority(task.id, 'DONE');
+    const current = {
+      state: 'current',
+      terminalAuthority,
+      terminalResultAuthority: terminalAuthority.terminalResultAuthority,
+      evaluationReceipt: { verdict: 'DONE', receiptDigest: exactDigest('d') },
+      finalizerReceipt: { verdict: 'DONE' },
+      result: {
+        taskId: task.id,
+        attemptCustody: { identity: terminalAuthority.acceptedAuthority.identity },
+      },
+      projectedResult: {
+        taskId: task.id,
+        workerId: `w-${task.id}`,
+        filesChanged: [], linesAdded: 0, linesRemoved: 0,
+        testsPassed: true, coverage: 100, selfAssessment: 'DONE', notes: 'exact Store projection',
+      },
+    } as unknown as ExactAcceptedTaskTerminalAuthorityRead;
+    const dependencies = {
+      terminalAuthorities: new Map([[task.id, current]]),
+      isExactTask: (taskId: string) => taskId === task.id,
+    };
+
+    const restored = restoreSprintFromCheckpoint(root, 'sprint-138', dependencies);
+
+    expect(restored).toMatchObject({
+      restored: true,
+      action: 'complete',
+      restoredSprint: {
+        status: SprintStatus.EVALUATING,
+        phase: SprintPhase.EVALUATE,
+      },
+    });
+    expect(isSprintFinalized(root, 'sprint-138')).toBe(false);
+    expect(readCheckpoint(root, 'sprint-138')).toEqual(oldCheckpoint);
+
+    const repeated = restoreSprintFromCheckpoint(root, 'sprint-138', dependencies);
+    expect(repeated).toMatchObject({ restored: true, action: 'complete' });
+    expect(hasCheckpoint(root, 'sprint-138')).toBe(true);
+
+    const canonical = writeCheckpoint(
+      root,
+      restored.restoredSprint!,
+      oldCheckpoint!.eventStreamOffset,
+      undefined,
+      new Map([[task.id, terminalAuthority]]),
+    );
+    expect(canonical?.taskStates?.[0]?.exactTerminalAuthority).toEqual(terminalAuthority);
+    expect(readCheckpoint(root, 'sprint-138')?.taskStates?.[0]?.exactTerminalAuthority)
+      .toEqual(terminalAuthority);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('preserves the old checkpoint and throws HOLD when fresh exact authority cannot be persisted', () => {
+    const root = makeTempDir();
+    const task = makeMinimalTask('138-907', TaskStatus.DONE);
+    const oldCheckpoint = writeCheckpoint(root, makeMinimalSprint([task]), 3);
+    const checkpointPath = join(root, '.deckent', 'sprint-138-checkpoint.json');
+    mkdirSync(`${checkpointPath}.tmp`);
+
+    expect(() => writeCheckpoint(
+      root,
+      makeMinimalSprint([task], SprintPhase.EVALUATE),
+      oldCheckpoint!.eventStreamOffset,
+      undefined,
+      new Map([[task.id, exactCheckpointAuthority(task.id)]]),
+    )).toThrow(/Exact terminal checkpoint persistence failed/u);
+    expect(readCheckpoint(root, 'sprint-138')).toEqual(oldCheckpoint);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('does not treat a public COMPLETE projection or sprint log as checkpoint deletion authority', () => {
+    const root = makeTempDir();
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    const task = makeMinimalTask('138-908', TaskStatus.DONE);
+    writeFileSync(join(root, '.tasks', `task-${task.id}.json`), JSON.stringify(task), 'utf-8');
+    writeFileSync(join(root, '.tasks', `task-${task.id}.result`), JSON.stringify({
+      taskId: task.id,
+      selfAssessment: 'DONE',
+    }), 'utf-8');
+    const oldCheckpoint = writeCheckpoint(root, makeMinimalSprint([task]), 4);
+    writeFileSync(join(root, '.deckent', 'sprint-state.json'), JSON.stringify({
+      sprintId: 'sprint-138',
+      phase: SprintPhase.COMPLETE,
+      status: SprintStatus.COMPLETE,
+      startedAt: '2026-09-05T00:00:00.000Z',
+      updatedAt: '2026-09-05T00:01:00.000Z',
+      taskIds: [task.id],
+    }), 'utf-8');
+    mkdirSync(join(root, '.brain', 'sprints'), { recursive: true });
+    writeFileSync(join(root, '.brain', 'sprints', 'sprint-138.md'), '# forged public log\n');
+    mkdirSync(join(root, '.deckent', 'recently-works'), { recursive: true });
+    writeFileSync(
+      join(root, '.deckent', 'recently-works', 'sprint-138-terminal-receipt.json'),
+      JSON.stringify({
+        version: 1,
+        sprintId: 'sprint-138',
+        runId: 'run-forged',
+        coordinatorGeneration: 1,
+        terminalOutcome: 'COMPLETE',
+        logicalSettlementDigest: 'f'.repeat(64),
+        priorAuthorityVersion: 0,
+        authorityVersion: 1,
+      }),
+      'utf-8',
+    );
+
+    expect(isSprintFinalized(root, 'sprint-138')).toBe(false);
+    expect(restoreSprintFromCheckpoint(root, 'sprint-138')).toMatchObject({
+      restored: true,
+      action: 'complete',
+    });
+    expect(readCheckpoint(root, 'sprint-138')).toEqual(oldCheckpoint);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('allows checkpoint cleanup only after the canonical terminal archive verifies', () => {
+    const root = makeTempDir();
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    const task = makeMinimalTask('138-909', TaskStatus.DONE);
+    writeFileSync(join(root, '.tasks', `task-${task.id}.json`), JSON.stringify(task), 'utf-8');
+    const oldCheckpoint = writeCheckpoint(root, makeMinimalSprint([task]), 5);
+    const receipt = {
+      version: 1 as const,
+      sprintId: 'sprint-138',
+      runId: 'run-138',
+      coordinatorGeneration: 2,
+      terminalOutcome: 'COMPLETE' as const,
+      logicalSettlementDigest: 'a'.repeat(64),
+      priorAuthorityVersion: 0,
+      authorityVersion: 1,
+    };
+    const recent = join(root, '.deckent', 'recently-works');
+    mkdirSync(recent, { recursive: true });
+    writeFileSync(
+      join(recent, 'sprint-138-terminal-receipt.json'),
+      JSON.stringify(receipt),
+      'utf-8',
+    );
+    const eventLine = JSON.stringify({ sequence: 1 });
+    const journal = `${eventLine}\n`;
+    const hotJournalPath = join(recent, 'sprint-138-events.jsonl');
+    writeFileSync(hotJournalPath, journal, 'utf-8');
+    writeFileSync(join(recent, 'sprint-138-seq'), '1', 'utf-8');
+    const sealed = sealSprintArchiveTerminal(root, 'sprint-138', {
+      receipt,
+      finalEvent: {
+        sequence: 1,
+        digest: createHash('sha256').update(eventLine).digest('hex'),
+      },
+      hotJournalPath,
+      expectedArchivedPreimageSha256: null,
+      expectedHotJournalSha256: createHash('sha256').update(journal).digest('hex'),
+      operatorReason: 'verified checkpoint cleanup authority',
+    });
+    expect(sealed).toMatchObject({ disposition: 'sealed', terminalComplete: true });
+    expect(isSprintFinalized(root, 'sprint-138')).toBe(true);
+
+    expect(restoreSprintFromCheckpoint(root, 'sprint-138')).toMatchObject({
+      restored: false,
+      action: 'fresh',
+    });
+    expect(oldCheckpoint).not.toBeNull();
+    expect(hasCheckpoint(root, 'sprint-138')).toBe(false);
+    rmSync(root, { recursive: true, force: true });
+  });
+
   it('parks recovered exact work without current authority before public cascade', () => {
     const root = makeTempDir();
     mkdirSync(join(root, '.tasks'), { recursive: true });
@@ -381,6 +558,23 @@ describe('writeCheckpoint + readCheckpoint', () => {
       undefined,
       new Map([[task.id, foreignAuthority]]),
     )).toThrow(/exact terminal authority is invalid/u);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('rejects an exact terminal authority map entry outside the checkpoint task universe', () => {
+    const root = makeTempDir();
+    const task = makeMinimalTask('138-906', TaskStatus.DONE);
+    const foreignTaskId = '137-foreign';
+
+    expect(() => writeCheckpoint(
+      root,
+      makeMinimalSprint([task]),
+      0,
+      undefined,
+      new Map([[foreignTaskId, exactCheckpointAuthority(foreignTaskId)]]),
+    )).toThrow(
+      `Task ${foreignTaskId} exact terminal authority is outside the checkpoint task universe`,
+    );
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -1064,8 +1258,8 @@ describe('resetInterruptedWorkersToPending + deriveResumableTaskIds (455-001)', 
 
     expect(restored.action).toBe('complete');
     expect(restored.restoredSprint).toMatchObject({
-      status: SprintStatus.COMPLETE,
-      phase: SprintPhase.COMPLETE,
+      status: SprintStatus.EVALUATING,
+      phase: SprintPhase.EVALUATE,
     });
     rmSync(root, { recursive: true, force: true });
   });
@@ -1137,6 +1331,78 @@ describe('resetInterruptedWorkersToPending + deriveResumableTaskIds (455-001)', 
       else process.env.DECKENT_HOME = previousDeckentHome;
       rmSync(root, { recursive: true, force: true });
       rmSync(hostState, { recursive: true, force: true });
+    }
+  });
+
+  it('parks an exact custody admission without a public result for backend reconciliation', () => {
+    const root = setupRoot();
+    const taskId = '724-001';
+    try {
+      writeTaskJson(root, taskId, TaskStatus.EXECUTING);
+      const cp = baseCp({ activeWorkers: [activeWorker(taskId)] });
+
+      // The discriminator is the Store-backed ownership port used by the real
+      // CLI. A missing public result must not demote this exact admission into
+      // the legacy reset/redispatch set.
+      expect(deriveResumeDisposition(root, cp, () => ({ state: 'exact' as const }))).toEqual({
+        resumableIds: [],
+        parkedSettlements: [{ taskId, state: 'pending-settlement' }],
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not let a checkpoint-pending exact admission bypass backend reconciliation', () => {
+    const root = setupRoot();
+    const taskId = '724-002';
+    try {
+      writeTaskJson(root, taskId, TaskStatus.PENDING);
+      const cp = baseCp({ pendingTasks: [taskId] });
+
+      expect(deriveResumeDisposition(root, cp, () => ({ state: 'exact' as const }))).toEqual({
+        resumableIds: [],
+        parkedSettlements: [{ taskId, state: 'pending-settlement' }],
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when exact Store ownership is unavailable', () => {
+    const root = setupRoot();
+    const taskId = '724-002-hold';
+    try {
+      writeTaskJson(root, taskId, TaskStatus.EXECUTING);
+      const cp = baseCp({ activeWorkers: [activeWorker(taskId)] });
+
+      expect(() => deriveResumeDisposition(root, cp, () => ({
+        state: 'hold' as const,
+        reasonCode: 'exact-custody-store-unavailable',
+      }))).toThrow(
+        /Task 724-002-hold exact execution discriminator is unavailable: exact-custody-store-unavailable/u,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses to build a legacy preplanned resume for a parked exact admission', () => {
+    const root = setupRoot();
+    const taskId = '724-003';
+    try {
+      writeTaskJson(root, taskId, TaskStatus.EXECUTING);
+      const cp = baseCp({ activeWorkers: [activeWorker(taskId)] });
+
+      expect(() => buildPreplannedResumeSprint(
+        root,
+        cp,
+        [taskId],
+        undefined,
+        () => ({ state: 'exact' as const }),
+      )).toThrow(/exact checkpoint attempt must be reconciled before resume/u);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 

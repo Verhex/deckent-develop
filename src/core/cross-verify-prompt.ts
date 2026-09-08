@@ -78,6 +78,28 @@ export const CROSS_VERIFY_TRUNCATION_MARKER =
   '[HOST-TRUNCATED: terminal verdict must be UNCLEAR]';
 export const CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX = 'XVERIFY_RESPONSE_JSON: ';
 
+const TERMINAL_ADJUDICATION_VERDICT_LINE = /^VERDICT:\s*(?:REFUTED|CONFIRMED|UNCLEAR)\s+.+$/iu;
+
+/** One host terminal verdict and at most one preceding typed response; ambiguity fails closed. */
+export function frameTerminalAdjudicationProtocol(notes: string): string | null {
+  const lines = notes.trim().split(/\r?\n/u)
+    .map((line: string) => line.trim())
+    .filter((line: string) => line.length > 0);
+  const verdictLines = lines.filter((line: string) => TERMINAL_ADJUDICATION_VERDICT_LINE.test(line));
+  if (verdictLines.length !== 1) return null;
+  const verdictLine = verdictLines[0]!;
+  const responseLines = lines.filter(
+    (line: string) => line.startsWith(CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX),
+  );
+  if (responseLines.length > 1) return null;
+  if (responseLines.length === 1) {
+    const responseLine = responseLines[0]!;
+    if (lines.indexOf(responseLine) >= lines.indexOf(verdictLine)) return null;
+    return `${responseLine}\n${verdictLine}`;
+  }
+  return verdictLine;
+}
+
 interface BoundedField {
   text: string;
   truncated: boolean;

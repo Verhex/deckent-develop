@@ -34,6 +34,7 @@ import {
   crossVerifyVerdictReceiptRef,
   readCrossVerifyEvidenceClaimReceipt,
   readCrossVerifyEvidenceReceipt,
+  readCrossVerifyEvidenceBlobBytes,
   readCrossVerifyVerdictReceipt,
   writeCrossVerifyVerdictReceiptAtomic,
   writeCrossVerifyDecodedSlice,
@@ -57,7 +58,7 @@ import {
   type TaskResultSettlementRefV1,
 } from '../../src/core/task-result-settlement.js';
 
-const roots: string[] = [];
+const cleanup: Array<() => void> = [];
 const originalDeckentHome = process.env.DECKENT_HOME;
 const pinnedRuntimeAvailable =
   process.platform === 'linux'
@@ -73,11 +74,12 @@ interface Fixture {
   readonly stateRoot: string;
   readonly ref: TaskResultSettlementRefV1;
   readonly fenceTokenHash: string;
+  writeClaimEvidence(): void;
 }
 
 function fixture(taskId = 'xverify-evidence-task'): Fixture {
   const base = mkdtempSync(join(tmpdir(), 'deckent-xverify-evidence-'));
-  roots.push(base);
+  cleanup.push(() => rmSync(base, { recursive: true, force: true }));
   const projectRoot = join(base, 'project');
   const stateRoot = join(base, 'host-state');
   mkdirSync(projectRoot, { recursive: true });
@@ -102,6 +104,11 @@ function fixture(taskId = 'xverify-evidence-task'): Fixture {
     stateRoot,
     ref,
     fenceTokenHash: taskResultSettlementActiveClaimDigest(ref),
+    writeClaimEvidence() {
+      mkdirSync(join(projectRoot, 'src'));
+      writeFileSync(join(projectRoot, 'src', 'one.ts'), 'one\n');
+      writeFileSync(join(projectRoot, 'src', 'two.ts'), 'two\n');
+    },
   };
 }
 
@@ -128,9 +135,7 @@ function expectBrokerCode(
 afterEach(() => {
   if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
   else process.env.DECKENT_HOME = originalDeckentHome;
-  for (const root of roots.splice(0)) {
-    rmSync(root, { recursive: true, force: true });
-  }
+  for (const remove of cleanup.splice(0)) remove();
 });
 
 describe('cross-verify evidence broker portable contract', () => {
@@ -192,6 +197,44 @@ describe('cross-verify evidence broker portable contract', () => {
 describe.skipIf(!pinnedRuntimeAvailable)(
   'cross-verify evidence broker pinned Linux/WSL authority',
   () => {
+    it('reads immutable evidence bytes instead of changed project bytes and rejects missing or corrupt blobs', () => {
+      const { projectRoot, ref, fenceTokenHash } = fixture('immutable-byte-reader');
+      const original = Buffer.from([0, 1, 255, 10]);
+      writeFileSync(join(projectRoot, 'evidence.bin'), original);
+      const claim = claimCrossVerifyEvidenceSnapshotAtomic({ projectRoot, settlementRef: ref,
+        fenceTokenHash, relativePaths: ['evidence.bin'] });
+      const captured = captureCrossVerifyEvidenceSnapshotAtomic({ projectRoot, settlementRef: ref, claim });
+      writeFileSync(join(projectRoot, 'evidence.bin'), 'mutable replacement');
+      expect(Buffer.from(readCrossVerifyEvidenceBlobBytes(projectRoot, ref, 'evidence.bin'))).toEqual(original);
+      expectBrokerCode(() => readCrossVerifyEvidenceBlobBytes(projectRoot, ref, 'sibling.bin'), 'AUTHORITY_MISMATCH');
+      writeFileSync(crossVerifyEvidenceBlobReceiptPath(ref, captured.manifest.entries[0]!.blobReceiptSha256), '{}');
+      expect(() => readCrossVerifyEvidenceBlobBytes(projectRoot, ref, 'evidence.bin')).toThrow(CrossVerifyEvidenceBrokerError);
+    });
+
+    it('does not admit caller-forged immutable evidence capabilities or read their mutable fallback', () => {
+      const { projectRoot, ref, fenceTokenHash } = fixture('forged-exact-source');
+      writeFileSync(join(projectRoot, 'evidence.txt'), 'must not replace missing custody authority');
+      expect(() => claimCrossVerifyEvidenceSnapshotAtomic({ projectRoot, settlementRef: ref, fenceTokenHash,
+        relativePaths: ['evidence.txt'], immutableSource: {} as NonNullable<Parameters<
+          typeof claimCrossVerifyEvidenceSnapshotAtomic>[0]['immutableSource']> })).toThrow();
+      expect(existsSync(crossVerifyEvidenceClaimReceiptPath(ref))).toBe(false);
+    });
+
+    it('rejects JSON, accessor and proxy read ports without evaluating attacker hooks', () => {
+      const { projectRoot, ref, fenceTokenHash } = fixture('untrusted-read-port');
+      let invoked = 0;
+      const getter = Object.defineProperty({}, 'read', { enumerable: true, get: () => { invoked++; return () => null; } });
+      const proxy = new Proxy({}, { get: () => { invoked++; throw new Error('proxy trap'); } });
+      const proxyFunction = { read: new Proxy(() => null, { apply: () => { invoked++; return null; } }) };
+      for (const immutableSource of [{ read: 'serialized authority' }, getter, proxy, proxyFunction]) {
+        expectBrokerCode(() => claimCrossVerifyEvidenceSnapshotAtomic({ projectRoot, settlementRef: ref,
+          fenceTokenHash, relativePaths: ['evidence.txt'], immutableSource: immutableSource as NonNullable<
+            Parameters<typeof claimCrossVerifyEvidenceSnapshotAtomic>[0]['immutableSource']> }), 'AUTHORITY_MISMATCH');
+      }
+      expect(invoked).toBe(0);
+      expect(existsSync(crossVerifyEvidenceClaimReceiptPath(ref))).toBe(false);
+    });
+
     it('publishes a deterministic attempt-scoped snapshot outside the project', () => {
       const { projectRoot, ref, fenceTokenHash } = fixture();
       mkdirSync(join(projectRoot, 'src'));
@@ -284,10 +327,8 @@ describe.skipIf(!pinnedRuntimeAvailable)(
     });
 
     it('enforces first-writer claim and manifest authority', () => {
-      const { projectRoot, ref, fenceTokenHash } = fixture();
-      mkdirSync(join(projectRoot, 'src'));
-      writeFileSync(join(projectRoot, 'src', 'one.ts'), 'one\n');
-      writeFileSync(join(projectRoot, 'src', 'two.ts'), 'two\n');
+      const { projectRoot, ref, fenceTokenHash, writeClaimEvidence } = fixture();
+      writeClaimEvidence();
 
       const first = claimCrossVerifyEvidenceSnapshotAtomic({
         projectRoot,

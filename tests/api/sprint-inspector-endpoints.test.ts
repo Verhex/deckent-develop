@@ -24,7 +24,7 @@ function get(path: string): Promise<Response> {
   });
 }
 
-function seedTask(taskId: string): void {
+function seedTask(taskId: string, sprintId?: string): void {
   mkdirSync(join(root, '.tasks'), { recursive: true });
   writeFileSync(join(root, '.tasks', `task-${taskId}.json`), JSON.stringify({
     id: taskId,
@@ -33,6 +33,7 @@ function seedTask(taskId: string): void {
     assignedAgent: 'api-builder',
     model: 'test-model',
     scope: { filesWrite: ['src/api/server.ts'] },
+    ...(sprintId === undefined ? {} : { sprintId }),
   }));
 }
 
@@ -245,11 +246,15 @@ describe('GET /api/sprint/* canonical inspector routes', () => {
           notesPresent: boolean;
         } | null;
       };
+      rawTaskProjectionStatus: string | null;
+      currentRun: unknown | null;
     };
     expect(Object.keys(detail).sort()).toEqual([
-      'hb', 'lineage', 'plan', 'result', 'task', 'taskId',
+      'currentRun', 'hb', 'lineage', 'plan', 'rawTaskProjectionStatus', 'result', 'task', 'taskId',
     ]);
     expect(detail.taskId).toBe('541-002');
+    expect(detail.rawTaskProjectionStatus).toBe('EXECUTING');
+    expect(detail.currentRun).toBeNull();
     expect(detail.plan.truncated).toBe(true);
     expect(detail.plan.text).toBe('x'.repeat(SPRINT_DETAIL_TEXT_CAP));
     expect(detail.lineage).toEqual({
@@ -265,6 +270,43 @@ describe('GET /api/sprint/* canonical inspector routes', () => {
 
     const invalidResponse = await get(`/api/sprint/task/${encodeURIComponent('../escape')}`);
     expect(invalidResponse.status).toBe(403);
+  });
+
+  it('keeps a stale raw task projection distinct from its exactly associated canonical run', async () => {
+    seedTask('722-001', 'sprint-722');
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    writeFileSync(join(root, '.deckent', 'sprint-state.json'), JSON.stringify({
+      sprintId: 'sprint-722', phase: 'COMPLETE', status: 'FAILED',
+    }));
+    await boot();
+
+    const response = await get('/api/sprint/task/722-001');
+    expect(response.status).toBe(200);
+    const detail = await response.json() as {
+      rawTaskProjectionStatus: string | null;
+      currentRun: Record<string, unknown> | null;
+    };
+    expect(detail.rawTaskProjectionStatus).toBe('EXECUTING');
+    expect(Object.keys(detail.currentRun ?? {}).sort()).toEqual([
+      'active', 'conflicts', 'coordinator', 'finalizeCommand', 'lifecycle', 'phase',
+      'reason', 'recoveryCommand', 'recoveryReconciliation', 'resumable', 'schemaVersion', 'sprintId', 'status',
+    ]);
+    expect(detail.currentRun?.['sprintId']).toBe('sprint-722');
+    expect(detail.currentRun?.['lifecycle']).toBe('ABORTED');
+    expect(detail.currentRun?.['status']).toBe('FAILED');
+    expect(detail.currentRun?.['reason']).toBeNull();
+    expect(detail.currentRun?.['recoveryReconciliation']).toEqual({
+      version: 1,
+      sprintId: 'sprint-722',
+      evidence: {
+        checkpointPresent: false,
+        terminalReceipt: null,
+        terminalReceiptConflict: null,
+      },
+      state: 'consistent',
+      mismatch: null,
+      remediation: null,
+    });
   });
 
   it('passes a bounded tailLines override through to the task log tail', async () => {
