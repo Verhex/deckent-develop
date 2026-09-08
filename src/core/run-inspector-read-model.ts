@@ -21,6 +21,8 @@ import {
   readCanonicalRunStatus,
   type CanonicalRunStatus,
 } from './run-status-authority.js';
+import type { DebtInjectionHold } from './sprint-types.js';
+import { readCurrentSprintDebtHolds } from './sprint-debt-holds.js';
 
 export const SPRINT_DETAIL_TEXT_CAP = 64_000;
 export const SPRINT_TASK_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
@@ -62,6 +64,7 @@ export interface RunInspectorSnapshot {
   readonly phase: string | null;
   readonly workers: readonly RunInspectorWorker[];
   readonly locks: readonly RunInspectorLock[];
+  readonly debtInjectionHolds?: readonly DebtInjectionHold[];
 }
 
 export interface RunInspectorTaskPlan {
@@ -111,6 +114,7 @@ export type RunInspectorRun = {
   readonly startedAt: string | null;
   readonly settledAt: string | null;
   readonly taskCounts: RunInspectorTaskCounts | null;
+  readonly debtInjectionHolds?: readonly DebtInjectionHold[];
 } | {
   readonly runId: string | null;
   readonly lifecycle?: never;
@@ -119,6 +123,7 @@ export type RunInspectorRun = {
   readonly startedAt: string | null;
   readonly settledAt: string | null;
   readonly taskCounts: RunInspectorTaskCounts | null;
+  readonly debtInjectionHolds?: readonly DebtInjectionHold[];
 };
 
 export interface RunInspectorRunList {
@@ -424,6 +429,7 @@ export function buildRunInspectorSnapshot(
   recordAuthoritySources(projectRoot, tracker);
   const workers = readWorkers(projectRoot, tracker, nowMs);
   const locks = readLocks(projectRoot, tracker);
+  const debtInjectionHolds = readCurrentSprintDebtHolds(projectRoot, lifecycle.sprintId);
   return {
     schemaVersion: 1,
     generatedAt: new Date(nowMs).toISOString(),
@@ -433,6 +439,7 @@ export function buildRunInspectorSnapshot(
     phase: lifecycle.phase,
     workers,
     locks,
+    ...(debtInjectionHolds !== undefined ? { debtInjectionHolds } : {}),
   };
 }
 
@@ -506,6 +513,7 @@ export function listRunInspectorRuns(
   recordAuthoritySources(projectRoot, tracker);
   const archives = readArchivedRuns(projectRoot, tracker)
     .filter(candidate => candidate.run.runId !== authority.sprintId);
+  const debtInjectionHolds = readCurrentSprintDebtHolds(projectRoot, authority.sprintId);
   return {
     schemaVersion: 1,
     generatedAt: new Date(nowMs).toISOString(),
@@ -517,6 +525,7 @@ export function listRunInspectorRuns(
       startedAt: null,
       settledAt: null,
       taskCounts: null,
+      ...(debtInjectionHolds !== undefined ? { debtInjectionHolds } : {}),
     }, ...archives.map(candidate => candidate.run)],
   };
 }

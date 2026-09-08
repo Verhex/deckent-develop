@@ -36,6 +36,7 @@ import type { TaskKind, TechStackKind } from '../core/work-model.js';
 import { modelRegistry } from '../core/model-registry.js';
 import type { RegistryProviderName } from '../core/model-registry.js';
 import { getSystemProfile } from '../core/system-profile.js';
+import { assertDebtInjectionHolds } from '../core/sprint-debt-holds.js';
 
 import type { ProviderAdapter } from '../core/provider.js';
 import { providerRegistry, ProviderError } from '../core/provider.js';
@@ -321,6 +322,7 @@ export interface SprintState {
   startedAt: string;
   updatedAt: string;
   taskIds: string[];
+  debtInjectionHolds?: import('../core/sprint-types.js').DebtInjectionHold[];
 }
 
 /**
@@ -330,6 +332,7 @@ export interface SprintState {
 export function writeSprintState(projectRoot: string, sprint: Sprint): void {
   const statePath = join(projectRoot, SPRINT_STATE_FILE);
   const tmpPath = `${statePath}.tmp.${process.pid}`;
+  assertDebtInjectionHolds(sprint.debtInjectionHolds);
   try {
     const state: SprintState = {
       sprintId: sprint.id,
@@ -338,6 +341,9 @@ export function writeSprintState(projectRoot: string, sprint: Sprint): void {
       startedAt: sprint.startedAt ?? now(),
       updatedAt: now(),
       taskIds: sprint.tasks.map(t => t.id),
+      ...(sprint.debtInjectionHolds !== undefined
+        ? { debtInjectionHolds: sprint.debtInjectionHolds.map(hold => ({ ...hold })) }
+        : {}),
     };
     mkdirSync(join(projectRoot, '.deckent'), { recursive: true });
     writeFileSync(tmpPath, JSON.stringify(state, null, 2), 'utf-8');
@@ -353,7 +359,9 @@ export function writeSprintState(projectRoot: string, sprint: Sprint): void {
  */
 export function readSprintState(projectRoot: string): SprintState | null {
   const statePath = join(projectRoot, SPRINT_STATE_FILE);
-  return readJsonSafe<SprintState>(statePath) ?? null;
+  const state = readJsonSafe<SprintState>(statePath) ?? null;
+  assertDebtInjectionHolds(state?.debtInjectionHolds);
+  return state;
 }
 
 /**

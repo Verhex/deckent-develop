@@ -11,6 +11,7 @@ import {
   RUN_INSPECTOR_OBSERVER_FAILURE_THRESHOLD,
   SPRINT_DETAIL_TEXT_CAP,
 } from '../../src/core/run-inspector-read-model.js';
+import { readCurrentSprintDebtHolds } from '../../src/core/sprint-debt-holds.js';
 
 const roots: string[] = [];
 
@@ -33,6 +34,29 @@ afterEach(() => {
 });
 
 describe('run inspector read model', () => {
+  it('projects persisted critical debt holds through the shared snapshot and run listing', () => {
+    const projectRoot = root();
+    write(projectRoot, '.deckent/sprint-state.json', { sprintId: 'sprint-700', phase: 'PLAN', status: 'PLANNING',
+      startedAt: '2026-09-08T00:00:00.000Z', updatedAt: '2026-09-08T00:00:00.000Z', taskIds: [],
+      debtInjectionHolds: [{ debtId: 'debt-critical', reason: 'invalid-origin' }] });
+    expect(buildRunInspectorSnapshot(projectRoot).debtInjectionHolds).toEqual([{ debtId: 'debt-critical', reason: 'invalid-origin' }]);
+    expect(listRunInspectorRuns(projectRoot).runs[0]?.debtInjectionHolds).toEqual([{ debtId: 'debt-critical', reason: 'invalid-origin' }]);
+  });
+
+  it('never attaches stale sibling debt holds to the canonical current run', () => {
+    const projectRoot = root();
+    write(projectRoot, '.deckent/sprint-state.json', { sprintId: 'sprint-stale', phase: 'PLAN', status: 'PLANNING',
+      debtInjectionHolds: [{ debtId: 'debt-sibling', reason: 'invalid-origin' }] });
+    expect(readCurrentSprintDebtHolds(projectRoot, 'sprint-current')).toBeUndefined();
+  });
+
+  it('fails the read model for malformed holds bound to the current run', () => {
+    const projectRoot = root();
+    write(projectRoot, '.deckent/sprint-state.json', { sprintId: 'sprint-541', phase: 'EXECUTE', status: 'RUNNING',
+      debtInjectionHolds: [{ debtId: '', reason: 'valid-v2' }] });
+    expect(() => buildRunInspectorSnapshot(projectRoot)).toThrow('SPRINT_STATE_DEBT_INJECTION_HOLDS_INVALID');
+  });
+
   it('returns an honest idle snapshot for an empty project without writing files', () => {
     const projectRoot = root();
     const before = readFileNames(projectRoot);

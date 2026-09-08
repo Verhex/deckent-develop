@@ -63,17 +63,34 @@ export function formatInspectRunListing(payload: unknown, lang: string): string 
     getMessage('inspect.column.state', lang),
     getMessage('inspect.column.source', lang),
     getMessage('inspect.column.settled_at', lang),
+    getMessage('inspect.column.debt_holds', lang),
   ].join('\t');
+  const details: string[] = [];
   const rows = runs.map((item) => {
     const run = record(item);
+    const holds = Array.isArray(run['debtInjectionHolds']) ? run['debtInjectionHolds'] as unknown[] : null;
+    if (holds && holds.length > 0) {
+      for (const value of holds) {
+        const hold = record(value);
+        const reason = String(hold['reason'] ?? '');
+        details.push(getMessage('inspect.debt_holds.item', lang, {
+          runId: display(run['runId']), debtId: display(hold['debtId']),
+          reason: reason === 'legacy-unavailable' || reason === 'invalid-origin'
+            ? getMessage(`plan.debt_holds.reason.${reason.replace('-', '_')}`, lang)
+            : display(reason),
+        }));
+      }
+      details.push(getMessage('inspect.debt_holds.recovery', lang));
+    }
     return [
       display(run['runId']),
       display(run['lifecycle'] ?? run['recordState']),
       display(run['source']),
       display(run['settledAt']),
+      display(holds?.length),
     ].join('\t');
   });
-  return [header, ...rows].join('\n');
+  return [header, ...rows, ...(details.length > 0 ? ['', ...details] : [])].join('\n');
 }
 
 export function formatInspectTaskDetail(payload: unknown, lang: string): string {

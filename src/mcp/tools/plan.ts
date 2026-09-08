@@ -183,6 +183,7 @@ export function registerPlanTool(server: McpServer): void {
         modelDistribution,
         riskAssessment,
         promptGate,
+        debtInjectionHolds: sprint.debtInjectionHolds ?? [],
         scopeGate: 'scopeGateResult' in preview
           ? {
             result: preview.scopeGateResult ?? 'skipped',
@@ -220,6 +221,9 @@ export function registerPlanTool(server: McpServer): void {
         summary += ` ⚠ Prompt gate: ${promptGate.blockerCount} blocking finding(s) — `
           + '`deckent start` will halt at PLAN unless re-run with acknowledgePromptGate=true '
           + '(CLI: --force-prompt-gate).';
+      }
+      if (sprint.debtInjectionHolds && sprint.debtInjectionHolds.length > 0) {
+        summary += ` ${getMessage('plan.debt_holds.summary', registerLang, { count: String(sprint.debtInjectionHolds.length) })}`;
       }
 
       return {

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Command } from 'commander';
 import {
+  formatInspectRunListing,
   formatInspectTaskDetail,
   registerInspect,
   runInspectCommand,
@@ -31,12 +32,23 @@ describe('deckent inspect', () => {
       output: (value) => lines.push(value),
       listRuns: () => ({
         schemaVersion: 1,
-        runs: [{ runId: 'run-42', lifecycle: 'EXECUTE', source: 'authority', settledAt: null }],
+        runs: [{ runId: 'run-42', lifecycle: 'EXECUTE', source: 'authority', settledAt: null,
+          debtInjectionHolds: [{ debtId: 'debt-critical', reason: 'legacy-unavailable' }] }],
       }),
     });
     expect(code).toBe(0);
     expect(lines[0]).toContain('Run ID\tState\tSource\tSettled at');
     expect(lines[0]).toContain('run-42\tEXECUTE\tauthority\t-');
+    expect(lines[0]).toContain('\t1');
+    expect(lines[0]).toContain('debt-critical');
+    expect(lines[0]).toContain('original authority is unavailable');
+    expect(lines[0]).toContain('inspect the JSON record');
+  });
+
+  it('renders absent archived debt hold evidence as unavailable rather than zero', () => {
+    const text = formatInspectRunListing({ runs: [{ runId: 'old-run', recordState: 'COMPLETE', source: 'archive', settledAt: '2026-01-01' }] }, 'en');
+    expect(text).toContain('old-run\tCOMPLETE\tarchive\t2026-01-01\t-');
+    expect(text).not.toContain('old-run\tCOMPLETE\tarchive\t2026-01-01\t0');
   });
 
   it('renders the real core task detail DTO including distinct task and current-run truth', async () => {

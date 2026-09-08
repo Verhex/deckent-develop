@@ -498,6 +498,15 @@ export function registerPlan(program: Command): void {
             print(getMessage('plan.prompt_gate_override', lang, { count: String(gate.blockers.length) }));
           }
         }
+        if (sprint.debtInjectionHolds && sprint.debtInjectionHolds.length > 0) {
+          print('');
+          print(getMessage('plan.debt_holds.header', lang, { count: String(sprint.debtInjectionHolds.length) }));
+          for (const hold of sprint.debtInjectionHolds) {
+            print(getMessage('plan.debt_holds.item', lang, { debtId: hold.debtId,
+              reason: getMessage(`plan.debt_holds.reason.${hold.reason.replace('-', '_')}`, lang) }));
+          }
+          print(getMessage('plan.debt_holds.recovery', lang));
+        }
 
         if (sprint.reasoning) {
           print(getMessage('plan.reasoning', lang, { reasoning: sprint.reasoning }));

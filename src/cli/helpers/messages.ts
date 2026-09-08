@@ -1672,6 +1672,39 @@ const BASE_MESSAGES: MessageMap = {
     en: 'Prompt-gate BLOCK bypassed via --force-prompt-gate ({count}).',
     tr: 'Prompt-gate BLOCK --force-prompt-gate ile atlandı ({count}).',
   },
+  'plan.debt_holds.header': {
+    en: 'Debt injection holds ({count})',
+    tr: 'Borç ekleme bekletmeleri ({count})',
+  },
+  'plan.debt_holds.item': {
+    en: '  [HOLD] {debtId} · {reason}',
+    tr: '  [BEKLETİLDİ] {debtId} · {reason}',
+  },
+  'plan.debt_holds.recovery': {
+    en: 'Recovery: restore or replace the debt origin authority, then plan again. The debt remains open.',
+    tr: 'Kurtarma: borç köken yetkisini geri yükleyin veya değiştirin, ardından yeniden planlayın. Borç açık kalır.',
+  },
+  'plan.debt_holds.summary': {
+    en: '{count} critical debt item(s) remain open because origin authority is unavailable.',
+    tr: '{count} kritik borç öğesi, köken yetkisi kullanılamadığı için açık kalıyor.',
+  },
+  'plan.debt_holds.reason.legacy_unavailable': {
+    en: 'the original authority is unavailable',
+    tr: 'özgün yetki kullanılamıyor',
+  },
+  'plan.debt_holds.reason.invalid_origin': {
+    en: 'the recorded origin authority is invalid',
+    tr: 'kaydedilmiş köken yetkisi geçersiz',
+  },
+  'inspect.column.debt_holds': { en: 'DEBT HOLDS', tr: 'BORÇ BEKLETMELERİ' },
+  'inspect.debt_holds.item': {
+    en: 'Debt hold · run {runId} · {debtId}: {reason}',
+    tr: 'Borç bekletmesi · run {runId} · {debtId}: {reason}',
+  },
+  'inspect.debt_holds.recovery': {
+    en: 'Next: inspect the JSON record, restore or replace origin authority, then plan again. The debt remains open.',
+    tr: 'Sonraki adım: JSON kaydını inceleyin, köken yetkisini geri yükleyin veya değiştirin, ardından yeniden planlayın. Borç açık kalır.',
+  },
   'plan.override_warnings_header': {
     en: 'Override warnings — {count} warning(s) (forceAgent/forceSkills routing overrides — advisory, plan proceeds):',
     tr: 'Override uyarıları — {count} uyarı (forceAgent/forceSkills routing override\'ları — bilgilendirme, plan devam eder):',

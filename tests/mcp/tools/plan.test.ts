@@ -44,7 +44,7 @@ vi.mock('../../../src/mcp/helpers/enrich.js', () => ({
 
 vi.mock('../../../src/mcp/helpers/format.js', () => ({
   formatPlanResponse: vi.fn(() => 'mocked summary'),
-  wrapResponse: vi.fn(<T>(data: T, _summary: string) => data),
+  wrapResponse: vi.fn(<T>(data: T, summary: string) => ({ ...data, summary })),
 }));
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -80,6 +80,7 @@ function makeDefaultMocks(overrides: Partial<{
   maxWorkers: number;
   presetMaxWorkers: number;
   mode: string;
+  debtInjectionHolds: Array<{ debtId: string; reason: 'legacy-unavailable' | 'invalid-origin' }>;
 }> = {}) {
   const tasks = overrides.tasks ?? [
     { id: '001', title: 'Task A', model: 'claude-opus-4-8', priority: 'HIGH' },
@@ -124,6 +125,7 @@ function makeDefaultMocks(overrides: Partial<{
         failureReason: null,
       },
     },
+    debtInjectionHolds: overrides.debtInjectionHolds ?? [],
   } as any;
   mockPlanSprint.mockReturnValue(plannedSprint);
   mockPlanRunFlow.mockImplementation(async (serviceInput: any) => {
@@ -189,6 +191,16 @@ function makeDefaultMocks(overrides: Partial<{
 describe('registerPlanTool', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('returns critical debt holds as structured truth and localized recovery summary', async () => {
+    const server = makeServer();
+    registerPlanTool(server as any);
+    makeDefaultMocks({ debtInjectionHolds: [{ debtId: 'debt-critical', reason: 'legacy-unavailable' }] });
+    const response = await server.callTool('deckent_plan', { dryRun: true }) as any;
+    const result = JSON.parse(response.content[0].text);
+    expect(result.debtInjectionHolds).toEqual([{ debtId: 'debt-critical', reason: 'legacy-unavailable' }]);
+    expect(result.summary).toContain('1');
   });
 
   // ── Tool registration ──────────────────────────────────────────────────────

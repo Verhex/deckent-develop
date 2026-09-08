@@ -8,6 +8,7 @@ vi.mock('node:fs', () => ({
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
   unlinkSync: vi.fn(),
+  renameSync: vi.fn(),
   statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
 }));
 
@@ -339,6 +340,39 @@ Fix the config module.
   });
 
   describe('writeSprintState / readSprintState / clearSprintState', () => {
+    it('persists debt injection holds without resolving or dropping them', () => {
+      writeSprintState('/test/project', {
+        id: 'sprint-100', number: 100, phase: 'PLAN', status: 'PLANNING', tasks: [], workers: [],
+        debtInjectionHolds: [{ debtId: 'debt-critical', reason: 'legacy-unavailable' }],
+      } as Sprint);
+      const payload = JSON.parse(String(vi.mocked(writeFileSync).mock.calls[0]?.[1]));
+      expect(payload.debtInjectionHolds).toEqual([{ debtId: 'debt-critical', reason: 'legacy-unavailable' }]);
+    });
+
+    it('preserves the producer-to-reader distinction between known empty and legacy absent holds', () => {
+      writeSprintState('/test/project', {
+        id: 'sprint-empty', number: 101, phase: 'PLAN', status: 'PLANNING', tasks: [], workers: [],
+        debtInjectionHolds: [],
+      } as Sprint);
+      const knownEmpty = JSON.parse(String(vi.mocked(writeFileSync).mock.calls[0]?.[1]));
+      expect(knownEmpty).toHaveProperty('debtInjectionHolds', []);
+      mockReadJsonSafe.mockReturnValue(knownEmpty);
+      expect(readSprintState('/test/project')?.debtInjectionHolds).toEqual([]);
+
+      vi.mocked(writeFileSync).mockClear();
+      writeSprintState('/test/project', {
+        id: 'sprint-legacy', number: 102, phase: 'PLAN', status: 'PLANNING', tasks: [], workers: [],
+      } as Sprint);
+      const legacyAbsent = JSON.parse(String(vi.mocked(writeFileSync).mock.calls[0]?.[1]));
+      expect(legacyAbsent).not.toHaveProperty('debtInjectionHolds');
+      mockReadJsonSafe.mockReturnValue(legacyAbsent);
+      expect(readSprintState('/test/project')?.debtInjectionHolds).toBeUndefined();
+    });
+
+    it('fails loudly for malformed persisted debt hold evidence', () => {
+      mockReadJsonSafe.mockReturnValue({ sprintId: 'sprint-100', debtInjectionHolds: [{ debtId: '', reason: 'valid-v2' }] } as never);
+      expect(() => readSprintState('/test/project')).toThrow('SPRINT_STATE_DEBT_INJECTION_HOLDS_INVALID');
+    });
     it('should read sprint state from disk', () => {
       const state = {
         sprintId: 'sprint-100',
