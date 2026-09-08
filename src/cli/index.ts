@@ -362,7 +362,13 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
       ? { providerAuthority: runtime.providerAuthority }
       : {}),
   });
-  registerApprovalsCommand(program);
+  registerApprovalsCommand(program, {
+    confirmationRun: {
+      ...(runtime.providerAuthority
+        ? { providerAuthority: runtime.providerAuthority }
+        : {}),
+    },
+  });
   registerConfirmationsCommand(program);
   registerProviderAuthorityCommand(program);
   registerProviderObservations(program);

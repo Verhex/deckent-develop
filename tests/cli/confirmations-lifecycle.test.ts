@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Command } from 'commander';
 
+import { registerApprovalsCommand } from '../../src/cli/commands/approvals.js';
 import { registerConfirmationsCommand } from '../../src/cli/commands/confirmations.js';
-import { loadConfig } from '../../src/core/config.js';
 import {
   confirmationContentDigest,
   createConfirmationRequest,
@@ -42,19 +42,13 @@ describe('confirmations CLI lifecycle', () => {
     }, { lifecycle, identity: idn, clock: () => at });
     at = new Date('2026-08-21T16:00:00.001Z');
 
-    const program = new Command().exitOverride();
-    registerConfirmationsCommand(program, {
-      resolveProjectRootFn: () => root,
-      confirmInteractiveFn: async () => true,
-      clock: () => at,
-      loadConfigFn: (async () => ({ approval: { lifecycle } })) as unknown as typeof loadConfig,
-    });
-    process.exitCode = 0;
-    await program.parseAsync([
-      'node', 'deckent', 'confirmations', 'decide', created.id,
-      '--confirm', '--reason', 'too late',
-    ]);
-    expect(process.exitCode).toBe(0);
+    const program = new Command();
+    registerApprovalsCommand(program);
+    registerConfirmationsCommand(program);
+    const legacy = program.commands.find(command => command.name() === 'confirmations');
+    expect(legacy?.commands).toEqual([]);
+    expect(program.commands.find(command => command.name() === 'approvals')
+      ?.commands.find(command => command.name() === 'decide')).toBeDefined();
     const found = readConfirmation(root, created.id, { lifecycle, clock: () => at });
     expect(found?.state).toBe('settled');
     if (!found || found.state !== 'settled') throw new Error('expected settled confirmation');
@@ -77,15 +71,16 @@ describe('confirmations CLI lifecycle', () => {
     const program = new Command().exitOverride();
     let xverifyCalls = 0;
     at = new Date('2026-08-21T16:00:00.001Z');
-    registerConfirmationsCommand(program, {
+    registerApprovalsCommand(program, { confirmationRun: {
       resolveProjectRootFn: () => root,
       clock: () => at,
-      loadConfigFn: (async () => ({ approval: { lifecycle } })) as unknown as typeof loadConfig,
-      runXverifyForResultFn: (async () => {
-        xverifyCalls += 1;
-        return { verdict: 'CONFIRMED' };
-      }) as never,
-    });
+      loadConfigFn: (async () => ({
+        approval: { lifecycle, authority: { tenant_id: 'local' } },
+      })) as never,
+      resolveTenantFn: () => ({ tenantId: 'local' }),
+      runXverifyForResultFn: (async () => { xverifyCalls += 1; return { verdict: 'CONFIRMED' }; }) as never,
+    } });
+    registerConfirmationsCommand(program);
     process.exitCode = 0;
     await program.parseAsync(['node', 'deckent', 'confirmations', 'run', '--id', created.id]);
     expect(process.exitCode).toBe(0);

@@ -37,6 +37,10 @@ import { resolveLocalOsActorId } from '../../core/principal.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { withCommandLocalShutdown } from '../helpers/shutdown-hooks.js';
+import {
+  registerApprovalConfirmationRun,
+  type ApprovalConfirmationRunDeps,
+} from './approval-confirmation-run.js';
 
 const LOCAL_TERMINAL_CHANNEL = 'local-terminal';
 const LOCAL_TERMINAL_AUTHORITY_REF = 'local-terminal:interactive-tty-confirmation:v1';
@@ -192,11 +196,20 @@ function createInteractiveTerminalReauthProvider(input: {
   };
 }
 
-export function registerApprovalsCommand(program: Command): void {
+export interface ApprovalsCommandDeps {
+  readonly confirmationRun?: ApprovalConfirmationRunDeps;
+}
+
+export function registerApprovalsCommand(
+  program: Command,
+  deps: ApprovalsCommandDeps = {},
+): void {
   const lang = getLanguage(undefined);
   const approvals = program
     .command('approvals')
     .description(getMessage('approvals.cmd_desc', lang));
+
+  registerApprovalConfirmationRun(approvals, deps.confirmationRun);
 
   // Access classification stated in help: a list is a read, a decide is an
   // authenticated decision. The two used to look interchangeable in `--help`.
