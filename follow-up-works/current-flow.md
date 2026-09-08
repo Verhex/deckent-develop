@@ -8,24 +8,23 @@
 
 7099 tek ACTIVE outcome; MASTER VERIFY. DOGFOOD ON / health DEGRADED.
 Owner-onaylı bounded elle yürütme; güvenli sınırda canonical dogfood'a dönüş.
-Son kaynak commit334a1882a: L1 explicit native migration, exact7path.
-Native provider/model açık çift; legacy chat/Brain korunur; yeni key/namespace yok.
-Dry-run no-write; lock+exclusive backup+fsync/atomic write; idempotent reload.
-Explicit alias/whitespace/conflict/opt-out typed refusal; readiness iddiası yok.
-Main149/149PASS+tsc/i18n/writer/build:all95085PASS; test-only portability7/7PASS.
-Main compiled Docker5536a55e:24/24PASS,0UNRUN,78/78child close,source/dist stable.
-Fable959 bağımsız scopedGO; canonical XVerify/whole7099 DONE değildir.
-Candidate d01484b8 aggregateFAIL + supplemental0900f745PASS birlikte korunur.
-Node permission-host fsync7142HOLD; writer zayıflatılmadı.
-Kanıt arşivi: /home/alperen/deckent-recovery-20260904/terminal-7099-native-migration-hVKHfe.
-Manifest12b32aa5/SUMSd3dd9dbb;1011payload checksum+0700/0600PASS.
-Bot3101962 canonical restart sonrası canlı/digest gözlemi; fresh kontrol yeniden yapılır.
-Main inherited messages73/10,run7/0,MASTER19/0,generated206/11+4/3 korunur.
+Son commitler 334a1882a + 0d4598e48: native migration ve kanıt mühürü.
+Bu tamamlanan dilimin ayrıntıları terminal capsule ve native-migration-hVKHfe arşivinde.
+L1 Brain-provider parity commit80e614362: exact4path; inherited main korunmuş.
+Root candidate32/32 ve main36/36 hedefli test; tsc + candidate/main build PASS.
+Compiled diagnostic proof candidate ve main7/7; beş subprocess kapanışı,20pin sabit.
+Kanıt: /tmp/deckent-7099-brain-parity-UKpw0Z/proof/root-evidence-summary.json.
+Main actual: /tmp/deckent-brain-parity-main-XMfawi/result.json (48e60bfa1832).
+Fable964 scoped GO; commit blob'ları candidate ile4/4, index boş.
+Arşiv: /home/alperen/deckent-recovery-20260904/terminal-7099-brain-parity-wAbKKK.
+99payload; manifest5d6c5557 / SUMS99a125ea checksum PASS. Ayrıntılar capsule'da.
+Bot canonical stop→build92752→start3150519; MCP freshness ayrıca iddia edilmez.
+Inherited source değişiklikleri inverse-hash ile korunmuş; MASTER/generated değişmedi.
 
 ## Sonraki iş / onaylı kuyruk
 
-1. L1 Brain-provider receipt parity production proof; native migration kısmı landed.
-2. L2 gerçek provider cancellation; L3 sync/audit structured renderer.
+1. L1 Brain-provider receipt parity source landed; docs seal/post-landing ölçümü.
+2. L2 gerçek provider cancellation proof; L3 sync/audit structured renderer.
 3. L4 legacy-context provider delivery; L5 failed-compaction accounting ayrımı.
 4. L6 kalan global ASCII/debug/platform; reduced-motion59f8cf581 landed.
 5. Gerçek bağımlı multiworker→otomatik next-goal→durable settlement.
@@ -38,4 +37,26 @@ Windows-native/macOS/SSH/local-daemon proof eksikleri honest HOLD.
 MCP reconnect owner904 gereği sonraki session boundary; eski süreç fresh sayılmaz.
 Retained728/.tasks/memory.db/inherited dirt korunur; sahte receipt/DONE yok.
 Owner4432b172f push doğrulandı; bu paketin yeni commit'leri henüz push edilmedi.
-Kanal yalnız sonuç/blocker milestone; ara ACK yok. Son Fable959, yanıt960.
+Kanal yalnız sonuç/blocker milestone; ara ACK yok. Son Fable964 GO, root965 kabul.
+
+## L1 mevcut dilim — 2026-09-08
+
+Candidate: /tmp/deckent-7099-brain-parity-UKpw0Z; base0d4598e48.
+Lovelace kaynak/test writer tamamladı: planner.ts + run-proposal-compiler.ts ve
+planner-invocation-receipt/run-proposal-planner testleri. Volta proof helper tamamladı.
+Root fan-in: requested/configured kimliği korunur; existing provider/model resolver;
+missing provider zero-dispatch; explicit adapter precedence; grouped/flat uyumu.
+RED→GREEN hedefli test, compiled gerçek subprocess + private receipt store proof.
+Diagnostic transport ≠ gerçek sağlayıcı/usage/settlement veya tüm7099 closure.
+1 implementation + 1 bağımsız verification; aynı hata fingerprint'ine tekrar yok.
+Negatif scope: receipt şeması/success receiptRef bağı, native/chat kimliği,
+MASTER/generated, memory.db, retained728/.tasks, inherited source hunks, auth.
+Başarılı proposal↔receiptRef kalıcı bağı ayrı provenance bulgusu; henüz bu dilimde değil.
+Build öncesi canonical bot stop + fresh ALLOW alındı; build sonrası bot başlatıldı.
+Pre-change baseline: compiler14/14PASS; receipt+sprint-planner+admission17/27PASS.
+10 mevcut FAIL ayrı tutuluyor (V2 wiring fixture uyumsuzluğu); üretim gate'i gevşetilmez.
+Config ayrıntısı: loadConfig env override sonrası flat alanı döndürür, grouped eski
+authoring değerini koruyabilir. Effective flat seçim grouped değere ezdirilmeyecek.
+L2 yalnız proof hazırlığı: Wegener /tmp/deckent-7099-active-cancel-48yLss/helper.mjs.
+Gerçek CLI+PTY+loopback; Esc/CtrlC→socket close→late-output suppression→fresh turn.
+Henüz çalıştırılmadı; kaynak/durum değişikliği yetkisi yok, root inceleyip çalıştıracak.

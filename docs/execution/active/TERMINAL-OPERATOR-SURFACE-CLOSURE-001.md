@@ -11,6 +11,58 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### L1 Brain-provider parity landed / LOCAL_VERIFIED — 2026-09-08
+
+Exact four-path slice: `src/orchestra/{planner,run-proposal-compiler}.ts` and
+`tests/orchestra/{planner-invocation-receipt,run-proposal-planner}.test.ts`.
+Zero-config now honors requested Brain provider instead of reselecting model owner.
+Compiler preserves effective flat provider (including env override), falls back to
+grouped-only authoring, and resolves a registered provider's model through the
+existing equivalence resolver. Configured/requested raw model remains in the receipt.
+Explicit adapter precedence and missing-provider zero-dispatch throw are preserved.
+No native/chat identity unification, receipt-schema change, or fallback authority added.
+
+Candidate `/tmp/deckent-7099-brain-parity-UKpw0Z`, base `0d4598e48`; root tests
+32/32 (`aefac10e`) and main 36/36 (`5cfa6c36`), typecheck and builds PASS.
+Main inverse-hash check proves inherited source hunks preserved. Pre-change baseline
+10 FAIL retained: six receipt fixtures corrected to legitimate documentation scope;
+four unrelated sprint-planner wiring-fixture failures remain outside this slice.
+Full raw root reports are retained; the agent's first RED artifact is a summary,
+not a falsely claimed full raw Vitest report.
+
+Compiled production-module diagnostic transport: candidate and main 7/7 PASS,
+five real subprocess starts/closes and twenty source/dist pins stable. Main result:
+`/tmp/deckent-brain-parity-main-XMfawi/result.json`, SHA
+`48e60bfa18321784f647d76e3e96308cb36418856a4bee2abb463ccf02dad7bc`.
+All commands, freezes, prior helper failures and Docker inspection are indexed by
+`/tmp/deckent-7099-brain-parity-UKpw0Z/proof/root-evidence-summary.json`.
+Missing fixture directory, invalid fixture authMode, and old-image SQLite/glibc
+failures are preserved; no production gate was weakened. Network-none, read-only,
+nonroot pinned trixie image; canonical host memory/config/custody not mounted.
+Bot canonical stop → fresh ALLOW → build92752 → start3150519, PID/digest observed.
+
+Fable ENTRY964 (480afcda7f27) independently reviewed the slice: scoped GO.
+Source commit `80e614362cedeb8779eab96f7a70ae6326d8e7ee`, exact four paths,
+167 added / 6 removed. Candidate blobs were staged directly; four committed blobs
+equal the reviewed candidate, while inherited+owned main worktree bytes stayed
+unchanged and the index returned empty. Committed content is covered by candidate
+tests/build/actual; main compiled proof covers the inherited+owned worktree, not
+the clean commit tree. Registry, messages, REPL and MASTER changes were not staged.
+
+Durable archive:
+`/home/alperen/deckent-recovery-20260904/terminal-7099-brain-parity-wAbKKK`.
+99 payload files, 3,863,182 bytes; independent-inode and byte readback verified,
+private 0700 directories / 0600 files, SHA256SUMS validation PASS.
+Manifest `5d6c55570bf275ea52d163eee934dd2862250717621b6adff2e264c7375aeff2`;
+SUMS `99a125ea68f4c20fb991cb0771634230f0a595676d5eb31f3792a06fd6fadda2`.
+Includes Fable review, exact snapshots, test reports, failed and passing actual
+fixtures, containment inspection, and post-commit preservation checks.
+
+This is not real-provider usage/billing, canonical XVerify, a public CLI run, or
+whole-7099 closure. Successful proposal↔receiptRef binding, durable pre-dispatch
+rejection records, and same-provider inactive-model admission remain distinct gaps.
+Next independent work: L2 actual CLI cancel/connection-close/fresh-turn proof.
+
 ### L1 explicit migration landed / LOCAL_VERIFIED — 2026-09-08
 
 Commit334a1882aa712d13221943406b57e53680f278cb: exact7 paths,638added/14removed;
