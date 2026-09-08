@@ -284,7 +284,13 @@ export async function proposeProviderLimitsAuthoring(
     accountRefHash: account.accountRefHash,
     quotaScopeRefHash,
     authMode,
-    backend: { transport, executionBackend: exactBackend, endpointRefHash },
+    backend: {
+      transport,
+      executionBackend: exactBackend,
+      endpointRefHash,
+      runtimeFingerprint: request.backend.runtimeFingerprint,
+      executionProfileRef: request.backend.executionProfileRef,
+    },
     requiredWindowIds: windowIds,
     sourceScopes: [sourceScope],
   };

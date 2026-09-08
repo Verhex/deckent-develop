@@ -904,6 +904,13 @@ export interface ExecutionBudgetPolicyConfig {
    *  budget. Every field optional — defaults are the bounded deep/extended
    *  profile in execution-budget-policy.ts (never provider-name-keyed). */
   native_agent?: NativeAgentBudgetConfig;
+  /** Purpose-specific ceilings may only narrow the role authority. */
+  purposes?: {
+    'reachability-probe'?: { maxInputTokens: number; maxOutputTokens: number; maxTokens: number; timeoutMs: number; maxUsd?: number };
+    'xverify-adjudication'?: { maxTokens: number; maxWallClockSeconds: number; maxVerificationsPerSprint: number };
+    'goal-authoring'?: ExecutionBudget;
+    'goal-acceptance'?: ExecutionBudget;
+  };
 }
 
 /** Owner-authored overrides for the native-agent session budget (all optional,
@@ -938,6 +945,10 @@ export interface ProviderLimitPolicySelectorConfig {
     transport: InvocationTransport;
     executionBackend: Exclude<InvocationExecutionBackend, 'unknown'>;
     endpointRefHash: string | null;
+    /** Exact executable identity; absent legacy policies remain non-authoritative for dispatch. */
+    runtimeFingerprint?: string | null;
+    /** Exact owner-authored execution profile; absent legacy policies remain inspection-only. */
+    executionProfileRef?: string;
   };
   requiredWindowIds: string[];
   sourceScopes: ProviderLimitPolicySourceScopeConfig[];

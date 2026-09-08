@@ -22,6 +22,8 @@ describe('SqliteMissionStore — schema', () => {
     expect(tables).toContain('mission_engine_lease');
     expect(tables).toContain('mission_dispatch_recoveries');
     expect(tables).toContain('mission_dispatch_recovery_acknowledgements');
+    expect(tables).toContain('mission_goal_consumer_checkpoints');
+    expect(tables).toContain('mission_goal_consumer_acknowledgements');
     expect(tables).toContain('mission_graph_authorities');
     expect(tables).toContain('work_item_dependencies');
     expect(tables).toContain('work_item_dependency_readiness');

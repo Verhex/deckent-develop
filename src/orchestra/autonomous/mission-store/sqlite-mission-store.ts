@@ -12,7 +12,9 @@ import type {
   MissionClaimFence, MissionDispatchClaim, MissionEngineLease,
   MissionRecoveredDispatchAttemptV1, MissionDispatchRecoveryAcknowledgementV1,
   MissionDependencyAuthorityV1, MissionDependencyActivationV1,
-  DependencyReconciliationOptions,
+  DependencyReconciliationOptions, GoalInvocationConsumerCheckpointV1,
+  NewGoalInvocationConsumerCheckpointV1, GoalInvocationConsumerPurpose,
+  GoalInvocationConsumerReceiptSettlementV1,
 } from './mission-types.js';
 import type {
   MissionAcceptanceDecisionRecord,
@@ -316,6 +318,43 @@ CREATE TABLE IF NOT EXISTS mission_acceptance_decisions (
   PRIMARY KEY(mission_id, round),
   UNIQUE(mission_id, decision_digest) );
 CREATE INDEX IF NOT EXISTS idx_mad_mission_created ON mission_acceptance_decisions(mission_id, created_at);
+CREATE TABLE IF NOT EXISTS mission_goal_consumer_checkpoints (
+  checkpoint_id TEXT PRIMARY KEY,
+  mission_id TEXT NOT NULL REFERENCES missions(id),
+  tenant_id TEXT NOT NULL,
+  project_id TEXT NOT NULL,
+  round INTEGER NOT NULL CHECK(round >= 1),
+  purpose TEXT NOT NULL CHECK(purpose IN ('goal-authoring','goal-acceptance')),
+  invocation_id TEXT NOT NULL UNIQUE,
+  output_digest TEXT NOT NULL,
+  effect_digest TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  payload_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE(mission_id, round, purpose) );
+CREATE TABLE IF NOT EXISTS mission_goal_consumer_acknowledgements (
+  checkpoint_id TEXT PRIMARY KEY REFERENCES mission_goal_consumer_checkpoints(checkpoint_id),
+  payload_json TEXT NOT NULL,
+  payload_hash TEXT NOT NULL,
+  acknowledged_at TEXT NOT NULL );
+CREATE INDEX IF NOT EXISTS idx_mgcc_pending
+  ON mission_goal_consumer_checkpoints(mission_id, round, purpose);
+CREATE TRIGGER IF NOT EXISTS mission_goal_consumer_checkpoints_no_update
+  BEFORE UPDATE ON mission_goal_consumer_checkpoints BEGIN
+    SELECT RAISE(ABORT, 'mission goal consumer checkpoints are immutable');
+  END;
+CREATE TRIGGER IF NOT EXISTS mission_goal_consumer_checkpoints_no_delete
+  BEFORE DELETE ON mission_goal_consumer_checkpoints BEGIN
+    SELECT RAISE(ABORT, 'mission goal consumer checkpoints are immutable');
+  END;
+CREATE TRIGGER IF NOT EXISTS mission_goal_consumer_acks_no_update
+  BEFORE UPDATE ON mission_goal_consumer_acknowledgements BEGIN
+    SELECT RAISE(ABORT, 'mission goal consumer acknowledgements are immutable');
+  END;
+CREATE TRIGGER IF NOT EXISTS mission_goal_consumer_acks_no_delete
+  BEFORE DELETE ON mission_goal_consumer_acknowledgements BEGIN
+    SELECT RAISE(ABORT, 'mission goal consumer acknowledgements are immutable');
+  END;
 CREATE TABLE IF NOT EXISTS mission_engine_lease (
   singleton_id INTEGER PRIMARY KEY CHECK(singleton_id=1),
   owner_id TEXT NOT NULL,
@@ -1571,8 +1610,239 @@ export class SqliteMissionStore implements MissionStore {
       completed_at=@completedAt, last_result=COALESCE(@result, last_result) WHERE id=@id`)
       .run({ id, status, ts, completedAt, result: result ? JSON.stringify(result) : null });
   }
+  persistGoalInvocationHoldIfMutable(id: string, result: ResultLike): boolean {
+    const info = this.db.prepare(`UPDATE missions
+      SET status=CASE WHEN status='pending' THEN 'pending' ELSE 'active' END,
+        updated_at=@ts, completed_at=NULL, last_result=@result
+      WHERE id=@id AND kind='goal' AND status IN ('pending','active')`).run({
+      id,
+      ts: this.now(),
+      result: JSON.stringify(result),
+    });
+    return info.changes === 1;
+  }
   setMissionProgress(id: string, progress: Progress): void {
     this.db.prepare('UPDATE missions SET progress=?, updated_at=? WHERE id=?').run(JSON.stringify(progress), this.now(), id);
+  }
+
+  private assertGoalConsumerCheckpointInput(
+    input: NewGoalInvocationConsumerCheckpointV1,
+  ): void {
+    const mission = this.getMission(input.missionId);
+    const ref = input.invocationReceiptRef;
+    if (input.schemaVersion !== 1 || !mission || mission.kind !== 'goal'
+      || mission.tenant !== input.tenantId
+      || !input.projectId.trim() || !input.missionId.trim()
+      || !Number.isSafeInteger(input.round) || input.round < 1
+      || (input.purpose !== 'goal-authoring' && input.purpose !== 'goal-acceptance')
+      || ref.schemaVersion !== 1 || ref.tenantId !== input.tenantId
+      || ref.projectId !== input.projectId || !ref.invocationId.trim()
+      || !/^[a-f0-9]{64}$/u.test(input.outputDigest)
+      || (input.purpose === 'goal-authoring' && input.effect.kind !== 'authored-batch')
+      || (input.purpose === 'goal-acceptance' && input.effect.kind !== 'acceptance-evaluation')) {
+      throw createExecutionAuthorityError('MISSION_GOAL_CONSUMER_CHECKPOINT_INVALID');
+    }
+    if (input.effect.kind === 'authored-batch') {
+      const ids = new Set<string>();
+      for (const item of input.effect.items) {
+        if (!item.id || item.id !== item.id.trim() || ids.has(item.id)
+          || item.missionId !== input.missionId) {
+          throw createExecutionAuthorityError('MISSION_GOAL_CONSUMER_CHECKPOINT_INVALID');
+        }
+        ids.add(item.id);
+        assertCanonicalWorkItemKind(item.kind, item.id);
+        this.assertPersistableTrigger(item);
+        this.assertPersistableFence(item);
+      }
+    }
+  }
+
+  private readGoalConsumerCheckpoint(row: Record<string, unknown>): GoalInvocationConsumerCheckpointV1 {
+    if (typeof row['payload_json'] !== 'string' || typeof row['payload_hash'] !== 'string'
+      || this.claimTokenHash(row['payload_json']) !== row['payload_hash']) {
+      throw createExecutionAuthorityError('MISSION_GOAL_CONSUMER_CHECKPOINT_INTEGRITY_FAILURE');
+    }
+    const value = this.p<GoalInvocationConsumerCheckpointV1>(row['payload_json']);
+    const expectedEffectDigest = value
+      ? this.claimTokenHash(this.canonical(value.effect))
+      : null;
+    const expectedCheckpointId = value && expectedEffectDigest
+      ? `goal-consumer-${this.claimTokenHash(this.canonical({
+        tenantId: value.tenantId,
+        projectId: value.projectId,
+        missionId: value.missionId,
+        round: value.round,
+        purpose: value.purpose,
+        invocationId: value.invocationReceiptRef.invocationId,
+        outputDigest: value.outputDigest,
+        effectDigest: expectedEffectDigest,
+      }))}`
+      : null;
+    if (!value || value.schemaVersion !== 1 || value.checkpointId !== row['checkpoint_id']
+      || value.checkpointId !== expectedCheckpointId || value.acknowledged !== false
+      || value.missionId !== row['mission_id'] || value.tenantId !== row['tenant_id']
+      || value.projectId !== row['project_id'] || value.round !== row['round']
+      || value.purpose !== row['purpose'] || value.invocationReceiptRef.invocationId !== row['invocation_id']
+      || value.outputDigest !== row['output_digest'] || value.effectDigest !== row['effect_digest']
+      || value.createdAt !== row['created_at']
+      || value.effectDigest !== expectedEffectDigest
+      || !Number.isFinite(Date.parse(value.createdAt))
+      || new Date(value.createdAt).toISOString() !== value.createdAt) {
+      throw createExecutionAuthorityError('MISSION_GOAL_CONSUMER_CHECKPOINT_INTEGRITY_FAILURE');
+    }
+    const { acknowledged: _ignored, ...input } = value;
+    this.assertGoalConsumerCheckpointInput(input);
+    const acknowledged = row['ack_payload_json'] !== null || row['ack_payload_hash'] !== null;
+    if (acknowledged) {
+      if (typeof row['ack_payload_json'] !== 'string' || typeof row['ack_payload_hash'] !== 'string'
+        || this.claimTokenHash(row['ack_payload_json']) !== row['ack_payload_hash']) {
+        throw createExecutionAuthorityError('MISSION_GOAL_CONSUMER_ACK_INTEGRITY_FAILURE');
+      }
+      const ack = this.p<GoalInvocationConsumerReceiptSettlementV1>(row['ack_payload_json']);
+      if (!ack || ack.schemaVersion !== 1
+        || this.canonical(ack.invocationReceiptRef) !== this.canonical(value.invocationReceiptRef)
+        || ack.receiptEventId !== `${value.invocationReceiptRef.invocationId}-consumer`
+        || !/^[a-f0-9]{64}$/u.test(ack.receiptEventHash)) {
+        throw createExecutionAuthorityError('MISSION_GOAL_CONSUMER_ACK_INTEGRITY_FAILURE');
+      }
+    }
+    return Object.freeze({ ...value, acknowledged });
+  }
+
+  private selectGoalConsumerCheckpoint(
+    missionId: string,
+    round: number,
+    purpose: GoalInvocationConsumerPurpose,
+  ): GoalInvocationConsumerCheckpointV1 | null {
+    const row = this.db.prepare(`SELECT checkpoint.*,
+        ack.payload_json AS ack_payload_json,ack.payload_hash AS ack_payload_hash
+      FROM mission_goal_consumer_checkpoints checkpoint
+      LEFT JOIN mission_goal_consumer_acknowledgements ack
+        ON ack.checkpoint_id=checkpoint.checkpoint_id
+      WHERE checkpoint.mission_id=? AND checkpoint.round=? AND checkpoint.purpose=?`)
+      .get(missionId, round, purpose) as Record<string, unknown> | undefined;
+    return row ? this.readGoalConsumerCheckpoint(row) : null;
+  }
+
+  stageGoalInvocationConsumer(
+    input: NewGoalInvocationConsumerCheckpointV1,
+  ): GoalInvocationConsumerCheckpointV1 {
+    this.assertGoalConsumerCheckpointInput(input);
+    const effectDigest = this.claimTokenHash(this.canonical(input.effect));
+    const checkpointId = `goal-consumer-${this.claimTokenHash(this.canonical({
+      tenantId: input.tenantId,
+      projectId: input.projectId,
+      missionId: input.missionId,
+      round: input.round,
+      purpose: input.purpose,
+      invocationId: input.invocationReceiptRef.invocationId,
+      outputDigest: input.outputDigest,
+      effectDigest,
+    }))}`;
+    const checkpoint: GoalInvocationConsumerCheckpointV1 = {
+      ...input,
+      checkpointId,
+      effectDigest,
+      createdAt: this.now(),
+      acknowledged: false,
+    };
+    const transaction = this.db.transaction((): GoalInvocationConsumerCheckpointV1 => {
+      const existing = this.selectGoalConsumerCheckpoint(input.missionId, input.round, input.purpose);
+      if (existing) {
+        const retry = { ...checkpoint, createdAt: existing.createdAt, acknowledged: existing.acknowledged };
+        if (this.canonical(existing) !== this.canonical(retry)) {
+          throw createExecutionAuthorityError(`MISSION_GOAL_CONSUMER_CHECKPOINT_CONFLICT: ${existing.checkpointId}`);
+        }
+        return existing;
+      }
+      const payloadJson = this.canonical(checkpoint);
+      this.db.prepare(`INSERT INTO mission_goal_consumer_checkpoints(
+        checkpoint_id,mission_id,tenant_id,project_id,round,purpose,invocation_id,
+        output_digest,effect_digest,payload_json,payload_hash,created_at
+      ) VALUES(@checkpointId,@missionId,@tenantId,@projectId,@round,@purpose,@invocationId,
+        @outputDigest,@effectDigest,@payloadJson,@payloadHash,@createdAt)`).run({
+        checkpointId,
+        missionId: input.missionId,
+        tenantId: input.tenantId,
+        projectId: input.projectId,
+        round: input.round,
+        purpose: input.purpose,
+        invocationId: input.invocationReceiptRef.invocationId,
+        outputDigest: input.outputDigest,
+        effectDigest,
+        payloadJson,
+        payloadHash: this.claimTokenHash(payloadJson),
+        createdAt: checkpoint.createdAt,
+      });
+      if (input.effect.kind === 'authored-batch') this.enqueueItems(input.effect.items);
+      return checkpoint;
+    });
+    try {
+      return transaction.immediate();
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('MISSION_GOAL_CONSUMER_')) throw error;
+      throw createExecutionAuthorityError(`MISSION_GOAL_CONSUMER_CHECKPOINT_CONFLICT: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  getGoalInvocationConsumer(
+    missionId: string,
+    round: number,
+    purpose: GoalInvocationConsumerPurpose,
+  ): GoalInvocationConsumerCheckpointV1 | null {
+    return this.selectGoalConsumerCheckpoint(missionId, round, purpose);
+  }
+
+  listPendingGoalInvocationConsumers(missionId: string): readonly GoalInvocationConsumerCheckpointV1[] {
+    const rows = this.db.prepare(`SELECT checkpoint.*,
+        ack.payload_json AS ack_payload_json,ack.payload_hash AS ack_payload_hash
+      FROM mission_goal_consumer_checkpoints checkpoint
+      LEFT JOIN mission_goal_consumer_acknowledgements ack
+        ON ack.checkpoint_id=checkpoint.checkpoint_id
+      WHERE checkpoint.mission_id=? AND ack.checkpoint_id IS NULL
+      ORDER BY checkpoint.round,checkpoint.purpose`).all(missionId) as Array<Record<string, unknown>>;
+    return rows.map((row) => this.readGoalConsumerCheckpoint(row));
+  }
+
+  acknowledgeGoalInvocationConsumer(
+    checkpoint: GoalInvocationConsumerCheckpointV1,
+    settlement: GoalInvocationConsumerReceiptSettlementV1,
+  ): boolean {
+    const transaction = this.db.transaction((): boolean => {
+      const persisted = this.selectGoalConsumerCheckpoint(
+        checkpoint.missionId,
+        checkpoint.round,
+        checkpoint.purpose,
+      );
+      if (!persisted || persisted.checkpointId !== checkpoint.checkpointId
+        || persisted.effectDigest !== checkpoint.effectDigest
+        || persisted.outputDigest !== checkpoint.outputDigest
+        || settlement.schemaVersion !== 1
+        || this.canonical(settlement.invocationReceiptRef) !== this.canonical(persisted.invocationReceiptRef)
+        || settlement.receiptEventId !== `${persisted.invocationReceiptRef.invocationId}-consumer`
+        || !/^[a-f0-9]{64}$/u.test(settlement.receiptEventHash)) {
+        throw createExecutionAuthorityError('MISSION_GOAL_CONSUMER_ACK_INVALID');
+      }
+      const payloadJson = this.canonical(settlement);
+      const payloadHash = this.claimTokenHash(payloadJson);
+      const inserted = this.db.prepare(`INSERT INTO mission_goal_consumer_acknowledgements(
+        checkpoint_id,payload_json,payload_hash,acknowledged_at
+      ) VALUES(?,?,?,?) ON CONFLICT(checkpoint_id) DO NOTHING`).run(
+        checkpoint.checkpointId,
+        payloadJson,
+        payloadHash,
+        this.now(),
+      );
+      if (inserted.changes === 1) return true;
+      const existing = this.db.prepare(`SELECT payload_json,payload_hash
+        FROM mission_goal_consumer_acknowledgements WHERE checkpoint_id=?`)
+        .get(checkpoint.checkpointId) as { payload_json: string; payload_hash: string } | undefined;
+      if (!existing || existing.payload_json !== payloadJson || existing.payload_hash !== payloadHash) {
+        throw createExecutionAuthorityError(`MISSION_GOAL_CONSUMER_ACK_CONFLICT: ${checkpoint.checkpointId}`);
+      }
+      return false;
+    });
+    return transaction.immediate();
   }
 
   recordAcceptanceDecision(decision: MissionAcceptanceDecisionV1): MissionAcceptanceDecisionRecord {

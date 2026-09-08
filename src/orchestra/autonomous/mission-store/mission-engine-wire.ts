@@ -578,7 +578,7 @@ async function runGoalDrivenEngine(opts: GoalDrivenEngineOpts): Promise<MissionS
           && readGoalAcceptanceContract(mission) !== null
           && store.listAcceptanceDecisions(mission.id)
             .some((decision) => decision.effectiveOutcome === 'accepted'))
-      ))
+      ) && store.listPendingGoalInvocationConsumers(mission.id).length === 0)
       .map((mission) => mission.id),
   );
   let dispatched = 0;
@@ -610,7 +610,33 @@ async function runGoalDrivenEngine(opts: GoalDrivenEngineOpts): Promise<MissionS
     // 1. Goal-driver pass.
     let authoredAny = false;
     for (const mission of store.listMissions()) {
-      if (mission.kind !== 'goal' || finalized.has(mission.id) || mission.status === 'cancelled') continue;
+      if (mission.kind !== 'goal' || finalized.has(mission.id)) continue;
+      const pendingGoalConsumers = store.listPendingGoalInvocationConsumers(mission.id);
+      const canonicallyAccepted = mission.status === 'completed'
+        && readGoalAcceptanceContract(mission) !== null
+        && store.listAcceptanceDecisions(mission.id)
+          .some((decision) => decision.effectiveOutcome === 'accepted');
+      if (pendingGoalConsumers.length > 0
+        && (mission.status === 'failed' || mission.status === 'cancelled' || canonicallyAccepted)) {
+        const outcome = await advanceGoalMission(store, mission.id, goalDeps);
+        const durableMission = store.getMission(mission.id);
+        const pendingAfter = store.listPendingGoalInvocationConsumers(mission.id);
+        const durablyAccepted = durableMission?.status === 'completed'
+          && readGoalAcceptanceContract(durableMission) !== null
+          && store.listAcceptanceDecisions(mission.id)
+            .some((decision) => decision.effectiveOutcome === 'accepted');
+        // A terminal mission is finalized only after reconciliation actually
+        // acknowledged every pending consumer. HOLD keeps it eligible for a
+        // later reconciliation pass without reactivation or execution.
+        if (outcome !== 'held' && pendingAfter.length === 0 && durableMission
+          && (durableMission.status === 'failed'
+            || durableMission.status === 'cancelled'
+            || durablyAccepted)) {
+          finalized.add(mission.id);
+        }
+        continue;
+      }
+      if (mission.status === 'cancelled') continue;
       if (mission.status === 'failed') {
         finalized.add(mission.id);
         onMissionSettled(mission);
@@ -618,7 +644,9 @@ async function runGoalDrivenEngine(opts: GoalDrivenEngineOpts): Promise<MissionS
       }
       const items = store.listItems(mission.id);
       if (items.some((i) => i.status === 'pending' || i.status === 'running' || i.status === 'parked')) {
-        continue; // round in flight or recovery reconciliation required
+        if (pendingGoalConsumers.length === 0) {
+          continue; // round in flight or recovery reconciliation required
+        }
       }
       const outcome = await advanceGoalMission(store, mission.id, goalDeps);
       if (!store.isEngineLeaseActive(opts.engineLease)) {

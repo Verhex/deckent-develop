@@ -13,6 +13,7 @@ import {
   InvocationReceiptStore,
   InvocationReceiptStoreError,
 } from '../../src/core/invocation-receipt-store.js';
+import { deriveProviderQuotaScopeRefHash } from '../../src/core/provider-limit-truth.js';
 
 const roots: string[] = [];
 
@@ -120,6 +121,37 @@ afterEach(() => {
 });
 
 describe('InvocationReceiptStore', () => {
+  it('atomically binds opaque invocation output to its receipt and transport settlement', () => {
+    const store = new InvocationReceiptStore(makeRoot(), { idFactory: () => 'project-a' });
+    const input = receipt(store, { purpose: 'goal-authoring', called: { provider: 'claude', model: 'm', source: 'wire', reasonCode: 'none' },
+      backend: { transport: 'cli', executionBackend: 'host-subprocess', endpointRefHash: null },
+      auth: { mode: 'subscription', accountRefHash: 'a'.repeat(64) } });
+    store.declare(input);
+    store.append(input, input.invocationId, { eventId: 'dispatch-1', type: 'dispatch_started', payload: { attempt: 1, calledProvider: 'claude', calledModel: 'm' } });
+    const ref = store.writeOutputArtifact({
+      ref: { schemaVersion: 1, tenantId: input.tenantId, projectId: input.projectId, invocationId: input.invocationId,
+        purpose: 'goal-authoring', provider: 'claude', model: 'm', promptDigest: 'a'.repeat(64) },
+      bytes: Buffer.from('opaque answer'),
+      transportEvent: { eventId: 'transport-1', type: 'transport_settled', payload: { outcome: 'succeeded', exitCode: 0, signal: null, reasonCode: 'none', durationMs: 2 } },
+      reservationRequest: (() => {
+        const identity = { tenantId: input.tenantId, provider: 'claude', accountRefHash: 'a'.repeat(64), authMode: 'subscription' as const,
+          backend: { transport: 'cli' as const, executionBackend: 'host-subprocess' as const, endpointRefHash: null } };
+        return { ...identity, projectId: input.projectId, model: 'm', quotaScopeRefHash: deriveProviderQuotaScopeRefHash(identity),
+          reservationId: 'reservation-1', idempotencyKey: 'reservation-key-1', runId: input.runId, taskId: null,
+          callId: input.callId, attemptId: 'attempt-1', fenceTokenHash: 'f'.repeat(64),
+          receiptRef: `invocation-receipt:${createHash('sha256').update(`${input.tenantId}\u0000${input.projectId}\u0000${input.invocationId}`).digest('hex')}`,
+          reachabilityEvidenceRef: 'reachability:test-0001', estimates: [{ windowId: 'tokens', unit: 'tokens' as const, amount: 10 }],
+          estimateEvidenceRefs: ['estimate:test-0001'], requestedAt: '2026-07-20T00:00:00.000Z', leaseExpiresAt: '2026-07-20T01:00:00.000Z' };
+      })(),
+      usageEvent: { eventId: 'usage-1', type: 'consumed', occurredAt: '2026-07-20T00:01:00.000Z',
+        fenceTokenHash: 'f'.repeat(64), evidenceRef: 'usage:test-0001', actual: [{ windowId: 'tokens', unit: 'tokens', amount: 5 }] },
+    });
+    expect(store.get(input, input.invocationId)?.transportOutcome).toBe('succeeded');
+    expect(Buffer.from(store.readOutputArtifact(input, input.invocationId)!.bytes).toString()).toBe('opaque answer');
+    expect(ref.contentSha256).toMatch(/^[a-f0-9]{64}$/u);
+    store.close();
+  });
+
   it('keeps a stable path-private project binding across restart', () => {
     const root = makeRoot();
     const first = new InvocationReceiptStore(root, { idFactory: () => 'project-a' });

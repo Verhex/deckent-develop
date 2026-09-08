@@ -717,4 +717,23 @@ describe('HostRoleInvocationAdmissionRuntime', () => {
     truthStore.close();
     limitStore.close();
   });
+
+  it('settles an existing exact dispatch idempotently without issuing a new admission', async () => {
+    const { truthStore, limitStore, runtime } = await setup();
+    const admission = runtime.admit(request(truthStore));
+    if (admission.decision !== 'allow') throw new Error('expected allow');
+    runtime.claimDispatch(admission, { eventId: 'dispatch-recovery', type: 'dispatched', occurredAt: T1.toISOString(),
+      fenceTokenHash: admission.reservation.fenceTokenHash, evidenceRef: 'provider-dispatch:recovery' });
+    const consumed = { eventId: 'consume-recovery', type: 'consumed' as const, occurredAt: T1.toISOString(),
+      fenceTokenHash: admission.reservation.fenceTokenHash, evidenceRef: 'provider-usage:recovery',
+      actual: [{ windowId: 'tokens-all', unit: 'tokens' as const, amount: 3 }] };
+    expect(runtime.settleExistingDispatch(admission.reservation, consumed)).toMatchObject({ type: 'consumed' });
+    expect(runtime.settleExistingDispatch(admission.reservation, consumed)).toMatchObject({ eventId: 'consume-recovery' });
+    expect(() => runtime.settleExistingDispatch({ ...admission.reservation, runId: 'sibling' }, consumed))
+      .toThrowError(expect.objectContaining({ code: 'SCOPE_MISMATCH' }));
+    expect(() => runtime.settleExistingDispatch(admission.reservation, { ...consumed, eventId: 'different' }))
+      .toThrowError(expect.objectContaining({ code: 'INVALID_EVENT' }));
+    truthStore.close();
+    limitStore.close();
+  });
 });

@@ -67,6 +67,8 @@ export interface ProviderLimitAuthoritySelectorQuery {
   readonly executionBackend:
     ProviderLimitPolicySelectorConfig['backend']['executionBackend'];
   readonly endpointRefHash: string | null;
+  readonly runtimeFingerprint: string | null;
+  readonly executionProfileRef: string;
 }
 
 export type ProviderLimitAuthoritySelectorProjection =
@@ -275,7 +277,11 @@ function normalizeSelector(
     true,
   );
   if (!isRecord(selector.backend)) throw createExecutionAdmissionError('provider_limits selector backend must be an object');
-  assertExactKeys(selector.backend, ['transport', 'executionBackend', 'endpointRefHash']);
+  assertExactKeys(
+    selector.backend,
+    ['transport', 'executionBackend', 'endpointRefHash'],
+    ['runtimeFingerprint', 'executionProfileRef'],
+  );
   if (!TRANSPORTS.has(selector.backend.transport)) {
     throw createExecutionAdmissionError('provider_limits selector transport is unsupported');
   }
@@ -287,6 +293,19 @@ function normalizeSelector(
     selector.backend.endpointRefHash,
     false,
   );
+  if (selector.backend.runtimeFingerprint !== undefined) {
+    assertOpaqueSha256(
+      'provider_limits selector runtimeFingerprint',
+      selector.backend.runtimeFingerprint,
+      false,
+    );
+  }
+  if (selector.backend.executionProfileRef !== undefined) {
+    assertCanonicalText(
+      'provider_limits selector executionProfileRef',
+      selector.backend.executionProfileRef,
+    );
+  }
   if (
     !Array.isArray(selector.requiredWindowIds)
     || selector.requiredWindowIds.length === 0
@@ -433,7 +452,14 @@ export function projectExactProviderLimitAuthoritySelector(
         && selector.authMode === query.authMode
         && selector.backend.transport === query.transport
         && selector.backend.executionBackend === query.executionBackend
-        && selector.backend.endpointRefHash === query.endpointRefHash;
+        && selector.backend.endpointRefHash === query.endpointRefHash
+        // Historical xverify selectors predate executable-profile binding.
+        // They retain their prior inspection/admission semantics; new goal
+        // candidate authority separately requires both fields to be present.
+        && (selector.backend.runtimeFingerprint === undefined
+          || selector.backend.runtimeFingerprint === query.runtimeFingerprint)
+        && (selector.backend.executionProfileRef === undefined
+          || selector.backend.executionProfileRef === query.executionProfileRef);
     });
     if (matches.length === 0) {
       return {

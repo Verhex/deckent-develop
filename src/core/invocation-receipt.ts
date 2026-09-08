@@ -1,4 +1,5 @@
 import type { ProviderName } from './task-types.js';
+import type { ProviderLimitReservationEvent, ProviderLimitReservationRequest } from './provider-limit-truth.js';
 
 export const INVOCATION_RECEIPT_SCHEMA_VERSION = 1 as const;
 
@@ -178,6 +179,7 @@ export type InvocationEvent =
         readonly signal: string | null;
         readonly reasonCode: InvocationReasonCode;
         readonly durationMs: number;
+        readonly outputRef?: string;
         readonly reconciliation?: {
           readonly evidenceRef: string;
           readonly dispatchEventHash: string;
@@ -214,6 +216,28 @@ export interface InvocationReceiptView {
   readonly transportOutcome: 'not_dispatched' | 'succeeded' | 'failed' | 'timeout' | 'unknown';
   readonly consumerOutcome: 'accepted' | 'rejected' | 'unknown';
   readonly taskDisposition?: InvocationTaskDisposition | null;
+}
+
+export interface InvocationOutputArtifactRef extends InvocationScope {
+  readonly schemaVersion: 1;
+  readonly invocationId: string;
+  readonly purpose: InvocationPurpose;
+  readonly provider: string;
+  readonly model: string;
+  readonly promptDigest: string;
+  readonly reservationDigest: string;
+  readonly usageDigest: string;
+  readonly contentSha256: string;
+  readonly artifactSha256: string;
+  readonly byteLength: number;
+}
+
+export interface InvocationOutputArtifactWrite {
+  readonly ref: Omit<InvocationOutputArtifactRef, 'contentSha256' | 'artifactSha256' | 'reservationDigest' | 'usageDigest' | 'byteLength'>;
+  readonly bytes: Uint8Array;
+  readonly transportEvent: Extract<InvocationEvent, { type: 'transport_settled' }>;
+  readonly reservationRequest: ProviderLimitReservationRequest;
+  readonly usageEvent: ProviderLimitReservationEvent;
 }
 
 export interface InvocationTaskReceiptScan extends InvocationScope {
@@ -313,6 +337,8 @@ export interface InvocationReceiptLedger {
   declare(receipt: InvocationReceipt): InvocationDeclarationResult;
   append(scope: InvocationScope, invocationId: string, event: InvocationEvent): StoredInvocationEvent;
   get(scope: InvocationScope, invocationId: string): InvocationReceiptView | null;
+  writeOutputArtifact(input: InvocationOutputArtifactWrite): InvocationOutputArtifactRef;
+  readOutputArtifact(scope: InvocationScope, invocationId: string): { ref: InvocationOutputArtifactRef; bytes: Uint8Array; reservationRequest: ProviderLimitReservationRequest; usageEvent: ProviderLimitReservationEvent } | null;
   close(): void;
 }
 

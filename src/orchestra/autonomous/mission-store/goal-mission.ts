@@ -1,4 +1,6 @@
 import type {
+  GoalInvocationConsumerCheckpointV1,
+  GoalInvocationConsumerReceiptSettlementV1,
   Mission, MissionStore, NewWorkItem, WorkItem,
 } from './mission-types.js';
 import type { InvocationReceiptRef } from '../../../core/invocation-receipt.js';
@@ -22,6 +24,8 @@ export interface GoalMissionSpec {
   title: string;
   /** The goal statement the loop works toward. */
   goal: string;
+  /** Verified actor that initiated this mission; required by live approval authority. */
+  createdBy?: string;
   /** Optional acceptance criteria (evaluated by the injected `accept`). */
   acceptance?: string;
   /** Host-known author surface. `actorId:null` is honest when no principal exists. */
@@ -101,8 +105,10 @@ function persistInvocationHold(
   mission: Mission,
   error: GoalInvocationHeldError,
 ): GoalAdvanceOutcome {
-  const status = mission.status === 'pending' ? 'pending' : 'active';
-  store.updateMissionStatus(mission.id, status, {
+  // The mission snapshot predates awaited provider/ledger work. Persist through
+  // a guarded store mutation so a concurrent terminal transition cannot be
+  // reactivated or have its authoritative terminal result replaced by HOLD.
+  store.persistGoalInvocationHoldIfMutable(mission.id, {
     ok: false,
     reason: error.message,
     goalInvocationHold: error.hold,
@@ -117,18 +123,29 @@ export interface GoalAdvanceDeps {
     goal: string,
     priorItems: WorkItem[],
     acceptanceContract?: GoalAcceptanceContractV1,
+    context?: GoalInvocationContext,
   ): Promise<NewWorkItem[]>;
   /** Decide whether the goal is reached given the (settled) items. */
   accept(
     goal: string,
     items: WorkItem[],
     acceptanceContract?: GoalAcceptanceContractV1,
+    context?: GoalInvocationContext,
   ): Promise<boolean | GoalAcceptanceEvaluation>;
   /** Host-owned cross-ledger receipt verification. Missing fails explicit decisions closed. */
   verifyAcceptanceReceipt?(
     mission: Pick<Mission, 'id' | 'tenant'>,
     evaluation: GoalAcceptanceEvaluation,
   ): GoalAcceptanceReceiptVerification | Promise<GoalAcceptanceReceiptVerification>;
+  /** One-shot in-process handle for the just-parsed provider output. */
+  takeInvocationConsumer?(
+    context: GoalInvocationContext,
+    purpose: 'goal-authoring' | 'goal-acceptance',
+  ): GoalInvocationConsumerHandle | null;
+  /** Restart-safe receipt append from an immutable MissionStore checkpoint. */
+  reconcileInvocationConsumer?(
+    checkpoint: GoalInvocationConsumerCheckpointV1,
+  ): GoalInvocationConsumerReceiptSettlementV1 | Promise<GoalInvocationConsumerReceiptSettlementV1>;
   /**
    * Infinite-loop guard — maximum cumulative work-items the goal may author
    * before being force-exhausted. Defaults to `Infinity` (rely on `author`
@@ -137,6 +154,21 @@ export interface GoalAdvanceDeps {
   maxRounds?: number;
   /** Runtime capability truth used to reject an unsupported authored batch before enqueue. */
   admission?: MissionRuntimeAdmission;
+}
+
+export interface GoalInvocationContext {
+  readonly missionId: string;
+  readonly tenantId: string;
+  readonly round: number;
+}
+
+export interface GoalInvocationConsumerHandle {
+  readonly outputDigest: string;
+  readonly invocationReceiptRef: InvocationReceiptRef;
+  settleConsumer(
+    outcome: 'accepted' | 'rejected',
+    reasonCode?: 'none' | 'parse_failed' | 'validation_failed',
+  ): GoalInvocationConsumerReceiptSettlementV1;
 }
 
 /**
@@ -153,14 +185,18 @@ export interface GoalDeps {
     goal: string,
     priorItems: WorkItem[],
     acceptanceContract?: GoalAcceptanceContractV1,
+    context?: GoalInvocationContext,
   ): Promise<NewWorkItem[]>;
   /** Real acceptance evaluator (LLM / Brain-eval) — is the goal reached? */
   accepter(
     goal: string,
     items: WorkItem[],
     acceptanceContract?: GoalAcceptanceContractV1,
+    context?: GoalInvocationContext,
   ): Promise<boolean | GoalAcceptanceEvaluation>;
   verifyAcceptanceReceipt?: GoalAdvanceDeps['verifyAcceptanceReceipt'];
+  takeInvocationConsumer?: GoalAdvanceDeps['takeInvocationConsumer'];
+  reconcileInvocationConsumer?: GoalAdvanceDeps['reconcileInvocationConsumer'];
   /** Infinite-loop guard, forwarded verbatim to {@link advanceGoalMission}. */
   maxRounds?: number;
   /** Runtime capability truth used to reject an unsupported authored batch before enqueue. */
@@ -177,15 +213,19 @@ export interface GoalDeps {
  */
 export function buildGoalDeps(deps: GoalDeps): GoalAdvanceDeps {
   return {
-    author: (goal, priorItems, acceptanceContract) => acceptanceContract
-      ? deps.planner(goal, priorItems, acceptanceContract)
-      : deps.planner(goal, priorItems),
-    accept: (goal, items, acceptanceContract) => acceptanceContract
-      ? deps.accepter(goal, items, acceptanceContract)
-      : deps.accepter(goal, items),
+    author: (goal, priorItems, acceptanceContract, context) => context && deps.planner.length >= 4
+      ? deps.planner(goal, priorItems, acceptanceContract, context)
+      : acceptanceContract ? deps.planner(goal, priorItems, acceptanceContract) : deps.planner(goal, priorItems),
+    accept: (goal, items, acceptanceContract, context) => context && deps.accepter.length >= 4
+      ? deps.accepter(goal, items, acceptanceContract, context)
+      : acceptanceContract ? deps.accepter(goal, items, acceptanceContract) : deps.accepter(goal, items),
     ...(deps.maxRounds !== undefined ? { maxRounds: deps.maxRounds } : {}),
     ...(deps.admission ? { admission: deps.admission } : {}),
     ...(deps.verifyAcceptanceReceipt ? { verifyAcceptanceReceipt: deps.verifyAcceptanceReceipt } : {}),
+    ...(deps.takeInvocationConsumer ? { takeInvocationConsumer: deps.takeInvocationConsumer } : {}),
+    ...(deps.reconcileInvocationConsumer
+      ? { reconcileInvocationConsumer: deps.reconcileInvocationConsumer }
+      : {}),
   };
 }
 
@@ -204,6 +244,7 @@ export function createGoalMission(store: MissionStore, spec: GoalMissionSpec): M
     id: spec.id,
     kind: 'goal',
     title: spec.title,
+    createdBy: spec.createdBy,
     tenant: spec.tenant,
     deliverTo: spec.deliverTo,
     renderAs: 'goal',
@@ -214,6 +255,63 @@ export function createGoalMission(store: MissionStore, spec: GoalMissionSpec): M
 function readGoal(mission: Mission): string {
   const g = mission.spec?.goal;
   return typeof g === 'string' ? g : '';
+}
+
+function goalConsumerHold(
+  checkpoint: GoalInvocationConsumerCheckpointV1,
+  reasonCode: Extract<GoalInvocationHoldReason, 'store_failure' | 'receipt_unavailable'>,
+): GoalInvocationHeldError {
+  return new GoalInvocationHeldError({
+    schemaVersion: 1,
+    reasonCode,
+    evidenceRefs: [`goal-consumer-checkpoint:${checkpoint.checkpointId}`],
+    invocationReceiptRef: checkpoint.invocationReceiptRef,
+    heldAt: new Date().toISOString(),
+  });
+}
+
+async function settleGoalConsumerCheckpoint(
+  store: MissionStore,
+  deps: GoalAdvanceDeps,
+  checkpoint: GoalInvocationConsumerCheckpointV1,
+  live?: GoalInvocationConsumerHandle,
+): Promise<void> {
+  if (checkpoint.acknowledged) return;
+  if (live && (live.outputDigest !== checkpoint.outputDigest
+    || live.invocationReceiptRef.invocationId !== checkpoint.invocationReceiptRef.invocationId
+    || live.invocationReceiptRef.tenantId !== checkpoint.invocationReceiptRef.tenantId
+    || live.invocationReceiptRef.projectId !== checkpoint.invocationReceiptRef.projectId)) {
+    throw goalConsumerHold(checkpoint, 'receipt_unavailable');
+  }
+  let settlement: GoalInvocationConsumerReceiptSettlementV1;
+  try {
+    if (deps.reconcileInvocationConsumer) {
+      settlement = await deps.reconcileInvocationConsumer(checkpoint);
+    } else throw new Error('goal invocation consumer reconciler unavailable');
+  } catch {
+    throw goalConsumerHold(checkpoint, 'receipt_unavailable');
+  }
+  try {
+    store.acknowledgeGoalInvocationConsumer(checkpoint, settlement);
+  } catch {
+    throw goalConsumerHold(checkpoint, 'store_failure');
+  }
+}
+
+async function reconcileGoalConsumers(
+  store: MissionStore,
+  mission: Mission,
+  deps: GoalAdvanceDeps,
+): Promise<GoalAdvanceOutcome | null> {
+  for (const checkpoint of store.listPendingGoalInvocationConsumers(mission.id)) {
+    try {
+      await settleGoalConsumerCheckpoint(store, deps, checkpoint);
+    } catch (error) {
+      if (error instanceof GoalInvocationHeldError) return persistInvocationHold(store, mission, error);
+      throw error;
+    }
+  }
+  return null;
 }
 
 /**
@@ -235,12 +333,30 @@ export async function advanceGoalMission(
   const mission = store.getMission(missionId);
   if (!mission) throw new Error(`goal mission not found: ${missionId}`);
 
+  // Cross-ledger receipt acknowledgement is reconciled before open-item and
+  // terminal-state filters. Only a MissionStore checkpoint proves the parser
+  // effect was durable; a receipt alone never authorizes replay consumption.
+  const reconciliation = await reconcileGoalConsumers(store, mission, deps);
+  if (reconciliation) return reconciliation;
+  if (mission.status === 'failed' || mission.status === 'cancelled'
+    || (mission.status === 'completed'
+      && readGoalAcceptanceContract(mission) !== null
+      && store.listAcceptanceDecisions(mission.id)
+        .some((decision) => decision.effectiveOutcome === 'accepted'))) {
+    return 'waiting';
+  }
+
   const all = store.listItems(missionId);
   const open = all.filter((i) => i.status === 'pending' || i.status === 'running' || i.status === 'parked');
   if (open.length > 0) return 'waiting';
 
   const goal = readGoal(mission);
   const acceptanceContract = readGoalAcceptanceContract(mission);
+  const invocationContext: GoalInvocationContext = Object.freeze({
+    missionId: mission.id,
+    tenantId: mission.tenant,
+    round: all.length + 1,
+  });
 
   // Infinite-loop guard: bound cumulative authored work-items.
   const maxRounds = deps.maxRounds ?? Infinity;
@@ -253,14 +369,26 @@ export async function advanceGoalMission(
   }
 
   // Ask the planner for the next batch of work.
+  const savedAuthor = store.getGoalInvocationConsumer(
+    missionId,
+    invocationContext.round,
+    'goal-authoring',
+  );
   let next: NewWorkItem[];
-  try {
-    next = acceptanceContract
-      ? await deps.author(goal, all, acceptanceContract)
-      : await deps.author(goal, all);
-  } catch (error) {
-    if (error instanceof GoalInvocationHeldError) return persistInvocationHold(store, mission, error);
-    throw error;
+  if (savedAuthor) {
+    if (savedAuthor.effect.kind !== 'authored-batch') {
+      throw new Error('MISSION_GOAL_CONSUMER_CHECKPOINT_INTEGRITY_FAILURE');
+    }
+    next = [...savedAuthor.effect.items];
+  } else {
+    try {
+      next = deps.author.length >= 4
+        ? await deps.author(goal, all, acceptanceContract ?? undefined, invocationContext)
+        : acceptanceContract ? await deps.author(goal, all, acceptanceContract) : await deps.author(goal, all);
+    } catch (error) {
+      if (error instanceof GoalInvocationHeldError) return persistInvocationHold(store, mission, error);
+      throw error;
+    }
   }
   if (next.length > 0) {
     const scopedNext = next.map((item) => ({ ...item, missionId }));
@@ -272,27 +400,126 @@ export async function advanceGoalMission(
         admittedNext = scopedNext;
       }
     } catch (error) {
+      const invalidConsumer = savedAuthor ? null
+        : deps.takeInvocationConsumer?.(invocationContext, 'goal-authoring') ?? null;
+      try {
+        invalidConsumer?.settleConsumer('rejected', 'validation_failed');
+      } catch (settlementError) {
+        if (invalidConsumer) {
+          return persistInvocationHold(store, mission, new GoalInvocationHeldError({
+            schemaVersion: 1,
+            invocationReceiptRef: invalidConsumer.invocationReceiptRef,
+            reasonCode: 'receipt_unavailable',
+            evidenceRefs: [`goal-consumer-validation-rejection:${missionId}:${invocationContext.round}`],
+            heldAt: new Date().toISOString(),
+          }));
+        }
+        throw settlementError;
+      }
       store.updateMissionStatus(missionId, 'failed', {
         ok: false,
         reason: error instanceof Error ? error.message : String(error),
       });
       return 'exhausted';
     }
-    // One admitted planner batch is one durable mutation. A mid-batch conflict
-    // cannot strand a partial goal round.
-    store.enqueueItems(admittedNext);
+    const live = savedAuthor ? null
+      : deps.takeInvocationConsumer?.(invocationContext, 'goal-authoring') ?? null;
+    if (live) {
+      let checkpoint: GoalInvocationConsumerCheckpointV1;
+      try {
+        checkpoint = store.stageGoalInvocationConsumer({
+          schemaVersion: 1,
+          tenantId: mission.tenant,
+          projectId: live.invocationReceiptRef.projectId,
+          missionId,
+          round: invocationContext.round,
+          purpose: 'goal-authoring',
+          invocationReceiptRef: live.invocationReceiptRef,
+          outputDigest: live.outputDigest,
+          effect: { kind: 'authored-batch', items: admittedNext },
+        });
+        await settleGoalConsumerCheckpoint(store, deps, checkpoint, live);
+      } catch (error) {
+        if (error instanceof GoalInvocationHeldError) return persistInvocationHold(store, mission, error);
+        return persistInvocationHold(store, mission, new GoalInvocationHeldError({
+          schemaVersion: 1,
+          reasonCode: 'store_failure',
+          evidenceRefs: [`goal-consumer-stage:${missionId}:${invocationContext.round}`],
+          invocationReceiptRef: live.invocationReceiptRef,
+          heldAt: new Date().toISOString(),
+        }));
+      }
+    } else if (!savedAuthor) {
+      // Receipt-less controlled adapters retain the pre-v5 atomic batch path.
+      store.enqueueItems(admittedNext);
+    }
     return 'authored';
   }
 
+  const liveAuthor = savedAuthor ? null
+    : deps.takeInvocationConsumer?.(invocationContext, 'goal-authoring') ?? null;
+  if (liveAuthor) {
+    try {
+      const checkpoint = store.stageGoalInvocationConsumer({
+        schemaVersion: 1,
+        tenantId: mission.tenant,
+        projectId: liveAuthor.invocationReceiptRef.projectId,
+        missionId,
+        round: invocationContext.round,
+        purpose: 'goal-authoring',
+        invocationReceiptRef: liveAuthor.invocationReceiptRef,
+        outputDigest: liveAuthor.outputDigest,
+        effect: { kind: 'authored-batch', items: [] },
+      });
+      await settleGoalConsumerCheckpoint(store, deps, checkpoint, liveAuthor);
+    } catch (error) {
+      if (error instanceof GoalInvocationHeldError) return persistInvocationHold(store, mission, error);
+      throw error;
+    }
+  }
+
   // No further work — decide acceptance.
+  const savedAcceptance = store.getGoalInvocationConsumer(
+    missionId,
+    invocationContext.round,
+    'goal-acceptance',
+  );
   let accepted: boolean | GoalAcceptanceEvaluation;
-  try {
-    accepted = acceptanceContract
-      ? await deps.accept(goal, all, acceptanceContract)
-      : await deps.accept(goal, all);
-  } catch (error) {
-    if (error instanceof GoalInvocationHeldError) return persistInvocationHold(store, mission, error);
-    throw error;
+  if (savedAcceptance) {
+    if (savedAcceptance.effect.kind !== 'acceptance-evaluation') {
+      throw new Error('MISSION_GOAL_CONSUMER_CHECKPOINT_INTEGRITY_FAILURE');
+    }
+    accepted = savedAcceptance.effect.evaluation;
+  } else {
+    try {
+      accepted = deps.accept.length >= 4
+        ? await deps.accept(goal, all, acceptanceContract ?? undefined, invocationContext)
+        : acceptanceContract ? await deps.accept(goal, all, acceptanceContract) : await deps.accept(goal, all);
+    } catch (error) {
+      if (error instanceof GoalInvocationHeldError) return persistInvocationHold(store, mission, error);
+      throw error;
+    }
+  }
+  const liveAcceptance = savedAcceptance ? null
+    : deps.takeInvocationConsumer?.(invocationContext, 'goal-acceptance') ?? null;
+  if (liveAcceptance) {
+    try {
+      const checkpoint = store.stageGoalInvocationConsumer({
+        schemaVersion: 1,
+        tenantId: mission.tenant,
+        projectId: liveAcceptance.invocationReceiptRef.projectId,
+        missionId,
+        round: invocationContext.round,
+        purpose: 'goal-acceptance',
+        invocationReceiptRef: liveAcceptance.invocationReceiptRef,
+        outputDigest: liveAcceptance.outputDigest,
+        effect: { kind: 'acceptance-evaluation', evaluation: accepted },
+      });
+      await settleGoalConsumerCheckpoint(store, deps, checkpoint, liveAcceptance);
+    } catch (error) {
+      if (error instanceof GoalInvocationHeldError) return persistInvocationHold(store, mission, error);
+      throw error;
+    }
   }
   if (acceptanceContract) {
     const evaluation: GoalAcceptanceEvaluation = typeof accepted === 'boolean'

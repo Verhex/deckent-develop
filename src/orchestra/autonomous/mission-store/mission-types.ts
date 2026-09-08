@@ -2,9 +2,11 @@
 import type { ApprovalDecision, ApprovalRequest } from '../../../core/approval-contract.js';
 import type { ExactPlanReferenceV1 } from '../../../core/run-flow-contract.js';
 import type {
+  GoalAcceptanceEvaluation,
   MissionAcceptanceDecisionRecord,
   MissionAcceptanceDecisionV1,
 } from './mission-acceptance.js';
+import type { InvocationReceiptRef } from '../../../core/invocation-receipt.js';
 import type {
   MissionRunnerRegistryV1,
   WorkItemAdmissionFenceV1,
@@ -185,6 +187,40 @@ export interface MissionDispatchRecoveryAcknowledgementV1 {
   readonly receiptEventHash: string;
   readonly acknowledgedAt: string;
 }
+
+export type GoalInvocationConsumerPurpose = 'goal-authoring' | 'goal-acceptance';
+export type GoalInvocationConsumerEffect =
+  | { readonly kind: 'authored-batch'; readonly items: readonly NewWorkItem[] }
+  | { readonly kind: 'acceptance-evaluation'; readonly evaluation: boolean | GoalAcceptanceEvaluation };
+
+/** Mission-DB half of the goal invocation consumer saga. Its effect is durable before receipt ack. */
+export interface GoalInvocationConsumerCheckpointV1 {
+  readonly schemaVersion: 1;
+  readonly checkpointId: string;
+  readonly tenantId: string;
+  readonly projectId: string;
+  readonly missionId: string;
+  readonly round: number;
+  readonly purpose: GoalInvocationConsumerPurpose;
+  readonly invocationReceiptRef: InvocationReceiptRef;
+  readonly outputDigest: string;
+  readonly effectDigest: string;
+  readonly effect: GoalInvocationConsumerEffect;
+  readonly createdAt: string;
+  readonly acknowledged: boolean;
+}
+
+export type NewGoalInvocationConsumerCheckpointV1 = Omit<
+  GoalInvocationConsumerCheckpointV1,
+  'checkpointId' | 'effectDigest' | 'createdAt' | 'acknowledged'
+>;
+
+export interface GoalInvocationConsumerReceiptSettlementV1 {
+  readonly schemaVersion: 1;
+  readonly invocationReceiptRef: InvocationReceiptRef;
+  readonly receiptEventId: string;
+  readonly receiptEventHash: string;
+}
 export interface MissionEvent { ts: string; workItemId?: string; type: string; data?: unknown; }
 
 export interface MissionStore {
@@ -211,10 +247,28 @@ export interface MissionStore {
   getMission(id: string): Mission | null;
   listMissions(f?: { status?: MissionStatus[]; tenant?: string }): Mission[];
   updateMissionStatus(id: string, status: MissionStatus, result?: ResultLike): void;
+  /** Atomically persist a goal HOLD only while the mission remains non-terminal. */
+  persistGoalInvocationHoldIfMutable(id: string, result: ResultLike): boolean;
   setMissionProgress(id: string, progress: Progress): void;
   /** Atomically persist one acceptance round and settle the mission from the validated decision. */
   recordAcceptanceDecision(decision: MissionAcceptanceDecisionV1): MissionAcceptanceDecisionRecord;
   listAcceptanceDecisions(missionId: string): MissionAcceptanceDecisionRecord[];
+  /** Atomically persist an admitted author batch (including empty) or parsed acceptance stage. */
+  stageGoalInvocationConsumer(
+    checkpoint: NewGoalInvocationConsumerCheckpointV1,
+  ): GoalInvocationConsumerCheckpointV1;
+  /** Includes acknowledged rows so a post-ack/pre-finalization acceptance can resume. */
+  getGoalInvocationConsumer(
+    missionId: string,
+    round: number,
+    purpose: GoalInvocationConsumerPurpose,
+  ): GoalInvocationConsumerCheckpointV1 | null;
+  listPendingGoalInvocationConsumers(missionId: string): readonly GoalInvocationConsumerCheckpointV1[];
+  /** Idempotently bind the exact receipt terminal event to its immutable mission checkpoint. */
+  acknowledgeGoalInvocationConsumer(
+    checkpoint: GoalInvocationConsumerCheckpointV1,
+    settlement: GoalInvocationConsumerReceiptSettlementV1,
+  ): boolean;
   enqueueItem(item: NewWorkItem): WorkItem;
   /** Atomically enqueue a complete already-admitted goal round. */
   enqueueItems(items: readonly NewWorkItem[]): WorkItem[];

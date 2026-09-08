@@ -13,12 +13,14 @@ import type { MissionTaskContext } from '../../../../src/orchestra/autonomous/mi
 import type { MissionNotifyPayload } from '../../../../src/orchestra/autonomous/mission-store/mission-deliver.js';
 import {
   createGoalMission,
+  advanceGoalMission,
   buildGoalDeps,
   GoalInvocationHeldError,
 } from '../../../../src/orchestra/autonomous/mission-store/goal-mission.js';
 import type {
   MissionDispatchClaim,
   MissionEngineLease,
+  GoalInvocationConsumerCheckpointV1,
   MissionRecoveredDispatchAttemptV1,
   MissionStore,
   NewWorkItem,
@@ -33,6 +35,7 @@ import { ApprovalBroker } from '../../../../src/core/approval-broker.js';
 import { ApprovalStore } from '../../../../src/core/approval-store.js';
 import type { ApprovalDecisionAuthority } from '../../../../src/core/approval-decision-ingress.js';
 import { MissionApprovalCoordinator } from '../../../../src/orchestra/autonomous/mission-store/mission-approval-coordinator.js';
+import { settleMissionItem } from '../../../helpers/mission-store.js';
 
 // ── tmpdir lifecycle ──────────────────────────────────────────────────
 const dirs: string[] = [];
@@ -262,7 +265,7 @@ describe('runV2Engine', () => {
       runTask,
       executeSprint: async () => ({ ok: true }),
       store,
-      maxIterations: BOUNDED,
+      maxIterations: 1,
     });
     expect(summary.dispatched).toBe(0);
     expect(runTask).not.toHaveBeenCalled();
@@ -681,6 +684,206 @@ describe('runV2Engine', () => {
 });
 
 describe('runV2Engine — goal-driven (Type-2)', () => {
+  it('reconciles an enqueue-committed consumer checkpoint before the open-item guard after reopen', async () => {
+    const r = root();
+    let store = openStore(r);
+    createGoalMission(store, { id: 'gConsumerReopen', title: 'Consumer reopen', goal: 'ship once' });
+    const invocationReceiptRef = {
+      schemaVersion: 1 as const,
+      tenantId: 'local',
+      projectId: 'project-test',
+      invocationId: 'goal-consumer-engine-reopen',
+    };
+    store.stageGoalInvocationConsumer({
+      schemaVersion: 1,
+      tenantId: 'local',
+      projectId: 'project-test',
+      missionId: 'gConsumerReopen',
+      round: 1,
+      purpose: 'goal-authoring',
+      invocationReceiptRef,
+      outputDigest: 'a'.repeat(64),
+      effect: { kind: 'authored-batch', items: admitWorkItemBatch([
+        { id: 'gConsumerReopen-step', missionId: 'gConsumerReopen', kind: 'task',
+          spec: { description: 'run once after receipt reconciliation' } },
+      ], PRODUCTION_V2_RUNNER_REGISTRY) },
+    });
+    store.close();
+
+    store = openStore(r);
+    const planner = vi.fn(async (): Promise<NewWorkItem[]> => []);
+    const accepter = vi.fn(async () => false);
+    const reconcile = vi.fn((checkpoint: GoalInvocationConsumerCheckpointV1) => ({
+      schemaVersion: 1 as const,
+      invocationReceiptRef: checkpoint.invocationReceiptRef,
+      receiptEventId: `${checkpoint.invocationReceiptRef.invocationId}-consumer`,
+      receiptEventHash: 'b'.repeat(64),
+    }));
+    const runTask = vi.fn(async () => ({ ok: true }));
+    await runV2Engine(r, cfg({ engine: 'v2' }), {
+      runTask,
+      executeSprint: async () => ({ ok: true }),
+      goalDeps: buildGoalDeps({ planner, accepter, reconcileInvocationConsumer: reconcile }),
+      store,
+      maxIterations: 1,
+    });
+    expect(reconcile).toHaveBeenCalledTimes(1);
+    expect(planner).not.toHaveBeenCalled();
+    expect(accepter).not.toHaveBeenCalled();
+    expect(runTask).toHaveBeenCalledTimes(1);
+    expect(store.listPendingGoalInvocationConsumers('gConsumerReopen')).toEqual([]);
+    expect(store.listItems('gConsumerReopen')).toHaveLength(1);
+    expect(store.listItems('gConsumerReopen')[0]!.status).toBe('done');
+  });
+
+  it('acknowledges a pending consumer on a reopened accepted mission without execution or delivery', async () => {
+    const r = root();
+    let store = openStore(r);
+    const mission = createGoalMission(store, {
+      id: 'gAcceptedConsumerReopen',
+      title: 'Accepted consumer reopen',
+      goal: 'retain accepted terminal truth',
+      acceptance: 'the durable goal is accepted',
+    });
+    const contract = mission.spec?.['acceptanceContract'] as {
+      criteria: readonly { id: string }[];
+    };
+    enqueueProduction(store, {
+      id: 'gAcceptedConsumerReopen-evidence',
+      missionId: mission.id,
+      kind: 'task',
+      spec: { description: 'durable acceptance evidence' },
+    });
+    settleMissionItem(store, 'gAcceptedConsumerReopen-evidence', 'done', { ok: true });
+    await expect(advanceGoalMission(store, mission.id, {
+      author: async () => [],
+      accept: async () => ({
+        outcome: 'accepted',
+        criteria: [{
+          criterionId: contract.criteria[0]!.id,
+          verdict: 'met',
+          evidenceRefs: ['work-item:gAcceptedConsumerReopen-evidence'],
+          rationale: 'the durable goal is accepted',
+        }],
+        evaluator: { role: 'brain', instanceId: 'accepted-reopen-test' },
+        invocationReceiptRef: {
+          schemaVersion: 1, tenantId: 'local', projectId: 'project-test',
+          invocationId: 'accepted-reopen-evaluation',
+        },
+        decidedAt: '2026-09-08T15:00:00.000Z',
+      }),
+      verifyAcceptanceReceipt: () => ({ verified: true, errors: [] }),
+    })).resolves.toBe('accepted');
+    const terminalResult = store.getMission(mission.id)!.lastResult;
+    const invocationReceiptRef = {
+      schemaVersion: 1 as const,
+      tenantId: 'local',
+      projectId: 'project-test',
+      invocationId: 'accepted-terminal-pending-consumer',
+    };
+    store.stageGoalInvocationConsumer({
+      schemaVersion: 1,
+      tenantId: 'local',
+      projectId: 'project-test',
+      missionId: mission.id,
+      round: 1,
+      purpose: 'goal-authoring',
+      invocationReceiptRef,
+      outputDigest: 'a'.repeat(64),
+      effect: { kind: 'authored-batch', items: [] },
+    });
+    store.close();
+
+    store = openStore(r);
+    const planner = vi.fn(async (): Promise<NewWorkItem[]> => []);
+    const accepter = vi.fn(async () => false);
+    const runTask = vi.fn(async () => ({ ok: true }));
+    const onMissionSettled = vi.fn();
+    await runV2Engine(r, cfg({ engine: 'v2' }), {
+      runTask,
+      executeSprint: async () => ({ ok: true }),
+      goalDeps: buildGoalDeps({
+        planner,
+        accepter,
+        reconcileInvocationConsumer: (checkpoint) => ({
+          schemaVersion: 1,
+          invocationReceiptRef: checkpoint.invocationReceiptRef,
+          receiptEventId: `${checkpoint.invocationReceiptRef.invocationId}-consumer`,
+          receiptEventHash: 'b'.repeat(64),
+        }),
+      }),
+      onMissionSettled,
+      store,
+      maxIterations: 1,
+    });
+    expect(store.getMission(mission.id)).toMatchObject({
+      status: 'completed',
+      lastResult: terminalResult,
+    });
+    expect(store.listPendingGoalInvocationConsumers(mission.id)).toEqual([]);
+    expect(planner).not.toHaveBeenCalled();
+    expect(accepter).not.toHaveBeenCalled();
+    expect(runTask).not.toHaveBeenCalled();
+    expect(onMissionSettled).not.toHaveBeenCalled();
+  });
+
+  it('keeps a held terminal checkpoint eligible for another pass without reactivation', async () => {
+    const r = root();
+    let store = openStore(r);
+    createGoalMission(store, {
+      id: 'gHeldTerminalConsumer', title: 'Held terminal consumer', goal: 'retain failure',
+    });
+    store.stageGoalInvocationConsumer({
+      schemaVersion: 1,
+      tenantId: 'local',
+      projectId: 'project-test',
+      missionId: 'gHeldTerminalConsumer',
+      round: 1,
+      purpose: 'goal-authoring',
+      invocationReceiptRef: {
+        schemaVersion: 1, tenantId: 'local', projectId: 'project-test',
+        invocationId: 'held-terminal-consumer',
+      },
+      outputDigest: 'a'.repeat(64),
+      effect: { kind: 'authored-batch', items: [] },
+    });
+    const terminalResult = { ok: false, terminalAuthority: 'dependency-failure' };
+    store.updateMissionStatus('gHeldTerminalConsumer', 'failed', terminalResult);
+    store.createMission({ id: 'list-keeps-engine-live', kind: 'list', title: 'one scheduler pass' });
+    enqueueProduction(store, {
+      id: 'list-keeps-engine-live-item', missionId: 'list-keeps-engine-live', kind: 'task',
+      spec: { description: 'force a second engine iteration' },
+    });
+    store.close();
+
+    store = openStore(r);
+    const reconcile = vi.fn(() => { throw new Error('receipt ledger unavailable'); });
+    const goalPlanner = vi.fn(async (): Promise<NewWorkItem[]> => []);
+    const goalAccepter = vi.fn(async () => false);
+    const goalSettled = vi.fn();
+    await runV2Engine(r, cfg({ engine: 'v2' }), {
+      runTask: async () => ({ ok: true }),
+      executeSprint: async () => ({ ok: true }),
+      goalDeps: buildGoalDeps({
+        planner: goalPlanner,
+        accepter: goalAccepter,
+        reconcileInvocationConsumer: reconcile,
+      }),
+      onMissionSettled: goalSettled,
+      store,
+      maxIterations: 2,
+    });
+    expect(reconcile).toHaveBeenCalledTimes(2);
+    expect(store.getMission('gHeldTerminalConsumer')).toMatchObject({
+      status: 'failed',
+      lastResult: terminalResult,
+    });
+    expect(store.listPendingGoalInvocationConsumers('gHeldTerminalConsumer')).toHaveLength(1);
+    expect(goalPlanner).not.toHaveBeenCalled();
+    expect(goalAccepter).not.toHaveBeenCalled();
+    expect(goalSettled).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'gHeldTerminalConsumer' }));
+  });
+
   it('threads the approval coordinator through the goal-driven scheduler drain', async () => {
     const r = root();
     const store = openStore(r);

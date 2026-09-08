@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { DECKENT_DIR } from './constants.js';
+import { assertProviderLimitReservationEvent, assertProviderLimitReservationRequest } from './provider-limit-truth.js';
 import {
   INVOCATION_RECEIPT_SCHEMA_VERSION,
   type InvocationAtomicWrite,
@@ -13,6 +14,8 @@ import {
   type InvocationEvent,
   type InvocationOpenDispatchCandidate,
   type InvocationOpenDispatchScan,
+  type InvocationOutputArtifactRef,
+  type InvocationOutputArtifactWrite,
   type InvocationProjectTaskReceiptBulkScan,
   type InvocationReceipt,
   type InvocationReceiptReconciliationLedger,
@@ -312,9 +315,16 @@ function assertEventPayload(
   if (candidate.type === 'transport_settled') {
     if (!hasOneExactKeySet(payload, [
       ['outcome', 'exitCode', 'signal', 'reasonCode', 'durationMs'],
+      ['outcome', 'exitCode', 'signal', 'reasonCode', 'durationMs', 'outputRef'],
       ['outcome', 'exitCode', 'signal', 'reasonCode', 'durationMs', 'reconciliation'],
     ])) {
       invalidEvent('transport_settled payload has unknown or missing fields');
+    }
+    if (hasOwn(payload, 'outputRef')
+      && (payload.outcome !== 'succeeded'
+        || typeof payload.outputRef !== 'string'
+        || !/^invocation-output:[a-f0-9]{64}$/u.test(payload.outputRef))) {
+      invalidEvent('Invalid transport output artifact ref');
     }
     const reconciliation = payload.reconciliation;
     if (hasOwn(payload, 'reconciliation')) {
@@ -487,8 +497,28 @@ function canonicalJson(value: unknown): string {
   return JSON.stringify(normalize(value));
 }
 
-function sha256(value: string): string {
+function sha256(value: string | Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+function assertOutputArtifactBinding(
+  receipt: InvocationReceipt,
+  ref: Pick<InvocationOutputArtifactRef, 'tenantId' | 'projectId' | 'invocationId' | 'purpose' | 'provider' | 'model'>,
+  reservation: import('./provider-limit-truth.js').ProviderLimitReservationRequest,
+  usage: import('./provider-limit-truth.js').ProviderLimitReservationEvent,
+): void {
+  const expectedReceiptRef = `invocation-receipt:${sha256(`${receipt.tenantId}\0${receipt.projectId}\0${receipt.invocationId}`)}`;
+  if (receipt.tenantId !== ref.tenantId || receipt.projectId !== ref.projectId
+    || receipt.invocationId !== ref.invocationId || receipt.purpose !== ref.purpose
+    || receipt.runId !== reservation.runId || receipt.taskId !== reservation.taskId
+    || receipt.callId !== reservation.callId || receipt.called.provider !== ref.provider
+    || receipt.called.model !== ref.model || reservation.provider !== ref.provider
+    || reservation.model !== ref.model || reservation.receiptRef !== expectedReceiptRef
+    || receipt.auth.mode !== reservation.authMode || receipt.auth.accountRefHash !== reservation.accountRefHash
+    || canonicalJson(receipt.backend) !== canonicalJson(reservation.backend)
+    || usage.type !== 'consumed' || usage.fenceTokenHash !== reservation.fenceTokenHash) {
+    throw new InvocationReceiptStoreError('SCOPE_MISMATCH', 'Invocation output artifact authority binding is invalid');
+  }
 }
 
 function requireIdentity(label: string, value: string): void {
@@ -786,6 +816,34 @@ export class InvocationReceiptStore implements InvocationReceiptReconciliationLe
           REFERENCES invocations (tenant_id, project_id, invocation_id)
       );
 
+      CREATE TABLE IF NOT EXISTS invocation_output_artifacts (
+        invocation_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        project_id TEXT NOT NULL,
+        purpose TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        model TEXT NOT NULL,
+        prompt_digest TEXT NOT NULL,
+        reservation_digest TEXT NOT NULL,
+        usage_digest TEXT NOT NULL,
+        content_sha256 TEXT NOT NULL,
+        artifact_sha256 TEXT NOT NULL,
+        byte_length INTEGER NOT NULL,
+        recovery_json TEXT NOT NULL,
+        content BLOB NOT NULL,
+        FOREIGN KEY (tenant_id, project_id, invocation_id)
+          REFERENCES invocations (tenant_id, project_id, invocation_id)
+      );
+
+      CREATE TRIGGER IF NOT EXISTS invocation_output_artifacts_no_update
+        BEFORE UPDATE ON invocation_output_artifacts BEGIN
+          SELECT RAISE(ABORT, 'invocation output artifacts are immutable');
+        END;
+      CREATE TRIGGER IF NOT EXISTS invocation_output_artifacts_no_delete
+        BEFORE DELETE ON invocation_output_artifacts BEGIN
+          SELECT RAISE(ABORT, 'invocation output artifacts are immutable');
+        END;
+
       CREATE INDEX IF NOT EXISTS idx_invocations_scope_created
         ON invocations (tenant_id, project_id, created_at);
       CREATE INDEX IF NOT EXISTS idx_invocations_task_scope
@@ -929,6 +987,90 @@ export class InvocationReceiptStore implements InvocationReceiptReconciliationLe
       throw new InvocationReceiptStoreError('READ_ONLY', 'Invocation receipt store is read-only');
     }
     return this.appendGuarded(scope, invocationId, event);
+  }
+
+  writeOutputArtifact(input: InvocationOutputArtifactWrite): InvocationOutputArtifactRef {
+    if (this.readOnly) throw new InvocationReceiptStoreError('READ_ONLY', 'Invocation receipt store is read-only');
+    this.assertScope(input.ref);
+    requireIdentity('invocationId', input.ref.invocationId);
+    if (!SHA256_RE.test(input.ref.promptDigest) || input.bytes.byteLength > 10 * 1024 * 1024) {
+      throw new InvocationReceiptStoreError('INVALID_TRANSITION', 'Invocation output artifact binding is invalid');
+    }
+    const view = this.get(input.ref, input.ref.invocationId);
+    if (!view || view.receipt.purpose !== input.ref.purpose
+      || view.receipt.called.provider !== input.ref.provider
+      || view.receipt.called.model !== input.ref.model
+      || view.events.some(event => event.type === 'transport_settled')) {
+      throw new InvocationReceiptStoreError('SCOPE_MISMATCH', 'Invocation output artifact does not match receipt authority');
+    }
+    assertOutputArtifactBinding(view.receipt, input.ref, input.reservationRequest, input.usageEvent);
+    const bytes = Buffer.from(input.bytes);
+    assertProviderLimitReservationRequest(input.reservationRequest);
+    assertProviderLimitReservationEvent(input.usageEvent);
+    const base = { ...input.ref, reservationDigest: sha256(canonicalJson(input.reservationRequest)),
+      usageDigest: sha256(canonicalJson(input.usageEvent)), contentSha256: sha256(bytes), byteLength: bytes.byteLength };
+    const artifact: InvocationOutputArtifactRef = Object.freeze({ ...base, artifactSha256: sha256(canonicalJson(base)) });
+    const expectedOutputRef = `invocation-output:${artifact.artifactSha256}`;
+    if (input.transportEvent.payload.outcome !== 'succeeded') {
+      throw new InvocationReceiptStoreError('INVALID_TRANSITION', 'Transport event does not bind output artifact');
+    }
+    const boundTransportEvent = { ...input.transportEvent,
+      payload: { ...input.transportEvent.payload, outputRef: expectedOutputRef } };
+    const transaction = this.db.transaction(() => {
+      const existing = this.db.prepare(`SELECT * FROM invocation_output_artifacts WHERE tenant_id=? AND project_id=? AND invocation_id=?`).get(
+        artifact.tenantId, artifact.projectId, artifact.invocationId,
+      ) as Record<string, unknown> | undefined;
+      if (existing) {
+        if (existing.content_sha256 !== artifact.contentSha256 || existing.prompt_digest !== artifact.promptDigest) {
+          throw new InvocationReceiptStoreError('IDEMPOTENCY_CONFLICT', 'Invocation output artifact already differs');
+        }
+      } else {
+        this.db.prepare(`INSERT INTO invocation_output_artifacts
+          (invocation_id,tenant_id,project_id,purpose,provider,model,prompt_digest,reservation_digest,usage_digest,content_sha256,artifact_sha256,byte_length,recovery_json,content)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+          artifact.invocationId, artifact.tenantId, artifact.projectId, artifact.purpose,
+          artifact.provider, artifact.model, artifact.promptDigest, artifact.reservationDigest, artifact.usageDigest, artifact.contentSha256,
+          artifact.artifactSha256, artifact.byteLength,
+          canonicalJson({ reservationRequest: input.reservationRequest, usageEvent: input.usageEvent }), bytes,
+        );
+      }
+      this.appendGuarded(input.ref, input.ref.invocationId, boundTransportEvent);
+    });
+    transaction.immediate();
+    return artifact;
+  }
+
+  readOutputArtifact(scope: InvocationScope, invocationId: string): { ref: InvocationOutputArtifactRef; bytes: Uint8Array; reservationRequest: import('./provider-limit-truth.js').ProviderLimitReservationRequest; usageEvent: import('./provider-limit-truth.js').ProviderLimitReservationEvent } | null {
+    this.assertScope(scope);
+    requireIdentity('invocationId', invocationId);
+    const table = this.db.prepare(`SELECT 1 FROM sqlite_master WHERE type='table' AND name='invocation_output_artifacts'`).get();
+    if (!table) return null;
+    const row = this.db.prepare(`SELECT * FROM invocation_output_artifacts WHERE tenant_id=? AND project_id=? AND invocation_id=?`).get(scope.tenantId, scope.projectId, invocationId) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    const bytes = Buffer.from(row.content as Uint8Array);
+    const base = { schemaVersion: 1, tenantId: String(row.tenant_id), projectId: String(row.project_id), invocationId: String(row.invocation_id),
+      purpose: row.purpose, provider: String(row.provider), model: String(row.model), promptDigest: String(row.prompt_digest),
+      reservationDigest: String(row.reservation_digest), usageDigest: String(row.usage_digest),
+      contentSha256: String(row.content_sha256), byteLength: Number(row.byte_length) };
+    const recovery = JSON.parse(String(row.recovery_json)) as { reservationRequest: import('./provider-limit-truth.js').ProviderLimitReservationRequest; usageEvent: import('./provider-limit-truth.js').ProviderLimitReservationEvent };
+    const view = this.get(scope, invocationId);
+    const transport = view?.events.find((event): event is typeof event & { type: 'transport_settled'; payload: Extract<InvocationEvent, { type: 'transport_settled' }>['payload'] } => event.type === 'transport_settled');
+    if (row.content_sha256 !== sha256(bytes) || row.byte_length !== bytes.byteLength || !SHA256_RE.test(String(row.prompt_digest))
+      || row.reservation_digest !== sha256(canonicalJson(recovery.reservationRequest)) || row.usage_digest !== sha256(canonicalJson(recovery.usageEvent))
+      || row.artifact_sha256 !== sha256(canonicalJson(base)) || transport?.payload.outputRef !== `invocation-output:${row.artifact_sha256}`
+      || !view || view.receipt.purpose !== row.purpose || view.receipt.called.provider !== row.provider || view.receipt.called.model !== row.model) {
+      throw new InvocationReceiptStoreError('INTEGRITY_FAILURE', 'Invocation output artifact integrity failed');
+    }
+    assertProviderLimitReservationRequest(recovery.reservationRequest);
+    assertProviderLimitReservationEvent(recovery.usageEvent);
+    assertOutputArtifactBinding(view.receipt, base as InvocationOutputArtifactRef, recovery.reservationRequest, recovery.usageEvent);
+    return {
+      ref: Object.freeze({ schemaVersion: 1, tenantId: String(row.tenant_id), projectId: String(row.project_id),
+        invocationId: String(row.invocation_id), purpose: row.purpose as InvocationReceipt['purpose'],
+        provider: String(row.provider), model: String(row.model), promptDigest: String(row.prompt_digest), reservationDigest: String(row.reservation_digest), usageDigest: String(row.usage_digest),
+        contentSha256: String(row.content_sha256), artifactSha256: String(row.artifact_sha256), byteLength: Number(row.byte_length) }),
+      bytes, ...recovery,
+    };
   }
 
   declareTaskReceiptAtomic(receipt: InvocationReceipt): InvocationDeclarationResult {

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { canonicalJson } from './audit-writer.js';
 
 import {
   admitRoleInvocation,
@@ -571,6 +572,41 @@ export class HostRoleInvocationAdmissionRuntime {
       quotaScopeRefHash: request.quotaScopeRefHash,
       authMode: request.authMode,
     }, request.reservationId);
+  }
+
+  settleExistingDispatch(
+    request: ProviderLimitReservationRequest,
+    event: ProviderLimitReservationEvent,
+  ): StoredProviderLimitReservationEvent {
+    const view = this.getReservation(request);
+    if (!view) throw new HostRoleInvocationAdmissionError('AUTHORITY_UNAVAILABLE', 'Existing invocation reservation is unavailable');
+    const persisted = view.reservation;
+    for (const key of Object.keys(request) as (keyof ProviderLimitReservationRequest)[]) {
+      if (canonicalJson(persisted[key]) !== canonicalJson(request[key])) {
+        throw new HostRoleInvocationAdmissionError('SCOPE_MISMATCH', 'Existing invocation reservation identity changed');
+      }
+    }
+    if (event.type === 'dispatched' || event.fenceTokenHash !== persisted.fenceTokenHash) {
+      throw new HostRoleInvocationAdmissionError('INVALID_EVENT', 'Existing invocation settlement is invalid');
+    }
+    if (view.state === 'consumed') {
+      const existing = view.events.at(-1)!;
+      const comparable = ({ eventId: existing.eventId, type: existing.type, occurredAt: existing.occurredAt,
+        fenceTokenHash: existing.fenceTokenHash, evidenceRef: existing.evidenceRef,
+        ...(existing.actual ? { actual: existing.actual } : {}) });
+      if (canonicalJson(comparable) !== canonicalJson(event)) {
+        throw new HostRoleInvocationAdmissionError('INVALID_EVENT', 'Existing invocation settlement conflicts');
+      }
+      return existing;
+    }
+    if (view.state !== 'dispatched') {
+      throw new HostRoleInvocationAdmissionError('INVALID_EVENT', 'Existing invocation is not dispatch-settleable');
+    }
+    return this.authorities!.limitStore.appendReservationEvent({
+      tenantId: persisted.tenantId, projectId: persisted.projectId, provider: persisted.provider,
+      accountRefHash: persisted.accountRefHash, quotaScopeRefHash: persisted.quotaScopeRefHash,
+      authMode: persisted.authMode,
+    }, persisted.reservationId, event);
   }
 
   /**

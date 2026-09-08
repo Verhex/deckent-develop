@@ -5,6 +5,7 @@ import {
   deriveExecutionLandingTurnAllocation,
   executionBudgetPolicyDigest,
   resolveExecutionBudgetPolicy,
+  resolveGoalInvocationBudgetPolicy,
   resolveXverifyAdjudicationPurposeProfile,
 } from '../../src/core/execution-budget-policy.js';
 import type { ExecutionBudgetPolicyConfig } from '../../src/core/config-types.js';
@@ -30,6 +31,18 @@ function policy(): ExecutionBudgetPolicyConfig {
 }
 
 describe('execution budget policy', () => {
+  it('narrows a goal purpose under role authority and requires final-only containment', () => {
+    const configured: ExecutionBudgetPolicyConfig = {
+      roles: { brain: { default: { maxTokens: 1_000, maxTurns: 8 } } },
+      landing: { reserve_ratio: 0.25 },
+      final_only_usage: { action: 'allow-wall-clock-containment', roles: ['brain'], max_wall_clock_seconds: 30 },
+      purposes: { 'goal-authoring': { maxTokens: 400, maxTurns: 2 } },
+    };
+    expect(resolveGoalInvocationBudgetPolicy({ policy: configured, role: 'brain', purpose: 'goal-authoring', liveUsageMode: 'final-only' }))
+      .toMatchObject({ state: 'allow', budget: { maxTokens: 400, maxTurns: 2 }, finalOnlyUsage: { maxWallClockSeconds: 30 } });
+    expect(resolveGoalInvocationBudgetPolicy({ policy: configured, role: 'auditor', purpose: 'goal-acceptance', liveUsageMode: 'final-only' }))
+      .toMatchObject({ state: 'hold', profileRef: 'execution_budget.purposes.goal-acceptance' });
+  });
   it('rounds discrete turn reserve upward without changing exact allocations', () => {
     expect(deriveExecutionLandingTurnAllocation(5, 0.25)).toEqual({
       workTurns: 3,

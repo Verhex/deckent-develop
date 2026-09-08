@@ -35,7 +35,7 @@ import { FlowRegistry } from '../../core/flow-registry.js';
 import { writeConfigJsonAtomic } from '../../core/config-write-authority.js';
 import { notifyAsync } from '../../core/notify.js';
 import { autonomousPendingPath } from '../../core/constants.js';
-import { resolveLocalOsPrincipal } from '../../core/principal.js';
+import { resolveLocalOsActorId, resolveLocalOsPrincipal } from '../../core/principal.js';
 import { bootstrapNotifyDispatcher, resolveWebhookBootstrapOption } from '../../core/notify-bootstrap.js';
 import { buildConnectorAdapterWithKpiSummary, buildSprintKpiSummaryFn } from '../../connectors/kpi-summary-dispatch.js';
 import { nextRun } from '../../core/scheduled-flow.js';
@@ -71,7 +71,9 @@ import {
   createGoalMission,
   GoalInvocationHeldError,
   type GoalAdvanceDeps,
+  type GoalInvocationContext,
 } from '../../orchestra/autonomous/mission-store/goal-mission.js';
+import type { GoalInvocationPendingConsumer } from '../../orchestra/autonomous/mission-store/goal-invocation-runtime.js';
 import {
   verifyGoalAcceptanceInvocationReceipt,
   workItemEvidenceRef,
@@ -80,7 +82,13 @@ import {
   type GoalAcceptanceOutcome,
   type GoalAcceptanceVerdict,
 } from '../../orchestra/autonomous/mission-store/mission-acceptance.js';
-import type { NewWorkItem, WorkItem, WorkItemKind } from '../../orchestra/autonomous/mission-store/mission-types.js';
+import type {
+  GoalInvocationConsumerCheckpointV1,
+  GoalInvocationConsumerReceiptSettlementV1,
+  NewWorkItem,
+  WorkItem,
+  WorkItemKind,
+} from '../../orchestra/autonomous/mission-store/mission-types.js';
 import { createListMission } from '../../orchestra/autonomous/mission-store/mission-ingest.js';
 import { projectMission } from '../../orchestra/autonomous/mission-store/mission-view.js';
 import { auditMissionLifecycle } from '../../orchestra/autonomous/mission-store/mission-audit-bridge.js';
@@ -127,6 +135,13 @@ import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootst
 import { ApprovalBroker } from '../../core/approval-broker.js';
 import { ApprovalStore } from '../../core/approval-store.js';
 import { MissionApprovalCoordinator } from '../../orchestra/autonomous/mission-store/mission-approval-coordinator.js';
+import { GoalInvocationRuntime } from '../../orchestra/autonomous/mission-store/goal-invocation-runtime.js';
+import { createGoalInvocationTransport } from '../../orchestra/autonomous/goal-invocation-transport.js';
+import { projectGoalProviderCandidateAuthority } from '../../orchestra/autonomous/mission-store/goal-provider-candidate-authority.js';
+import { projectGoalInvocationEstimates } from '../../orchestra/autonomous/mission-store/goal-invocation-budget-authority.js';
+import { projectExactProviderLimitAuthoritySelector } from '../../core/provider-limit-policy.js';
+import { resolveGoalInvocationBudgetPolicy } from '../../core/execution-budget-policy.js';
+import { getProviderCommandSpec } from '../../core/provider-command-spec.js';
 
 function missionExactOutcomeResult(
   outcome: CanonicalExactSprintExecutionOutcome,
@@ -776,58 +791,8 @@ export interface LiveGoalDepsOptions {
     purpose: Extract<InvocationPurpose, 'goal-authoring' | 'goal-acceptance'>;
   }) => void | Promise<void>;
   now?: () => Date;
-}
-
-function makeGoalRoleAdmissionGuard(
-  config: ResolvedConfig,
-  providerAuthority: ProviderAuthorityRuntimeServiceOpenResult,
-): NonNullable<LiveGoalDepsOptions['admitInvocation']> {
-  const configuredBrainModel = resolveBrainModel(config);
-  return ({ role, purpose }): void => {
-    if (providerAuthority.state === 'hold') {
-      const roleEvidenceRef = `goal-role-admission:${createHash('sha256')
-        .update(`${providerAuthority.authorityEvidenceRef}\0${role}\0${purpose}`)
-        .digest('hex')}`;
-      throw new GoalInvocationHeldError({
-        schemaVersion: 1,
-        reasonCode: 'authority_unavailable',
-        providerAuthorityReasonCode: providerAuthority.reasonCode,
-        evidenceRefs: [providerAuthority.authorityEvidenceRef, roleEvidenceRef],
-        invocationReceiptRef: null,
-        heldAt: new Date().toISOString(),
-      });
-    }
-    const order = orderedRoleProviders(role, config);
-    const roleModel = getEquivalentModel(configuredBrainModel, order.primary);
-    const result = providerAuthority.service.roleAdmissionRuntime.admit({
-      invocation: {
-        role,
-        purpose,
-        primaryProvider: order.primary,
-        model: roleModel,
-        fallbackProviders: order.fallbacks,
-        policy: defaultRoleInvocationPolicy(role, order.unattended),
-      },
-      candidates: {},
-      buildReservation: () => {
-        throw ErrorRegistry.createError('DECKENT_E095', { message: 'UNREACHABLE_GOAL_RESERVATION_WITHOUT_HOST_AUTHORITIES' });
-      },
-    });
-    if (result.decision !== 'hold') {
-      throw ErrorRegistry.createError('DECKENT_E095', { message: 'GOAL_INVOCATION_ADMISSION_INVARIANT' });
-    }
-    throw new GoalInvocationHeldError({
-      schemaVersion: 1,
-      reasonCode: result.reasonCode,
-      providerAuthorityReasonCode: 'candidate_authority_unavailable',
-      evidenceRefs: [...new Set([
-        providerAuthority.authorityEvidenceRef,
-        result.authorityEvidenceRef,
-      ])],
-      invocationReceiptRef: null,
-      heldAt: new Date().toISOString(),
-    });
-  };
+  invokeGoal?: (input: { role: 'brain' | 'auditor'; purpose: 'goal-authoring' | 'goal-acceptance'; prompt: string; context: GoalInvocationContext }) => Promise<GoalInvocationPendingConsumer>;
+  reconcileInvocationConsumer?: GoalAdvanceDeps['reconcileInvocationConsumer'];
 }
 
 /**
@@ -840,32 +805,71 @@ function makeGoalRoleAdmissionGuard(
  * onto the loop's author/accept surface and carries the maxRounds guard.
  */
 export function buildLiveGoalDeps(complete: LlmComplete, opts: LiveGoalDepsOptions = {}): GoalAdvanceDeps {
+  const pendingConsumers = new Map<string, GoalInvocationPendingConsumer>();
+  const consumerKey = (context: GoalInvocationContext, purpose: 'goal-authoring' | 'goal-acceptance') =>
+    `${context.tenantId}\0${context.missionId}\0${context.round}\0${purpose}`;
+  const retainPendingConsumer = (
+    context: GoalInvocationContext,
+    purpose: 'goal-authoring' | 'goal-acceptance',
+    pending: GoalInvocationPendingConsumer | null,
+  ): void => {
+    if (!pending) return;
+    const key = consumerKey(context, purpose);
+    if (pendingConsumers.has(key)) throw new Error('GOAL_INVOCATION_CONSUMER_HANDLE_CONFLICT');
+    pendingConsumers.set(key, pending);
+  };
   const planner = async (
     goal: string,
     priorItems: WorkItem[],
     acceptanceContract?: GoalAcceptanceContractV1,
+    context?: GoalInvocationContext,
   ): Promise<NewWorkItem[]> => {
     await opts.admitInvocation?.({ role: 'brain', purpose: 'goal-authoring' });
-    const raw = await complete(buildGoalNextPrompt(
+    const prompt = buildGoalNextPrompt(
       goal,
       priorItems,
       listRuntimeAdmittedKinds(PRODUCTION_V2_ADMISSION),
       acceptanceContract,
-    ));
-    return plannedItemsToWorkItems(parsePlannedItems(raw));
+    );
+    const pending = opts.invokeGoal && context
+      ? await opts.invokeGoal({ role: 'brain', purpose: 'goal-authoring', prompt, context }) : null;
+    try {
+      const parsed = plannedItemsToWorkItems(parsePlannedItems(pending?.output ?? await complete(prompt)));
+      if (context) retainPendingConsumer(context, 'goal-authoring', pending);
+      return parsed;
+    } catch (error) {
+      pending?.settleConsumer('rejected', 'parse_failed');
+      throw error;
+    }
   };
   const accepter = async (
     goal: string,
     items: WorkItem[],
     acceptanceContract?: GoalAcceptanceContractV1,
+    context?: GoalInvocationContext,
   ): Promise<boolean | GoalAcceptanceEvaluation> => {
     await opts.admitInvocation?.({ role: 'auditor', purpose: 'goal-acceptance' });
     if (!acceptanceContract) {
-      const raw = await complete(buildGoalAcceptPromptLegacy(goal, items));
-      return parseGoalAccepted(raw);
+      const prompt = buildGoalAcceptPromptLegacy(goal, items);
+      const pending = opts.invokeGoal && context
+        ? await opts.invokeGoal({ role: 'auditor', purpose: 'goal-acceptance', prompt, context }) : null;
+      try {
+        const accepted = parseGoalAccepted(pending?.output ?? await complete(prompt));
+        if (context) retainPendingConsumer(context, 'goal-acceptance', pending);
+        return accepted;
+      } catch (error) {
+        pending?.settleConsumer('rejected', 'parse_failed');
+        throw error;
+      }
     }
     const prompt = buildGoalAcceptPrompt(goal, items, acceptanceContract);
-    const completed = opts.acceptanceComplete
+    const pending = opts.invokeGoal && context
+      ? await opts.invokeGoal({ role: 'auditor', purpose: 'goal-acceptance', prompt, context }) : null;
+    const completed = pending ? {
+      output: pending.output, evaluatorRole: 'auditor' as const,
+      evaluatorInstanceId: `goal-invocation:${context!.missionId}:${context!.round}`,
+      invocationReceiptRef: pending.invocationReceiptRef,
+    } : opts.acceptanceComplete
       ? await opts.acceptanceComplete(prompt)
       : {
         output: await complete(prompt),
@@ -873,19 +877,35 @@ export function buildLiveGoalDeps(complete: LlmComplete, opts: LiveGoalDepsOptio
         evaluatorInstanceId: null,
         invocationReceiptRef: null,
       };
-    return parseGoalAcceptanceEvaluation(
+    try {
+      const evaluation = parseGoalAcceptanceEvaluation(
       completed.output,
       completed.evaluatorRole,
       completed.evaluatorInstanceId,
       completed.invocationReceiptRef,
       (opts.now ?? (() => new Date()))().toISOString(),
-    );
+      );
+      if (context) retainPendingConsumer(context, 'goal-acceptance', pending);
+      return evaluation;
+    } catch (error) {
+      pending?.settleConsumer('rejected', 'parse_failed');
+      throw error;
+    }
   };
   return buildGoalDeps({
     planner,
     accepter,
     maxRounds: GOAL_MAX_ROUNDS,
     admission: PRODUCTION_V2_ADMISSION,
+    takeInvocationConsumer: (context, purpose) => {
+      const key = consumerKey(context, purpose);
+      const pending = pendingConsumers.get(key) ?? null;
+      pendingConsumers.delete(key);
+      return pending;
+    },
+    ...(opts.reconcileInvocationConsumer
+      ? { reconcileInvocationConsumer: opts.reconcileInvocationConsumer }
+      : {}),
     ...(opts.acceptanceReceiptVerifier
       ? { verifyAcceptanceReceipt: opts.acceptanceReceiptVerifier }
       : {}),
@@ -941,6 +961,92 @@ export function handleEnable(opts: AutonomousEnableOptions): void {
   mkdirSync(dirname(configPath), { recursive: true });
   writeConfigJsonAtomic(configPath, doc);
   print(getMessage('autonomous.enabled_banner', lang, { path: PROJECT_CONFIG_PATH }));
+}
+
+type LiveGoalInvoker = ((input: {
+  role: 'brain' | 'auditor';
+  purpose: 'goal-authoring' | 'goal-acceptance';
+  prompt: string;
+  context: GoalInvocationContext;
+}) => Promise<GoalInvocationPendingConsumer>) & {
+  settlePersistedConsumer(
+    checkpoint: GoalInvocationConsumerCheckpointV1,
+  ): GoalInvocationConsumerReceiptSettlementV1;
+};
+
+function createLiveGoalInvoker(
+  config: ResolvedConfig,
+  providerAuthority: ProviderAuthorityRuntimeServiceOpenResult,
+): LiveGoalInvoker {
+  if (providerAuthority.state === 'hold') {
+    const unavailable = async (input: { role: 'brain' | 'auditor'; purpose: 'goal-authoring' | 'goal-acceptance' }) => {
+      const roleRef = `goal-role-admission:${createHash('sha256').update(`${providerAuthority.authorityEvidenceRef}\0${input.role}\0${input.purpose}`).digest('hex')}`;
+      throw new GoalInvocationHeldError({ schemaVersion: 1, reasonCode: 'authority_unavailable',
+        providerAuthorityReasonCode: providerAuthority.reasonCode,
+        evidenceRefs: [providerAuthority.authorityEvidenceRef, roleRef], invocationReceiptRef: null,
+        heldAt: new Date().toISOString() });
+    };
+    return Object.assign(unavailable, {
+      settlePersistedConsumer: (checkpoint: GoalInvocationConsumerCheckpointV1) => {
+        throw new GoalInvocationHeldError({
+          schemaVersion: 1,
+          reasonCode: 'receipt_unavailable',
+          providerAuthorityReasonCode: providerAuthority.reasonCode,
+          evidenceRefs: [providerAuthority.authorityEvidenceRef],
+          invocationReceiptRef: checkpoint.invocationReceiptRef,
+          heldAt: new Date().toISOString(),
+        });
+      },
+    }) as LiveGoalInvoker;
+  }
+  const runtime = new GoalInvocationRuntime({
+    admissionRuntime: providerAuthority.service.roleAdmissionRuntime,
+    receiptLedger: providerAuthority.service.invocationReceiptLedger,
+    executeSelected: createGoalInvocationTransport(),
+  });
+  const invoke = async (input: { role: 'brain' | 'auditor'; purpose: 'goal-authoring' | 'goal-acceptance'; prompt: string; context: GoalInvocationContext }) => {
+    const order = orderedRoleProviders(input.role, config);
+    const provider = String(order.primary);
+    const model = getEquivalentModel(resolveBrainModel(config), order.primary);
+    const selectors = [
+      ...(config.provider_limit_authority?.parent?.config.policies ?? []),
+      ...(config.provider_limit_authority?.project?.config.policies ?? []),
+    ]
+      .map(entry => entry.selector)
+      .filter(selector => selector.tenantId === input.context.tenantId && selector.provider === provider);
+    if (selectors.length !== 1) throw new GoalInvocationHeldError({ schemaVersion: 1, reasonCode: 'authority_unavailable', evidenceRefs: ['goal-provider-selector:unavailable'], invocationReceiptRef: null, heldAt: new Date().toISOString() });
+    const selector = selectors[0]!;
+    const profileRef = selector.backend.executionProfileRef;
+    if (!profileRef) throw new GoalInvocationHeldError({ schemaVersion: 1, reasonCode: 'authority_unavailable', evidenceRefs: ['goal-execution-profile:unavailable'], invocationReceiptRef: null, heldAt: new Date().toISOString() });
+    const selectedPolicy = projectExactProviderLimitAuthoritySelector(config.provider_limit_authority, {
+      tenantId: input.context.tenantId, provider, authMode: selector.authMode,
+      transport: selector.backend.transport, executionBackend: selector.backend.executionBackend,
+      endpointRefHash: selector.backend.endpointRefHash,
+      runtimeFingerprint: selector.backend.runtimeFingerprint ?? null, executionProfileRef: profileRef,
+    });
+    if (selectedPolicy.state === 'hold') throw new GoalInvocationHeldError({ schemaVersion: 1, reasonCode: 'authority_unavailable', evidenceRefs: [selectedPolicy.authorityEvidenceRef], invocationReceiptRef: null, heldAt: new Date().toISOString() });
+    const candidate = projectGoalProviderCandidateAuthority({ selector: selectedPolicy.selector, projectId: providerAuthority.service.invocationReceiptLedger.projectId, model });
+    if (candidate.state === 'hold') throw new GoalInvocationHeldError({ schemaVersion: 1, reasonCode: 'authority_unavailable', evidenceRefs: [`goal-candidate:${candidate.reasonCode}`], invocationReceiptRef: null, heldAt: new Date().toISOString() });
+    const projected = providerAuthority.service.roleAdmissionRuntime.projectVerifierCandidate(candidate.candidate);
+    if (projected.state === 'hold') throw new GoalInvocationHeldError({ schemaVersion: 1, reasonCode: 'authority_unavailable', evidenceRefs: [projected.authorityEvidenceRef], invocationReceiptRef: null, heldAt: new Date().toISOString() });
+    const commandSpec = getProviderCommandSpec(provider);
+    const budget = resolveGoalInvocationBudgetPolicy({ policy: config.execution_budget, role: input.role, purpose: input.purpose, liveUsageMode: commandSpec?.liveUsage ?? 'none' });
+    if (budget.state === 'hold') throw new GoalInvocationHeldError({ schemaVersion: 1, reasonCode: 'authority_unavailable', evidenceRefs: [`goal-budget:${budget.reasonCode}`], invocationReceiptRef: null, heldAt: new Date().toISOString() });
+    if (!budget.finalOnlyUsage) throw new GoalInvocationHeldError({ schemaVersion: 1, reasonCode: 'authority_unavailable', evidenceRefs: ['goal-budget:final-only-hold'], invocationReceiptRef: null, heldAt: new Date().toISOString() });
+    const estimates = projectGoalInvocationEstimates({ decision: budget, model, windows: projected.requiredWindows });
+    if (estimates.state === 'hold') throw new GoalInvocationHeldError({ schemaVersion: 1, reasonCode: 'authority_unavailable', evidenceRefs: [`goal-budget:${estimates.reasonCode}`], invocationReceiptRef: null, heldAt: new Date().toISOString() });
+    const key = createHash('sha256').update(`${input.context.tenantId}\0${input.context.missionId}\0${input.context.round}\0${input.purpose}`).digest('hex');
+    const invocationId = `goal-${key}`;
+    const receiptRef = `invocation-receipt:${createHash('sha256').update(`${input.context.tenantId}\0${providerAuthority.service.invocationReceiptLedger.projectId}\0${invocationId}`).digest('hex')}`;
+    const requestedAt = new Date().toISOString();
+    if (!projected.candidate.reachability.evidenceRef) throw new GoalInvocationHeldError({ schemaVersion: 1, reasonCode: 'authority_unavailable', evidenceRefs: [projected.authorityEvidenceRef], invocationReceiptRef: null, heldAt: new Date().toISOString() });
+    return runtime.execute({ ...input, tenantId: input.context.tenantId, missionId: input.context.missionId, round: input.context.round, finalOnlyUsage: budget.finalOnlyUsage,
+      admission: { invocation: { role: input.role, purpose: input.purpose, primaryProvider: provider, model, fallbackProviders: [], policy: defaultRoleInvocationPolicy(input.role, order.unattended) }, candidates: { [provider]: candidate.candidate }, buildReservation: () => ({ tenantId: input.context.tenantId, projectId: providerAuthority.service.invocationReceiptLedger.projectId, provider, model, accountRefHash: selector.accountRefHash, quotaScopeRefHash: selector.quotaScopeRefHash, authMode: selector.authMode, backend: { transport: selector.backend.transport, executionBackend: selector.backend.executionBackend, endpointRefHash: selector.backend.endpointRefHash }, reservationId: `goal-reservation-${key}`, idempotencyKey: `goal-reservation-key-${key}`, runId: input.context.missionId, taskId: null, callId: `${input.purpose}:${input.context.round}`, attemptId: `goal-round-${input.context.round}`, fenceTokenHash: createHash('sha256').update(`goal-fence\0${key}`).digest('hex'), receiptRef, reachabilityEvidenceRef: projected.candidate.reachability.evidenceRef!, estimates: estimates.estimates, estimateEvidenceRefs: estimates.evidenceRefs, requestedAt, leaseExpiresAt: projected.expiresAt }) } });
+  };
+  return Object.assign(invoke, {
+    settlePersistedConsumer: (checkpoint: GoalInvocationConsumerCheckpointV1) =>
+      runtime.settlePersistedConsumer(checkpoint),
+  });
 }
 
 export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
@@ -1044,6 +1150,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
           reasonCode: 'mission_worker_candidate_adapter_unavailable',
           authorityEvidenceRef: providerAuthority.authorityEvidenceRef,
         };
+    const liveGoalInvoker = createLiveGoalInvoker(resolvedConfig, providerAuthority);
     try {
       const summary = await runV2Engine(root, resolvedConfig, {
         store: missionStore,
@@ -1095,10 +1202,9 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
         goalDeps: buildLiveGoalDeps(
           realPlannerComplete(resolvePlannerModelIdentity(resolvedConfig, lang), { lang }),
           {
-            admitInvocation: makeGoalRoleAdmissionGuard(
-              resolvedConfig,
-              providerAuthority,
-            ),
+            invokeGoal: liveGoalInvoker,
+            reconcileInvocationConsumer: (checkpoint) =>
+              liveGoalInvoker.settlePersistedConsumer(checkpoint),
             acceptanceReceiptVerifier: (mission, evaluation) =>
               verifyGoalAcceptanceInvocationReceipt(invocationReceiptStore, mission, evaluation),
           },
@@ -1820,6 +1926,10 @@ export interface CreateGoalOpts {
 }
 
 export function handleCreateGoal(opts: CreateGoalOpts): void {
+  const actorId = resolveLocalOsActorId();
+  if (actorId === null) {
+    throw createExecutionAuthorityError('MISSION_APPROVAL_VERIFIED_OWNER_MISSING');
+  }
   const store = openStore(opts.root);
   try {
     const missionId = opts.id ?? `goal-${Date.now()}`;
@@ -1827,8 +1937,9 @@ export function handleCreateGoal(opts: CreateGoalOpts): void {
       id: missionId,
       title: opts.title ?? opts.goal,
       goal: opts.goal,
+      createdBy: actorId,
       acceptance: opts.acceptance,
-      acceptanceAuthoredBy: { surface: 'cli', actorId: null },
+      acceptanceAuthoredBy: { surface: 'cli', actorId },
       tenant: opts.tenant,
       deliverTo: opts.deliverTo,
     });

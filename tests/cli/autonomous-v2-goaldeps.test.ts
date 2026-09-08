@@ -124,6 +124,42 @@ describe('resolvePlannerModelIdentity — canonical Brain role', () => {
 // ─── buildLiveGoalDeps — planner adapter ───────────────────────────────
 
 describe('buildLiveGoalDeps — planner', () => {
+  it('retains parsed provider output for durable mission commit instead of accepting it in the parser', async () => {
+    const settleConsumer = vi.fn(() => ({
+      schemaVersion: 1 as const,
+      invocationReceiptRef: {
+        schemaVersion: 1 as const,
+        tenantId: 'local',
+        projectId: 'project-test',
+        invocationId: 'goal-parser-boundary',
+      },
+      receiptEventId: 'goal-parser-boundary-consumer',
+      receiptEventHash: 'b'.repeat(64),
+    }));
+    const context = { missionId: 'goal-parser', tenantId: 'local', round: 1 };
+    const deps = buildLiveGoalDeps(async () => { throw new Error('fallback completion forbidden'); }, {
+      invokeGoal: async () => ({
+        output: JSON.stringify({ items: [] }),
+        outputDigest: 'a'.repeat(64),
+        invocationReceiptRef: {
+          schemaVersion: 1,
+          tenantId: 'local',
+          projectId: 'project-test',
+          invocationId: 'goal-parser-boundary',
+        },
+        settleConsumer,
+      }),
+    });
+
+    await expect(deps.author('ship', [], undefined, context)).resolves.toEqual([]);
+    expect(settleConsumer).not.toHaveBeenCalled();
+    const pending = deps.takeInvocationConsumer?.(context, 'goal-authoring');
+    expect(pending).toMatchObject({ outputDigest: 'a'.repeat(64) });
+    pending!.settleConsumer('accepted');
+    expect(settleConsumer).toHaveBeenCalledWith('accepted');
+    expect(deps.takeInvocationConsumer?.(context, 'goal-authoring')).toBeNull();
+  });
+
   it('runs the injected role admission before either provider completion', async () => {
     const complete = vi.fn(async () => JSON.stringify({ items: [] }));
     const admitted: Array<{ role: string; purpose: string }> = [];
@@ -370,12 +406,13 @@ describe('handleStart — engine=v2 passes live goalDeps to runV2Engine', () => 
 
     const runtime = runV2Spy.mock.calls[0]![2] as {
       goalDeps: {
-        author: (goal: string, items: WorkItem[]) => Promise<unknown>;
-        accept: (goal: string, items: WorkItem[]) => Promise<unknown>;
+        author: (goal: string, items: WorkItem[], acceptance: undefined, context: { missionId: string; tenantId: string; round: number }) => Promise<unknown>;
+        accept: (goal: string, items: WorkItem[], acceptance: undefined, context: { missionId: string; tenantId: string; round: number }) => Promise<unknown>;
       };
     };
-    const authorError = await runtime.goalDeps.author('goal', []).catch((error: unknown) => error);
-    const acceptError = await runtime.goalDeps.accept('goal', []).catch((error: unknown) => error);
+    const context = { missionId: 'goal-a', tenantId: 'local', round: 1 };
+    const authorError = await runtime.goalDeps.author('goal', [], undefined, context).catch((error: unknown) => error);
+    const acceptError = await runtime.goalDeps.accept('goal', [], undefined, context).catch((error: unknown) => error);
 
     expect(authorError).toMatchObject({
       name: 'GoalInvocationHeldError',

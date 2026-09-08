@@ -9,8 +9,14 @@ import {
   buildGoalDeps,
   GoalInvocationHeldError,
 } from '../../../../src/orchestra/autonomous/mission-store/goal-mission.js';
-import type { NewWorkItem, WorkItem } from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
+import type {
+  GoalInvocationConsumerCheckpointV1,
+  GoalInvocationConsumerReceiptSettlementV1,
+  NewWorkItem,
+  WorkItem,
+} from '../../../../src/orchestra/autonomous/mission-store/mission-types.js';
 import { PRODUCTION_V2_ADMISSION } from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
+import type { GoalAcceptanceContractV1 } from '../../../../src/orchestra/autonomous/mission-store/mission-acceptance.js';
 import type { InvocationReceiptRef } from '../../../../src/core/invocation-receipt.js';
 import { settleMissionItem } from '../../../helpers/mission-store.js';
 
@@ -36,6 +42,37 @@ function invocationHold(reasonCode: 'authority_unavailable' | 'fallback_exhauste
   });
 }
 
+const outputDigest = 'a'.repeat(64);
+const receiptEventHash = 'b'.repeat(64);
+function receiptRef(invocationId: string): InvocationReceiptRef {
+  return { schemaVersion: 1, tenantId: 'local', projectId: 'project-test', invocationId };
+}
+function settlement(ref: InvocationReceiptRef): GoalInvocationConsumerReceiptSettlementV1 {
+  return {
+    schemaVersion: 1,
+    invocationReceiptRef: ref,
+    receiptEventId: `${ref.invocationId}-consumer`,
+    receiptEventHash,
+  };
+}
+
+class OneAckFaultStore extends SqliteMissionStore {
+  constructor(root: string, private readonly purpose: 'goal-authoring' | 'goal-acceptance') {
+    super(root);
+  }
+  private failed = false;
+  override acknowledgeGoalInvocationConsumer(
+    checkpoint: GoalInvocationConsumerCheckpointV1,
+    receiptSettlement: GoalInvocationConsumerReceiptSettlementV1,
+  ): boolean {
+    if (!this.failed && checkpoint.purpose === this.purpose) {
+      this.failed = true;
+      throw new Error('injected checkpoint acknowledgement failure');
+    }
+    return super.acknowledgeGoalInvocationConsumer(checkpoint, receiptSettlement);
+  }
+}
+
 describe('createGoalMission', () => {
   it('creates a kind=goal mission (renderAs goal) with goal + acceptance persisted', () => {
     const store = newStore();
@@ -43,9 +80,10 @@ describe('createGoalMission', () => {
       id: 'goal-1',
       title: 'Ship the feature',
       goal: 'All endpoints return 200',
+      createdBy: 'terminal-operator',
       acceptance: 'integration tests green',
       acceptanceAuthoredAt: '2026-07-22T00:00:00.000Z',
-      acceptanceAuthoredBy: { surface: 'cli', actorId: null },
+      acceptanceAuthoredBy: { surface: 'cli', actorId: 'terminal-operator' },
       tenant: 'acme',
       deliverTo: 'user@example.com',
     });
@@ -56,13 +94,14 @@ describe('createGoalMission', () => {
     expect(mission.status).toBe('pending');
     expect(mission.tenant).toBe('acme');
     expect(mission.deliverTo).toBe('user@example.com');
+    expect(mission.createdBy).toBe('terminal-operator');
 
     const stored = store.getMission('goal-1')!;
     expect(stored.spec?.['goal']).toBe('All endpoints return 200');
     expect(stored.spec?.['acceptanceContract']).toMatchObject({
       schemaVersion: 1,
       authoredAt: '2026-07-22T00:00:00.000Z',
-      authoredBy: { surface: 'cli', actorId: null },
+      authoredBy: { surface: 'cli', actorId: 'terminal-operator' },
       criteria: [{ text: 'integration tests green', critical: true }],
     });
     expect((stored.spec?.['acceptanceContract'] as { digest: string }).digest).toMatch(/^[a-f0-9]{64}$/);
@@ -72,6 +111,275 @@ describe('createGoalMission', () => {
 });
 
 describe('advanceGoalMission', () => {
+  it('reconciles an authored effect committed before receipt ack after SQLite reopen without duplicate work', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'goal-consumer-author-'));
+    dirs.push(root);
+    const first = new OneAckFaultStore(root, 'goal-authoring');
+    first.migrate();
+    createGoalMission(first, { id: 'g-author-reopen', title: 'Author reopen', goal: 'ship' });
+    const ref = receiptRef('goal-author-reopen-invocation');
+    const settle = vi.fn(() => settlement(ref));
+    let handleTaken = false;
+    await expect(advanceGoalMission(first, 'g-author-reopen', {
+      author: async () => [{ id: 'g-author-reopen-item', missionId: '', kind: 'task' }],
+      accept: async () => false,
+      takeInvocationConsumer: (_context, purpose) => {
+        if (purpose !== 'goal-authoring' || handleTaken) return null;
+        handleTaken = true;
+        return { outputDigest, invocationReceiptRef: ref, settleConsumer: settle };
+      },
+      reconcileInvocationConsumer: (checkpoint) => settlement(checkpoint.invocationReceiptRef),
+    })).resolves.toBe('held');
+    expect(first.listItems('g-author-reopen')).toHaveLength(1);
+    expect(first.listPendingGoalInvocationConsumers('g-author-reopen')).toHaveLength(1);
+    expect(settle).not.toHaveBeenCalled();
+    first.close();
+
+    const reopened = new SqliteMissionStore(root);
+    reopened.migrate();
+    const author = vi.fn(async (): Promise<NewWorkItem[]> => []);
+    const reconcile = vi.fn((checkpoint: GoalInvocationConsumerCheckpointV1) =>
+      settlement(checkpoint.invocationReceiptRef));
+    await expect(advanceGoalMission(reopened, 'g-author-reopen', {
+      author,
+      accept: async () => false,
+      reconcileInvocationConsumer: reconcile,
+    })).resolves.toBe('waiting');
+    expect(author).not.toHaveBeenCalled();
+    expect(reconcile).toHaveBeenCalledTimes(1);
+    expect(reopened.listPendingGoalInvocationConsumers('g-author-reopen')).toEqual([]);
+    expect(reopened.listItems('g-author-reopen').map((item) => item.id))
+      .toEqual(['g-author-reopen-item']);
+    reopened.close();
+  });
+
+  it.each(['cancelled', 'failed', 'completed'] as const)(
+    'preserves a reopened terminal %s mission and its result when consumer reconciliation is held',
+    async (status) => {
+      const root = mkdtempSync(join(tmpdir(), `goal-consumer-terminal-${status}-`));
+      dirs.push(root);
+      const first = new SqliteMissionStore(root);
+      first.migrate();
+      createGoalMission(first, {
+        id: `g-terminal-${status}`,
+        title: `Terminal ${status}`,
+        goal: 'preserve durable terminal truth',
+      });
+      const ref = receiptRef(`goal-terminal-${status}-invocation`);
+      first.stageGoalInvocationConsumer({
+        schemaVersion: 1,
+        tenantId: 'local',
+        projectId: 'project-test',
+        missionId: `g-terminal-${status}`,
+        round: 1,
+        purpose: 'goal-authoring',
+        invocationReceiptRef: ref,
+        outputDigest,
+        effect: { kind: 'authored-batch', items: [] },
+      });
+      const terminalResult = { ok: status === 'completed', terminalAuthority: `result:${status}` };
+      first.updateMissionStatus(`g-terminal-${status}`, status, terminalResult);
+      first.close();
+
+      const reopened = new SqliteMissionStore(root);
+      reopened.migrate();
+      const author = vi.fn(async (): Promise<NewWorkItem[]> => []);
+      const accept = vi.fn(async () => false);
+      await expect(advanceGoalMission(reopened, `g-terminal-${status}`, {
+        author,
+        accept,
+        reconcileInvocationConsumer: () => { throw new Error('receipt ledger unavailable'); },
+      })).resolves.toBe('held');
+      expect(reopened.getMission(`g-terminal-${status}`)).toMatchObject({
+        status,
+        lastResult: terminalResult,
+      });
+      expect(reopened.listPendingGoalInvocationConsumers(`g-terminal-${status}`)).toHaveLength(1);
+      expect(author).not.toHaveBeenCalled();
+      expect(accept).not.toHaveBeenCalled();
+      reopened.close();
+    },
+  );
+
+  it('does not reactivate a mission cancelled while consumer reconciliation is awaiting', async () => {
+    const store = newStore();
+    createGoalMission(store, {
+      id: 'g-reconcile-cancel-race',
+      title: 'Reconciliation cancellation race',
+      goal: 'preserve concurrent terminal truth',
+    });
+    store.updateMissionStatus('g-reconcile-cancel-race', 'active');
+    store.stageGoalInvocationConsumer({
+      schemaVersion: 1,
+      tenantId: 'local',
+      projectId: 'project-test',
+      missionId: 'g-reconcile-cancel-race',
+      round: 1,
+      purpose: 'goal-authoring',
+      invocationReceiptRef: receiptRef('goal-reconcile-cancel-race'),
+      outputDigest,
+      effect: { kind: 'authored-batch', items: [] },
+    });
+    const terminalResult = { ok: false, terminalAuthority: 'concurrent-owner-cancellation' };
+    const author = vi.fn(async (): Promise<NewWorkItem[]> => []);
+    const accept = vi.fn(async () => false);
+    await expect(advanceGoalMission(store, 'g-reconcile-cancel-race', {
+      author,
+      accept,
+      reconcileInvocationConsumer: async () => {
+        store.updateMissionStatus('g-reconcile-cancel-race', 'cancelled', terminalResult);
+        await Promise.resolve();
+        throw new Error('receipt ledger unavailable after cancellation');
+      },
+    })).resolves.toBe('held');
+    expect(store.getMission('g-reconcile-cancel-race')).toMatchObject({
+      status: 'cancelled',
+      lastResult: terminalResult,
+    });
+    expect(store.listPendingGoalInvocationConsumers('g-reconcile-cancel-race')).toHaveLength(1);
+    expect(author).not.toHaveBeenCalled();
+    expect(accept).not.toHaveBeenCalled();
+  });
+
+  it('reuses an acknowledged empty author stage when acceptance is held', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'goal-consumer-empty-'));
+    dirs.push(root);
+    const first = new SqliteMissionStore(root);
+    first.migrate();
+    createGoalMission(first, { id: 'g-empty-reopen', title: 'Empty reopen', goal: 'ship' });
+    const ref = receiptRef('goal-empty-author-invocation');
+    let handleTaken = false;
+    await expect(advanceGoalMission(first, 'g-empty-reopen', {
+      author: async () => [],
+      accept: async () => { throw invocationHold(); },
+      takeInvocationConsumer: (_context, purpose) => {
+        if (purpose !== 'goal-authoring' || handleTaken) return null;
+        handleTaken = true;
+        return { outputDigest, invocationReceiptRef: ref, settleConsumer: () => settlement(ref) };
+      },
+      reconcileInvocationConsumer: (checkpoint) => settlement(checkpoint.invocationReceiptRef),
+    })).resolves.toBe('held');
+    expect(first.getGoalInvocationConsumer('g-empty-reopen', 1, 'goal-authoring'))
+      .toMatchObject({ acknowledged: true, effect: { kind: 'authored-batch', items: [] } });
+    first.close();
+
+    const reopened = new SqliteMissionStore(root);
+    reopened.migrate();
+    const author = vi.fn(async (): Promise<NewWorkItem[]> => []);
+    await expect(advanceGoalMission(reopened, 'g-empty-reopen', {
+      author,
+      accept: async () => false,
+    })).resolves.toBe('exhausted');
+    expect(author).not.toHaveBeenCalled();
+    reopened.close();
+  });
+
+  it('persists acceptance evaluation before ack and finalizes the identical decision after reopen', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'goal-consumer-accept-'));
+    dirs.push(root);
+    const first = new OneAckFaultStore(root, 'goal-acceptance');
+    first.migrate();
+    const mission = createGoalMission(first, {
+      id: 'g-accept-reopen', title: 'Accept reopen', goal: 'ship', acceptance: 'done',
+      acceptanceAuthoredAt: '2026-07-22T00:00:00.000Z',
+    });
+    first.enqueueItem({ id: 'g-accept-evidence', missionId: mission.id, kind: 'task' });
+    settleMissionItem(first, 'g-accept-evidence', 'done', { ok: true });
+    const contract = mission.spec?.['acceptanceContract'] as GoalAcceptanceContractV1;
+    const authorRef = receiptRef('goal-empty-before-acceptance');
+    const acceptanceRef = receiptRef('goal-acceptance-reopen-invocation');
+    const evaluation = {
+      outcome: 'accepted' as const,
+      criteria: [{
+        criterionId: contract.criteria[0]!.id,
+        verdict: 'met' as const,
+        evidenceRefs: ['work-item:g-accept-evidence'],
+        rationale: 'the durable work item completed',
+      }],
+      evaluator: { role: 'brain' as const, instanceId: 'goal-evaluator-reopen' },
+      invocationReceiptRef: acceptanceRef,
+      decidedAt: '2026-07-22T00:05:00.000Z',
+    };
+    const handles = new Map([
+      ['goal-authoring', { outputDigest, invocationReceiptRef: authorRef,
+        settleConsumer: () => settlement(authorRef) }],
+      ['goal-acceptance', { outputDigest: 'c'.repeat(64), invocationReceiptRef: acceptanceRef,
+        settleConsumer: () => settlement(acceptanceRef) }],
+    ]);
+    await expect(advanceGoalMission(first, 'g-accept-reopen', {
+      author: async () => [],
+      accept: async () => evaluation,
+      takeInvocationConsumer: (_context, purpose) => handles.get(purpose) ?? null,
+      reconcileInvocationConsumer: (checkpoint) => settlement(checkpoint.invocationReceiptRef),
+      verifyAcceptanceReceipt: () => ({ verified: true, errors: [] }),
+    })).resolves.toBe('held');
+    expect(first.listAcceptanceDecisions('g-accept-reopen')).toEqual([]);
+    expect(first.listPendingGoalInvocationConsumers('g-accept-reopen'))
+      .toMatchObject([{ purpose: 'goal-acceptance', effect: { evaluation } }]);
+    first.close();
+
+    const reopened = new SqliteMissionStore(root);
+    reopened.migrate();
+    const author = vi.fn(async (): Promise<NewWorkItem[]> => []);
+    const accept = vi.fn(async () => evaluation);
+    await expect(advanceGoalMission(reopened, 'g-accept-reopen', {
+      author,
+      accept,
+      reconcileInvocationConsumer: (checkpoint) => settlement(checkpoint.invocationReceiptRef),
+      verifyAcceptanceReceipt: () => ({ verified: true, errors: [] }),
+    })).resolves.toBe('accepted');
+    expect(author).not.toHaveBeenCalled();
+    expect(accept).not.toHaveBeenCalled();
+    expect(reopened.listAcceptanceDecisions('g-accept-reopen'))
+      .toMatchObject([{ decision: { decidedAt: evaluation.decidedAt }, effectiveOutcome: 'accepted' }]);
+    reopened.close();
+  });
+
+  it('rolls back a checkpoint with its conflicting batch and rejects sibling payload reuse', () => {
+    const store = newStore();
+    createGoalMission(store, { id: 'g-checkpoint-a', title: 'A', goal: 'a' });
+    createGoalMission(store, { id: 'g-checkpoint-b', title: 'B', goal: 'b' });
+    store.enqueueItem({ id: 'global-conflict', missionId: 'g-checkpoint-b', kind: 'task' });
+    const ref = receiptRef('goal-checkpoint-conflict');
+    expect(() => store.stageGoalInvocationConsumer({
+      schemaVersion: 1,
+      tenantId: 'local',
+      projectId: 'project-test',
+      missionId: 'g-checkpoint-a',
+      round: 1,
+      purpose: 'goal-authoring',
+      invocationReceiptRef: ref,
+      outputDigest,
+      effect: { kind: 'authored-batch', items: [
+        { id: 'global-conflict', missionId: 'g-checkpoint-a', kind: 'task' },
+      ] },
+    })).toThrow('MISSION_GOAL_CONSUMER_CHECKPOINT_CONFLICT');
+    expect(store.getGoalInvocationConsumer('g-checkpoint-a', 1, 'goal-authoring')).toBeNull();
+
+    store.stageGoalInvocationConsumer({
+      schemaVersion: 1,
+      tenantId: 'local',
+      projectId: 'project-test',
+      missionId: 'g-checkpoint-a',
+      round: 1,
+      purpose: 'goal-authoring',
+      invocationReceiptRef: ref,
+      outputDigest,
+      effect: { kind: 'authored-batch', items: [] },
+    });
+    expect(() => store.stageGoalInvocationConsumer({
+      schemaVersion: 1,
+      tenantId: 'local',
+      projectId: 'project-test',
+      missionId: 'g-checkpoint-a',
+      round: 1,
+      purpose: 'goal-authoring',
+      invocationReceiptRef: ref,
+      outputDigest: 'd'.repeat(64),
+      effect: { kind: 'authored-batch', items: [] },
+    })).toThrow('MISSION_GOAL_CONSUMER_CHECKPOINT_CONFLICT');
+    store.close();
+  });
   it('passes the exact immutable acceptance contract to the author prompt seam', async () => {
     const store = newStore();
     createGoalMission(store, {

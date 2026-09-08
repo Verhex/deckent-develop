@@ -752,6 +752,8 @@ implements MandatoryCrossVerifyInvocationFactory {
         transport: profile.transport,
         executionBackend: profile.executionBackend,
         endpointRefHash: profile.endpointRefHash,
+        runtimeFingerprint: profile.runtimeFingerprint,
+        executionProfileRef: profile.executionProfileRef,
       },
     );
     if (selected.state === 'hold') {

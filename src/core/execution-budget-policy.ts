@@ -94,6 +94,8 @@ type ExecutionBudgetPolicyWithPurposeProfiles = ExecutionBudgetPolicyConfig & {
   readonly purposes?: {
     readonly 'reachability-probe'?: ReachabilityProbePurposeProfile;
     readonly 'xverify-adjudication'?: XverifyAdjudicationPurposeProfile;
+    readonly 'goal-authoring'?: import('./work-model.js').ExecutionBudget;
+    readonly 'goal-acceptance'?: import('./work-model.js').ExecutionBudget;
   };
 };
 
@@ -177,6 +179,26 @@ export interface ExecutionBudgetPolicyHoldDecision {
 export type ExecutionBudgetPolicyDecision =
   | ExecutionBudgetPolicyAllowDecision
   | ExecutionBudgetPolicyHoldDecision;
+
+export function resolveGoalInvocationBudgetPolicy(input: {
+  policy?: ExecutionBudgetPolicyConfig;
+  role: Extract<ExecutionBudgetRole, 'brain' | 'auditor'>;
+  purpose: 'goal-authoring' | 'goal-acceptance';
+  liveUsageMode: ExecutionBudgetLiveUsageMode;
+  executionCostClass?: 'remote' | 'local';
+}): ExecutionBudgetPolicyDecision {
+  const purposeBudget = input.policy?.purposes?.[input.purpose];
+  if (!purposeBudget) {
+    return { state: 'hold', reasonCode: 'role-profile-missing', profileRef: `execution_budget.purposes.${input.purpose}` };
+  }
+  return resolveExecutionBudgetPolicy({
+    policy: input.policy,
+    role: input.role,
+    requestedBudget: purposeBudget,
+    liveUsageMode: input.liveUsageMode,
+    ...(input.executionCostClass ? { executionCostClass: input.executionCostClass } : {}),
+  });
+}
 
 export class ExecutionBudgetPolicyError extends Error {
   readonly code = 'EXECUTION_BUDGET_POLICY_INVALID';
@@ -414,7 +436,7 @@ export function assertExecutionBudgetPolicyConfig(
     }
     assertKnownKeys(
       value.purposes,
-      ['reachability-probe', 'xverify-adjudication'],
+      ['reachability-probe', 'xverify-adjudication', 'goal-authoring', 'goal-acceptance'],
       'execution_budget.purposes',
     );
     if (value.purposes['reachability-probe'] !== undefined) {
@@ -422,6 +444,11 @@ export function assertExecutionBudgetPolicyConfig(
     }
     if (value.purposes['xverify-adjudication'] !== undefined) {
       assertXverifyAdjudicationPurposeProfile(value.purposes['xverify-adjudication']);
+    }
+    for (const purpose of ['goal-authoring', 'goal-acceptance'] as const) {
+      if (value.purposes[purpose] !== undefined) {
+        assertBudget(value.purposes[purpose], `execution_budget.purposes.${purpose}`);
+      }
     }
   }
 
