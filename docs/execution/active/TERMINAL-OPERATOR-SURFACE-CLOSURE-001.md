@@ -3457,6 +3457,151 @@ privacy remain open; no paid-provider, billing, autonomous or whole7099 closure.
 Git repeated prior unreachable-loose-object/gc.log advisory; no prune/cleanup.
 Source commit did not build/restart/run/push or mutate retained runtime/Brain.
 
+#### L6 debug lifecycle — exact integration admission, 2026-09-08T05:18Z
+
+ASCII source383aae8af/docs56dc60154 independently postchecked by Fable991
+(body098c1e1d81e690065be76cc76180e9b47d630c81f70060f406d9157fbcea5761),
+all32committed blobs, preserved run7,85main pins and seal boundaries PASS.
+No fresh ASCII audit. Next existing7099 blocker: main raw debug input persistence.
+
+Root and independent read-only agent traced held input-debug.ts fail(limit):
+it revokes active/writing ownership and closes fd before pending fs.write callback.
+Original probe/source stays terminal FAIL/HOLD, never rerun or relabeled green.
+New integration fixes the specific lifecycle contract: stop admission on close/
+limit; drain bounded content-free accepted data; close once only after outstanding
+callback settles. I/O failure drops unissued queue but retains in-flight custody.
+No raw text/hash/bytes/key extras in sink; exclusive creation and budgets retained.
+
+Plan /tmp/deckent-7099-debug-lifecycle-nDuVBH/plan.md
+SHAd4c702f6c74038525d8cc5b0f2bb50386abf13c27a75a513893bde9ff528af21;
+preimages SHA6f056e4fdafa99539beac2676f0ec5443a86f26d449e4fc230645c7239c30b2c.
+Fresh detached candidate at56dc60154, six exact source/test paths, preimage
+conflict0. approval_truth_a sole candidate writer; no main writes. One pass plus
+max1changed-evidence correction,<=2targeted test invocations, one tsc,30min/8GB.
+Known inherited Enter-shape test cannot be weakened or hidden. Root owns actual
+proof/build/fan-in and economic foreign review; memory_landing_map only prepares
+two private helper/contract files and a result, no execution/source overlap.
+Old attempt counters/archive remain terminal; no new MASTER/task/run/authority.
+Node permissions are not OS isolation; proof will use pinned nonroot/read-only/
+networknone container. No platform/security claims beyond measured guarantees.
+Main raw logger still present; no debug build/actual PASS/fan-in/closure yet.
+
+#### L6 debug candidate LOCAL_VERIFIED — 2026-09-08T05:40Z
+
+Worker result032041a0e212e6c3c77b96cbb66375d0c078bc9d5c85bbd61ac92e3608386dc7:
+six exact paths frozen; input-debug3914ebb6fd33/InputBar14ba09108d34.
+Root source review also caught render-owned ref plus effect cleanup retaining a
+closed sink under StrictMode replay. Final effect owns/captures its own instance;
+cleanup closes that instance and clears only its matching ref. No other UI change.
+Initial34/35 test FAIL observed newly-created but undrained file; one test-only
+correction waits for the last accepted return record. Final35/35 report6263da621d0e,
+tsc exit0, diffcheckPASS. Legacy Enter assertion was not edited; current base passes.
+
+Fresh guarded candidate build96404 exit0. Source prebuildace64fb20e05 and compiled
+freeze30fe670600cd:50source/test+47compiled. Root actual compiled public-fs probe
+997de1a40be5a5aa8dae7c1772f5f1a91a7dc6c93e06db6aa9ab9ed499968a1a:
+5/5 PASS, pending limit256accepted rows drain before close; partial/duplicate
+callback and late-open ownership; synchronous write/reporter throws contained;
+total byte limit reached at789writes/65487bytes, next83bytes refused, close once.
+This tests actual compiled source with injected filesystem, not OS durability.
+
+Old UNRUN helper corrected before execution for the visible caret: run.tsx:2337
+selects marker under NO_COLOR, CaretText inserts9|8 while raw edited buffer is98.
+Initial V3 actual CLI result844488508ae19448a483b1be73407ce7beb1e548267eb4ac44a62376d040fb0d
+is terminal HOLD: helper expected Unicode ready separator while real terminal
+rendered `ready | your turn`. No keystrokes/privacy case reached; other4UNRUN.
+Archive /home/alperen/deckent-recovery-20260904/terminal-7099-debug-held-evykec:
+132payload/133checksums; manifest9c217148474144a54efa5b86959956f3c3753dbe0f79397142a5889a9d18f1d7,
+SUMS45d52e43b690551fad615373121c81e881023dedece36a8284fbb1c952b03f64.
+
+One actual changed-evidence correction V4 binds ready+clear expected labels to
+the real renderTerminalOwnedTemplate/ASCII glyph producer. No product source or
+compiled bytes changed; no rebuild. Final helper29bd600d3567, refreeze406b994babe7.
+Actual /tmp/deckent-7099-debug-cli-candidate-f6K3f6/deckent-7099-l6-debug-pty-sZyiCR/result.json
+SHAf03629a2eaea48f4db260618ad06b4b0a57b24aedb3ef7f952f992e7834031fa:
+5/5 EN/TR enabled/disabled + ENexisting PASS. Causal fragmented fake secret,
+bracketed Unicode paste, exact left/backspace9|8 render, Ctrl-C clear and normal
+exit observed. Enabled logs each41events/2019bytes, closed event/action/modifier
+allowlist and0600; disabled explicit/default no-file; existing bytes unchanged
+with typed failure. No chat/measurement/provider turn; child close/dead custody.
+Container f6k3f6 05:35:38.145Z–05:35:45.962Z exit0/noOOM, nonroot/networknone/
+RO2GB2CPU;50source/test47compiled/helper unchanged. No main runtime/auth mounts.
+
+Archive /home/alperen/deckent-recovery-20260904/terminal-7099-debug-cli-x11Uu5:
+160payload/161checksums; manifest616f597f6356c3996ca4b246c889ba7b12c9a98f7d358864099e0b6470450d8b,
+SUMSa61c0a08f2cec1450720044a0b45c36c44676fee9f8ddca27eea22f0aeb04357.
+Includes pinned source/bundle/tests/build/probe/helpers and actual diagnostic,
+transcript/process artifacts; excludes raw DB/config/auth trees. Historical HOLDs
+immutable; both worker and actual correction allowances consumed, no blind retry.
+Root993 e895d007437e9da7811083acba23634ae98d11148cd84f3369153b8d78bcf6d4
+requests one independent review. Main still56dc60154/rawlogger unchanged; no main
+fan-in/build/restart/commit/push/MASTER change or whole7099/canonicalXVerify claim.
+Linux POSIX-only observation does not prove Windows/NTFS/macOS/SSH guarantees.
+
+#### Main fan-in readiness and MCP freshness observation — 2026-09-08T05:46Z
+
+Debug fan-in dry-run2ebb25a4ab84: exact6paths, current main preimages/protected5
+unchanged, git apply --check PASS; no source application. Prepared main build/
+freeze/CLI scripts are UNRUN pending independent993 review. Fresh canonical
+main clean inspector HOLD has only E_CLEAN_BOT_ACTIVE; no active-sprint blocker
+was reported. Authorized next lifecycle after source admission is canonical bot
+stop -> fresh ALLOW -> build:all -> bot start -> main proof, not manual cleanup.
+
+Read-only7099 MCP follow-up, independently corroborated by root process/source
+inspection: PIDs3944/583356/704950/2336235/2350783/2517302/2607594 all remain live
+and started Sep6/7, before the Sep8 04:53:58Z main build. Existing MCP handshake
+src/mcp/server.ts:174-177 and help response src/mcp/tools/help.ts:190-194 publish
+package version, not loaded-byte identity. No build/source/entry digest match
+was found anywhere in src/mcp. Current disk serverSHA5593e82a70f246eec8307848b2c99f09e32dd710fcdd46b92b4d2139f0ba37db
+and build-manifestSHA2462dbb3ed2261c2576d5edbae604b079fb70397ebd01cf14cb14e7fc44e28e6
+are disk facts only, not running-process attestation. Freshness stays UNPROVEN
+with prebuild-process evidence; do not conflate it with an exact old loaded hash.
+DECKENT.md:496-503 requires host-specific reconnect, but documents no Codex hot-
+reconnect command. No host process was killed/restarted or auth/config changed.
+This refines the existing open7099 MCP-proof boundary, not a new MASTER item or
+authority to implement a different package while debug review is pending.
+
+#### L6 debug main landing / LOCAL_VERIFIED — 2026-09-08T05:59Z
+
+Fable994 independent scoped GO, body06dd4f51568d16fd326a974323e2cd0887a82b27161543c84c8979071ffe6968,
+raw review458755324d970c3d127104e00969e1afdb4386b1d0325bc9ef230b496587c9b4.
+Exact six source/test paths integrated; main tests35/35 (ca77382c58293aefb23ac00a28bb25557503defd594f2442c5ff94823ab5f65e),
+tsc exit0. Canonical stop of3466215 -> fresh clean ALLOW -> build:all49116 exit0
+-> canonical start43004 -> new bot3536055 alive, old PID dead. Loaded entry
+afeeb38f091fca73170045ac8a4afbb2c53941052d96af0d203e7279dec78ffc and bot-module
+311be99b0aa51031d8ff8ffaeefda8aac512b1f8e948528c4e1e81574e7d9ba1 match disk.
+Build-manifest6b6904cbed0044ac49540c2202f665701bd77f2f986d172587294c8aff670953
+is separate disk evidence, not the bot-module identity or MCP attestation.
+
+Main source/compiled freeze66321c04ff8d493552ded07c53fbd5a172c1b3da4cd1926e3eee0be37c5d6d99:
+50source/test,47compiled,5build-input pins unchanged through proof and commit.
+Compiled filesystem probes5/5, result3b792edbe7c007885ec7841e8030d572da0488daea05411136bc625f389385bc.
+Actual main CLI5/5, resultcb770c8859156c08d45ab9acd0efb14e28febebca0cd50ad86fa021b6c287f2b:
+EN/TR enabled/disabled and EN existing-path; raw fragmented input, Unicode paste,
+left/backspace edit, Ctrl-C clear, normal exit preserved. Enabled EN41events/2019bytes,
+TR40events/1981bytes; all fields/values allowlisted,0600. Event counts are observations,
+not an input-byte contract. Disabled creates no diagnostic file; existing sentinel
+unchanged with typed failure visible. All children closed/dead, provider generation0.
+Container deckent-proof-debug-fvrlcc 05:55:33.054Z–05:55:40.946Z exit0/noOOM;
+nonroot/networknone/read-only repo/private writes,2GB/2CPU/pids128.
+
+Source commit4cf7e4d144e6c88d2da51a80ed5e9a5e971e3307: exact6paths,+604/-12.
+HEAD/main/candidate equality and protected run/messages/MASTER/generated5 PASS;
+index empty. No inherited changes absorbed. Landing record2d584f164e6266c6eb1cdb8a39fc19b833c7c85dfa1dc3b63f2e87214cbd06ad.
+Main proof archive /home/alperen/deckent-recovery-20260904/terminal-7099-debug-main-cli-QrGvqZ:
+174payload/175checksums; manifeste79cf43b2a97e7044e34693821a31356fb364fea44a4a4a2554a5ec0c00bbe1b,
+SUMS05dd821af2e5566047702297fb618db2fead07dc72101974cce711bd78073644.
+Landing seal /home/alperen/deckent-recovery-20260904/terminal-7099-debug-seal-IkXJJT:
+6payload/7checksums; manifest9cc81948a86b20abd2e2fe87e4aed4e85939be7629f9c9b9f478a34a00c28729,
+SUMSa1a660a27019b2480ba3192d70a25ccb8e9c9b6b4ae5e04fec12431eb8da2d80.
+Both archives readback verified; no raw DB/auth/config trees copied.
+
+MASTER read-only validator PASS; Closure OS append-only gate PASS. 7099 remains VERIFY;
+Linux/POSIX input privacy proof is not NTFS/macOS/SSH, paid-provider, canonical XVerify,
+dependent multiworker/automatic next-goal settlement or whole7099 closure. Reporter
+stderr shell-note integration is RELATED_BUT_NONBLOCKING, not added to this slice.
+MCP freshness stays unproven. No sprint/recovery/retained728/DB mutation or push.
+
 ### L4/L5 supportive evidence seal — 2026-09-08T03:26Z
 
 Fable980 independent scoped GO, UTC03:24:49.914Z, bodySHA
