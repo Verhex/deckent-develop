@@ -9,7 +9,7 @@ import { addDoc, removeDoc, loadDocsConfig, saveDocsConfig } from '../../orchest
 import { runManagedDocUpdates, buildStandaloneDocContext } from '../../orchestra/managed-docs/managed-doc-runner.js';
 import { validatePath } from '../../core/validators.js';
 import { runDocsTrackScan, runDocsTrackStatus } from '../../cli/commands/docs.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 export function registerDocsTool(server: McpServer): void {
   server.registerTool(
@@ -19,16 +19,16 @@ export function registerDocsTool(server: McpServer): void {
       description: mcpToolDescription('deckent_docs'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        action: z.enum(['add', 'remove', 'list', 'update', 'run', 'track-scan', 'track-status']).describe('Action to perform'),
-        file: z.string().optional().describe('File path or doc ID (required for add/remove/update)'),
-        autoSections: z.array(z.string()).optional().describe('Section headings for auto-update (e.g., ["Sprint Metrics", "Active Debt"])'),
-        protectedSections: z.array(z.string()).optional().describe('Section headings to protect (e.g., ["Vision", "Architecture"])'),
-        addAutoSections: z.array(z.string()).optional().describe('Add auto-update sections (for update action)'),
-        removeAutoSections: z.array(z.string()).optional().describe('Remove auto-update sections (for update action)'),
-        addProtectedSections: z.array(z.string()).optional().describe('Add protected sections (for update action)'),
-        skills: z.array(z.string()).optional().describe('Skill IDs for content generation (e.g., ["typescript-expert"])'),
-        maxLines: z.number().optional().describe('Max lines for auto sections'),
-        root: z.string().optional().describe('Project root (default: cwd)'),
+        action: z.enum(['add', 'remove', 'list', 'update', 'run', 'track-scan', 'track-status']).describe(mcpFieldDescription('deckent_docs', 'action')),
+        file: z.string().optional().describe(mcpFieldDescription('deckent_docs', 'file')),
+        autoSections: z.array(z.string()).optional().describe(mcpFieldDescription('deckent_docs', 'autoSections')),
+        protectedSections: z.array(z.string()).optional().describe(mcpFieldDescription('deckent_docs', 'protectedSections')),
+        addAutoSections: z.array(z.string()).optional().describe(mcpFieldDescription('deckent_docs', 'addAutoSections')),
+        removeAutoSections: z.array(z.string()).optional().describe(mcpFieldDescription('deckent_docs', 'removeAutoSections')),
+        addProtectedSections: z.array(z.string()).optional().describe(mcpFieldDescription('deckent_docs', 'addProtectedSections')),
+        skills: z.array(z.string()).optional().describe(mcpFieldDescription('deckent_docs', 'skills')),
+        maxLines: z.number().optional().describe(mcpFieldDescription('deckent_docs', 'maxLines')),
+        root: z.string().optional().describe(mcpFieldDescription('deckent_docs', 'root')),
       }),
     },
     async ({ action, file, autoSections, protectedSections, addAutoSections, removeAutoSections, addProtectedSections, skills, maxLines, root: rootArg }) => {

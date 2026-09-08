@@ -10,7 +10,7 @@ import { detectSubscription } from '../../core/subscription.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatDoctorResponse, wrapResponse, type DoctorData } from '../helpers/format.js';
 import { loadConfig } from '../../core/config.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 export function registerDoctorTool(server: McpServer): void {
   server.registerTool(
@@ -20,10 +20,10 @@ export function registerDoctorTool(server: McpServer): void {
       description: mcpToolDescription('deckent_doctor'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        includeProfile: z.boolean().optional().default(false).describe('Also include system profile: CPU core count, total/free RAM, recommended max workers, and detected Claude subscription tier'),
-        profile: z.boolean().optional().default(false).describe('Alias for includeProfile — show system profile: CPU cores, RAM, recommended max workers, Claude subscription tier.'),
-        providers: z.boolean().optional().default(false).describe('Include detailed provider diagnostics with local authentication evidence and catalog-only model metadata for available cloud and local providers.'),
-        json: z.boolean().optional().default(false).describe('Return raw JSON data without the human-readable summary wrapper. Useful for programmatic consumption or piping.'),
+        includeProfile: z.boolean().optional().default(false).describe(mcpFieldDescription('deckent_doctor', 'includeProfile')),
+        profile: z.boolean().optional().default(false).describe(mcpFieldDescription('deckent_doctor', 'profile')),
+        providers: z.boolean().optional().default(false).describe(mcpFieldDescription('deckent_doctor', 'providers')),
+        json: z.boolean().optional().default(false).describe(mcpFieldDescription('deckent_doctor', 'json')),
       }),
     },
     async ({ includeProfile, profile, providers, json }) => {

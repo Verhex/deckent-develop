@@ -6,7 +6,7 @@ import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatRetroResponse, wrapResponse, type RetroData } from '../helpers/format.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 function extractHighlights(content: string): string[] {
   const highlights: string[] = [];
@@ -53,7 +53,7 @@ export function registerRetroTool(server: McpServer): void {
       description: mcpToolDescription('deckent_retro'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        sprintId: z.string().optional().describe('Read a specific sprint retrospective by sprint ID (e.g. "sprint-083"). If omitted, returns the most recent sprint retrospective.'),
+        sprintId: z.string().optional().describe(mcpFieldDescription('deckent_retro', 'sprintId')),
       }),
     },
     async ({ sprintId }) => {

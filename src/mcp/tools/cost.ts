@@ -20,7 +20,7 @@ import {
   readSpendWindow,
 } from '../../core/cost-config-loader.js';
 import type { CostConfig } from '../../core/cost-config-loader.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 // ─── Injectable deps ──────────────────────────────────────────────────────────
 
@@ -131,13 +131,13 @@ export function registerCostTool(server: McpServer, deps: CostToolDeps = {}): vo
           .string()
           .optional()
           .describe(
-            'Sprint ID hint (e.g. "sprint-332") — reserved for future sprint-scoped cost view',
+            mcpFieldDescription('deckent_cost', 'sprint'),
           ),
         tenantId: z
           .string()
           .optional()
           .describe(
-            'Tenant scope — reserved for future multi-tenant routing (defaults to "default")',
+            mcpFieldDescription('deckent_cost', 'tenantId'),
           ),
       }),
     },

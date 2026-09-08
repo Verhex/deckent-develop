@@ -15,7 +15,7 @@ import type { BrainPlanningMode, PlannerProof, SprintSizeRecommendation } from '
 import { getMessage } from '../../cli/helpers/messages.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatPlanResponse, wrapResponse } from '../helpers/format.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription, getMcpToolDescriptionLanguage } from './description-catalog.js';
 
 function computeModelDistribution(tasks: Array<{ model?: string }>): Record<string, number> {
   const dist: Record<string, number> = {};
@@ -34,6 +34,9 @@ function computeRiskAssessment(taskCount: number): string {
 }
 
 export function registerPlanTool(server: McpServer): void {
+  // 7085: field descriptions render in the ONE server-start resolved language
+  // (previously pinned to 'en', so a tr session read English field text).
+  const registerLang = getMcpToolDescriptionLanguage();
   server.registerTool(
     'deckent_plan',
     {
@@ -41,10 +44,10 @@ export function registerPlanTool(server: McpServer): void {
       description: mcpToolDescription('deckent_plan'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
-        dryRun: z.boolean().optional().default(true).describe('Always dry-run for plan tool — tasks are never written to disk'),
-        mode: z.enum(['ai', 'structured', 'auto']).optional().describe('Planning mode: "ai" uses Claude to interpret directives creatively (requires API access), "structured" parses DIRECTIVES.md task blocks directly (deterministic, no AI call), "auto" picks ai if available else falls back to structured'),
-        approve: z.boolean().optional().default(false).describe(getMessage('plan.mcp_approve_option', 'en')),
-        acknowledgeScopePaths: z.boolean().optional().default(false).describe(getMessage('plan.mcp_ack_scope_option', 'en')),
+        dryRun: z.boolean().optional().default(true).describe(mcpFieldDescription('deckent_plan', 'dryRun')),
+        mode: z.enum(['ai', 'structured', 'auto']).optional().describe(mcpFieldDescription('deckent_plan', 'mode')),
+        approve: z.boolean().optional().default(false).describe(getMessage('plan.mcp_approve_option', registerLang)),
+        acknowledgeScopePaths: z.boolean().optional().default(false).describe(getMessage('plan.mcp_ack_scope_option', registerLang)),
       }),
     },
     async (input: {

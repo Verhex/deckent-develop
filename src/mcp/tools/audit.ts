@@ -10,7 +10,7 @@ import type { RetentionPolicy } from '../../core/audit-retention.js';
 import { runComplianceReport, runAuditRetention } from '../../cli/commands/audit.js';
 import { loadConfig } from '../../core/config.js';
 import { enrichResponse } from '../helpers/enrich.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 const MS_PER_DAY = 86_400_000;
 const DEFAULT_SPRINT = 'sprint-001'; // CLI --sprint default (cli/commands/audit.ts)
@@ -37,14 +37,14 @@ export function registerAuditTool(server: McpServer): void {
       // skip approval prompts on readOnlyHint, so understating it is a security defect.
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
       inputSchema: z.object({
-        sprintId: z.string().optional().describe('Sprint ID (e.g. "sprint-150"). Required for action="gate"; defaults to "sprint-001" for query/compliance/retention (CLI --sprint parity).'),
-        action: z.enum(AUDIT_ACTIONS as [AuditAction, ...AuditAction[]]).optional().default('gate').describe('Audit subcommand: gate (default, back-compatible) | query | compliance | retention.'),
-        channel: z.string().optional().describe('Filter audit events by action/channel (action="query", CLI --action parity).'),
-        tenant: z.string().optional().describe('Filter audit events by tenant ID (action="query").'),
-        limit: z.number().optional().describe('Maximum number of matched events to return (action="query").'),
-        keepDays: z.number().optional().describe('Retention: prune audit events older than n days (action="retention").'),
-        keepCount: z.number().optional().describe('Retention: archive audit events beyond the most recent n (action="retention").'),
-        apply: z.boolean().optional().default(false).describe('Retention: apply the plan. DESTRUCTIVE — archives the archive partition and permanently deletes pruned events; without it the run is a dry-run with zero writes.'),
+        sprintId: z.string().optional().describe(mcpFieldDescription('deckent_audit', 'sprintId')),
+        action: z.enum(AUDIT_ACTIONS as [AuditAction, ...AuditAction[]]).optional().default('gate').describe(mcpFieldDescription('deckent_audit', 'action')),
+        channel: z.string().optional().describe(mcpFieldDescription('deckent_audit', 'channel')),
+        tenant: z.string().optional().describe(mcpFieldDescription('deckent_audit', 'tenant')),
+        limit: z.number().optional().describe(mcpFieldDescription('deckent_audit', 'limit')),
+        keepDays: z.number().optional().describe(mcpFieldDescription('deckent_audit', 'keepDays')),
+        keepCount: z.number().optional().describe(mcpFieldDescription('deckent_audit', 'keepCount')),
+        apply: z.boolean().optional().default(false).describe(mcpFieldDescription('deckent_audit', 'apply')),
       }),
     },
     async ({ sprintId, action, channel, tenant, limit, keepDays, keepCount, apply }) => {

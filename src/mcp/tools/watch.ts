@@ -6,7 +6,7 @@ import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { eventBus } from '../../orchestra/event-bus.js';
 import { getCurrentSprintId } from '../../monitor/sprint-state.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 const CHANNEL_KEYWORDS = [
   'PHASE',
@@ -36,12 +36,12 @@ export function registerWatch(server: McpServer): void {
         sprintId: z
           .string()
           .optional()
-          .describe('Sprint ID to watch. Defaults to current active sprint.'),
+          .describe(mcpFieldDescription('deckent_watch', 'sprintId')),
         channels: z
           .array(z.enum(CHANNEL_KEYWORDS))
           .optional()
           .describe(
-            'Filter events by channel keyword. Only events whose channel string contains one of these keywords are forwarded. Omit for all channels.',
+            mcpFieldDescription('deckent_watch', 'channels'),
           ),
         tail: z
           .number()
@@ -49,7 +49,7 @@ export function registerWatch(server: McpServer): void {
           .max(100)
           .optional()
           .default(20)
-          .describe('Number of recent events to backfill (0-100, default 20).'),
+          .describe(mcpFieldDescription('deckent_watch', 'tail')),
       }),
     },
     async ({ sprintId, channels, tail }) => {

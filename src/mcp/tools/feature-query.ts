@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FEATURES_MANIFEST_FILE } from '../../core/constants.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 interface FeatureEntry {
   id: string;
@@ -52,8 +52,8 @@ export function registerFeatureQueryTool(server: McpServer): void {
         idempotentHint: true,
       },
       inputSchema: z.object({
-        category: z.string().optional().describe('Filter by category: active, lightly_used, dormant, dead, all (default: all)'),
-        id: z.string().optional().describe('Look up a specific feature by ID'),
+        category: z.string().optional().describe(mcpFieldDescription('deckent_feature_query', 'category')),
+        id: z.string().optional().describe(mcpFieldDescription('deckent_feature_query', 'id')),
       }),
     },
     async ({ category: inputCategory, id: inputId }) => {

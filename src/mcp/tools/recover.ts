@@ -5,7 +5,7 @@ import {
   SprintRecoveryOperationError,
 } from '../../orchestra/sprint-recovery-operation.js';
 import { enrichResponse } from '../helpers/enrich.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 export function registerRecoverTool(server: McpServer): void {
   server.registerTool(
@@ -15,9 +15,9 @@ export function registerRecoverTool(server: McpServer): void {
       description: mcpToolDescription('deckent_recover'),
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
       inputSchema: z.object({
-        sprintId: z.string().describe('Sprint ID to recover (e.g. "sprint-150")'),
-        dryRun: z.boolean().optional().default(true).describe('Preview mode: show what would be cleaned without making changes'),
-        skipAudit: z.boolean().optional().default(false).describe('Skip the self-audit gate step'),
+        sprintId: z.string().describe(mcpFieldDescription('deckent_recover', 'sprintId')),
+        dryRun: z.boolean().optional().default(true).describe(mcpFieldDescription('deckent_recover', 'dryRun')),
+        skipAudit: z.boolean().optional().default(false).describe(mcpFieldDescription('deckent_recover', 'skipAudit')),
         approval: z.object({
           approvalRef: z.string().min(1),
           idempotencyKey: z.string().min(1),
@@ -28,7 +28,7 @@ export function registerRecoverTool(server: McpServer): void {
             attemptId: z.string().min(1),
             fenceToken: z.string().min(1),
           }),
-        }).optional().describe('Required exact identity/generation/fence binding for mutation'),
+        }).optional().describe(mcpFieldDescription('deckent_recover', 'approval')),
       }),
     },
     async ({ sprintId, dryRun, skipAudit, approval }) => {

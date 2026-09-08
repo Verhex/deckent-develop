@@ -21,7 +21,7 @@ import type {
   LineageUsageAuthorityAggregate,
   LineageUsageAuthorityInput,
 } from '../../core/lineage-usage-authority.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 // ─── Injectable deps ────────────────────────────────────────────────────────
 
@@ -177,11 +177,11 @@ export function registerUsageTool(server: McpServer): void {
         idempotentHint: true,
       },
       inputSchema: z.object({
-        sprint: z.string().optional().describe('Sprint number (e.g. "275") — per-task breakdown mode'),
-        since: z.string().optional().describe('ISO date window start (e.g. "2026-06-01")'),
-        until: z.string().optional().describe('ISO date window end (e.g. "2026-06-10")'),
+        sprint: z.string().optional().describe(mcpFieldDescription('deckent_usage', 'sprint')),
+        since: z.string().optional().describe(mcpFieldDescription('deckent_usage', 'since')),
+        until: z.string().optional().describe(mcpFieldDescription('deckent_usage', 'until')),
         lineage: lineageInputSchema.optional()
-          .describe('Tasks + attempts to fold into logical-root usage/billing aggregates via the canonical authority'),
+          .describe(mcpFieldDescription('deckent_usage', 'lineage')),
       }),
     },
     async ({ sprint, since, until, lineage }) => {

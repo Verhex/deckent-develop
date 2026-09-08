@@ -10,7 +10,7 @@ import {
 } from '../../core/config-write-authority.js';
 import { setNestedValue, getNestedValue } from '../../core/config-migration.js';
 import { enrichResponse } from '../helpers/enrich.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 export function registerConfigTool(server: McpServer): void {
   server.registerTool(
@@ -20,9 +20,9 @@ export function registerConfigTool(server: McpServer): void {
       description: mcpToolDescription('deckent_config'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
-        action: z.enum(['read', 'get', 'set']).describe('Action: "read" returns full config, "get" returns one key value, "set" writes one key-value pair to .deckent/config.json'),
-        key: z.string().optional().describe('Dot-notation config key (e.g. "brain_provider", "max_workers", "routing_engine"). Required for action=get and action=set.'),
-        value: z.unknown().optional().describe('Value to write. Required for action=set. Type must match the key (e.g. number for max_workers, string for brain_provider).'),
+        action: z.enum(['read', 'get', 'set']).describe(mcpFieldDescription('deckent_config', 'action')),
+        key: z.string().optional().describe(mcpFieldDescription('deckent_config', 'key')),
+        value: z.unknown().optional().describe(mcpFieldDescription('deckent_config', 'value')),
       }),
     },
     async ({ action, key, value }) => {

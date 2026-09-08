@@ -40,7 +40,7 @@ import {
   type NervousBridgePlanResult,
 } from '../../cli/repl/nervous-bridge.js';
 import { NervousHistory } from '../../nervous/history.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 // ─── Disk-backed pending store (production reader) ─────────────────────────
 // nervous-bridge.ts's own banner deliberately deferred "a real disk/IPC-backed
@@ -187,9 +187,9 @@ export function registerNervousEditTool(server: McpServer): void {
       description: mcpToolDescription('deckent_nervous_edit'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        id: z.string().describe('Pending notification ID, id-prefix, or shortCode to accept with an edited payload'),
-        modifiedPayload: z.record(z.string(), z.unknown()).describe('Payload fields to shallow-merge onto the original action payload before accepting'),
-        root: z.string().optional().describe('Project root path (for locating the pending-notification store)'),
+        id: z.string().describe(mcpFieldDescription('deckent_nervous_edit', 'id')),
+        modifiedPayload: z.record(z.string(), z.unknown()).describe(mcpFieldDescription('deckent_nervous_edit', 'modifiedPayload')),
+        root: z.string().optional().describe(mcpFieldDescription('deckent_nervous_edit', 'root')),
       }),
     },
     async ({ id, modifiedPayload, root }) => {
@@ -215,8 +215,8 @@ export function registerNervousUndoTool(server: McpServer): void {
       description: mcpToolDescription('deckent_nervous_undo'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        id: z.string().optional().describe('Specific ExecutionRecord id to target (default: most recent reversible accepted action)'),
-        root: z.string().optional().describe('Project root path'),
+        id: z.string().optional().describe(mcpFieldDescription('deckent_nervous_undo', 'id')),
+        root: z.string().optional().describe(mcpFieldDescription('deckent_nervous_undo', 'root')),
       }),
     },
     async ({ id, root }) => {

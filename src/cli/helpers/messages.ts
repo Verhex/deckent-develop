@@ -9038,6 +9038,605 @@ const BASE_MESSAGES: MessageMap = {
     en: 'Serves the canonical ApprovalBroker read model — the SAME source as the CLI — and returns each pending request id, summary and expiry. READ-ONLY: this surface never decides, allows or denies. Deciding stays CLI-only behind an interactive live-authenticated TTY, so there is no self-approval path over MCP.',
     tr: 'Canonical ApprovalBroker read model\'ini sunar — CLI ile AYNI kaynak — ve bekleyen her isteğin id\'sini, özetini ve son geçerlilik zamanını döndürür. SALT OKUNUR: bu yüzey asla karar vermez, izin vermez veya reddetmez. Karar vermek yalnız CLI\'da, etkileşimli canlı kimlik doğrulamalı TTY arkasında kalır; MCP üzerinden self-approval yolu yoktur.',
   },
+  // ─── MCP inputSchema field descriptions (7085) ─────────────────────────────
+  // One en+tr row per tool input field, resolved ONLY through
+  // mcpFieldDescription(tool, field) (src/mcp/tools/description-catalog.ts) —
+  // key = mcp.<tool>.<snake_case_field>_desc; a missing row fails registration.
+  // deckent_audit
+  'mcp.audit.sprint_id_desc': {
+    en: 'Sprint ID (e.g. "sprint-150"). Required for action="gate"; defaults to "sprint-001" for query/compliance/retention (CLI --sprint parity).',
+    tr: 'Sprint ID (örn. "sprint-150"). action="gate" için gereklidir; query/compliance/retention için varsayılan "sprint-001"’dir (CLI --sprint parity).',
+  },
+  'mcp.audit.action_desc': {
+    en: 'Audit subcommand: gate (default, back-compatible) | query | compliance | retention.',
+    tr: 'Audit alt komutu: gate (varsayılan, geriye dönük uyumlu) | query | compliance | retention.',
+  },
+  'mcp.audit.channel_desc': {
+    en: 'Filter audit events by action/channel (action="query", CLI --action parity).',
+    tr: 'Audit olaylarını action/channel’a göre filtreler (action="query", CLI --action parity).',
+  },
+  'mcp.audit.tenant_desc': {
+    en: 'Filter audit events by tenant ID (action="query").',
+    tr: 'Audit olaylarını tenant ID’ye göre filtreler (action="query").',
+  },
+  'mcp.audit.limit_desc': {
+    en: 'Maximum number of matched events to return (action="query").',
+    tr: 'Döndürülecek eşleşen olayların azami sayısı (action="query").',
+  },
+  'mcp.audit.keep_days_desc': {
+    en: 'Retention: prune audit events older than n days (action="retention").',
+    tr: 'Saklama: n günden eski audit olaylarını budar (action="retention").',
+  },
+  'mcp.audit.keep_count_desc': {
+    en: 'Retention: archive audit events beyond the most recent n (action="retention").',
+    tr: 'Saklama: en son n olayın ötesindeki audit olaylarını arşivler (action="retention").',
+  },
+  'mcp.audit.apply_desc': {
+    en: 'Retention: apply the plan. DESTRUCTIVE — archives the archive partition and permanently deletes pruned events; without it the run is a dry-run with zero writes.',
+    tr: 'Saklama: planı uygular. DESTRUCTIVE — arşiv bölümünü arşivler ve budanan olayları kalıcı olarak siler; bu olmadan run sıfır yazmayla bir dry-run’dır.',
+  },
+  // deckent_agent_manage
+  'mcp.agent_manage.action_desc': {
+    en: 'Action to perform',
+    tr: 'Gerçekleştirilecek eylem',
+  },
+  'mcp.agent_manage.id_desc': {
+    en: 'Agent id (required for all actions)',
+    tr: 'Agent id (tüm eylemler için zorunlu)',
+  },
+  'mcp.agent_manage.name_desc': {
+    en: 'Display name (action=add; defaults to id)',
+    tr: 'Görünen ad (action=add; varsayılan: id)',
+  },
+  'mcp.agent_manage.description_desc': {
+    en: 'Agent description (action=add)',
+    tr: 'Agent açıklaması (action=add)',
+  },
+  'mcp.agent_manage.model_desc': {
+    en: 'Registered canonical provider API model ID (action=add; registry default when omitted)',
+    tr: 'Kayıtlı canonical provider API model ID’si (action=add; belirtilmezse registry varsayılanı kullanılır)',
+  },
+  'mcp.agent_manage.triggers_desc': {
+    en: 'Trigger keywords for routing (action=add)',
+    tr: 'Routing için trigger anahtar kelimeleri (action=add)',
+  },
+  'mcp.agent_manage.prompt_desc': {
+    en: 'System prompt content (action=add)',
+    tr: 'Sistem prompt içeriği (action=add)',
+  },
+  'mcp.agent_manage.root_desc': {
+    en: 'Project root (default: cwd)',
+    tr: 'Proje kökü (varsayılan: cwd)',
+  },
+  // deckent_skill_manage
+  'mcp.skill_manage.action_desc': {
+    en: 'Action to perform',
+    tr: 'Gerçekleştirilecek eylem',
+  },
+  'mcp.skill_manage.id_desc': {
+    en: 'Skill id (required for add/remove)',
+    tr: 'Skill id (add/remove için zorunlu)',
+  },
+  'mcp.skill_manage.name_desc': {
+    en: 'Display name (action=add; defaults to id)',
+    tr: 'Görünen ad (action=add; varsayılan: id)',
+  },
+  'mcp.skill_manage.description_desc': {
+    en: 'Skill description (action=add)',
+    tr: 'Skill açıklaması (action=add)',
+  },
+  'mcp.skill_manage.category_desc': {
+    en: 'Skill category (action=add; default: tool)',
+    tr: 'Skill kategorisi (action=add; varsayılan: tool)',
+  },
+  'mcp.skill_manage.triggers_desc': {
+    en: 'Trigger keywords for routing (action=add)',
+    tr: 'Routing için trigger anahtar kelimeleri (action=add)',
+  },
+  'mcp.skill_manage.query_desc': {
+    en: 'Marketplace search query (action=marketplace-list; default: "")',
+    tr: 'Marketplace arama sorgusu (action=marketplace-list; varsayılan: "")',
+  },
+  'mcp.skill_manage.limit_desc': {
+    en: 'Max marketplace results (action=marketplace-list; default 20)',
+    tr: 'Azami marketplace sonucu (action=marketplace-list; varsayılan 20)',
+  },
+  'mcp.skill_manage.root_desc': {
+    en: 'Project root (default: cwd)',
+    tr: 'Proje kökü (varsayılan: cwd)',
+  },
+  // deckent_memory_manage
+  'mcp.memory_manage.action_desc': {
+    en: 'Action to perform',
+    tr: 'Gerçekleştirilecek eylem',
+  },
+  'mcp.memory_manage.id_desc': {
+    en: 'Entry id (required for insert/update)',
+    tr: 'Kayıt id’si (insert/update için zorunlu)',
+  },
+  'mcp.memory_manage.type_desc': {
+    en: 'Entry type: adr|memory|sprint|debt|pattern|retro|... (required for insert)',
+    tr: 'Kayıt türü: adr|memory|sprint|debt|pattern|retro|... (insert için zorunlu)',
+  },
+  'mcp.memory_manage.title_desc': {
+    en: 'Entry title (required for insert)',
+    tr: 'Kayıt başlığı (insert için zorunlu)',
+  },
+  'mcp.memory_manage.content_desc': {
+    en: 'Entry content (required for insert; patch value for update)',
+    tr: 'Kayıt içeriği (insert için zorunlu; update için patch değeri)',
+  },
+  'mcp.memory_manage.summary_desc': {
+    en: 'Short summary',
+    tr: 'Kısa özet',
+  },
+  'mcp.memory_manage.tags_desc': {
+    en: 'Tags (insert only)',
+    tr: 'Etiketler (yalnızca insert)',
+  },
+  'mcp.memory_manage.status_desc': {
+    en: 'Entry status: active|accepted|deprecated|...',
+    tr: 'Kayıt durumu: active|accepted|deprecated|...',
+  },
+  'mcp.memory_manage.priority_desc': {
+    en: 'Entry priority',
+    tr: 'Kayıt önceliği',
+  },
+  'mcp.memory_manage.sprint_id_desc': {
+    en: 'Sprint id association (insert only)',
+    tr: 'Sprint id ilişkilendirmesi (yalnızca insert)',
+  },
+  'mcp.memory_manage.sprint_num_desc': {
+    en: 'Sprint number association (insert only)',
+    tr: 'Sprint numarası ilişkilendirmesi (yalnızca insert)',
+  },
+  'mcp.memory_manage.lang_desc': {
+    en: 'Language code (insert only, default: en)',
+    tr: 'Dil kodu (yalnızca insert, varsayılan: en)',
+  },
+  'mcp.memory_manage.decay_exempt_desc': {
+    en: 'Exempt this entry from decay',
+    tr: 'Bu kaydı decay’den muaf tutar',
+  },
+  'mcp.memory_manage.metadata_desc': {
+    en: 'Arbitrary metadata object',
+    tr: 'Serbest biçimli metadata nesnesi',
+  },
+  'mcp.memory_manage.changed_by_desc': {
+    en: 'Attribution for update history (default: "mcp")',
+    tr: 'Update geçmişi için atıf (varsayılan: "mcp")',
+  },
+  'mcp.memory_manage.current_sprint_num_desc': {
+    en: 'Required for action=decay-trigger',
+    tr: 'action=decay-trigger için zorunlu',
+  },
+  'mcp.memory_manage.decay_after_sprints_desc': {
+    en: 'Retention window in sprints (action=decay-trigger; default: config decay_after_sprints or 8)',
+    tr: 'Sprint cinsinden saklama penceresi (action=decay-trigger; varsayılan: config decay_after_sprints veya 8)',
+  },
+  'mcp.memory_manage.root_desc': {
+    en: 'Project root (default: cwd)',
+    tr: 'Proje kökü (varsayılan: cwd)',
+  },
+  // deckent_checkpoint
+  'mcp.checkpoint.action_desc': {
+    en: 'Action to perform: list all checkpoints, approve a pending checkpoint, or reject a pending checkpoint.',
+    tr: 'Gerçekleştirilecek eylem: tüm checkpoint’leri listele, bekleyen bir checkpoint’i onayla veya reddet.',
+  },
+  'mcp.checkpoint.sprint_id_desc': {
+    en: 'Sprint ID (e.g. "sprint-089"). Required for approve/reject actions.',
+    tr: 'Sprint ID (örn. "sprint-089"). approve/reject eylemleri için zorunludur.',
+  },
+  'mcp.checkpoint.phase_desc': {
+    en: 'Phase name (e.g. "plan", "evaluate", "fix"). Required for approve/reject actions.',
+    tr: 'Faz adı (örn. "plan", "evaluate", "fix"). approve/reject eylemleri için zorunludur.',
+  },
+  'mcp.checkpoint.root_desc': {
+    en: 'Project root directory. Defaults to current working directory.',
+    tr: 'Proje kök dizini. Varsayılan olarak geçerli çalışma dizinidir.',
+  },
+  // deckent_cleanup
+  'mcp.cleanup.decay_desc': {
+    en: 'Also run memory decay on .brain/ files if they exceed the configured line budget (default: 900 lines). Trims old sprint logs and compresses MEMORY.md.',
+    tr: 'Ayrıca yapılandırılmış satır bütçesini aşarlarsa .brain/ dosyaları üzerinde memory decay çalıştırır (varsayılan: 900 satır). Eski sprint loglarını kırpar ve MEMORY.md’yi sıkıştırır.',
+  },
+  'mcp.cleanup.dry_run_desc': {
+    en: 'Preview mode: show what would be deleted (file counts, brain line count, decay decision) without actually deleting anything. Recommended before first cleanup.',
+    tr: 'Preview modu: hiçbir şeyi gerçekten silmeden neyin silineceğini gösterir (dosya sayıları, brain satır sayısı, decay kararı). İlk cleanup’tan önce önerilir.',
+  },
+  // deckent_config
+  'mcp.config.action_desc': {
+    en: 'Action: "read" returns full config, "get" returns one key value, "set" writes one key-value pair to .deckent/config.json',
+    tr: 'Eylem: "read" tam config’i döndürür, "get" tek bir key değeri döndürür, "set" .deckent/config.json dosyasına tek bir key-value çifti yazar',
+  },
+  'mcp.config.key_desc': {
+    en: 'Dot-notation config key (e.g. "brain_provider", "max_workers", "routing_engine"). Required for action=get and action=set.',
+    tr: 'Dot-notation config key’i (örn. "brain_provider", "max_workers", "routing_engine"). action=get ve action=set için zorunludur.',
+  },
+  'mcp.config.value_desc': {
+    en: 'Value to write. Required for action=set. Type must match the key (e.g. number for max_workers, string for brain_provider).',
+    tr: 'Yazılacak değer. action=set için zorunludur. Tip, key ile eşleşmelidir (örn. max_workers için number, brain_provider için string).',
+  },
+  // deckent_cost
+  'mcp.cost.sprint_desc': {
+    en: 'Sprint ID hint (e.g. "sprint-332") — reserved for future sprint-scoped cost view',
+    tr: 'Sprint ID ipucu (örn. "sprint-332") — gelecekteki sprint-scoped cost view için ayrılmıştır',
+  },
+  'mcp.cost.tenant_id_desc': {
+    en: 'Tenant scope — reserved for future multi-tenant routing (defaults to "default")',
+    tr: 'Tenant scope — gelecekteki multi-tenant routing için ayrılmıştır (varsayılan: "default")',
+  },
+  // deckent_set_directives
+  'mcp.set_directives.content_desc': {
+    en: 'Formatted DIRECTIVES.md content with ## Task N: or ## Görev N: blocks. Each block needs Model (exact provider API ID — no legacy aliases), Effort, Skills, Files, Scope, and Description sub-sections; Provider is optional.',
+    tr: '## Task N: veya ## Görev N: bloklarıyla biçimlendirilmiş DIRECTIVES.md içeriği. Her blok Model (exact provider API ID — legacy alias yok), Effort, Skills, Files, Scope ve Description alt bölümlerine ihtiyaç duyar; Provider isteğe bağlıdır.',
+  },
+  // deckent_docs
+  'mcp.docs.action_desc': {
+    en: 'Action to perform',
+    tr: 'Gerçekleştirilecek eylem',
+  },
+  'mcp.docs.file_desc': {
+    en: 'File path or doc ID (required for add/remove/update)',
+    tr: 'Dosya yolu veya doc ID (add/remove/update için zorunlu)',
+  },
+  'mcp.docs.auto_sections_desc': {
+    en: 'Section headings for auto-update (e.g., ["Sprint Metrics", "Active Debt"])',
+    tr: 'Otomatik güncelleme için bölüm başlıkları (örn., ["Sprint Metrics", "Active Debt"])',
+  },
+  'mcp.docs.protected_sections_desc': {
+    en: 'Section headings to protect (e.g., ["Vision", "Architecture"])',
+    tr: 'Korunacak bölüm başlıkları (örn., ["Vision", "Architecture"])',
+  },
+  'mcp.docs.add_auto_sections_desc': {
+    en: 'Add auto-update sections (for update action)',
+    tr: 'Otomatik güncelleme bölümleri ekle (update eylemi için)',
+  },
+  'mcp.docs.remove_auto_sections_desc': {
+    en: 'Remove auto-update sections (for update action)',
+    tr: 'Otomatik güncelleme bölümlerini kaldır (update eylemi için)',
+  },
+  'mcp.docs.add_protected_sections_desc': {
+    en: 'Add protected sections (for update action)',
+    tr: 'Korunan bölümler ekle (update eylemi için)',
+  },
+  'mcp.docs.skills_desc': {
+    en: 'Skill IDs for content generation (e.g., ["typescript-expert"])',
+    tr: 'İçerik üretimi için Skill ID’leri (örn., ["typescript-expert"])',
+  },
+  'mcp.docs.max_lines_desc': {
+    en: 'Max lines for auto sections',
+    tr: 'Otomatik bölümler için azami satır sayısı',
+  },
+  'mcp.docs.root_desc': {
+    en: 'Project root (default: cwd)',
+    tr: 'Proje kök dizini (varsayılan: cwd)',
+  },
+  // deckent_doctor
+  'mcp.doctor.include_profile_desc': {
+    en: 'Also include system profile: CPU core count, total/free RAM, recommended max workers, and detected Claude subscription tier',
+    tr: 'Ayrıca sistem profilini de içerir: CPU çekirdek sayısı, toplam/boş RAM, önerilen azami worker sayısı ve tespit edilen Claude abonelik katmanı',
+  },
+  'mcp.doctor.profile_desc': {
+    en: 'Alias for includeProfile — show system profile: CPU cores, RAM, recommended max workers, Claude subscription tier.',
+    tr: 'includeProfile için alias — sistem profilini gösterir: CPU çekirdekleri, RAM, önerilen azami worker sayısı, Claude abonelik katmanı.',
+  },
+  'mcp.doctor.providers_desc': {
+    en: 'Include detailed provider diagnostics with local authentication evidence and catalog-only model metadata for available cloud and local providers.',
+    tr: 'Mevcut cloud ve local provider’lar için local kimlik doğrulama kanıtı ve yalnızca katalog model metadata’sı içeren detaylı provider tanılaması içerir.',
+  },
+  'mcp.doctor.json_desc': {
+    en: 'Return raw JSON data without the human-readable summary wrapper. Useful for programmatic consumption or piping.',
+    tr: 'Human-readable summary wrapper’ı olmadan ham JSON verisini döndürür. Programatik tüketim veya piping için kullanışlıdır.',
+  },
+  // deckent_explain
+  'mcp.explain.sprint_id_desc': {
+    en: 'Show a specific sprint by ID (e.g. "042", "sprint-042"). If omitted, returns the latest sprint.',
+    tr: 'Belirli bir sprint’i ID’ye göre gösterir (örn. "042", "sprint-042"). Belirtilmezse en son sprint’i döndürür.',
+  },
+  'mcp.explain.verbose_desc': {
+    en: 'Show all learnings and full task details. Default shows max 3 learnings.',
+    tr: 'Tüm learnings’i ve tam görev detaylarını gösterir. Varsayılan olarak azami 3 learnings gösterilir.',
+  },
+  'mcp.explain.json_desc': {
+    en: 'Return raw JSON data instead of human-readable summary.',
+    tr: 'Human-readable summary yerine ham JSON verisini döndürür.',
+  },
+  // deckent_feature_query
+  'mcp.feature_query.category_desc': {
+    en: 'Filter by category: active, lightly_used, dormant, dead, all (default: all)',
+    tr: 'Category’e göre filtreler: active, lightly_used, dormant, dead, all (varsayılan: all)',
+  },
+  'mcp.feature_query.id_desc': {
+    en: 'Look up a specific feature by ID',
+    tr: 'Belirli bir özelliği ID’ye göre arar',
+  },
+  // deckent_history
+  'mcp.history.last_desc': {
+    en: 'Number of most recent runs to return (1-50, default: 5). Runs are sorted by sprint ID ascending.',
+    tr: 'Döndürülecek en son run sayısı (1-50, varsayılan: 5). Run’lar sprint ID’ye göre artan sırada sıralanır.',
+  },
+  'mcp.history.json_desc': {
+    en: 'Return raw JSON data without the human-readable summary wrapper. Useful for programmatic consumption or piping to other tools.',
+    tr: 'Human-readable özet wrapper’ı olmadan ham JSON verisi döndürür. Programatik kullanım veya başka araçlara pipe etmek için kullanışlıdır.',
+  },
+  // deckent_init
+  'mcp.init.project_name_desc': {
+    en: 'Project name used in DECKENT.md header and PROJECT-IDENTITY.md. Defaults to current directory name if omitted.',
+    tr: 'DECKENT.md başlığında ve PROJECT-IDENTITY.md içinde kullanılan proje adı. Belirtilmezse varsayılan olarak geçerli dizin adı kullanılır.',
+  },
+  'mcp.init.mode_desc': {
+    en: 'Plan tier mode (tier-based model strategy; effective models resolve from the configured provider\'s registry and your active model policy, never from a fixed model family). performance: premium-tier Brain and workers, up to premium_plus with auto-upgrade, max 8 workers. balanced: standard-tier Brain with premium-tier workers, auto-upgrade and auto-downgrade, max 5 workers. economic: standard tier for Brain and workers, capped at standard (premium is never selected), auto-downgrade only, max 3 workers. api: pay-per-use API-key mode (requires the API key the config declares, ANTHROPIC_API_KEY), premium-tier Brain with standard-tier workers and a per-sprint budget, max 10 workers. Legacy aliases max_plan, max5x_plan and pro_plan are accepted and normalize to performance, balanced and economic.',
+    tr: 'Plan tier modu (tier tabanlı model stratejisi; effective modeller yapılandırılmış provider’ın registry’sinden ve aktif model policy’nizden çözülür, asla sabit bir model ailesinden değil). performance: premium-tier Brain ve worker’lar, auto-upgrade ile premium_plus’a kadar, azami 8 worker. balanced: premium-tier worker’larla standard-tier Brain, auto-upgrade ve auto-downgrade, azami 5 worker. economic: Brain ve worker’lar için standard tier, standard ile sınırlı (premium asla seçilmez), yalnızca auto-downgrade, azami 3 worker. api: kullandıkça-öde API-key modu (config’in bildirdiği API anahtarını gerektirir, ANTHROPIC_API_KEY), per-sprint bütçeli standard-tier worker’larla premium-tier Brain, azami 10 worker. Legacy alias’lar max_plan, max5x_plan ve pro_plan kabul edilir ve performance, balanced ve economic’e normalize edilir.',
+  },
+  'mcp.init.language_desc': {
+    en: 'Language for agent prompt templates (en=English, tr=Turkish)',
+    tr: 'Agent prompt template’leri için dil (en=English, tr=Turkish)',
+  },
+  'mcp.init.force_desc': {
+    en: 'Force config re-initialization while reconciling only registered managed workspace sections; user-owned workspace content, .brain/ and .tasks/ data are preserved.',
+    tr: 'Yalnızca kayıtlı managed workspace bölümlerini uzlaştırırken config’i zorla yeniden ilklendirir; user-owned workspace içeriği, .brain/ ve .tasks/ verileri korunur.',
+  },
+  'mcp.init.auto_desc': {
+    en: 'Auto-detection mode: skip interactive wizard, detect project stack automatically and apply defaults.',
+    tr: 'Otomatik algılama modu: interactive wizard’ı atlar, proje stack’ini otomatik algılar ve varsayılanları uygular.',
+  },
+  'mcp.init.install_missing_desc': {
+    en: 'Install missing provider CLIs (claude/codex/gemini) automatically. MCP has no interactive consent, so this is an explicit opt-in (equivalent to CLI `--yes`). When false, missing tools are only reported.',
+    tr: 'Eksik provider CLI’larını (claude/codex/gemini) otomatik olarak kurar. MCP’de interactive consent olmadığından bu açık bir opt-in’dir (CLI `--yes` ile eşdeğerdir). false olduğunda, eksik araçlar yalnızca raporlanır.',
+  },
+  // deckent_inspect
+  'mcp.inspect.task_id_desc': {
+    en: 'Task id for the drill-down view (e.g. "541-001"). Omit for the run listing.',
+    tr: 'Drill-down görünümü için Task ID (örn. "541-001"). Run listesi için atlayın.',
+  },
+  // deckent_kill
+  'mcp.kill.task_id_desc': {
+    en: 'Specific task ID to kill (e.g. "059-001"). The worker for this task is stopped and its locks released.',
+    tr: 'Kill edilecek belirli Task ID (örn. "059-001"). Bu task’ın worker’ı durdurulur ve kilitleri serbest bırakılır.',
+  },
+  'mcp.kill.all_desc': {
+    en: 'Kill ALL active workers (status EXECUTING, CLAIMED, or TESTING). Use when sprint is stuck and needs a full restart.',
+    tr: 'TÜM aktif worker’ları kill eder (status EXECUTING, CLAIMED veya TESTING). Sprint takılıp tam bir restart gerektiğinde kullanın.',
+  },
+  'mcp.kill.force_desc': {
+    en: 'CLI --force parity (Sprint 189 T-009). Marks the kill as a panic-guard bypass attempt. Must be combined with userExplicit; on its own it does nothing. The kill itself still proceeds — this flag only flips the audit-trail breadcrumb.',
+    tr: 'CLI --force parity’si (Sprint 189 T-009). Kill’i bir panic-guard bypass girişimi olarak işaretler. userExplicit ile birlikte kullanılmalıdır; tek başına hiçbir şey yapmaz. Kill yine de devam eder — bu flag yalnızca audit-trail breadcrumb’ını değiştirir.',
+  },
+  'mcp.kill.user_explicit_desc': {
+    en: 'CLI --user-explicit parity. Explicit human confirmation required to mark the kill as a panic-guard override. Combined with force this writes a debug breadcrumb (mcp:kill:panic-bypass) so post-mortems can correlate the override. Alperen rule (feedback_sprint_kill_always_ask_user): kill default ALWAYS requires user approval — bypass is logged, never silent.',
+    tr: 'CLI --user-explicit parity’si. Kill’i bir panic-guard override olarak işaretlemek için açık insan onayı gereklidir. force ile birlikte kullanıldığında bir debug breadcrumb’ı (mcp:kill:panic-bypass) yazılır, böylece post-mortem’ler override’ı ilişkilendirebilir. Alperen kuralı (feedback_sprint_kill_always_ask_user): kill varsayılan olarak HER ZAMAN kullanıcı onayı gerektirir — bypass loglanır, asla sessiz değildir.',
+  },
+  // deckent_kpi
+  'mcp.kpi.sprint_desc': {
+    en: 'Sprint ID (e.g. "sprint-330") — defaults to the current active sprint (scorecard mode only)',
+    tr: 'Sprint ID (örn. "sprint-330") — varsayılan olarak mevcut aktif sprint’tir (yalnızca scorecard modu)',
+  },
+  'mcp.kpi.tenant_id_desc': {
+    en: 'Tenant scope — defaults to "default"',
+    tr: 'Tenant scope’u — varsayılanı "default"’tur',
+  },
+  'mcp.kpi.trend_desc': {
+    en: 'KPI ID to fetch trend for (e.g. "cost_per_sprint") — activates trend mode',
+    tr: 'Trend’i getirilecek KPI ID’si (örn. "cost_per_sprint") — trend modunu etkinleştirir',
+  },
+  'mcp.kpi.n_desc': {
+    en: 'Number of sprint periods to return in trend mode — defaults to 10',
+    tr: 'Trend modunda döndürülecek sprint periyodu sayısı — varsayılanı 10’dur',
+  },
+  // deckent_memory_query
+  'mcp.memory_query.query_desc': {
+    en: 'Search query text',
+    tr: 'Arama sorgusu metni',
+  },
+  'mcp.memory_query.type_desc': {
+    en: 'Filter by type: adr, memory, sprint, debt, pattern, retro',
+    tr: 'Türe göre filtrele: adr, memory, sprint, debt, pattern, retro',
+  },
+  'mcp.memory_query.status_desc': {
+    en: 'Filter by status: active, accepted, deprecated, resolved',
+    tr: 'Duruma göre filtrele: active, accepted, deprecated, resolved',
+  },
+  'mcp.memory_query.limit_desc': {
+    en: 'Max results (default 5)',
+    tr: 'Azami sonuç sayısı (varsayılan 5)',
+  },
+  'mcp.memory_query.sprint_min_desc': {
+    en: 'Minimum sprint number',
+    tr: 'Asgari sprint numarası',
+  },
+  'mcp.memory_query.mode_desc': {
+    en: 'FTS5 token join: or (default, broader recall) | and (all tokens must match)',
+    tr: 'FTS5 token birleşimi: or (varsayılan, daha geniş recall) | and (tüm token’lar eşleşmeli)',
+  },
+  'mcp.memory_query.cursor_desc': {
+    en: 'Opaque continuation cursor returned by an earlier memory query',
+    tr: 'Önceki bir memory query tarafından döndürülen opak devam cursor’ı',
+  },
+  'mcp.memory_query.detail_ref_desc': {
+    en: 'Opaque detail reference returned for a deferred complete entry',
+    tr: 'Ertelenmiş complete kaydı için döndürülen opak detay referansı',
+  },
+  'mcp.memory_query.root_desc': {
+    en: 'Project root path',
+    tr: 'Proje kök yolu',
+  },
+  // deckent_models
+  'mcp.models.action_desc': {
+    en: 'Action to perform: list | refresh | tier',
+    tr: 'Gerçekleştirilecek eylem: list | refresh | tier',
+  },
+  'mcp.models.provider_desc': {
+    en: 'Provider filter for "list" action (claude, codex, gemini, ollama)',
+    tr: '"list" eylemi için provider filtresi (claude, codex, gemini, ollama)',
+  },
+  'mcp.models.model_desc': {
+    en: 'Model ID or API ID for "tier" action',
+    tr: '"tier" eylemi için Model ID veya API ID',
+  },
+  'mcp.models.offline_desc': {
+    en: 'Use cached/bundled catalog without network (default: false)',
+    tr: 'Ağ olmadan cached/bundled katalog kullan (varsayılan: false)',
+  },
+  // deckent_nervous_edit
+  'mcp.nervous_edit.id_desc': {
+    en: 'Pending notification ID, id-prefix, or shortCode to accept with an edited payload',
+    tr: 'Düzenlenmiş bir payload ile kabul edilecek bekleyen bildirim ID’si, id-prefix ya da shortCode',
+  },
+  'mcp.nervous_edit.modified_payload_desc': {
+    en: 'Payload fields to shallow-merge onto the original action payload before accepting',
+    tr: 'Kabul etmeden önce orijinal action payload’ına shallow-merge edilecek payload alanları',
+  },
+  'mcp.nervous_edit.root_desc': {
+    en: 'Project root path (for locating the pending-notification store)',
+    tr: 'Proje kök dizini yolu (pending-notification store’unu bulmak için)',
+  },
+  // deckent_nervous_undo
+  'mcp.nervous_undo.id_desc': {
+    en: 'Specific ExecutionRecord id to target (default: most recent reversible accepted action)',
+    tr: 'Hedeflenecek belirli ExecutionRecord id’si (varsayılan: geri alınabilir en son kabul edilmiş action)',
+  },
+  'mcp.nervous_undo.root_desc': {
+    en: 'Project root path',
+    tr: 'Proje kök dizini yolu',
+  },
+  // deckent_plan
+  'mcp.plan.dry_run_desc': {
+    en: 'Always dry-run for plan tool — tasks are never written to disk',
+    tr: 'Plan aracı için her zaman dry-run — task’lar diske asla yazılmaz',
+  },
+  'mcp.plan.mode_desc': {
+    en: 'Planning mode. Omitted: the config-resolved Brain planning mode (top-level brain_planning, else the active plan-tier preset\'s brain_planning, else auto). "structured": parses DIRECTIVES.md task blocks deterministically, no provider call. "ai": one receipt-bound Brain call through the configured Brain provider and model (effective config/routing authority, never a fixed provider); a failed call is reported as a typed failure, never a silent structured fallback. "auto": attempts the same Brain call and falls back to structured when the call fails or the returned task count does not match the directives (fewer, or more than twice as many). In every non-structured mode, per-task Provider/Model/Agent/Skills directives force structured planning so routing is honored exactly.',
+    tr: 'Planlama modu. Verilmezse: config’den çözülen Brain planlama modu (üst düzey brain_planning, yoksa etkin plan katmanı preset’inin brain_planning değeri, yoksa auto). "structured": DIRECTIVES.md task bloklarını deterministic olarak parse eder, provider çağrısı yoktur. "ai": yapılandırılmış Brain provider ve model üzerinden receipt’e bağlı tek bir Brain çağrısı (effective config/routing authority, asla sabit bir provider değil); başarısız çağrı typed failure olarak raporlanır, asla sessizce structured’a düşülmez. "auto": aynı Brain çağrısını dener; çağrı başarısız olursa ya da dönen task sayısı directive’lerle uyuşmazsa (daha az ya da iki katından fazla) structured’a düşer. structured dışındaki her modda task başına Provider/Model/Agent/Skills directive’leri, routing’in birebir korunması için structured planlamayı zorlar.',
+  },
+  // deckent_process
+  'mcp.process.action_desc': {
+    en: 'submit | status | result',
+    tr: 'Eylem: submit | status | result',
+  },
+  'mcp.process.root_desc': {
+    en: 'Project root (default: cwd)',
+    tr: 'Proje kök dizini (varsayılan: cwd)',
+  },
+  'mcp.process.description_desc': {
+    en: 'submit: what to do (task description or capability intent)',
+    tr: 'submit: ne yapılacağı (görev açıklaması veya capability niyeti)',
+  },
+  'mcp.process.kind_desc': {
+    en: 'submit: execution kind (inferred capability when a capability verb is set)',
+    tr: 'submit: çalıştırma türü (bir capability fiili ayarlandığında capability olarak çıkarsanır)',
+  },
+  'mcp.process.capability_desc': {
+    en: 'submit kind=capability: dotted verb (e.g. erp.read, erp.write, db.query)',
+    tr: 'submit kind=capability: noktalı fiil (örn. erp.read, erp.write, db.query)',
+  },
+  'mcp.process.capability_args_desc': {
+    en: 'submit kind=capability: JSON object of handler args',
+    tr: 'submit kind=capability: handler argümanlarının JSON nesnesi',
+  },
+  'mcp.process.connector_desc': {
+    en: 'submit kind=capability: preferred backend (e.g. odoo, imap, postgres)',
+    tr: 'submit kind=capability: tercih edilen backend (örn. odoo, imap, postgres)',
+  },
+  'mcp.process.scope_dir_desc': {
+    en: 'submit kind=task: scope directory (drives risk classification)',
+    tr: 'submit kind=task: scope dizini (risk sınıflandırmasını yönlendirir)',
+  },
+  'mcp.process.provider_desc': {
+    en: 'submit: provider override',
+    tr: 'submit: provider override’ını belirler',
+  },
+  'mcp.process.model_desc': {
+    en: 'submit: model override',
+    tr: 'submit: model override’ını belirler',
+  },
+  'mcp.process.tenant_desc': {
+    en: 'submit: tenant id (audit isolation)',
+    tr: 'submit: tenant id (audit izolasyonu)',
+  },
+  'mcp.process.actor_id_desc': {
+    en: 'submit: actor id (RBAC + audit lineage)',
+    tr: 'submit: actor id (RBAC + audit soy izi)',
+  },
+  'mcp.process.execution_id_desc': {
+    en: 'status|result: the id returned by a prior submit',
+    tr: 'status|result: önceki bir submit tarafından döndürülen id',
+  },
+  // deckent_recover
+  'mcp.recover.sprint_id_desc': {
+    en: 'Sprint ID to recover (e.g. "sprint-150")',
+    tr: 'Recover edilecek Sprint ID (örn. "sprint-150")',
+  },
+  'mcp.recover.dry_run_desc': {
+    en: 'Preview mode: show what would be cleaned without making changes',
+    tr: 'Preview modu: değişiklik yapmadan neyin temizleneceğini gösterir',
+  },
+  'mcp.recover.skip_audit_desc': {
+    en: 'Skip the self-audit gate step',
+    tr: 'Self-audit gate adımını atlar',
+  },
+  'mcp.recover.approval_desc': {
+    en: 'Required exact identity/generation/fence binding for mutation',
+    tr: 'Mutation için gerekli exact identity/generation/fence binding’i',
+  },
+  // deckent_retro
+  'mcp.retro.sprint_id_desc': {
+    en: 'Read a specific sprint retrospective by sprint ID (e.g. "sprint-083"). If omitted, returns the most recent sprint retrospective.',
+    tr: 'Belirli bir sprint retrospektifini sprint ID’ye göre okur (örn. "sprint-083"). Belirtilmezse en son sprint retrospektifini döndürür.',
+  },
+  // deckent_review
+  'mcp.review.auto_desc': {
+    en: 'Auto-approve tasks where selfAssessment=DONE and testsPassed=true. Rejected tasks (NO_GO) are never auto-approved.',
+    tr: 'selfAssessment=DONE ve testsPassed=true olan görevleri otomatik onaylar. Reddedilen görevler (NO_GO) asla otomatik onaylanmaz.',
+  },
+  // deckent_status
+  'mcp.status.json_desc': {
+    en: 'Return raw JSON data without the human-readable summary wrapper. Useful for programmatic consumption.',
+    tr: 'İnsan tarafından okunabilir özet sarmalayıcısı olmadan ham JSON verisi döndürür. Programatik kullanım için faydalıdır.',
+  },
+  'mcp.status.verbose_desc': {
+    en: 'Include verbose details: full agent assignment map, skill assignments, and per-task agent/skill breakdown.',
+    tr: 'Verbose detayları dahil eder: tam agent atama haritası, skill atamaları ve task bazlı agent/skill dökümü.',
+  },
+  'mcp.status.output_mode_desc': {
+    en: 'Render mode for formatted output: explainatory (emoji + Türkçe insight blocks), standart (markdown table), verbose (full snapshot with timestamps), json (raw JSON). Defaults to standart.',
+    tr: 'Biçimlendirilmiş çıktı için render modu: explainatory (emoji + Türkçe içgörü blokları), standart (markdown tablosu), verbose (zaman damgalı tam anlık görüntü), json (ham JSON). Varsayılan: standart.',
+  },
+  // deckent_truth
+  'mcp.truth.check_desc': {
+    en: 'Also diff half-wire candidates against the pinned .deckent/truth-baseline.json ratchet',
+    tr: 'Half-wire adaylarını, sabitlenmiş .deckent/truth-baseline.json ratchet’ine karşı ayrıca diff’le',
+  },
+  // deckent_usage
+  'mcp.usage.sprint_desc': {
+    en: 'Sprint number (e.g. "275") — per-task breakdown mode',
+    tr: 'Sprint numarası (örn. "275") — task bazlı döküm modu',
+  },
+  'mcp.usage.since_desc': {
+    en: 'ISO date window start (e.g. "2026-06-01")',
+    tr: 'ISO tarih penceresi başlangıcı (örn. "2026-06-01")',
+  },
+  'mcp.usage.until_desc': {
+    en: 'ISO date window end (e.g. "2026-06-10")',
+    tr: 'ISO tarih penceresi bitişi (örn. "2026-06-10")',
+  },
+  'mcp.usage.lineage_desc': {
+    en: 'Tasks + attempts to fold into logical-root usage/billing aggregates via the canonical authority',
+    tr: 'Canonical authority üzerinden logical-root usage/billing aggregate’lerine katılacak task’lar + attempt’ler',
+  },
+  // deckent_watch
+  'mcp.watch.sprint_id_desc': {
+    en: 'Sprint ID to watch. Defaults to current active sprint.',
+    tr: 'İzlenecek Sprint ID. Varsayılan olarak geçerli aktif sprint’tir.',
+  },
+  'mcp.watch.channels_desc': {
+    en: 'Filter events by channel keyword. Only events whose channel string contains one of these keywords are forwarded. Omit for all channels.',
+    tr: 'Olayları channel keyword’üne göre filtrele. Yalnızca channel string’i bu keyword’lerden birini içeren olaylar iletilir. Tüm channel’lar için atlayın.',
+  },
+  'mcp.watch.tail_desc': {
+    en: 'Number of recent events to backfill (0-100, default 20).',
+    tr: 'Backfill edilecek son olay sayısı (0-100, varsayılan 20).',
+  },
 
   // ─── cost gate result/warning messages (task 591-001) ─────────────────
   // Human-readable sentences for src/core/cost-gate.ts. Typed codes

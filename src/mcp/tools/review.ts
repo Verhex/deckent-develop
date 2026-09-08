@@ -6,7 +6,7 @@ import { TASKS_DIR } from '../../core/constants.js';
 import { loadConfig } from '../../core/config.js';
 import { getNextSprintId } from '../../core/utils.js';
 import { enrichResponse } from '../helpers/enrich.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 import { resolveTaskArtifactReadDirs } from '../../core/sprint-archive.js';
 
 interface TaskResultData {
@@ -69,7 +69,7 @@ export function registerReviewTool(server: McpServer): void {
       description: mcpToolDescription('deckent_review'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        auto: z.boolean().optional().default(false).describe('Auto-approve tasks where selfAssessment=DONE and testsPassed=true. Rejected tasks (NO_GO) are never auto-approved.'),
+        auto: z.boolean().optional().default(false).describe(mcpFieldDescription('deckent_review', 'auto')),
       }),
     },
     async ({ auto }) => {

@@ -26,7 +26,7 @@ import {
   type FeatureTruthContext,
 } from '../../core/feature-truth.js';
 import { loadConfig } from '../../core/config.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 /** Pinned half-wire ratchet baseline, relative to projectRoot (mirrors CLI). */
 const TRUTH_BASELINE_FILE = '.deckent/truth-baseline.json';
@@ -87,7 +87,7 @@ export function registerTruthTool(server: McpServer): void {
         check: z
           .boolean()
           .optional()
-          .describe('Also diff half-wire candidates against the pinned .deckent/truth-baseline.json ratchet'),
+          .describe(mcpFieldDescription('deckent_truth', 'check')),
       }),
     },
     async ({ check }) => {

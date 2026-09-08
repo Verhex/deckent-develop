@@ -22,7 +22,7 @@ import {
   type RunStatusReadiness,
 } from '../../core/run-status-read-model.js';
 import * as runStatusReadModelAuthority from '../../core/run-status-read-model.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 /**
  * Read the last N events from the event stream JSONL file.
@@ -382,9 +382,9 @@ export function registerStatusTool(server: McpServer): void {
       description: mcpToolDescription('deckent_status'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        json: z.boolean().optional().default(false).describe('Return raw JSON data without the human-readable summary wrapper. Useful for programmatic consumption.'),
-        verbose: z.boolean().optional().default(false).describe('Include verbose details: full agent assignment map, skill assignments, and per-task agent/skill breakdown.'),
-        outputMode: z.enum(['explainatory', 'standart', 'verbose', 'json']).optional().describe('Render mode for formatted output: explainatory (emoji + Türkçe insight blocks), standart (markdown table), verbose (full snapshot with timestamps), json (raw JSON). Defaults to standart.'),
+        json: z.boolean().optional().default(false).describe(mcpFieldDescription('deckent_status', 'json')),
+        verbose: z.boolean().optional().default(false).describe(mcpFieldDescription('deckent_status', 'verbose')),
+        outputMode: z.enum(['explainatory', 'standart', 'verbose', 'json']).optional().describe(mcpFieldDescription('deckent_status', 'outputMode')),
       }),
     },
     async ({ json, verbose, outputMode }) => {

@@ -24,7 +24,7 @@ import {
   withConfigWriteLock,
   writeConfigJsonAtomic,
 } from '../../core/config-write-authority.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 function ensureDir(dir: string): void {
   mkdirSync(dir, { recursive: true });
@@ -57,12 +57,12 @@ export function registerInitTool(server: McpServer): void {
       description: mcpToolDescription('deckent_init'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        projectName: z.string().optional().describe('Project name used in DECKENT.md header and PROJECT-IDENTITY.md. Defaults to current directory name if omitted.'),
-        mode: z.enum(['performance', 'balanced', 'economic', 'api', 'max_plan', 'max5x_plan', 'pro_plan']).optional().default('performance').describe('Plan tier mode: performance (Opus, max power), balanced (Sonnet brain + Opus workers), economic (Sonnet, cost-efficient), api (API key, pay-per-use)'),
-        language: z.enum(['en', 'tr']).optional().default('en').describe('Language for agent prompt templates (en=English, tr=Turkish)'),
-        force: z.boolean().optional().default(false).describe('Force config re-initialization while reconciling only registered managed workspace sections; user-owned workspace content, .brain/ and .tasks/ data are preserved.'),
-        auto: z.boolean().optional().default(false).describe('Auto-detection mode: skip interactive wizard, detect project stack automatically and apply defaults.'),
-        installMissing: z.boolean().optional().default(false).describe('Install missing provider CLIs (claude/codex/gemini) automatically. MCP has no interactive consent, so this is an explicit opt-in (equivalent to CLI `--yes`). When false, missing tools are only reported.'),
+        projectName: z.string().optional().describe(mcpFieldDescription('deckent_init', 'projectName')),
+        mode: z.enum(['performance', 'balanced', 'economic', 'api', 'max_plan', 'max5x_plan', 'pro_plan']).optional().default('performance').describe(mcpFieldDescription('deckent_init', 'mode')),
+        language: z.enum(['en', 'tr']).optional().default('en').describe(mcpFieldDescription('deckent_init', 'language')),
+        force: z.boolean().optional().default(false).describe(mcpFieldDescription('deckent_init', 'force')),
+        auto: z.boolean().optional().default(false).describe(mcpFieldDescription('deckent_init', 'auto')),
+        installMissing: z.boolean().optional().default(false).describe(mcpFieldDescription('deckent_init', 'installMissing')),
       }),
     },
     async ({ projectName, mode, language, force, auto, installMissing }) => {

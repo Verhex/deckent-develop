@@ -5,7 +5,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatHistoryResponse, wrapResponse, type HistoryData } from '../helpers/format.js';
 import { collectSprintFiles } from '../../orchestra/sprint-reporter.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 function detectTrend(sprints: Array<{ id: string; content: string }>): string {
   if (sprints.length < 2) return 'insufficient_data';
@@ -34,8 +34,8 @@ export function registerHistoryTool(server: McpServer): void {
       description: mcpToolDescription('deckent_history'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        last: z.number().min(1).max(50).optional().default(5).describe('Number of most recent runs to return (1-50, default: 5). Runs are sorted by sprint ID ascending.'),
-        json: z.boolean().optional().default(false).describe('Return raw JSON data without the human-readable summary wrapper. Useful for programmatic consumption or piping to other tools.'),
+        last: z.number().min(1).max(50).optional().default(5).describe(mcpFieldDescription('deckent_history', 'last')),
+        json: z.boolean().optional().default(false).describe(mcpFieldDescription('deckent_history', 'json')),
       }),
     },
     async ({ last, json }) => {

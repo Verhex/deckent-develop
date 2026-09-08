@@ -13,7 +13,7 @@ import {
   readRunInspectorTaskDetail,
   SPRINT_TASK_ID_RE,
 } from '../../core/run-inspector-read-model.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 export function registerInspectTool(server: McpServer): void {
   server.registerTool(
@@ -23,7 +23,7 @@ export function registerInspectTool(server: McpServer): void {
       description: mcpToolDescription('deckent_inspect'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        taskId: z.string().optional().describe('Task id for the drill-down view (e.g. "541-001"). Omit for the run listing.'),
+        taskId: z.string().optional().describe(mcpFieldDescription('deckent_inspect', 'taskId')),
       }),
     },
     async ({ taskId }) => {

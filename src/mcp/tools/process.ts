@@ -15,7 +15,7 @@ import { loadBacklog } from '../../orchestra/autonomous/backlog.js';
 import { buildProcessController } from '../../cli/helpers/process-runtime.js';
 import type { ProcessSubmitCtx } from '../../orchestra/process-controller.js';
 import type { CapabilityTarget } from '../../core/work-model.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 function backlogPath(root: string): string {
   return join(root, '.deckent', 'autonomous', 'backlog.json');
@@ -33,21 +33,21 @@ export function registerProcessTool(server: McpServer): void {
       description: mcpToolDescription('deckent_process'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
-        action: z.enum(['submit', 'status', 'result']).describe('submit | status | result'),
-        root: z.string().optional().describe('Project root (default: cwd)'),
+        action: z.enum(['submit', 'status', 'result']).describe(mcpFieldDescription('deckent_process', 'action')),
+        root: z.string().optional().describe(mcpFieldDescription('deckent_process', 'root')),
         // submit fields
-        description: z.string().optional().describe('submit: what to do (task description or capability intent)'),
-        kind: z.enum(['task', 'sprint', 'capability']).optional().describe('submit: execution kind (inferred capability when a capability verb is set)'),
-        capability: z.string().optional().describe('submit kind=capability: dotted verb (e.g. erp.read, erp.write, db.query)'),
-        capabilityArgs: z.string().optional().describe('submit kind=capability: JSON object of handler args'),
-        connector: z.string().optional().describe('submit kind=capability: preferred backend (e.g. odoo, imap, postgres)'),
-        scopeDir: z.string().optional().describe('submit kind=task: scope directory (drives risk classification)'),
-        provider: z.string().optional().describe('submit: provider override'),
-        model: z.string().optional().describe('submit: model override'),
-        tenant: z.string().optional().describe('submit: tenant id (audit isolation)'),
-        actorId: z.string().optional().describe('submit: actor id (RBAC + audit lineage)'),
+        description: z.string().optional().describe(mcpFieldDescription('deckent_process', 'description')),
+        kind: z.enum(['task', 'sprint', 'capability']).optional().describe(mcpFieldDescription('deckent_process', 'kind')),
+        capability: z.string().optional().describe(mcpFieldDescription('deckent_process', 'capability')),
+        capabilityArgs: z.string().optional().describe(mcpFieldDescription('deckent_process', 'capabilityArgs')),
+        connector: z.string().optional().describe(mcpFieldDescription('deckent_process', 'connector')),
+        scopeDir: z.string().optional().describe(mcpFieldDescription('deckent_process', 'scopeDir')),
+        provider: z.string().optional().describe(mcpFieldDescription('deckent_process', 'provider')),
+        model: z.string().optional().describe(mcpFieldDescription('deckent_process', 'model')),
+        tenant: z.string().optional().describe(mcpFieldDescription('deckent_process', 'tenant')),
+        actorId: z.string().optional().describe(mcpFieldDescription('deckent_process', 'actorId')),
         // status/result field
-        executionId: z.string().optional().describe('status|result: the id returned by a prior submit'),
+        executionId: z.string().optional().describe(mcpFieldDescription('deckent_process', 'executionId')),
       }).shape,
     },
     async ({ action, root: rootParam, description, kind, capability, capabilityArgs, connector, scopeDir, provider, model, tenant, actorId, executionId }) => {

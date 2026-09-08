@@ -24,7 +24,7 @@ import type { KpiFormat } from '../../core/kpi/types.js';
 import type { ResultRow } from '../../core/kpi/kpi-store.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { getCurrentSprintId } from '../../monitor/sprint-state.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 // ─── Injectable deps ──────────────────────────────────────────────────────────
 
@@ -118,16 +118,16 @@ export function registerKpiTool(server: McpServer, deps: KpiToolDeps = {}): void
       },
       inputSchema: z.object({
         sprint: z.string().optional().describe(
-          'Sprint ID (e.g. "sprint-330") — defaults to the current active sprint (scorecard mode only)',
+          mcpFieldDescription('deckent_kpi', 'sprint'),
         ),
         tenantId: z.string().optional().describe(
-          'Tenant scope — defaults to "default"',
+          mcpFieldDescription('deckent_kpi', 'tenantId'),
         ),
         trend: z.string().optional().describe(
-          'KPI ID to fetch trend for (e.g. "cost_per_sprint") — activates trend mode',
+          mcpFieldDescription('deckent_kpi', 'trend'),
         ),
         n: z.number().int().positive().optional().describe(
-          'Number of sprint periods to return in trend mode — defaults to 10',
+          mcpFieldDescription('deckent_kpi', 'n'),
         ),
       }),
     },

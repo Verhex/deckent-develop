@@ -6,7 +6,7 @@ import { DIRECTIVES_FILE } from '../../core/constants.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { getActiveDirectivesProtection } from '../../nervous/observer.js';
 import { modelRegistry, LEGACY_MODEL_ALIASES } from '../../core/model-registry.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 // 454-004: the tool description's Model example must teach an exact provider
 // API ID + explicit Provider ownership — never a retired alias
@@ -59,7 +59,7 @@ export function registerSetDirectivesTool(server: McpServer): void {
       }),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
-        content: z.string().describe('Formatted DIRECTIVES.md content with ## Task N: or ## Görev N: blocks. Each block needs Model (exact provider API ID — no legacy aliases), Effort, Skills, Files, Scope, and Description sub-sections; Provider is optional.'),
+        content: z.string().describe(mcpFieldDescription('deckent_set_directives', 'content')),
       }),
     },
     async ({ content }) => {

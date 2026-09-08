@@ -7,7 +7,7 @@ import { getNextSprintId } from '../../core/utils.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import { runDecay } from '../../orchestra/brain.js';
 import { enrichResponse } from '../helpers/enrich.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 /** DB-first memory entry count — replaces legacy countBrainLines. */
 function getMemoryEntryCount(projectRoot: string): number {
@@ -60,8 +60,8 @@ export function registerCleanupTool(server: McpServer): void {
       description: mcpToolDescription('deckent_cleanup'),
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
       inputSchema: z.object({
-        decay: z.boolean().optional().default(false).describe('Also run memory decay on .brain/ files if they exceed the configured line budget (default: 900 lines). Trims old sprint logs and compresses MEMORY.md.'),
-        dryRun: z.boolean().optional().default(false).describe('Preview mode: show what would be deleted (file counts, brain line count, decay decision) without actually deleting anything. Recommended before first cleanup.'),
+        decay: z.boolean().optional().default(false).describe(mcpFieldDescription('deckent_cleanup', 'decay')),
+        dryRun: z.boolean().optional().default(false).describe(mcpFieldDescription('deckent_cleanup', 'dryRun')),
       }),
     },
     async ({ decay, dryRun }) => {

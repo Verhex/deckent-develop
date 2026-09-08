@@ -20,7 +20,7 @@
 // `setMcpToolDescriptionLanguage` from the config-backed canonical resolver
 // before `registerTools()` runs); tool modules never re-resolve it themselves.
 
-import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
+import { getLanguage, getMessage, getMessageLanguages } from '../../cli/helpers/messages.js';
 
 /** Which surface owns the shared description key. */
 export type McpToolDescriptionSurface = 'cli-shared' | 'mcp-only';
@@ -148,4 +148,72 @@ export function mcpToolDescription(
   const base = getMessage(binding.key, lang, options.vars);
   if (binding.detailKey === undefined) return base;
   return `${base} ${getMessage(binding.detailKey, lang, options.vars)}`;
+}
+
+// ─── MCP inputSchema field description catalog binding (7085) ────────────────
+//
+// Every inputSchema field description resolves from the SAME `MESSAGES`
+// catalog as the tool description above, in the SAME server-start resolved
+// language — there is exactly one language resolver on this surface.
+//
+// Key convention (one key per tool field, owned by the MCP surface):
+//   `mcp.<tool>.<snake_case_field>_desc`   e.g. deckent_kill / taskId
+//                                           → `mcp.kill.task_id_desc`
+// Fields migrated before this binding existed keep their historical keys
+// (`mcp.start.*_desc`, `nervous.mcp.*`, `xverify.mcp.*`, …) and read them
+// through `getMessage(key, registerLang)` directly; both forms are catalog
+// reads, and the field-description gate accepts both while rejecting any
+// literal.
+
+/** Languages every field description MUST carry — an English-only row is unbound. */
+export const MCP_FIELD_DESCRIPTION_REQUIRED_LANGUAGES: readonly string[] = Object.freeze(['en', 'tr']);
+
+/** `taskId` → `task_id`, `acknowledgeCost` → `acknowledge_cost`, `sprint_id` → `sprint_id`. */
+function fieldToKeySegment(field: string): string {
+  return field
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/([A-Z])([A-Z][a-z])/g, '$1_$2')
+    .toLowerCase();
+}
+
+/**
+ * The catalog key an inputSchema field description resolves from — derived,
+ * never hand-typed at the call site, so a tool/field rename cannot leave a
+ * stale key behind unnoticed (the field gate re-derives it from source).
+ */
+export function mcpFieldDescriptionKey(toolName: string, field: string): string {
+  if (!/^deckent_[a-z0-9_]+$/.test(toolName)) {
+    throw new Error(`E_MCP_FIELD_DESCRIPTION_TOOL_NAME: "${toolName}" is not a deckent_* MCP tool name.`);
+  }
+  if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(field)) {
+    throw new Error(`E_MCP_FIELD_DESCRIPTION_FIELD_NAME: "${field}" is not a valid inputSchema field name.`);
+  }
+  return `mcp.${toolName.slice('deckent_'.length)}.${fieldToKeySegment(field)}_desc`;
+}
+
+/**
+ * Resolve one inputSchema field description from the shared catalog in the
+ * server-start resolved language (or an explicit override).
+ *
+ * Fails closed: a key missing from the catalog, or present without EVERY
+ * required language, throws at registration — a tool never ships a field
+ * whose description is the raw key, an empty string, or an English-only row
+ * silently rendered under a Turkish session.
+ */
+export function mcpFieldDescription(
+  toolName: string,
+  field: string,
+  options: McpToolDescriptionOptions = {},
+): string {
+  const key = mcpFieldDescriptionKey(toolName, field);
+  const present = getMessageLanguages(key);
+  const missing = MCP_FIELD_DESCRIPTION_REQUIRED_LANGUAGES.filter((lang) => !present.includes(lang));
+  if (missing.length > 0) {
+    throw new Error(
+      `E_MCP_FIELD_DESCRIPTION_UNBOUND: MCP tool "${toolName}" field "${field}" has no complete catalog entry `
+      + `"${key}" (missing: ${missing.join(', ')}) — add the en+tr pair to src/cli/helpers/messages.ts before registering it.`,
+    );
+  }
+  const lang = options.lang ?? getMcpToolDescriptionLanguage();
+  return getMessage(key, lang, options.vars);
 }

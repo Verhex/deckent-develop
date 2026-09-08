@@ -8,7 +8,7 @@ import { buildMemoryReadLabels } from '../../core/memory-read-labels.js';
 import { attendedExecutionProjectId } from '../../core/attended-execution-approval.js';
 import { resolveMemoryReadConfig } from '../../core/config.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 import { getMemoryReadMessage, resolveMemoryReadAmbientLanguage } from '../../core/memory-read-messages.js';
 
 export function registerMemoryQueryTool(server: McpServer): void {
@@ -23,15 +23,15 @@ export function registerMemoryQueryTool(server: McpServer): void {
         idempotentHint: true,
       },
       inputSchema: z.object({
-        query: z.string().optional().describe('Search query text'),
-        type: z.array(z.string()).optional().describe('Filter by type: adr, memory, sprint, debt, pattern, retro'),
-        status: z.array(z.string()).optional().describe('Filter by status: active, accepted, deprecated, resolved'),
-        limit: z.number().optional().default(5).describe('Max results (default 5)'),
-        sprint_min: z.number().optional().describe('Minimum sprint number'),
-        mode: z.enum(['and', 'or']).optional().default('or').describe('FTS5 token join: or (default, broader recall) | and (all tokens must match)'),
-        cursor: z.string().optional().describe('Opaque continuation cursor returned by an earlier memory query'),
-        detail_ref: z.string().optional().describe('Opaque detail reference returned for a deferred complete entry'),
-        root: z.string().optional().describe('Project root path'),
+        query: z.string().optional().describe(mcpFieldDescription('deckent_memory_query', 'query')),
+        type: z.array(z.string()).optional().describe(mcpFieldDescription('deckent_memory_query', 'type')),
+        status: z.array(z.string()).optional().describe(mcpFieldDescription('deckent_memory_query', 'status')),
+        limit: z.number().optional().default(5).describe(mcpFieldDescription('deckent_memory_query', 'limit')),
+        sprint_min: z.number().optional().describe(mcpFieldDescription('deckent_memory_query', 'sprint_min')),
+        mode: z.enum(['and', 'or']).optional().default('or').describe(mcpFieldDescription('deckent_memory_query', 'mode')),
+        cursor: z.string().optional().describe(mcpFieldDescription('deckent_memory_query', 'cursor')),
+        detail_ref: z.string().optional().describe(mcpFieldDescription('deckent_memory_query', 'detail_ref')),
+        root: z.string().optional().describe(mcpFieldDescription('deckent_memory_query', 'root')),
       }),
     },
     async ({ query, type, status, limit, sprint_min, mode, cursor, detail_ref, root: rootParam }) => {

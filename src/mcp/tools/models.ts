@@ -9,7 +9,7 @@ import {
   type CatalogLoadOptions,
 } from '../../core/model-catalog.js';
 import type { ModelDefinition } from '../../core/model-registry.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -33,19 +33,19 @@ export function registerModelsTool(server: McpServer): void {
       inputSchema: z.object({
         action: z
           .enum(['list', 'refresh', 'tier'])
-          .describe('Action to perform: list | refresh | tier'),
+          .describe(mcpFieldDescription('deckent_models', 'action')),
         provider: z
           .string()
           .optional()
-          .describe('Provider filter for "list" action (claude, codex, gemini, ollama)'),
+          .describe(mcpFieldDescription('deckent_models', 'provider')),
         model: z
           .string()
           .optional()
-          .describe('Model ID or API ID for "tier" action'),
+          .describe(mcpFieldDescription('deckent_models', 'model')),
         offline: z
           .boolean()
           .optional()
-          .describe('Use cached/bundled catalog without network (default: false)'),
+          .describe(mcpFieldDescription('deckent_models', 'offline')),
       }),
     },
     async ({ action, provider, model, offline }) => {

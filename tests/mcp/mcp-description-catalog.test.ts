@@ -220,3 +220,30 @@ describe('MCP tool description catalog binding', () => {
     expect(String(effective.get('deckent_audit')!['description'])).toContain('DESTRUCTIVE');
   });
 });
+
+// ─── 7085: the field binding shares this surface's ONE language resolver ─────
+describe('MCP field description binding shares the tool description language (7085)', () => {
+  afterEach(() => resetMcpToolDescriptionLanguage());
+
+  it('a tr-seeded server renders tool AND field descriptions in tr from the same seed', async () => {
+    const { mcpFieldDescription, mcpFieldDescriptionKey } = await import('../../src/mcp/tools/description-catalog.js');
+    setMcpToolDescriptionLanguage('tr');
+    const key = mcpFieldDescriptionKey('deckent_kill', 'taskId');
+    expect(mcpFieldDescription('deckent_kill', 'taskId')).toBe(getMessage(key, 'tr'));
+    expect(mcpToolDescription('deckent_kill')).toBe(mcpToolDescription('deckent_kill', { lang: 'tr' }));
+    expect(getMessage(key, 'tr')).not.toBe(getMessage(key, 'en'));
+  });
+
+  it('registering under a tr seed renders every deckent_kill field in tr, and the seed does not leak past reset', () => {
+    setMcpToolDescriptionLanguage('tr');
+    const trConfigs = capture();
+    resetMcpToolDescriptionLanguage();
+    setMcpToolDescriptionLanguage('en');
+    const enConfigs = capture();
+    const shapeOf = (configs: Map<string, Record<string, unknown>>) =>
+      (configs.get('deckent_kill')!['inputSchema'] as { shape: Record<string, { description?: string }> }).shape;
+    for (const field of Object.keys(shapeOf(enConfigs))) {
+      expect(shapeOf(trConfigs)[field]!.description, `deckent_kill.${field} tr rendering`).not.toBe(shapeOf(enConfigs)[field]!.description);
+    }
+  });
+});

@@ -4,7 +4,7 @@ import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { validateSprintId, validatePhase, validatePath } from '../../core/validators.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -83,10 +83,10 @@ export function registerCheckpointTool(server: McpServer): void {
       description: mcpToolDescription('deckent_checkpoint'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
-        action: z.enum(['list', 'approve', 'reject']).describe('Action to perform: list all checkpoints, approve a pending checkpoint, or reject a pending checkpoint.'),
-        sprintId: z.string().optional().describe('Sprint ID (e.g. "sprint-089"). Required for approve/reject actions.'),
-        phase: z.string().optional().describe('Phase name (e.g. "plan", "evaluate", "fix"). Required for approve/reject actions.'),
-        root: z.string().optional().describe('Project root directory. Defaults to current working directory.'),
+        action: z.enum(['list', 'approve', 'reject']).describe(mcpFieldDescription('deckent_checkpoint', 'action')),
+        sprintId: z.string().optional().describe(mcpFieldDescription('deckent_checkpoint', 'sprintId')),
+        phase: z.string().optional().describe(mcpFieldDescription('deckent_checkpoint', 'phase')),
+        root: z.string().optional().describe(mcpFieldDescription('deckent_checkpoint', 'root')),
       }),
     },
     async ({ action, sprintId, phase, root: rootArg }) => {

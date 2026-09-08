@@ -24,7 +24,7 @@
 // `descriptionKeyGaps` in the same baseline file.
 
 import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -93,6 +93,56 @@ const descriptionBindings = [];
     descriptionBindings.push({ tool: m[1], key: m[2], surface: m[3] });
   }
 }
+
+// ── 2c. inputSchema field-description ratchet (7085) ─────────────────────────
+//
+// Every `.describe(...)` on an MCP tool inputSchema field must be a CATALOG
+// read — `mcpFieldDescription('<tool>', '<field>')` (7085 binding, derived
+// `mcp.<tool>.<field>_desc` key), `getMessage('<key>', lang)` (historical
+// per-tool keys) or `cliContractMessage('<key>', lang)` (the CLI-contract
+// split catalog). A quoted literal, a template, or any other expression is a
+// gap: the AI operator would read an English-only, untranslatable sentence
+// under a Turkish session. Same baseline-ratchet discipline: NEW gaps fail,
+// accepted ones live in `fieldDescriptionGaps` (starts EMPTY — 7085 removed
+// every literal; the baseline can only ever be tightened back to zero).
+//
+// `--field-scan-dir=<dir>` points the scan at a fixture tree (hermetic tests);
+// every other rule still runs against the real repository.
+
+const FIELD_SCAN_SKIP = new Set(['index.ts', 'tool-catalog.ts', 'description-catalog.ts']);
+const fieldScanDirArg = process.argv.find((a) => a.startsWith('--field-scan-dir='));
+const fieldScanDir = fieldScanDirArg ? resolve(fieldScanDirArg.slice('--field-scan-dir='.length)) : mcpToolsDir;
+
+/** @type {{ file: string, line: number, kind: 'catalog'|'literal'|'unknown' }[]} */
+const fieldDescribeSites = [];
+{
+  const CATALOG_CALL = /^(mcpFieldDescription|getMessage|cliContractMessage)\(/;
+  for (const file of readdirSync(fieldScanDir).filter((f) => f.endsWith('.ts') && !FIELD_SCAN_SKIP.has(f)).sort()) {
+    const content = readFileSync(join(fieldScanDir, file), 'utf8');
+    const re = /\.describe\(\s*/g;
+    let m;
+    while ((m = re.exec(content)) !== null) {
+      const argStart = m.index + m[0].length;
+      const rest = content.slice(argStart, argStart + 80);
+      const ch = rest.charAt(0);
+      let kind = 'unknown';
+      if (ch === "'" || ch === '"' || ch === '`') kind = 'literal';
+      else if (CATALOG_CALL.test(rest)) kind = 'catalog';
+      const line = content.slice(0, m.index).split('\n').length;
+      fieldDescribeSites.push({ file, line, kind });
+    }
+  }
+}
+const fieldDescriptionGaps = fieldDescribeSites
+  .filter((s) => s.kind !== 'catalog')
+  .map((s) => `${s.file}:${s.line}:${s.kind}`)
+  .sort();
+const fieldSiteCounts = {
+  total: fieldDescribeSites.length,
+  catalog: fieldDescribeSites.filter((s) => s.kind === 'catalog').length,
+  literal: fieldDescribeSites.filter((s) => s.kind === 'literal').length,
+  unknown: fieldDescribeSites.filter((s) => s.kind === 'unknown').length,
+};
 
 // Keys actually used as a real `.description(getMessage('<key>', ...))` call
 // site across the CLI surface — the single source of truth a cli-shared
@@ -216,6 +266,7 @@ if (process.argv.includes('--update-baseline')) {
     cliOnly: cliOnly.map((x) => x.cmd),
     mcpOnly: mcpOnly.map((x) => x.tool),
     descriptionKeyGaps,
+    fieldDescriptionGaps,
     // Authority intent is hand-authored policy, not a discovered gap. Preserve
     // it during mechanical baseline refreshes so --update-baseline cannot erase
     // the reason an operator-only mutation surface exists.
@@ -224,16 +275,19 @@ if (process.argv.includes('--update-baseline')) {
   writeFileSync(BASELINE_PATH, JSON.stringify(baseline, null, 2) + '\n');
   console.log(
     `✓ baseline updated: ${baseline.cliOnly.length} CLI-only + ${baseline.mcpOnly.length} MCP-only `
-    + `+ ${baseline.descriptionKeyGaps.length} description-key gap(s) accepted (${BASELINE_PATH})`,
+    + `+ ${baseline.descriptionKeyGaps.length} description-key + ${baseline.fieldDescriptionGaps.length} field-description gap(s) accepted (${BASELINE_PATH})`,
   );
   process.exit(0);
 }
 
-let baseline = { cliOnly: [], mcpOnly: [], descriptionKeyGaps: [], intentionalCliAuthority: {} };
+let baseline = { cliOnly: [], mcpOnly: [], descriptionKeyGaps: [], fieldDescriptionGaps: [], intentionalCliAuthority: {} };
 if (existsSync(BASELINE_PATH)) {
   baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
   // Older baseline files predate 559-005 and won't carry this field.
   baseline.descriptionKeyGaps ??= [];
+  // Older baseline files predate 7085; an absent list means ZERO accepted
+  // field-description gaps — never a silently permissive default.
+  baseline.fieldDescriptionGaps ??= [];
   baseline.intentionalCliAuthority ??= {};
 } else {
   console.error(`✗ baseline missing: ${BASELINE_PATH} — run with --update-baseline first`);
@@ -247,6 +301,8 @@ const staleMcp = baseline.mcpOnly.filter((name) => !mcpOnly.some((x) => x.tool =
 
 const newDescriptionKeyGaps = descriptionKeyGaps.filter((g) => !baseline.descriptionKeyGaps.includes(g));
 const staleDescriptionKeyGaps = baseline.descriptionKeyGaps.filter((g) => !descriptionKeyGaps.includes(g));
+const newFieldDescriptionGaps = fieldDescriptionGaps.filter((g) => !baseline.fieldDescriptionGaps.includes(g));
+const staleFieldDescriptionGaps = baseline.fieldDescriptionGaps.filter((g) => !fieldDescriptionGaps.includes(g));
 
 // Operator-only mutation intent is stronger than an ordinary accepted gap:
 // it must remain a real CLI-only command, carry the catalogued risk/capability,
@@ -301,17 +357,23 @@ console.log('');
 console.log(`  CLI commands scanned : ${cliCommands.size}`);
 console.log(`  MCP tools scanned    : ${mcpTools.size}`);
 console.log(`  cli-shared description bindings scanned : ${descriptionBindings.filter((b) => b.surface === 'cli-shared').length}`);
+console.log(
+  `  inputSchema field .describe() sites     : ${fieldSiteCounts.total} `
+  + `(catalog ${fieldSiteCounts.catalog}, literal ${fieldSiteCounts.literal}, unknown ${fieldSiteCounts.unknown})`
+  + (fieldScanDirArg ? `  ← ${fieldScanDir}` : ''),
+);
 console.log('');
 console.log(line);
 
 console.log(
   `  Known-intentional gaps (baseline): ${baseline.cliOnly.length} CLI-only + ${baseline.mcpOnly.length} MCP-only `
-  + `+ ${baseline.descriptionKeyGaps.length} description-key`,
+  + `+ ${baseline.descriptionKeyGaps.length} description-key + ${baseline.fieldDescriptionGaps.length} field-description`,
 );
 console.log('');
 console.log(line);
 
-if (newCliOnly.length === 0 && newMcpOnly.length === 0 && newDescriptionKeyGaps.length === 0 && authorityIntentErrors.length === 0) {
+if (newCliOnly.length === 0 && newMcpOnly.length === 0 && newDescriptionKeyGaps.length === 0
+  && newFieldDescriptionGaps.length === 0 && authorityIntentErrors.length === 0) {
   console.log('  ✓ No NEW parity gaps beyond the accepted baseline.');
 } else {
   if (newCliOnly.length > 0) {
@@ -342,6 +404,16 @@ if (newCliOnly.length === 0 && newMcpOnly.length === 0 && newDescriptionKeyGaps.
     console.log('  fix the key drift in src/mcp/tools/description-catalog.ts, or if');
     console.log('  intentional, accept it below.');
   }
+  if (newFieldDescriptionGaps.length > 0) {
+    console.log(`  ✗ NEW field-description gap (inputSchema .describe() not read from the catalog) — ${newFieldDescriptionGaps.length} item(s):`);
+    console.log('');
+    for (const gap of newFieldDescriptionGaps) {
+      console.log(`    ${gap}`);
+    }
+    console.log('');
+    console.log('  Resolve the field through mcpFieldDescription(\'<tool>\', \'<field>\') with an');
+    console.log('  en+tr pair in src/cli/helpers/messages.ts (see src/mcp/tools/description-catalog.ts).');
+  }
   if (authorityIntentErrors.length > 0) {
     console.log(`  ✗ CLI authority intent violation — ${authorityIntentErrors.length} item(s):`);
     for (const error of authorityIntentErrors) console.log(`    ${error}`);
@@ -351,10 +423,10 @@ if (newCliOnly.length === 0 && newMcpOnly.length === 0 && newDescriptionKeyGaps.
   console.log('  accept it: node scripts/lint-cli-mcp-parity.mjs --update-baseline');
 }
 
-if (staleCli.length > 0 || staleMcp.length > 0 || staleDescriptionKeyGaps.length > 0) {
+if (staleCli.length > 0 || staleMcp.length > 0 || staleDescriptionKeyGaps.length > 0 || staleFieldDescriptionGaps.length > 0) {
   console.log('');
   console.log(
-    `  ⚠ Stale baseline entries (gap no longer exists): ${[...staleCli, ...staleMcp, ...staleDescriptionKeyGaps].join(', ')}`,
+    `  ⚠ Stale baseline entries (gap no longer exists): ${[...staleCli, ...staleMcp, ...staleDescriptionKeyGaps, ...staleFieldDescriptionGaps].join(', ')}`,
   );
   console.log('    Prune with: node scripts/lint-cli-mcp-parity.mjs --update-baseline');
 }
@@ -366,4 +438,5 @@ console.log('');
 // Assigning exitCode lets piped stdout/stderr drain. `process.exit(...)` can
 // truncate the short reports produced by hermetic fixtures and CI wrappers.
 process.exitCode = newCliOnly.length > 0 || newMcpOnly.length > 0
-  || newDescriptionKeyGaps.length > 0 || authorityIntentErrors.length > 0 ? 1 : 0;
+  || newDescriptionKeyGaps.length > 0 || newFieldDescriptionGaps.length > 0
+  || authorityIntentErrors.length > 0 ? 1 : 0;

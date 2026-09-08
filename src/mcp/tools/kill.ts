@@ -9,7 +9,7 @@ import {
   releaseAllLocks,
   releaseAllSpawnLocks,
 } from '../../core/file-lock.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 interface TaskFileData {
   id?: string;
@@ -82,10 +82,10 @@ export function registerKillTool(server: McpServer): void {
       description: mcpToolDescription('deckent_kill'),
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
       inputSchema: z.object({
-        taskId: z.string().optional().describe('Specific task ID to kill (e.g. "059-001"). The worker for this task is stopped and its locks released.'),
-        all: z.boolean().optional().default(false).describe('Kill ALL active workers (status EXECUTING, CLAIMED, or TESTING). Use when sprint is stuck and needs a full restart.'),
-        force: z.boolean().optional().describe('CLI --force parity (Sprint 189 T-009). Marks the kill as a panic-guard bypass attempt. Must be combined with userExplicit; on its own it does nothing. The kill itself still proceeds — this flag only flips the audit-trail breadcrumb.'),
-        userExplicit: z.boolean().optional().describe('CLI --user-explicit parity. Explicit human confirmation required to mark the kill as a panic-guard override. Combined with force this writes a debug breadcrumb (mcp:kill:panic-bypass) so post-mortems can correlate the override. Alperen rule (feedback_sprint_kill_always_ask_user): kill default ALWAYS requires user approval — bypass is logged, never silent.'),
+        taskId: z.string().optional().describe(mcpFieldDescription('deckent_kill', 'taskId')),
+        all: z.boolean().optional().default(false).describe(mcpFieldDescription('deckent_kill', 'all')),
+        force: z.boolean().optional().describe(mcpFieldDescription('deckent_kill', 'force')),
+        userExplicit: z.boolean().optional().describe(mcpFieldDescription('deckent_kill', 'userExplicit')),
       }),
     },
     async ({ taskId, all, force, userExplicit }) => {

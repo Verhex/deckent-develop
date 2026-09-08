@@ -16,7 +16,7 @@ import {
   buildExplainOutput,
   formatDuration,
 } from '../../cli/commands/explain.js';
-import { mcpToolDescription } from './description-catalog.js';
+import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
 
 /**
  * Load a sprint's retrospective content from the Memory V2 DB `retro` entry.
@@ -52,9 +52,9 @@ export function registerExplainTool(server: McpServer): void {
       description: mcpToolDescription('deckent_explain'),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
-        sprintId: z.string().optional().describe('Show a specific sprint by ID (e.g. "042", "sprint-042"). If omitted, returns the latest sprint.'),
-        verbose: z.boolean().optional().default(false).describe('Show all learnings and full task details. Default shows max 3 learnings.'),
-        json: z.boolean().optional().default(false).describe('Return raw JSON data instead of human-readable summary.'),
+        sprintId: z.string().optional().describe(mcpFieldDescription('deckent_explain', 'sprintId')),
+        verbose: z.boolean().optional().default(false).describe(mcpFieldDescription('deckent_explain', 'verbose')),
+        json: z.boolean().optional().default(false).describe(mcpFieldDescription('deckent_explain', 'json')),
       }),
     },
     async ({ sprintId, verbose, json }) => {
