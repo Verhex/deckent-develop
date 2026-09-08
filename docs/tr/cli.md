@@ -39,3 +39,12 @@ Yerelleştirilmiş help için `deckent --help` öncesinde `DECKENT_LANGUAGE=tr` 
 diliniz) ayarlayın. Türkçe help `Usage:` yerine `Kullanım:` gibi yerelleştirilmiş başlıklar kullanır.
 Pipe/redirect senaryolarında dekoratif terminal çıktısı yerine yukarıdaki makine-güvenli yüzeylere
 güvenin. Bu rehberdeki davranış Linux/WSL üzerinde doğrulanmıştır; diğer platformlar iddia edilmez.
+
+### `deckent init` splash
+
+`deckent init` çalıştığında Kraken splash, TTY `--version` ile aynı capability ve renk kurallarıyla
+başlangıçta basılır. Splash, hoş geldin banner'ından ve kurulum ilerlemesinden önce gelir; init
+sonuç bloğunun dili (`Setup outcome:` / `Kurulum sonucu:`) ile bağımsızdır. Etkileşimsiz kanıt
+için `deckent init --yes --no-install --no-image` (veya sistem dilinin outcome mesajlarını
+sürüklemesi için `--auto --yes …`) kullanılır. Init tamamlanması ile provider/doctor durumu,
+splash glyph/renk sözleşmesinden ayrıdır.

@@ -41,3 +41,12 @@ For localized help text, set `DECKENT_LANGUAGE=tr` (or your configured language)
 Pipe and redirect scenarios should rely on the machine-safe surfaces above rather than decorative
 terminal output. Behavior documented here is verified on Linux/WSL; other platforms are not
 claimed by this guide.
+
+### `deckent init` splash
+
+On `deckent init`, the Kraken splash is printed at startup via the same capability and color
+rules as `--version` on a TTY. The splash appears before the welcome banner and setup progress;
+it is independent of the init outcome block language (`Setup outcome:` / `Kurulum sonucu:`).
+Non-interactive proof uses `deckent init --yes --no-install --no-image` (or `--auto --yes …`
+when system language should drive the outcome messages). Init completion and provider/doctor
+state are separate from splash glyph/color contracts.
