@@ -13,7 +13,7 @@ export function parseReplacementSurface(replacement: string): {
   readonly prefixFlags: readonly string[];
   readonly targetPath: readonly string[];
 } {
-  const parts = replacement.trim().split(/\s+/).filter(Boolean);
+  const parts = replacement.trim().split(/\s+/u).filter(Boolean);
   const prefixFlags: string[] = [];
   const targetPath: string[] = [];
   for (const part of parts) {
@@ -36,11 +36,60 @@ function findNestedCommand(program: Command, ...segments: string[]): Command | u
   return current;
 }
 
+/**
+ * Resolve a help target from the parsed legacy arguments using only public
+ * Commander shape: child command names and registered positional arguments.
+ * An unknown child deliberately yields no canonical child help.
+ */
+export function resolveReplacementHelpCommand(
+  program: Command,
+  targetPath: readonly string[],
+  legacyArgs: readonly string[] = [],
+): Command | undefined {
+  const initialReplacement = findNestedCommand(program, ...targetPath);
+  if (!initialReplacement) return undefined;
+  let replacement: Command = initialReplacement;
+  for (const token of legacyArgs) {
+    if (token.startsWith('-')) break;
+    const child: Command | undefined = replacement.commands.find((candidate) => candidate.name() === token);
+    if (child) {
+      replacement = child;
+      continue;
+    }
+    // Positional input belongs to the resolved leaf, not a nested command.
+    if (replacement.registeredArguments.length > 0) break;
+    return undefined;
+  }
+  return replacement;
+}
+
 /** Replacement help body from live Commander registration (SSOT), not rewired legacy options. */
-export function replacementHelpBody(program: Command, targetPath: readonly string[]): string {
-  const replacement = findNestedCommand(program, ...targetPath);
+export function replacementHelpBody(
+  program: Command,
+  targetPath: readonly string[],
+  legacyCommand?: Command,
+): string {
+  const replacement = resolveReplacementHelpCommand(program, targetPath, legacyCommand?.args ?? []);
   if (!replacement) return '';
-  return replacement.helpInformation();
+  // `helpInformation()` omits Commander `before`/`after` help text. Capture
+  // the public `outputHelp()` surface so compatibility help includes the
+  // canonical command's policy notices as well as its generated usage.
+  // Commander mutates its configuration object in place, so retain a value
+  // snapshot rather than the mutable object returned by configureOutput().
+  const previousOutput = { ...replacement.configureOutput() };
+  let rendered = '';
+  replacement.configureOutput({
+    ...previousOutput,
+    writeOut: (chunk) => { rendered += chunk; },
+    writeErr: (chunk) => { rendered += chunk; },
+  });
+  try {
+    replacement.outputHelp();
+  } finally {
+    replacement.configureOutput(previousOutput);
+  }
+  // The enclosing addHelpText('after') supplies its own terminal newline.
+  return rendered.trimEnd();
 }
 
 /** Baseline argv forwarding: prefix flags + user args, parsed with from:node semantics. */
@@ -79,7 +128,7 @@ export function registerDeprecatedForwarding(
     .allowExcessArguments(true)
     .description(getMessage(summaryKey, getLanguage(undefined)))
     .addHelpText('before', () => deprecationHelpText(surface.warningKey, getLanguage(undefined)))
-    .addHelpText('after', () => replacementHelpBody(program, targetPath))
+    .addHelpText('after', ({ command }) => replacementHelpBody(program, targetPath, command))
     .action(async (args: string[]) => forwardDeprecatedAction(program, surface, args));
   return cmd;
 }
