@@ -24,6 +24,27 @@ export type ConfigWriteOutcome =
   | { readonly ok: true }
   | { readonly ok: false; readonly code: 'validation' | 'lock' | 'io'; readonly error: string };
 
+type NativeMigrationErrorCode = 'NATIVE_SELECTION_INCOMPLETE' | 'NATIVE_PROVIDER_INVALID'
+  | 'NATIVE_MODEL_INVALID' | 'NATIVE_TARGET_CONFLICT' | 'NATIVE_LEGACY_OPT_OUT';
+
+function nativeMigrationMessage(
+  result: { status: 'not-applicable' | 'selection-required' | 'already-native' | 'planned' | 'applied'; provider?: string; model?: string },
+  lang: string,
+): string | null {
+  if (result.status === 'not-applicable') return null;
+  if (result.status === 'selection-required') return getMessage('config.migrate.native.selection_required', lang);
+  const key = result.status === 'already-native'
+    ? 'config.migrate.native.already_native'
+    : `config.migrate.native.${result.status}`;
+  return getMessage(key, lang, {
+    provider: result.provider ?? '-', model: result.model ?? '-',
+  });
+}
+
+function nativeMigrationErrorMessage(code: NativeMigrationErrorCode, lang: string): string {
+  return getMessage(`config.migrate.native.error.${code}`, lang);
+}
+
 export function setConfigValues(root: string, patch: Readonly<Record<string, unknown>>): ConfigWriteOutcome {
   const configPath = join(root, PROJECT_CONFIG_PATH);
   try {
@@ -260,12 +281,38 @@ export function registerConfig(program: Command): void {
     .command('migrate')
     .description(getMessage('cli.config.migrate.desc', getLanguage(undefined)))
     .option('--dry-run', cliContractMessage('cliContract.config.opt.dry_run', helpLang))
-    .action((opts: { dryRun?: boolean }) => {
+    .option('--native-provider <provider>', getMessage('cli.config.migrate.opt.native_provider', helpLang))
+    .option('--native-model <model>', getMessage('cli.config.migrate.opt.native_model', helpLang))
+    .option('--json', getMessage('cli.config.migrate.opt.json', helpLang))
+    .action((opts: { dryRun?: boolean; nativeProvider?: string; nativeModel?: string; json?: boolean }) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);
       const configPath = join(root, PROJECT_CONFIG_PATH);
       try {
-        const result = migrateConfig(configPath, { dryRun: opts.dryRun });
+        const result = migrateConfig(configPath, {
+          dryRun: opts.dryRun,
+          ...(opts.nativeProvider !== undefined ? { nativeProvider: opts.nativeProvider } : {}),
+          ...(opts.nativeModel !== undefined ? { nativeModel: opts.nativeModel } : {}),
+        });
+        if (opts.json) {
+          print(JSON.stringify({
+            ok: result.error === undefined && result.nativeMigrationError === undefined,
+            migrated: result.migrated,
+            addedFields: result.addedFields,
+            ...(result.renamedFields ? { renamedFields: result.renamedFields } : {}),
+            backupCreated: result.backupPath !== null,
+            ...(result.nativeMigration ? { nativeMigration: result.nativeMigration } : {}),
+            ...(result.nativeMigrationError ? { nativeMigrationError: result.nativeMigrationError } : {}),
+            ...(result.error ? { errorCode: 'CONFIG_MIGRATION_FAILED' } : {}),
+          }));
+          if (result.error || result.nativeMigrationError) process.exitCode = 1;
+          return;
+        }
+        if (result.nativeMigrationError) {
+          printError(new Error(nativeMigrationErrorMessage(result.nativeMigrationError, lang)));
+          process.exitCode = 1;
+          return;
+        }
         if (result.error) {
           printError(new Error(result.error));
           process.exitCode = 1;
@@ -273,6 +320,8 @@ export function registerConfig(program: Command): void {
         }
         if (!result.migrated) {
           print(getMessage('config.migrate_up_to_date', lang));
+          const nativeMessage = result.nativeMigration ? nativeMigrationMessage(result.nativeMigration, lang) : null;
+          if (nativeMessage) print(nativeMessage);
           return;
         }
         if (opts.dryRun) {
@@ -297,7 +346,16 @@ export function registerConfig(program: Command): void {
             print(getMessage('config.migrate_backup', lang, { path: result.backupPath }));
           }
         }
+        const nativeMessage = result.nativeMigration ? nativeMigrationMessage(result.nativeMigration, lang) : null;
+        if (nativeMessage) print(nativeMessage);
       } catch (error) {
+        if (opts.json) {
+          // A thrown I/O error may occur after a write/backup boundary. Do not
+          // fabricate a no-mutation result or expose raw paths/config values.
+          print(JSON.stringify({ ok: false, errorCode: 'CONFIG_MIGRATION_FAILED', mutationState: 'unknown' }));
+          process.exitCode = 1;
+          return;
+        }
         printError(error);
         process.exitCode = 1;
       }

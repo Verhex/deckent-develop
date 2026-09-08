@@ -81,12 +81,29 @@ Bu local verification snapshot'tır; portable recommended configuration değildi
 | `deckent config export [file]` | Stdout'a veya file'a export eder. |
 | `deckent config import <file>` | JSON import eder. |
 | `deckent config list` / `keys` | Grouped parameter'ları veya tüm key'leri gösterir. |
-| `deckent config migrate [--dry-run]` | File'ı en güncel full format'a project eder; inspection için `--dry-run` kullanılır. |
+| `deckent config migrate [--dry-run] [--json]` | Yapılandırma geçişini önizler veya uygular; JSON yapılandırılmış geçiş durumunu döndürür. |
 | `deckent config nervous set\|override\|list\|reset` | Nervous authority mode ve per-action policy yönetir. |
 | `deckent mode show\|sprint\|run\|task\|process\|auto\|global` | `deckent_style` okur veya değiştirir. |
 | `deckent models list\|refresh\|tier` | Model catalog ve tier lookup inceler veya refresh eder. |
 
-[Her satır için kanıt: listelenen 25 command path'in gerçek binary help çıktısı, exit code 0, 2026-08-01]
+[İlk komut envanteri: 25 gerçek binary help çıktısı, exit code 0, 2026-08-01. Aşağıdaki native geçiş uzantıları MASTER 7099 altında doğrulanır.]
+
+#### Açık seçimle native Terminal geçişi
+
+`chat_provider`, kullanımdan kaldırılmış legacy-host seçimidir; native transport seçmez. Host CLI aboneliği API kimlik bilgisi değildir. Geçiş, bu değeri veya Brain sağlayıcısını otomatik olarak `native_provider` alanına kopyalamaz ve yeni bir yapılandırma anahtarı oluşturmaz.
+
+Mevcut iki native alanını birlikte açıkça seçin; legacy alias, başta/sonda boşluk veya kontrol karakteri içermeyen tam model kimliği kullanın. Eski kayıtlardaki alias'lar normal uyumluluk geçişinden geçer; yeni hedef seçenekleri farklı bir modeli yerine koymaz. Yerelde mevcut bir Ollama modeli için örnek (model adı kurulum veya hazır olma kanıtı değildir):
+
+```sh
+deckent config migrate --native-provider ollama --native-model qwen2.5-coder:7b --dry-run --json
+deckent config migrate --native-provider ollama --native-model qwen2.5-coder:7b --json
+```
+
+Önizleme hiçbir şey yazmaz ve yedek oluşturmaz. Uygulama mevcut yapılandırma kilidi ve atomik yazıcıyı kullanır; önceki dosyanın baytlarıyla birebir yedeğini tutar, legacy seçimi, ilgisiz ayarları ve Brain sağlayıcısının anlamını korur. Tamamlanmış geçişi tekrarlamak yapılandırmayı ve yedekleri değiştirmez.
+
+Hedef verilmezse legacy yapılandırma `selection-required` bildirir; genel alan geçişi native geçiş tamamlandı demek değildir. Eksik/geçersiz hedef, mevcut native seçimle çelişki veya açık `terminal.native_agent=false`, dosyayı değiştirmeden reddedilir. Eski `chat_provider` açık legacy yüzeyinde kullanılabilir.
+
+Yalnız proje yapılandırması değişir: kimlik doğrulama, sağlayıcı çağrısı, model indirme, worker başlatma veya hazır olma iddiası yoktur. Başlangıçta normal global/proje/ortam öncelikleri ve native admission geçerlidir. JSON, ham yapılandırma veya kimlik bilgileri değil, geçiş durumunu verir.
 
 CLI'da `deckent config read` adlı path yoktur; effective configuration bare `deckent config` action ile okunur. MCP ise `action: "read"` kullanır; bu bir surface naming mismatch'tir. [Kanıt: gerçek `deckent config --help`; `src/cli/commands/config.ts:72-108`; `src/mcp/tools/config.ts:12-18`]
 

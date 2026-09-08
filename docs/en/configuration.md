@@ -81,12 +81,29 @@ This is a local verification snapshot, not a portable recommended configuration.
 | `deckent config export [file]` | Export to stdout or a file. |
 | `deckent config import <file>` | Import JSON. |
 | `deckent config list` / `keys` | Show grouped parameters or all keys. |
-| `deckent config migrate [--dry-run]` | Project the file to the latest full format; use `--dry-run` for inspection. |
+| `deckent config migrate [--dry-run] [--json]` | Preview or apply configuration migration; JSON reports structured migration state. |
 | `deckent config nervous set\|override\|list\|reset` | Manage Nervous authority mode and per-action policy. |
 | `deckent mode show\|sprint\|run\|task\|process\|auto\|global` | Read or mutate `deckent_style`. |
 | `deckent models list\|refresh\|tier` | Inspect or refresh the model catalog and tier lookup. |
 
-[Evidence for every row: actual binary help outputs for all 25 listed command paths, exit code 0, 2026-08-01]
+[Original command inventory: 25 actual binary help outputs, exit code 0, 2026-08-01. Native migration extensions below are verified under MASTER 7099.]
+
+#### Explicit native Terminal migration
+
+`chat_provider` is a deprecated legacy-host override, not a native transport selector. A host CLI subscription is not an API credential. Migration never copies that value or the Brain provider into `native_provider` automatically, and introduces no replacement config key.
+
+Choose both existing native fields explicitly, using an exact model ID without legacy aliases, surrounding whitespace, or control characters. Existing stored aliases still use the ordinary compatibility migration; new target flags do not substitute a different model. Example for a locally available Ollama model (the name is not an installation or readiness claim):
+
+```sh
+deckent config migrate --native-provider ollama --native-model qwen2.5-coder:7b --dry-run --json
+deckent config migrate --native-provider ollama --native-model qwen2.5-coder:7b --json
+```
+
+Preview writes nothing and creates no backup. Apply uses the existing config lock and atomic writer, retains a byte-exact backup, and preserves legacy fallback, unrelated settings, and Brain provider semantics. Repeating a completed transition leaves config and backups unchanged.
+
+Without a target, legacy configuration reports `selection-required`; generic field migration is not native migration completion. Incomplete/invalid targets, conflicts with existing native pins, or explicit `terminal.native_agent=false` refuse without mutation. The old `chat_provider` remains usable by the explicit legacy surface.
+
+This changes project configuration only: no authentication, provider call, model download, worker start, or readiness claim. Normal global/project/environment precedence and native admission still apply at startup. JSON reports migration status, not raw config or credentials.
 
 There is no CLI path named `deckent config read`; reading effective configuration is the bare `deckent config` action. MCP uses `action: "read"`, which is a surface naming mismatch. [Evidence: actual `deckent config --help`; `src/cli/commands/config.ts:72-108`; `src/mcp/tools/config.ts:12-18`]
 

@@ -9,18 +9,21 @@ import {
   readFileSync,
   existsSync,
   copyFileSync,
+  constants as fsConstants,
   readdirSync,
   unlinkSync,
 } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { dirname, basename } from 'node:path';
 import { createDefaultConfig } from './config.js';
-import { resolveConfigMigrationModelTier } from './model-registry.js';
+import { getLegacyModelMigration, resolveConfigMigrationModelTier } from './model-registry.js';
 import { structuredLog } from './observability.js';
 import type { DeckentConfig } from './types.js';
 import type { ModelTier } from './model-equivalence.js';
 import { canonicalizeProviderConfigAliases } from './provider-config-canonicalizer.js';
 import { canonicalizeModelConfigAliases, hasLegacyModelConfigAliases } from './model-config-canonicalizer.js';
 import { withConfigWriteLock, writeConfigJsonAtomic } from './config-write-authority.js';
+import { isNativeProviderName } from './native-provider-names.js';
 
 function replaceObjectContents(
   target: Record<string, unknown>,
@@ -46,6 +49,114 @@ export interface MigrationResult {
   backupPath: string | null;
   /** Error message if migration failed */
   error?: string;
+  /** Explicit legacy-host → native selection state; never implies readiness. */
+  nativeMigration?: {
+    status: 'not-applicable' | 'selection-required' | 'already-native' | 'planned' | 'applied';
+    provider?: string;
+    model?: string;
+  };
+  /** Stable refusal code for an invalid or conflicting explicit native transition. */
+  nativeMigrationError?:
+    | 'NATIVE_SELECTION_INCOMPLETE'
+    | 'NATIVE_PROVIDER_INVALID'
+    | 'NATIVE_MODEL_INVALID'
+    | 'NATIVE_TARGET_CONFLICT'
+    | 'NATIVE_LEGACY_OPT_OUT';
+}
+
+export interface MigrationOptions {
+  dryRun?: boolean;
+  nativeProvider?: string;
+  nativeModel?: string;
+}
+
+type NativeMigrationError = NonNullable<MigrationResult['nativeMigrationError']>;
+type NativeMigration = NonNullable<MigrationResult['nativeMigration']>;
+
+function nativeMigrationRefusal(code: NativeMigrationError): MigrationResult {
+  return {
+    migrated: false,
+    addedFields: [],
+    renamedFields: [],
+    backupPath: null,
+    nativeMigrationError: code,
+  };
+}
+
+function isValidNativeModel(value: unknown): value is string {
+  return typeof value === 'string'
+    && value.trim().length > 0
+    && !/[\u0000-\u001f\u007f-\u009f]/u.test(value);
+}
+
+function canonicalNativeModel(value: string): string {
+  return canonicalizeModelConfigAliases({ native_model: value }, 'migration')
+    .config['native_model'] as string;
+}
+
+function resolveNativeMigration(
+  existing: Readonly<Record<string, unknown>>,
+  options: MigrationOptions,
+): NativeMigration | NativeMigrationError {
+  const requestedProvider = options.nativeProvider;
+  const requestedModel = options.nativeModel;
+  const hasRequestedProvider = requestedProvider !== undefined;
+  const hasRequestedModel = requestedModel !== undefined;
+  const existingProvider = existing['native_provider'];
+  const existingModel = existing['native_model'];
+  const hasExistingProvider = existingProvider !== undefined;
+  const hasExistingModel = existingModel !== undefined;
+
+  if (hasRequestedProvider !== hasRequestedModel) return 'NATIVE_SELECTION_INCOMPLETE';
+
+  if (!hasRequestedProvider && !hasRequestedModel) {
+    if (hasExistingProvider && hasExistingModel
+      && isNativeProviderName(existingProvider) && isValidNativeModel(existingModel)) {
+      return {
+        status: 'already-native',
+        provider: existingProvider as string,
+        model: canonicalNativeModel(existingModel as string),
+      };
+    }
+    return existing['chat_provider'] !== undefined
+      ? { status: 'selection-required' }
+      : { status: 'not-applicable' };
+  }
+
+  if (!isNativeProviderName(requestedProvider)) return 'NATIVE_PROVIDER_INVALID';
+  // The runtime selection authority rejects compatibility aliases before
+  // adapter or credential lookup. Migration must admit the same exact authored
+  // identity so a successful write cannot become an unusable boot selection.
+  if (!isValidNativeModel(requestedModel)
+    || requestedModel.trim() !== requestedModel
+    || getLegacyModelMigration(requestedModel) !== undefined) return 'NATIVE_MODEL_INVALID';
+  const terminal = existing['terminal'];
+  if (typeof terminal === 'object' && terminal !== null && !Array.isArray(terminal)
+    && (terminal as Record<string, unknown>)['native_agent'] === false) {
+    return 'NATIVE_LEGACY_OPT_OUT';
+  }
+  if (hasExistingProvider && !isNativeProviderName(existingProvider)) return 'NATIVE_PROVIDER_INVALID';
+  if (hasExistingModel && !isValidNativeModel(existingModel)) return 'NATIVE_MODEL_INVALID';
+  const canonicalExistingModel = hasExistingModel
+    ? canonicalNativeModel(existingModel as string)
+    : undefined;
+  if ((hasExistingProvider && existingProvider !== requestedProvider)
+    || (hasExistingModel && canonicalExistingModel !== requestedModel)) return 'NATIVE_TARGET_CONFLICT';
+  if (hasExistingProvider && hasExistingModel) {
+    return { status: 'already-native', provider: requestedProvider, model: requestedModel };
+  }
+  return {
+    status: options.dryRun === true ? 'planned' : 'applied',
+    provider: requestedProvider,
+    model: requestedModel,
+  };
+}
+
+function createExclusiveConfigBackup(configPath: string): string {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupPath = `${configPath}.bak.${timestamp}.${randomUUID()}`;
+  copyFileSync(configPath, backupPath, fsConstants.COPYFILE_EXCL);
+  return backupPath;
 }
 
 /**
@@ -198,7 +309,16 @@ export function hasDuplicateKeys(existing: Record<string, unknown>): boolean {
  */
 export function migrateConfig(
   configPath: string,
-  options: { dryRun?: boolean } = {},
+  options: MigrationOptions = {},
+): MigrationResult {
+  if (options.dryRun === true) return migrateConfigUnlocked(configPath, options);
+  if (!existsSync(configPath)) return migrateConfigUnlocked(configPath, options);
+  return withConfigWriteLock(configPath, () => migrateConfigUnlocked(configPath, options));
+}
+
+function migrateConfigUnlocked(
+  configPath: string,
+  options: MigrationOptions,
 ): MigrationResult {
   const { dryRun = false } = options;
 
@@ -222,6 +342,14 @@ export function migrateConfig(
       backupPath: null,
       error: `Failed to parse config JSON: ${err instanceof Error ? err.message : String(err)}`,
     };
+  }
+
+  const nativeMigration = resolveNativeMigration(existing, options);
+  if (typeof nativeMigration === 'string') return nativeMigrationRefusal(nativeMigration);
+
+  if (nativeMigration.status === 'applied') {
+    existing['native_provider'] = nativeMigration.provider;
+    existing['native_model'] = nativeMigration.model;
   }
 
   // Validate all provider aliases before any migration mutates the parsed
@@ -289,13 +417,17 @@ export function migrateConfig(
   const removedDuplicates = [...removedProviderAliases, ...removeDuplicateKeys(existing)];
 
   const missingFields = getMissingFields(existing);
+  const nativeMigrationChangesConfig = nativeMigration.status === 'planned'
+    || nativeMigration.status === 'applied';
 
-  if (missingFields.length === 0 && !legacyRenamed && removedDuplicates.length === 0) {
+  if (missingFields.length === 0 && !legacyRenamed && removedDuplicates.length === 0
+    && !nativeMigrationChangesConfig) {
     return {
       migrated: false,
       addedFields: [],
       renamedFields: [],
       backupPath: null,
+      nativeMigration,
     };
   }
 
@@ -305,13 +437,14 @@ export function migrateConfig(
       addedFields: missingFields,
       renamedFields,
       backupPath: null,
+      nativeMigration,
     };
   }
 
-  // Create timestamped backup before modifying
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const backupPath = `${configPath}.bak.${timestamp}`;
-  copyFileSync(configPath, backupPath);
+  // Create an exclusive timestamped backup before modifying. The enclosing
+  // config lock keeps the read/transform/backup/write sequence atomic for
+  // cooperating writers; COPYFILE_EXCL also protects a colliding old snapshot.
+  const backupPath = createExclusiveConfigBackup(configPath);
 
   // Merge: existing values preserved, only missing fields added from defaults
   const defaults = createDefaultConfig() as unknown as Record<string, unknown>;
@@ -328,7 +461,7 @@ export function migrateConfig(
     }
   }
 
-  withConfigWriteLock(configPath, () => writeConfigJsonAtomic(configPath, merged));
+  writeConfigJsonAtomic(configPath, merged);
 
   try {
     const pruned = pruneConfigBackups(configPath, 3);
@@ -350,6 +483,7 @@ export function migrateConfig(
     addedFields: missingFields,
     renamedFields,
     backupPath,
+    nativeMigration,
   };
 }
 

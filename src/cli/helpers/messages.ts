@@ -5770,6 +5770,42 @@ const BASE_MESSAGES: MessageMap = {
   'config.migrate_dry_run': { en: '[dry-run] Would add {count} missing field(s):', tr: '[dry-run] {count} eksik alan eklenecek:' },
   'config.migrate_complete': { en: 'Migration complete. Added {count} field(s):', tr: 'Geçiş tamamlandı. {count} alan eklendi:' },
   'config.migrate_backup': { en: 'Backup saved to: {path}', tr: 'Yedek kaydedildi: {path}' },
+  'config.migrate.native.selection_required': {
+    en: 'Native migration needs an explicit provider and model selection.',
+    tr: 'Native geçişi için açık bir provider ve model seçimi gerekir.',
+  },
+  'config.migrate.native.already_native': {
+    en: 'Native target is already configured: {provider} / {model}.',
+    tr: 'Native hedef zaten yapılandırılmış: {provider} / {model}.',
+  },
+  'config.migrate.native.planned': {
+    en: '[dry-run] Native target would be configured: {provider} / {model}.',
+    tr: '[dry-run] Native hedef yapılandırılacak: {provider} / {model}.',
+  },
+  'config.migrate.native.applied': {
+    en: 'Native target configured: {provider} / {model}. Restart Deckent to use it.',
+    tr: 'Native hedef yapılandırıldı: {provider} / {model}. Kullanmak için Deckent’i yeniden başlatın.',
+  },
+  'config.migrate.native.error.NATIVE_SELECTION_INCOMPLETE': {
+    en: 'Both --native-provider and --native-model are required.',
+    tr: '--native-provider ve --native-model birlikte gereklidir.',
+  },
+  'config.migrate.native.error.NATIVE_PROVIDER_INVALID': {
+    en: 'The selected native provider is invalid.',
+    tr: 'Seçilen native provider geçersiz.',
+  },
+  'config.migrate.native.error.NATIVE_MODEL_INVALID': {
+    en: 'Use an exact native model ID without legacy aliases, surrounding whitespace, or control characters.',
+    tr: 'Legacy alias, çevreleyen boşluk veya kontrol karakteri içermeyen tam native model ID kullanın.',
+  },
+  'config.migrate.native.error.NATIVE_TARGET_CONFLICT': {
+    en: 'A different explicit native target is already configured; no changes were made.',
+    tr: 'Farklı bir açık native hedef zaten yapılandırılmış; değişiklik yapılmadı.',
+  },
+  'config.migrate.native.error.NATIVE_LEGACY_OPT_OUT': {
+    en: 'Native migration is disabled by terminal.native_agent=false; no changes were made.',
+    tr: 'Native geçişi terminal.native_agent=false ile devre dışı; değişiklik yapılmadı.',
+  },
   'retro.none_found': { en: 'No retrospective found. Run `deckent start` to complete a run first.', tr: 'Retrospektif bulunamadı. Önce bir run tamamlamak için `deckent start` çalıştırın.' },
   'retro.no_previous_sprint': { en: 'No previous run found for comparison.', tr: 'Karşılaştırma için önceki run bulunamadı.' },
   'dashboard.sprint_line': { en: 'Run: {id} (#{number})', tr: 'Run: {id} (#{number})' },
@@ -7877,6 +7913,18 @@ const BASE_MESSAGES: MessageMap = {
   'cli.config.migrate.desc': {
     en: 'Migrate config.json to the latest full format (adds missing fields with defaults)',
     tr: 'config.json\'ı en güncel tam formata taşıyın (eksik alanları varsayılanlarla ekler)',
+  },
+  'cli.config.migrate.opt.native_provider': {
+    en: 'Explicit native provider target (requires --native-model)',
+    tr: 'Açık native provider hedefi (--native-model gerektirir)',
+  },
+  'cli.config.migrate.opt.native_model': {
+    en: 'Exact native model ID; no legacy aliases or surrounding whitespace (requires --native-provider)',
+    tr: 'Tam native model ID; legacy alias veya çevreleyen boşluk kullanmayın (--native-provider gerektirir)',
+  },
+  'cli.config.migrate.opt.json': {
+    en: 'Print a structured migration result',
+    tr: 'Yapılandırılmış geçiş sonucu yazdır',
   },
   'cli.connect.desc': {
     en: 'Diagnose provider/MCP/IDE/shell connection status (read-only — no changes are made)',
