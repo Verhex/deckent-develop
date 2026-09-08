@@ -752,6 +752,77 @@ describe('runV2Engine — goal-driven (Type-2)', () => {
     expect(summary.reason).toBe('drained');
   });
 
+  it('does not re-author a canonically accepted goal after a clean restart', async () => {
+    const r = root();
+    let store = openStore(r);
+    createGoalMission(store, {
+      id: 'gAcceptedRestart', title: 'Accepted restart', goal: 'retain terminal acceptance',
+      acceptance: 'the admitted task settled',
+    });
+    enqueueProduction(store, { id: 'gAcceptedRestart-step', missionId: 'gAcceptedRestart', kind: 'task', spec: { description: 'settle once' } });
+    const firstAuthor = vi.fn(async (): Promise<NewWorkItem[]> => []);
+    await runV2Engine(r, cfg({ engine: 'v2' }), {
+      runTask: async () => ({ ok: true }), executeSprint: async () => ({ ok: true }),
+      goalDeps: buildGoalDeps({
+        planner: firstAuthor,
+        accepter: async (_goal, _items, contract) => ({
+          outcome: 'accepted',
+          criteria: [{ criterionId: contract!.criteria[0]!.id, verdict: 'met', evidenceRefs: ['work-item:gAcceptedRestart-step'], rationale: 'the durable work-item result is accepted' }],
+          evaluator: { role: 'brain', instanceId: 'goal-evaluator-restart' },
+          invocationReceiptRef: { schemaVersion: 1, invocationId: 'inv-goal-accepted-restart', tenantId: 'local', projectId: 'project-test' },
+          decidedAt: '2026-09-08T12:00:00.000Z',
+        }),
+        verifyAcceptanceReceipt: () => ({ verified: true, errors: [] }),
+      }), store, maxIterations: BOUNDED,
+    });
+    expect(store.listAcceptanceDecisions('gAcceptedRestart')).toHaveLength(1);
+    expect(store.listAcceptanceDecisions('gAcceptedRestart')[0]!.effectiveOutcome).toBe('accepted');
+    store.close();
+
+    store = openStore(r);
+    const restartedAuthor = vi.fn(async (): Promise<NewWorkItem[]> => [{
+      id: 'gAcceptedRestart-duplicate', missionId: 'gAcceptedRestart', kind: 'task',
+      spec: { description: 'must never be authored after acceptance' },
+    }]);
+    const restartedAccepter = vi.fn(async () => false);
+    const restartedRunTask = vi.fn(async () => ({ ok: true }));
+    const restarted = await runV2Engine(r, cfg({ engine: 'v2' }), {
+      runTask: restartedRunTask, executeSprint: async () => ({ ok: true }),
+      goalDeps: buildGoalDeps({ planner: restartedAuthor, accepter: restartedAccepter }), store, maxIterations: 1,
+    });
+    expect(restarted).toMatchObject({ reason: 'drained', dispatched: 0 });
+    expect(restartedAuthor).not.toHaveBeenCalled();
+    expect(restartedAccepter).not.toHaveBeenCalled();
+    expect(restartedRunTask).not.toHaveBeenCalled();
+    expect(store.listAcceptanceDecisions('gAcceptedRestart')).toHaveLength(1);
+    expect(store.listItems('gAcceptedRestart')).toHaveLength(1);
+  });
+
+  it.each([
+    { id: 'gLegacyCompleted', acceptance: undefined },
+    { id: 'gAwaitingDecision', acceptance: 'the next round settles' },
+  ])('continues a completed goal without accepted terminal truth: $id', async ({ id, acceptance }) => {
+    const r = root();
+    const store = openStore(r);
+    createGoalMission(store, {
+      id, title: 'Intermediate completed round', goal: 'continue to the next round',
+      ...(acceptance ? { acceptance } : {}),
+    });
+    store.updateMissionStatus(id, 'completed', { ok: true });
+    if (acceptance) expect(store.listAcceptanceDecisions(id)).toHaveLength(0);
+    const planner = vi.fn(async (_goal: string, prior: WorkItem[]): Promise<NewWorkItem[]> =>
+      prior.length === 0
+        ? [{ id: `${id}-next`, missionId: id, kind: 'task', spec: { description: 'next round' } }]
+        : []);
+    await runV2Engine(r, cfg({ engine: 'v2' }), {
+      runTask: async () => ({ ok: true }), executeSprint: async () => ({ ok: true }),
+      goalDeps: buildGoalDeps({ planner, accepter: async () => false }), store, maxIterations: 1,
+    });
+    expect(planner).toHaveBeenCalledTimes(1);
+    expect(store.listItems(id).map((item) => item.id)).toEqual([`${id}-next`]);
+    expect(store.getMission(id)!.status).toBe('completed');
+  });
+
   it('drains without dispatch/finalize on HOLD, then resumes exactly once after restart', async () => {
     const r = root();
     let store = openStore(r);

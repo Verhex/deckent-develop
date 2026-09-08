@@ -28,6 +28,7 @@ import {
   type MissionSchedulerSummary,
 } from './mission-scheduler.js';
 import { advanceGoalMission, type GoalAdvanceDeps } from './goal-mission.js';
+import { readGoalAcceptanceContract } from './mission-acceptance.js';
 import { auditMissionLifecycle } from './mission-audit-bridge.js';
 import type { MissionApprovalCoordinatorLike } from './mission-approval-coordinator.js';
 import type {
@@ -564,13 +565,20 @@ async function runGoalDrivenEngine(opts: GoalDrivenEngineOpts): Promise<MissionS
   const { store, dispatch, poolSize, intervalMs, onMissionSettled, runtimeRegistry, signal } = opts;
   const goalDeps: GoalAdvanceDeps = { ...opts.goalDeps, admission: runtimeRegistry.descriptor };
   const maxIterations = opts.maxIterations ?? Infinity;
-  // A durably failed goal is terminal. Seed it as finalized so a clean engine
-  // restart does not re-deliver the same settlement. This is at-most-once
-  // restart containment, not a substitute for a delivery receipt/fence across
-  // a crash between the status write and the external notification.
+  // A durably failed goal is terminal. A completed goal is terminal only when
+  // the canonical acceptance ledger contains an accepted decision: the
+  // scheduler also uses `completed` between goal rounds, so status alone must
+  // never suppress the next author/accept pass. Unknown/rejected/held or absent
+  // acceptance truth remains live and fail-closed.
   const finalized = new Set<string>(
     store.listMissions()
-      .filter((mission) => mission.kind === 'goal' && mission.status === 'failed')
+      .filter((mission) => mission.kind === 'goal' && (
+        mission.status === 'failed'
+        || (mission.status === 'completed'
+          && readGoalAcceptanceContract(mission) !== null
+          && store.listAcceptanceDecisions(mission.id)
+            .some((decision) => decision.effectiveOutcome === 'accepted'))
+      ))
       .map((mission) => mission.id),
   );
   let dispatched = 0;
