@@ -19,12 +19,67 @@
 // timestamp in this file's types is caller-supplied data, never generated.
 
 import type { ActorContext, RequestOrigin } from './work-model.js';
+import {
+  INVOCATION_RECEIPT_SCHEMA_VERSION,
+  type InvocationReceiptRef,
+} from './invocation-receipt.js';
 
-/** Content-addressed identity of the exact input that produced a RunFlow plan. */
-export const RUN_FLOW_PLAN_SOURCE_AUTHORITY_SCHEMA_VERSION = 1 as const;
+const SHA256_HEX = /^[a-f0-9]{64}$/u;
 
-export interface RunFlowPlanSourceAuthority {
-  readonly schemaVersion: typeof RUN_FLOW_PLAN_SOURCE_AUTHORITY_SCHEMA_VERSION;
+/** Content-addressed authority returned by one accepted zero-config planner invocation. */
+export interface PlannerInvocationBindingV1 {
+  readonly schemaVersion: 1;
+  readonly flowId: string;
+  readonly revision: number;
+  readonly receiptRef: InvocationReceiptRef;
+  readonly receiptSha256: string;
+  readonly terminalEventHash: string;
+  readonly plannerResultSha256: string;
+  readonly directivesSha256: string;
+}
+
+export type PlanningEvidence =
+  | { readonly kind: 'accepted-planner-invocation'; readonly binding: PlannerInvocationBindingV1 }
+  | { readonly kind: 'not-applicable'; readonly sourceKind: 'directives' };
+
+/** Pure persisted-envelope guard. Canonical receipt verification remains in the store-backed helper. */
+export function isPlannerInvocationBinding(value: unknown): value is PlannerInvocationBindingV1 {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const row = value as Record<string, unknown>;
+  if (Object.keys(row).sort().join(',') !== 'directivesSha256,flowId,plannerResultSha256,receiptRef,receiptSha256,revision,schemaVersion,terminalEventHash') return false;
+  const ref = row.receiptRef;
+  if (!ref || typeof ref !== 'object' || Array.isArray(ref)) return false;
+  const receiptRef = ref as Record<string, unknown>;
+  const validText = (candidate: unknown): candidate is string => (
+    typeof candidate === 'string'
+    && candidate === candidate.trim()
+    && candidate.length > 0
+    && candidate.length <= 512
+    && !/[\u0000-\u001f\u007f-\u009f]/u.test(candidate)
+  );
+  const validDigest = (candidate: unknown): candidate is string => (
+    typeof candidate === 'string' && SHA256_HEX.test(candidate)
+  );
+  return row.schemaVersion === 1
+    && validText(row.flowId)
+    && Number.isSafeInteger(row.revision)
+    && (row.revision as number) > 0
+    && Object.keys(receiptRef).sort().join(',') === 'invocationId,projectId,schemaVersion,tenantId'
+    && receiptRef.schemaVersion === INVOCATION_RECEIPT_SCHEMA_VERSION
+    && validText(receiptRef.invocationId)
+    && validText(receiptRef.projectId)
+    && validText(receiptRef.tenantId)
+    && validDigest(row.receiptSha256)
+    && validDigest(row.terminalEventHash)
+    && validDigest(row.plannerResultSha256)
+    && validDigest(row.directivesSha256);
+}
+
+/** Content-addressed identity of the exact input and planning evidence that produced a RunFlow plan. */
+export const RUN_FLOW_PLAN_SOURCE_AUTHORITY_SCHEMA_VERSION = 2 as const;
+
+export interface LegacyRunFlowPlanSourceAuthorityV1 {
+  readonly schemaVersion: 1;
   readonly sourceKind: 'intent' | 'directives';
   readonly contentSha256: string;
   readonly configSha256: string;
@@ -33,6 +88,22 @@ export interface RunFlowPlanSourceAuthority {
   readonly scopeInputSha256: string;
   readonly lineageSha256: string;
 }
+
+export interface RunFlowPlanSourceAuthorityV2 {
+  readonly schemaVersion: typeof RUN_FLOW_PLAN_SOURCE_AUTHORITY_SCHEMA_VERSION;
+  readonly sourceKind: 'intent' | 'directives';
+  readonly contentSha256: string;
+  readonly configSha256: string;
+  readonly proposalSha256: string;
+  readonly planningInputSha256: string;
+  readonly scopeInputSha256: string;
+  readonly lineageSha256: string;
+  readonly planningEvidence: PlanningEvidence;
+}
+
+export type RunFlowPlanSourceAuthority =
+  | LegacyRunFlowPlanSourceAuthorityV1
+  | RunFlowPlanSourceAuthorityV2;
 
 // ═══ State ═══════════════════════════════════════════════════════════════
 

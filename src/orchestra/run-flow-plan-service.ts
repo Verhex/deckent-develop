@@ -18,7 +18,8 @@ import { createHash } from 'node:crypto';
 import { canonicalJson } from '../core/audit-writer.js';
 import {
   computeExecutionPlanDigestByVersion,
-  computeExecutionPlanDigestV4,
+  computeExecutionPlanDigestV5,
+  EXECUTION_PLAN_DIGEST_VERSION_V5,
   type ExecutionPlanDigestContext,
 } from '../core/execution-plan-digest.js';
 import type {
@@ -27,11 +28,17 @@ import type {
   RunFlowGateResult,
   RunFlowPlanLineageRecord,
   RunFlowPlanSourceAuthority,
+  RunFlowPlanSourceAuthorityV2,
   RunFlowPolicyDecision,
   RunFlowProjectionAdoptionRecord,
   RunProposal,
 } from '../core/run-flow-contract.js';
 import { RUN_FLOW_PLAN_SOURCE_AUTHORITY_SCHEMA_VERSION } from '../core/run-flow-contract.js';
+import type { PlanningEvidence } from '../core/run-flow-contract.js';
+import {
+  createPlannerInvocationBinding,
+  verifyPlannerInvocationBinding,
+} from '../core/planner-invocation-binding.js';
 import {
   loadPlannedSprint,
   savePlannedSprint,
@@ -65,6 +72,7 @@ import {
   compileRunProposal,
   type RunProposalPlanner,
 } from './run-proposal-compiler.js';
+import { derivePlannerPlanContract } from './planner-plan-contract.js';
 import {
   inspectStructuredCriteriaProjectionAdoption,
   TaskArtifactProjectionError,
@@ -83,7 +91,9 @@ export type RunFlowPlanServiceErrorCode =
   | 'TOPOLOGY_HOLD'
   | 'PROMPT_GATE_HOLD'
   | 'SCOPE_GATE_HOLD'
-  | 'CLOSED_WRITE_SCOPE_HOLD';
+  | 'CLOSED_WRITE_SCOPE_HOLD'
+  | 'PLANNER_EVIDENCE_HOLD'
+  | 'PLANNER_EVIDENCE_REPLAN_REQUIRED';
 
 export class RunFlowPlanServiceError extends Error {
   constructor(
@@ -205,7 +215,12 @@ function stableProjectionAdoptionAuthority(
   return stable;
 }
 
-function buildSourceAuthority(
+type RunFlowPlanSourceAuthorityInput = Omit<
+  RunFlowPlanSourceAuthorityV2,
+  'schemaVersion' | 'planningEvidence'
+>;
+
+function buildSourceAuthorityInput(
   proposal: RunProposal,
   source: RunFlowPlanSource,
   config: ResolvedConfig,
@@ -215,7 +230,7 @@ function buildSourceAuthority(
   scopeInput: ScopeInput,
   lineage: RunFlowPlanLineage,
   projectionAdoption: RunFlowProjectionAdoptionInput | undefined,
-): RunFlowPlanSourceAuthority {
+): RunFlowPlanSourceAuthorityInput {
   const content = source.sourceKind === 'intent'
     ? proposal.intentSummary
     : source.brainContext.directives;
@@ -223,7 +238,6 @@ function buildSourceAuthority(
     ? source.baseContext
     : source.brainContext;
   return Object.freeze({
-    schemaVersion: RUN_FLOW_PLAN_SOURCE_AUTHORITY_SCHEMA_VERSION,
     sourceKind: source.sourceKind,
     contentSha256: sha256(content),
     configSha256: sha256(canonicalJson(config)),
@@ -245,18 +259,78 @@ function buildSourceAuthority(
   });
 }
 
+function buildSourceAuthority(
+  input: RunFlowPlanSourceAuthorityInput,
+  planningEvidence: PlanningEvidence,
+): RunFlowPlanSourceAuthorityV2 {
+  return Object.freeze({
+    schemaVersion: RUN_FLOW_PLAN_SOURCE_AUTHORITY_SCHEMA_VERSION,
+    ...input,
+    planningEvidence,
+  });
+}
+
 function sourceAuthorityMatches(
   actual: RunFlowPlanSourceAuthority | undefined,
-  expected: RunFlowPlanSourceAuthority,
+  expected: RunFlowPlanSourceAuthorityInput,
 ): boolean {
-  return actual?.schemaVersion === expected.schemaVersion
-    && actual.sourceKind === expected.sourceKind
+  return actual?.sourceKind === expected.sourceKind
     && actual.contentSha256 === expected.contentSha256
     && actual.configSha256 === expected.configSha256
     && actual.proposalSha256 === expected.proposalSha256
     && actual.planningInputSha256 === expected.planningInputSha256
     && actual.scopeInputSha256 === expected.scopeInputSha256
     && actual.lineageSha256 === expected.lineageSha256;
+}
+
+function verifyPlanningEvidence(
+  projectRoot: string,
+  authority: RunFlowPlanSourceAuthority,
+  proposal: RunProposal,
+): void {
+  if (authority.schemaVersion === 1) {
+    if (authority.sourceKind === 'intent') {
+      throw new RunFlowPlanServiceError('PLANNER_EVIDENCE_REPLAN_REQUIRED', {
+        flowId: proposal.flowId,
+        reason: 'legacy_intent_has_no_planner_binding',
+      });
+    }
+    return;
+  }
+  const evidence = authority.planningEvidence;
+  if (!evidence || typeof evidence !== 'object') {
+    throw new RunFlowPlanServiceError('PLANNER_EVIDENCE_HOLD', {
+      flowId: proposal.flowId,
+      reason: 'planning_evidence_malformed',
+    });
+  }
+  if (authority.sourceKind === 'directives') {
+    if (evidence.kind !== 'not-applicable' || evidence.sourceKind !== 'directives') {
+      throw new RunFlowPlanServiceError('PLANNER_EVIDENCE_HOLD', {
+        flowId: proposal.flowId,
+        reason: 'directives_planning_evidence_mismatch',
+      });
+    }
+    return;
+  }
+  if (evidence.kind !== 'accepted-planner-invocation') {
+    throw new RunFlowPlanServiceError('PLANNER_EVIDENCE_HOLD', {
+      flowId: proposal.flowId,
+      reason: 'accepted_planner_evidence_missing',
+    });
+  }
+  try {
+    verifyPlannerInvocationBinding(projectRoot, evidence.binding, {
+      flowId: proposal.flowId,
+      revision: proposal.revision,
+      tenantId: proposal.tenant,
+    });
+  } catch (error) {
+    throw new RunFlowPlanServiceError('PLANNER_EVIDENCE_HOLD', {
+      flowId: proposal.flowId,
+      reason: error instanceof Error ? error.message : 'planner_binding_invalid',
+    });
+  }
 }
 
 function computePolicyDecision(
@@ -271,7 +345,8 @@ function asDurableRecord(record: StoredPlannedSprint | undefined): DurableRunFlo
   if (!record) return undefined;
   const candidate = record as Partial<DurableRunFlowPlanRecord>;
   if (
-    candidate.sourceAuthority?.schemaVersion !== RUN_FLOW_PLAN_SOURCE_AUTHORITY_SCHEMA_VERSION
+    (candidate.sourceAuthority?.schemaVersion !== 1
+      && candidate.sourceAuthority?.schemaVersion !== RUN_FLOW_PLAN_SOURCE_AUTHORITY_SCHEMA_VERSION)
     || !candidate.proposal
     || !candidate.preview
     || !candidate.planDigest
@@ -396,7 +471,7 @@ function buildResult(
 function verifyReusableRecord(
   record: DurableRunFlowPlanRecord,
   input: PlanRunFlowInput,
-  authority: RunFlowPlanSourceAuthority,
+  authority: RunFlowPlanSourceAuthorityInput,
 ): void {
   if (
     record.flowId !== input.proposal.flowId
@@ -429,6 +504,35 @@ function verifyReusableRecord(
       'FLOW_ID_CONFLICT',
       { flowId: input.proposal.flowId, reason: 'authority_mismatch' },
     );
+  }
+  verifyPlanningEvidence(input.projectRoot, record.sourceAuthority, input.proposal);
+  if (
+    record.sourceAuthority.schemaVersion === 1
+    && record.sourceAuthority.sourceKind === 'directives'
+    && (
+      record.planDigestVersion === EXECUTION_PLAN_DIGEST_VERSION_V5
+      || record.planDigestContext.planningEvidence !== undefined
+      || record.planDigestContext.sourceAuthoritySha256 !== undefined
+    )
+  ) {
+    throw new RunFlowPlanServiceError('PLANNER_EVIDENCE_HOLD', {
+      flowId: record.flowId,
+      reason: 'legacy_directives_authority_downgrade',
+    });
+  }
+  if (record.sourceAuthority.schemaVersion === RUN_FLOW_PLAN_SOURCE_AUTHORITY_SCHEMA_VERSION) {
+    if (
+      record.planDigestVersion !== EXECUTION_PLAN_DIGEST_VERSION_V5
+      || canonicalJson(record.planDigestContext.planningEvidence)
+        !== canonicalJson(record.sourceAuthority.planningEvidence)
+      || record.planDigestContext.sourceAuthoritySha256
+        !== sha256(canonicalJson(record.sourceAuthority))
+    ) {
+      throw new RunFlowPlanServiceError('PLANNER_EVIDENCE_HOLD', {
+        flowId: record.flowId,
+        reason: 'source_authority_digest_mismatch',
+      });
+    }
   }
   assertCanonicalDependencies(record.sprint);
   assertExecutableStatuses(record.sprint);
@@ -584,7 +688,7 @@ export async function planRunFlow(input: PlanRunFlowInput): Promise<PlanRunFlowR
       ),
     };
   }
-  const authority = buildSourceAuthority(
+  const authorityInput = buildSourceAuthorityInput(
     input.proposal,
     input.source,
     input.config,
@@ -606,7 +710,7 @@ export async function planRunFlow(input: PlanRunFlowInput): Promise<PlanRunFlowR
   }
 
   if (reusable) {
-    verifyReusableRecord(reusable, input, authority);
+    verifyReusableRecord(reusable, input, authorityInput);
     let context = ensureDurableEventChain(input.projectRoot, reusable);
     if (input.approval && context.state !== 'APPROVED') {
       assertApprovalAuthority(reusable, input.approval);
@@ -618,18 +722,48 @@ export async function planRunFlow(input: PlanRunFlowInput): Promise<PlanRunFlowR
     return buildResult(reusable, context, true);
   }
 
-  const brainContext = input.source.sourceKind === 'intent'
-    ? {
-        ...input.source.baseContext,
-        directives: (
-          await compileRunProposal(
-            input.proposal,
-            input.source.planner,
-            input.config,
-          )
-        ).directivesMarkdown,
-      }
-    : input.source.brainContext;
+  let brainContext: BrainContext;
+  let planningEvidence: PlanningEvidence;
+  if (input.source.sourceKind === 'intent') {
+    const compiled = await compileRunProposal(
+      input.proposal,
+      input.source.planner,
+      input.config,
+      {
+        projectRoot: input.projectRoot,
+        planContract: derivePlannerPlanContract(previewOptions?.writeScopePolicy),
+      },
+    );
+    if (!compiled.plannerInvocation) {
+      throw new RunFlowPlanServiceError('PLANNER_EVIDENCE_HOLD', {
+        flowId: input.proposal.flowId,
+        reason: 'accepted_planner_receipt_missing',
+      });
+    }
+    try {
+      planningEvidence = {
+        kind: 'accepted-planner-invocation',
+        binding: createPlannerInvocationBinding(input.projectRoot, {
+          flowId: input.proposal.flowId,
+          revision: input.proposal.revision,
+          tenantId: input.proposal.tenant,
+          receiptRef: compiled.plannerInvocation.receiptRef,
+          plannerResultSha256: compiled.plannerInvocation.plannerResultSha256,
+          directivesSha256: compiled.plannerInvocation.directivesSha256,
+        }),
+      };
+    } catch (error) {
+      throw new RunFlowPlanServiceError('PLANNER_EVIDENCE_HOLD', {
+        flowId: input.proposal.flowId,
+        reason: error instanceof Error ? error.message : 'planner_binding_invalid',
+      });
+    }
+    brainContext = { ...input.source.baseContext, directives: compiled.directivesMarkdown };
+  } else {
+    planningEvidence = { kind: 'not-applicable', sourceKind: 'directives' };
+    brainContext = input.source.brainContext;
+  }
+  const authority = buildSourceAuthority(authorityInput, planningEvidence);
 
   // Exactly one plan-generation call for a new source authority.
   const generated = await generatePlanPreview(
@@ -736,9 +870,14 @@ export async function planRunFlow(input: PlanRunFlowInput): Promise<PlanRunFlowR
     }
   }
 
-  const digest = computeExecutionPlanDigestV4(
+  const planDigestContext: ExecutionPlanDigestContext = {
+    ...generated.planDigestContext,
+    planningEvidence,
+    sourceAuthoritySha256: sha256(canonicalJson(authority)),
+  };
+  const digest = computeExecutionPlanDigestV5(
     generated.sprint,
-    generated.planDigestContext,
+    planDigestContext,
   );
   let canonicalSprint = generated.sprint;
   let projectionAdoption: RunFlowProjectionAdoptionRecord | undefined;
@@ -794,9 +933,9 @@ export async function planRunFlow(input: PlanRunFlowInput): Promise<PlanRunFlowR
       ...generated.sprint,
       tasks: [...inspected.canonicalTasks],
     };
-    const adoptedDigest = computeExecutionPlanDigestV4(
+    const adoptedDigest = computeExecutionPlanDigestV5(
       canonicalSprint,
-      generated.planDigestContext,
+      planDigestContext,
     );
     if (adoptedDigest.digest !== digest.digest) {
       throw new RunFlowPlanServiceError('PROJECTION_ADOPTION_HOLD', {
@@ -836,7 +975,7 @@ export async function planRunFlow(input: PlanRunFlowInput): Promise<PlanRunFlowR
     revision: input.proposal.revision,
     planDigest: digest.digest,
     planDigestVersion: digest.version,
-    planDigestContext: generated.planDigestContext,
+    planDigestContext,
     taskSummaries: generated.taskSummaries,
     policyDecision: scopeGateResult === 'fail'
       ? 'deny'
@@ -858,7 +997,7 @@ export async function planRunFlow(input: PlanRunFlowInput): Promise<PlanRunFlowR
     sprint: canonicalSprint,
     planDigest: digest.digest,
     planDigestVersion: digest.version,
-    planDigestContext: generated.planDigestContext,
+    planDigestContext,
     proposal: input.proposal,
     preview,
     sourceAuthority: authority,

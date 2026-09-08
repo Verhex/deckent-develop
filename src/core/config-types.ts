@@ -115,11 +115,12 @@ export interface TerminalConfig {
   /**
    * TERM-FLOW-UNIFY Sprint-1 dilim (422-001,
    * docs/analysis/term-flow-unify-design-2026-07-11.md): gates the
-   * host-owned RunFlow state machine (`core/run-flow-contract.ts` +
-   * `orchestra/run-flow-reducer.ts`). Opt-in — absent/`false` = off
-   * (default: false). Unlike `native_agent` above, undefined here means OFF,
-   * not ON — this slice ships contract + pure reducer only, with ZERO
-   * production caller; no code reads this flag yet.
+   * exposed host-owned RunFlow control surface (`core/run-flow-contract.ts` +
+   * `orchestra/run-flow-reducer.ts`). For `deckent do`, canonical exact
+   * planning/execution is unconditional: absent/`false` selects the compatible
+   * interactive foreground posture, while `true` selects non-interactive
+   * detached control. Other exposed RunFlow controls remain opt-in and require
+   * literal true. The flag never authorizes a fallback to an unbound plan.
    */
   run_flow_v2?: boolean;
 }

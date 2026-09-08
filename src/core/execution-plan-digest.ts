@@ -28,14 +28,18 @@ import {
   normalizeExecutionWriteScopePolicy,
   type ExecutionWriteScopePolicy,
 } from './execution-write-scope-policy.js';
+import { isPlannerInvocationBinding, type PlanningEvidence } from './run-flow-contract.js';
 
 export const EXECUTION_PLAN_DIGEST_VERSION_V2 = 2 as const;
 export const EXECUTION_PLAN_DIGEST_VERSION_V3 = 3 as const;
-export const EXECUTION_PLAN_DIGEST_VERSION = 4 as const;
+export const EXECUTION_PLAN_DIGEST_VERSION_V4 = 4 as const;
+export const EXECUTION_PLAN_DIGEST_VERSION = EXECUTION_PLAN_DIGEST_VERSION_V4;
+export const EXECUTION_PLAN_DIGEST_VERSION_V5 = 5 as const;
 export type ExecutionPlanDigestVersion =
   | typeof EXECUTION_PLAN_DIGEST_VERSION_V2
   | typeof EXECUTION_PLAN_DIGEST_VERSION_V3
-  | typeof EXECUTION_PLAN_DIGEST_VERSION;
+  | typeof EXECUTION_PLAN_DIGEST_VERSION_V4
+  | typeof EXECUTION_PLAN_DIGEST_VERSION_V5;
 
 export type ExecutionPlanAuthMode = 'subscription' | 'api' | 'hybrid';
 
@@ -52,6 +56,10 @@ export interface ExecutionPlanDigestContext {
   readonly configuredMaxWorkers?: number;
   /** V4-only owner authority. V2/V3 projections remain byte-frozen. */
   readonly writeScopePolicy?: ExecutionWriteScopePolicy;
+  /** V5-only accepted planner authority. Older projections deliberately ignore it. */
+  readonly planningEvidence?: PlanningEvidence;
+  /** V5-only digest of the canonical Flow source-authority envelope. */
+  readonly sourceAuthoritySha256?: string;
 }
 
 export interface ExecutionPlanDigestResult {
@@ -495,6 +503,37 @@ export function computeExecutionPlanDigestV4(
   };
 }
 
+function validPlanningEvidence(value: PlanningEvidence | undefined): value is PlanningEvidence {
+  if (value?.kind === 'not-applicable') return value.sourceKind === 'directives' && Object.keys(value).sort().join(',') === 'kind,sourceKind';
+  return value?.kind === 'accepted-planner-invocation'
+    && Object.keys(value).sort().join(',') === 'binding,kind'
+    && isPlannerInvocationBinding(value.binding);
+}
+
+export function computeExecutionPlanDigestV5(
+  sprint: Sprint,
+  context: ExecutionPlanDigestContext,
+): ExecutionPlanDigestResult & { readonly version: typeof EXECUTION_PLAN_DIGEST_VERSION_V5; readonly topology: ExecutionTopology } {
+  if (!validPlanningEvidence(context.planningEvidence)) {
+    throw createExecutionAuthorityError('execution-plan-digest: v5 requires valid planningEvidence');
+  }
+  if (typeof context.sourceAuthoritySha256 !== 'string' || !/^[a-f0-9]{64}$/u.test(context.sourceAuthoritySha256)) {
+    throw createExecutionAuthorityError('execution-plan-digest: v5 requires sourceAuthoritySha256');
+  }
+  const v4 = computeExecutionPlanDigestV4(sprint, context);
+  const projection = deepFreeze({
+    ...cloneJson(v4.projection),
+    version: EXECUTION_PLAN_DIGEST_VERSION_V5,
+    planningEvidence: cloneJson(context.planningEvidence),
+    sourceAuthoritySha256: context.sourceAuthoritySha256,
+  }) as Readonly<Record<string, unknown>>;
+  return {
+    version: EXECUTION_PLAN_DIGEST_VERSION_V5,
+    digest: createHash('sha256').update(canonicalJson(projection)).digest('hex'),
+    projection, budgetHolds: v4.budgetHolds, topology: v4.topology,
+  };
+}
+
 export function computeExecutionPlanDigestByVersion(
   version: number,
   sprint: Sprint,
@@ -508,6 +547,9 @@ export function computeExecutionPlanDigestByVersion(
   }
   if (version === EXECUTION_PLAN_DIGEST_VERSION) {
     return computeExecutionPlanDigestV4(sprint, context);
+  }
+  if (version === EXECUTION_PLAN_DIGEST_VERSION_V5) {
+    return computeExecutionPlanDigestV5(sprint, context);
   }
   throw createExecutionAuthorityError(
     `execution-plan-digest: unsupported version ${version}`,

@@ -19,19 +19,50 @@
 // No `vi.mock('node:child_process', ...)` anywhere in this file — a real
 // AI/provider call would show up as an actual attempted spawn, not a mock hit.
 
-import { describe, it, expect, vi } from 'vitest';
+import { execFile } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import {
   compileRunProposal,
   compileRunProposalIntent,
   RunProposalPlanError,
   type RunProposalPlanner,
 } from '../../src/orchestra/run-proposal-compiler.js';
-import { callZeroConfigPlanner, buildZeroConfigPlanPrompt } from '../../src/orchestra/planner.js';
+import { callZeroConfigPlannerWithReason, buildZeroConfigPlanPrompt } from '../../src/orchestra/planner.js';
 import { DEFAULT_MODES } from '../../src/core/config.js';
 import { getEquivalentModel } from '../../src/core/model-equivalence.js';
 import { providerRegistry } from '../../src/core/provider.js';
 import type { RunProposal } from '../../src/core/run-flow-contract.js';
 import type { DeckentConfig, PlannerResult, PlannerTask } from '../../src/core/types.js';
+import { derivePlannerPlanContract } from '../../src/orchestra/planner-plan-contract.js';
+
+const execFileAsync = promisify(execFile);
+let plannerProjectRoot: string;
+
+beforeEach(() => {
+  plannerProjectRoot = mkdtempSync(join(tmpdir(), 'run-proposal-planner-'));
+});
+
+afterEach(() => {
+  rmSync(plannerProjectRoot, { recursive: true, force: true });
+});
+
+function planningContext() {
+  return {
+    projectRoot: plannerProjectRoot,
+    planContract: derivePlannerPlanContract({
+      mode: 'closed-allowlist',
+      filesWrite: ['src/api/export.ts'],
+    }),
+  };
+}
+
+function hermeticConfig(config: DeckentConfig = {}): DeckentConfig {
+  return { ...config, spawn_backend: 'subprocess' };
+}
 
 // Task 431-003 — spy (never replace) `callZeroConfigPlanner` so the model-selection
 // tests below (group 5) can assert on the `model` argument `defaultRunProposalPlanner`
@@ -43,7 +74,7 @@ vi.mock('../../src/orchestra/planner.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/orchestra/planner.js')>();
   return {
     ...actual,
-    callZeroConfigPlanner: vi.fn(actual.callZeroConfigPlanner),
+    callZeroConfigPlannerWithReason: vi.fn(actual.callZeroConfigPlannerWithReason),
   };
 });
 
@@ -232,7 +263,7 @@ describe('compileRunProposalIntent — production default is wired to the real p
 
       let caught: unknown;
       try {
-        await compileRunProposalIntent(proposal);
+        await compileRunProposalIntent(proposal, undefined, hermeticConfig(), planningContext());
       } catch (e) {
         caught = e;
       }
@@ -256,7 +287,7 @@ describe('compileRunProposalIntent — production default is wired to the real p
 describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(config)', () => {
   it('uses grouped Brain provider when no effective flat projection is supplied', async () => {
     const proposal = makeProposal({ flowId: 'flow-brain-provider-parity' });
-    const spy = vi.mocked(callZeroConfigPlanner);
+    const spy = vi.mocked(callZeroConfigPlannerWithReason);
     spy.mockClear();
     const config: DeckentConfig = {
       mode: 'balanced',
@@ -266,7 +297,7 @@ describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(c
     const available = vi.spyOn(providerRegistry, 'hasProvider').mockReturnValue(true);
 
     try {
-      await expect(compileRunProposalIntent(proposal, undefined, config)).rejects.toThrow(RunProposalPlanError);
+      await expect(compileRunProposalIntent(proposal, undefined, hermeticConfig(config), planningContext())).rejects.toThrow(RunProposalPlanError);
     } finally {
       available.mockRestore();
     }
@@ -283,7 +314,7 @@ describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(c
 
   it('preserves an effective flat Brain provider over the retained grouped authoring value', async () => {
     const proposal = makeProposal({ flowId: 'flow-brain-provider-env-override' });
-    const spy = vi.mocked(callZeroConfigPlanner);
+    const spy = vi.mocked(callZeroConfigPlannerWithReason);
     spy.mockClear();
     const config: DeckentConfig = {
       mode: 'balanced',
@@ -294,7 +325,7 @@ describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(c
     const available = vi.spyOn(providerRegistry, 'hasProvider').mockReturnValue(true);
 
     try {
-      await expect(compileRunProposalIntent(proposal, undefined, config)).rejects.toThrow(RunProposalPlanError);
+      await expect(compileRunProposalIntent(proposal, undefined, hermeticConfig(config), planningContext())).rejects.toThrow(RunProposalPlanError);
     } finally {
       available.mockRestore();
     }
@@ -310,10 +341,10 @@ describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(c
 
   it("passes the balanced-mode canonical 'claude-sonnet-5' when no config is given", async () => {
     const proposal = makeProposal({ flowId: 'flow-431-no-config' });
-    const spy = vi.mocked(callZeroConfigPlanner);
+    const spy = vi.mocked(callZeroConfigPlannerWithReason);
     spy.mockClear();
 
-    await expect(compileRunProposalIntent(proposal)).rejects.toThrow(RunProposalPlanError);
+    await expect(compileRunProposalIntent(proposal, undefined, hermeticConfig(), planningContext())).rejects.toThrow(RunProposalPlanError);
 
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy.mock.calls[0]?.[1]).toBe('claude-sonnet-5');
@@ -321,29 +352,29 @@ describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(c
 
   it("passes 'claude-sonnet-5' for an economic-mode config", async () => {
     const proposal = makeProposal({ flowId: 'flow-431-economic' });
-    const spy = vi.mocked(callZeroConfigPlanner);
+    const spy = vi.mocked(callZeroConfigPlannerWithReason);
     spy.mockClear();
 
     const config: DeckentConfig = { mode: 'economic', modes: DEFAULT_MODES };
-    await expect(compileRunProposalIntent(proposal, undefined, config)).rejects.toThrow(RunProposalPlanError);
+    await expect(compileRunProposalIntent(proposal, undefined, hermeticConfig(config), planningContext())).rejects.toThrow(RunProposalPlanError);
 
     expect(spy.mock.calls[0]?.[1]).toBe('claude-sonnet-5');
   });
 
   it("passes 'claude-opus-4-8' for a performance-mode config", async () => {
     const proposal = makeProposal({ flowId: 'flow-431-performance' });
-    const spy = vi.mocked(callZeroConfigPlanner);
+    const spy = vi.mocked(callZeroConfigPlannerWithReason);
     spy.mockClear();
 
     const config: DeckentConfig = { mode: 'performance', modes: DEFAULT_MODES };
-    await expect(compileRunProposalIntent(proposal, undefined, config)).rejects.toThrow(RunProposalPlanError);
+    await expect(compileRunProposalIntent(proposal, undefined, hermeticConfig(config), planningContext())).rejects.toThrow(RunProposalPlanError);
 
     expect(spy.mock.calls[0]?.[1]).toBe('claude-opus-5');
   });
 
   it('keeps the Brain invocation model separate from the configured Worker task-model policy', async () => {
     const proposal = makeProposal({ flowId: 'flow-role-split' });
-    const spy = vi.mocked(callZeroConfigPlanner);
+    const spy = vi.mocked(callZeroConfigPlannerWithReason);
     spy.mockClear();
 
     const config: DeckentConfig = {
@@ -352,7 +383,7 @@ describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(c
       brain_provider: 'claude',
       worker_provider: 'codex',
     };
-    await expect(compileRunProposalIntent(proposal, undefined, config)).rejects.toThrow(RunProposalPlanError);
+    await expect(compileRunProposalIntent(proposal, undefined, hermeticConfig(config), planningContext())).rejects.toThrow(RunProposalPlanError);
 
     expect(spy.mock.calls[0]?.[1]).toBe('claude-sonnet-5');
     expect(spy.mock.calls[0]?.[8]).toMatchObject({ defaultModel: 'gpt-5.5' });
@@ -367,10 +398,13 @@ describe('defaultRunProposalPlanner — model resolution via resolveBrainModel(c
     // containing a known tracked file (hermetic: tracked state exists on a
     // fresh checkout; nothing gitignored is read).
     const proposal = makeProposal({ flowId: 'flow-f1-tree' });
-    const spy = vi.mocked(callZeroConfigPlanner);
+    const spy = vi.mocked(callZeroConfigPlannerWithReason);
     spy.mockClear();
 
-    await expect(compileRunProposalIntent(proposal)).rejects.toThrow(RunProposalPlanError);
+    writeFileSync(join(plannerProjectRoot, 'package.json'), '{}\n');
+    await execFileAsync('git', ['init'], { cwd: plannerProjectRoot });
+    await execFileAsync('git', ['add', 'package.json'], { cwd: plannerProjectRoot });
+    await expect(compileRunProposalIntent(proposal, undefined, hermeticConfig(), planningContext())).rejects.toThrow(RunProposalPlanError);
 
     const tree = spy.mock.calls[0]?.[3];
     expect(Array.isArray(tree)).toBe(true);

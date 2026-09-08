@@ -55,10 +55,16 @@ export interface HealthSnapshot {
 
 /** Injectable seams — hermetic tests supply fakes; production defaults are real I/O. */
 export interface HealthSnapshotDeps {
+  /** Already-resolved boot config. Supplying it prevents a second disk read. */
+  config?: ResolvedConfig;
   loadConfigFn?: (root: string) => Promise<ResolvedConfig>;
   probeAuthFn?: typeof probeProviderAuth;
   loadMcpServersFn?: (root: string) => McpServersMap;
   readMemoryCountFn?: (root: string) => number | undefined;
+  /** Count projected by the REPL-owned MemoryStore; avoids opening it again. */
+  memoryCount?: number;
+  /** Distinguishes an unavailable owned projection from no injected owner. */
+  memoryCountProvided?: boolean;
   /** 363-011 — active REPL session count (361-015 session-registry). Default: listActive(root). */
   listActiveSessionsFn?: (root: string) => ReplSession[];
   /**
@@ -79,6 +85,8 @@ export interface HealthSnapshotDeps {
     model: HealthField;
     auth: HealthField;
   };
+  /** Paint an honest unknown auth field now; the caller may refresh it later. */
+  deferAuth?: boolean;
 }
 
 // ─── Timing budget ───────────────────────────────────────────────────────
@@ -268,22 +276,104 @@ export async function buildHealthSnapshot(
   const readMemoryCountFn = deps.readMemoryCountFn ?? defaultReadMemoryCount;
   const listActiveSessionsFn = deps.listActiveSessionsFn ?? ((r: string) => listActive(r));
 
-  let config: ResolvedConfig | undefined;
-  try {
-    config = await raceWithTimeout(loadConfigFn(root), CONFIG_TIMEOUT_MS);
-  } catch {
-    config = undefined;
+  let config = deps.config;
+  if (!config) {
+    try {
+      config = await raceWithTimeout(loadConfigFn(root), CONFIG_TIMEOUT_MS);
+    } catch {
+      config = undefined;
+    }
   }
 
   const provider = deps.resolvedSelection?.provider ?? resolveProviderField(config, deps.provider);
   const model = deps.resolvedSelection?.model ?? resolveModelField(config, provider.label);
   const mcp = resolveMcpField(loadMcpServersFn, root);
-  const memory = resolveMemoryField(root, config, readMemoryCountFn);
+  const memory = resolveMemoryField(
+    root,
+    config,
+    deps.memoryCountProvided === true ? () => deps.memoryCount : readMemoryCountFn,
+  );
   const mode = resolveModeField(config);
   const sessions = resolveSessionsField(root, listActiveSessionsFn);
-  const auth = deps.resolvedSelection?.auth ?? await resolveAuthField(probeAuthFn, provider);
+  const auth: HealthField = deps.deferAuth
+    ? { status: 'unknown', label: UNKNOWN_LABEL, detail: 'auth probe pending' }
+    : deps.resolvedSelection?.auth ?? await resolveAuthField(probeAuthFn, provider);
 
   return { provider, model, auth, mcp, memory, mode, sessions, cwd: root, elapsedMs: Date.now() - start };
+}
+
+/**
+ * Resolve only the deferred auth field without repeating config, MCP, memory,
+ * or session reads. The returned snapshot is a new value so an already-painted
+ * unknown snapshot remains truthful historical output.
+ */
+export async function resolveDeferredHealthAuth(
+  snapshot: HealthSnapshot,
+  deps: Pick<HealthSnapshotDeps, 'probeAuthFn'> = {},
+): Promise<HealthField> {
+  return resolveAuthField(deps.probeAuthFn ?? probeProviderAuth, snapshot.provider);
+}
+
+export interface DeferredHealthAuthUpdate {
+  start(snapshot: HealthSnapshot): void;
+  dispose(): void;
+}
+
+export interface DeferredHealthAuthFeed extends DeferredHealthAuthUpdate {
+  readonly feed: {
+    getSnapshot: () => string | null;
+    subscribe: (listener: () => void) => () => void;
+  };
+  clear(): void;
+}
+
+/** One-shot, lifecycle-owned auth refresh for an already-painted snapshot. */
+export function createDeferredHealthAuthUpdate(
+  onResolved: (auth: HealthField) => void,
+  deps: Pick<HealthSnapshotDeps, 'probeAuthFn'> = {},
+): DeferredHealthAuthUpdate {
+  let active = true;
+  let started = false;
+  return {
+    start(snapshot) {
+      if (started) return;
+      started = true;
+      void resolveDeferredHealthAuth(snapshot, deps).then((auth) => {
+        if (active) onResolved(auth);
+      }).catch(() => { /* the painted unknown remains authoritative */ });
+    },
+    dispose() { active = false; },
+  };
+}
+
+/** Ink-owned scalar projection over the one-shot auth refresh. */
+export function createDeferredHealthAuthFeed(
+  renderAuth: (auth: HealthField) => string,
+  deps: Pick<HealthSnapshotDeps, 'probeAuthFn'> = {},
+): DeferredHealthAuthFeed {
+  let line: string | null = null;
+  const listeners = new Set<() => void>();
+  const notify = (): void => { for (const listener of listeners) listener(); };
+  const update = createDeferredHealthAuthUpdate((auth) => {
+    line = renderAuth(auth);
+    notify();
+  }, deps);
+  return {
+    start: update.start,
+    dispose: update.dispose,
+    clear() {
+      update.dispose();
+      line = null;
+      notify();
+    },
+    feed: {
+      getSnapshot: () => line,
+      subscribe(listener) {
+        listeners.add(listener);
+        return () => { listeners.delete(listener); };
+      },
+    },
+  };
 }
 
 // ─── Render (i18n-first, NO_COLOR via `theme`) ──────────────────────────
@@ -306,6 +396,11 @@ function authLabelText(field: HealthField, lang: string): string {
   if (field.label === 'logged-in') return getMessage('health.logged_in', lang);
   if (field.label === 'logged-out') return getMessage('health.logged_out', lang);
   return getMessage('health.unknown', lang);
+}
+
+/** Auth-only live projection; never replays stale MCP/memory/session fields. */
+export function renderHealthAuthUpdate(field: HealthField, lang: string): string {
+  return `${getMessage('health.auth', lang)}: ${statusColor(field.status, authLabelText(field, lang))}`;
 }
 
 /**

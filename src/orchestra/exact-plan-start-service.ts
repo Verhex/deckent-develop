@@ -14,15 +14,19 @@ import {
   type PlanPreview,
   type RunHandle,
   type RunProposal,
+  type RunFlowPlanSourceAuthority,
   type StartAttemptLineage,
   type StartAttemptProcessIdentity,
   type StartAttemptRecord,
   type StartAttemptSettlement,
 } from '../core/run-flow-contract.js';
+import { EXECUTION_PLAN_DIGEST_VERSION_V5 } from '../core/execution-plan-digest.js';
+import { verifyPlannerInvocationBinding } from '../core/planner-invocation-binding.js';
 import {
   admitStartAttempt,
   loadApprovedSnapshot,
   loadLatestStartAttempt,
+  loadPlannedSprint,
   loadRunFlowRecoveryManifest,
   loadStartAttempt,
   prepareStartAttempt,
@@ -65,6 +69,7 @@ import {
   normalizeExecutionWriteScopePolicy,
 } from '../core/execution-write-scope-policy.js';
 import { DeckentError } from '../core/errors.js';
+import { resolvePlannerEvidenceRefusal } from '../core/planner-evidence-refusal.js';
 
 const DEFAULT_PREPARE_LEASE_MS = 60_000;
 
@@ -84,6 +89,8 @@ export type ExactPlanStartErrorCode =
   | 'EXACT_START_REFERENCE_MISMATCH'
   | 'EXACT_START_LINEAGE_HOLD'
   | 'EXACT_START_LINEAGE_DENIED'
+  | 'EXACT_START_PLANNER_EVIDENCE_HOLD'
+  | 'EXACT_START_PLANNER_EVIDENCE_REPLAN_REQUIRED'
   | 'EXACT_START_ATTEMPT_ACTIVE'
   | 'EXACT_START_ATTEMPT_TERMINAL'
   | 'EXACT_START_RECOVERY_MANIFEST_HOLD'
@@ -280,6 +287,124 @@ function assertRefMatchesSnapshot(
     expectedPlanDigest: ref.planDigest,
     approvedSnapshot: snapshot,
   }).sprint;
+}
+
+function assertSnapshotPlanningAuthority(
+  root: string,
+  ref: ExactPlanReferenceV1,
+  snapshot: StoredApprovedSnapshot | undefined,
+): void {
+  const authority = snapshot?.sourceAuthority as RunFlowPlanSourceAuthority | undefined;
+  if (!authority || typeof authority !== 'object' || Array.isArray(authority)) {
+    throw new ExactPlanStartError(
+      'EXACT_START_PLANNER_EVIDENCE_REPLAN_REQUIRED',
+      `exact-plan-start: approved intent '${ref.flowId}' has no accepted planner evidence; replan required`,
+      ref.flowId,
+    );
+  }
+  if (authority.schemaVersion === 1) {
+    if (authority.sourceKind === 'directives') {
+      if (
+        snapshot?.planDigestVersion === EXECUTION_PLAN_DIGEST_VERSION_V5
+        || snapshot?.planDigestContext?.planningEvidence !== undefined
+        || snapshot?.planDigestContext?.sourceAuthoritySha256 !== undefined
+      ) {
+        throw new ExactPlanStartError(
+          'EXACT_START_PLANNER_EVIDENCE_HOLD',
+          `exact-plan-start: v5 planning evidence for '${ref.flowId}' cannot be downgraded`,
+          ref.flowId,
+        );
+      }
+      return;
+    }
+    if (authority.sourceKind === 'intent') {
+      throw new ExactPlanStartError(
+        'EXACT_START_PLANNER_EVIDENCE_REPLAN_REQUIRED',
+        `exact-plan-start: approved intent '${ref.flowId}' has no accepted planner evidence; replan required`,
+        ref.flowId,
+      );
+    }
+  }
+  if (
+    authority.schemaVersion !== 2
+    || (authority.sourceKind !== 'intent' && authority.sourceKind !== 'directives')
+  ) {
+    throw new ExactPlanStartError(
+      'EXACT_START_PLANNER_EVIDENCE_HOLD',
+      `exact-plan-start: planning authority for '${ref.flowId}' is invalid`,
+      ref.flowId,
+    );
+  }
+  const context = snapshot?.planDigestContext;
+  const evidence = authority.planningEvidence;
+  if (
+    snapshot?.planDigestVersion !== EXECUTION_PLAN_DIGEST_VERSION_V5
+    || !context
+    || !evidence
+    || typeof evidence !== 'object'
+    || canonicalJson(context.planningEvidence) !== canonicalJson(evidence)
+    || context.sourceAuthoritySha256
+      !== createHash('sha256').update(canonicalJson(authority)).digest('hex')
+  ) {
+    throw new ExactPlanStartError(
+      'EXACT_START_PLANNER_EVIDENCE_HOLD',
+      `exact-plan-start: approved planning evidence for '${ref.flowId}' is not digest-bound`,
+      ref.flowId,
+    );
+  }
+  const planned = loadPlannedSprint(root, ref.flowId, {
+    revision: ref.revision,
+    planDigest: ref.planDigest,
+    planDigestVersion: EXECUTION_PLAN_DIGEST_VERSION_V5,
+  });
+  if (!planned || canonicalJson(planned.sourceAuthority) !== canonicalJson(authority)) {
+    throw new ExactPlanStartError(
+      'EXACT_START_PLANNER_EVIDENCE_HOLD',
+      `exact-plan-start: approved planning authority for '${ref.flowId}' does not match the planned record`,
+      ref.flowId,
+    );
+  }
+  if (authority.sourceKind === 'directives') {
+    if (
+      evidence.kind !== 'not-applicable'
+      || evidence.sourceKind !== 'directives'
+    ) {
+      throw new ExactPlanStartError(
+        'EXACT_START_PLANNER_EVIDENCE_HOLD',
+        `exact-plan-start: directives plan '${ref.flowId}' carries invalid planner evidence`,
+        ref.flowId,
+      );
+    }
+    return;
+  }
+  const proposal = snapshot?.proposal;
+  if (
+    evidence.kind !== 'accepted-planner-invocation'
+    || !proposal
+    || proposal.flowId !== ref.flowId
+    || proposal.revision !== ref.revision
+  ) {
+    throw new ExactPlanStartError(
+      'EXACT_START_PLANNER_EVIDENCE_HOLD',
+      `exact-plan-start: accepted planner evidence for '${ref.flowId}' is incomplete`,
+      ref.flowId,
+    );
+  }
+  try {
+    verifyPlannerInvocationBinding(root, evidence.binding, {
+      flowId: ref.flowId,
+      revision: ref.revision,
+      tenantId: proposal.tenant,
+    });
+  } catch (cause) {
+    throw new ExactPlanStartError(
+      'EXACT_START_PLANNER_EVIDENCE_HOLD',
+      `exact-plan-start: accepted planner evidence for '${ref.flowId}' could not be verified`,
+      ref.flowId,
+      undefined,
+      { cause },
+    );
+  }
 }
 
 function buildLineage(
@@ -488,6 +613,7 @@ function classifyExisting(
 function prepareNewAttempt(
   input: PrepareExactRunBase,
 ): { attempt: StartAttemptRecord; sprint: Sprint; lineage: StartAttemptLineage } | PrepareExactRunResult {
+  assertSnapshotPlanningAuthority(input.root, input.exactRef, input.approvedSnapshot);
   const sprint = assertRefMatchesSnapshot(input.exactRef, input.approvedSnapshot);
   const snapshot = input.approvedSnapshot!;
   const lineage = buildLineage(
@@ -1157,6 +1283,13 @@ export interface CanonicalExactSprintExecutorDeps {
       readonly attempt: StartAttemptRecord;
       readonly handle: RunHandle;
     }) => void;
+    readonly publishSettlement?: (input: {
+      readonly projectRoot: string;
+      readonly exactRef: ExactPlanReferenceV1;
+      readonly attempt: StartAttemptRecord;
+      readonly settlement: StartAttemptSettlement;
+      readonly handle?: RunHandle;
+    }) => void | Promise<void>;
   };
 }
 
@@ -1201,6 +1334,15 @@ function refusalOutcome(
   ref: ExactPlanReferenceV1 | undefined,
   error: unknown,
 ): CanonicalExactSprintExecutionOutcome {
+  const planningRefusal = resolvePlannerEvidenceRefusal(error);
+  if (planningRefusal) {
+    return {
+      status: 'held',
+      ...(ref ? { exactRef: ref } : {}),
+      reasonCode: planningRefusal.code,
+      detail: planningRefusal.code,
+    };
+  }
   if (error instanceof RunJobFlowNotApprovedError) {
     return { status: 'awaiting-approval', ...(ref ? { exactRef: ref } : {}), reasonCode: error.code, detail: error.message };
   }
@@ -1240,6 +1382,29 @@ export function createCanonicalExactSprintExecutor(
   deps: CanonicalExactSprintExecutorDeps,
 ): CanonicalExactSprintExecutor {
   const now = deps.now ?? (() => new Date());
+
+  async function publishPersistedSettlement(input: {
+    readonly projectRoot: string;
+    readonly exactRef: ExactPlanReferenceV1;
+    readonly attempt: StartAttemptRecord;
+    readonly settlement: StartAttemptSettlement;
+    readonly handle?: RunHandle;
+  }): Promise<CanonicalExactSprintExecutionOutcome | null> {
+    if (!deps.lifecycle.publishSettlement) return null;
+    try {
+      await deps.lifecycle.publishSettlement(input);
+      return null;
+    } catch (error) {
+      return {
+        status: 'held',
+        exactRef: input.exactRef,
+        reasonCode: 'EXACT_START_LIFECYCLE_PUBLICATION_HOLD',
+        detail: error instanceof Error ? error.message : String(error),
+        attempt: input.attempt,
+        ...(input.handle ? { handle: input.handle } : {}),
+      };
+    }
+  }
 
   async function resolveSource(
     input: CanonicalExactSprintExecutionInput,
@@ -1411,6 +1576,15 @@ export function createCanonicalExactSprintExecutor(
 
         const prepared = prepareInProcessExactRun(common);
         if (prepared.status === 'duplicate-admitted' || prepared.status === 'duplicate-terminal') {
+          if (prepared.status === 'duplicate-terminal' && prepared.attempt.settlement) {
+            const publicationHold = await publishPersistedSettlement({
+              projectRoot: input.projectRoot,
+              exactRef: resolvedRef,
+              attempt: prepared.attempt,
+              settlement: prepared.attempt.settlement,
+            });
+            if (publicationHold) return publicationHold;
+          }
           return {
             status: 'duplicate',
             exactRef: resolvedRef,
@@ -1472,18 +1646,27 @@ export function createCanonicalExactSprintExecutor(
             detail: error instanceof Error ? error.message : String(error),
             settledAt: now().toISOString(),
           } as const;
+          let terminal: StartAttemptRecord;
           try {
-            settleExactRunAttempt({
+            terminal = settleExactRunAttempt({
               root: input.projectRoot,
               capability: prepared.capability,
               process: prepared.attempt.process!,
               freshCapability,
               settlement,
               ...(deps.identityDeps ? { identityDeps: deps.identityDeps } : {}),
-            });
+            }).attempt;
           } catch (settleError) {
             return refusalOutcome(resolvedRef, settleError);
           }
+          const publicationHold = await publishPersistedSettlement({
+            projectRoot: input.projectRoot,
+            exactRef: resolvedRef,
+            attempt: terminal,
+            settlement,
+            ...(admittedHandle ? { handle: admittedHandle } : {}),
+          });
+          if (publicationHold) return publicationHold;
           return {
             status: 'failed',
             exactRef: resolvedRef,
@@ -1506,6 +1689,13 @@ export function createCanonicalExactSprintExecutor(
             settlement,
             ...(deps.identityDeps ? { identityDeps: deps.identityDeps } : {}),
           }).attempt;
+          const publicationHold = await publishPersistedSettlement({
+            projectRoot: input.projectRoot,
+            exactRef: resolvedRef,
+            attempt: terminal,
+            settlement,
+          });
+          if (publicationHold) return publicationHold;
           return {
             status: 'held',
             exactRef: resolvedRef,
@@ -1527,6 +1717,14 @@ export function createCanonicalExactSprintExecutor(
           settlement,
           ...(deps.identityDeps ? { identityDeps: deps.identityDeps } : {}),
         }).attempt;
+        const publicationHold = await publishPersistedSettlement({
+          projectRoot: input.projectRoot,
+          exactRef: resolvedRef,
+          attempt: terminal,
+          settlement,
+          handle: admittedHandle,
+        });
+        if (publicationHold) return publicationHold;
         if (lifecyclePublication?.status === 'uncertain') {
           return {
             status: 'held',

@@ -15,6 +15,7 @@ import { interruptActiveSprint } from '../orchestra/sprint-controller.js';
 import { killAllSessions } from '../orchestra/tmux.js';
 import { bootstrapFromCatalog } from '../core/model-catalog.js';
 import { loadConfig, resolveChatProvider, type ChatProviderName } from '../core/config.js';
+import type { ResolvedConfig } from '../core/config-types.js';
 // TERMINAL-PROVIDER-EVIDENCE-001 — the readline surface reads the same
 // provider-evidence store the Ink surface does (read-only probes).
 import { createProviderEvidence } from './repl/provider-evidence.js';
@@ -22,7 +23,7 @@ import { probeProviderAuth } from '../core/provider-auth-probe.js';
 import { AUTH_PROBE_PROVIDERS } from '../core/native-provider-names.js';
 import { modelRegistry } from '../core/model-registry.js';
 import { isCatalogDependent } from './command-registry.js';
-import { getMessage } from './helpers/messages.js';
+import { getLanguage, getMessage } from './helpers/messages.js';
 import { resolveChatAdapter } from './commands/chat-provider-parity.js';
 import {
   runChatNativeLoop,
@@ -71,8 +72,9 @@ import {
   OPENAI_COMPAT_PRESETS,
   type OpenAICompatPresetName,
 } from '../providers/openai-compatible.js';
-import { buildHealthSnapshot, renderHealthSnapshot } from './helpers/health-snapshot.js';
+import { buildHealthSnapshot, createDeferredHealthAuthFeed, renderHealthAuthUpdate, renderHealthSnapshot } from './helpers/health-snapshot.js';
 import type { TerminalGlyphs } from './helpers/terminal-glyphs.js';
+import type { BootHealthEmitter } from './repl/run.js';
 import { getLangFromConfig } from './helpers/config-reader.js';
 import { resolveWorktreeBinaryAuthority } from './worktree-binary-authority.js';
 import { withCliProviderAuthority } from './provider-authority-process-runtime.js';
@@ -680,11 +682,11 @@ function isValidReplProviderName(name: string): name is ReplProviderName {
  * Invalid env values fall through to disk config so a typo cannot stall the
  * REPL boot path.
  */
-async function resolveReplProviderForCwd(): Promise<ReplProviderName> {
+async function resolveReplProviderForCwd(config?: ResolvedConfig): Promise<ReplProviderName> {
   const envOverride = process.env['DECKENT_CHAT_PROVIDER'];
   if (envOverride && isValidReplProviderName(envOverride)) return envOverride;
   try {
-    const cfg = await loadConfig();
+    const cfg = config ?? await loadConfig();
     return resolveChatProvider(cfg);
   } catch {
     return 'claude';
@@ -713,8 +715,38 @@ export function replReadlineOptions(isTty: boolean): ReadLineOptions {
  * with a real {@link ChatProviderAdapter} so the user gets a real LLM round-trip
  * instead of the legacy skeleton message.
  */
-export async function launchDefaultRepl(): Promise<void> {
-  const providerName = await resolveReplProviderForCwd();
+export interface DefaultReplLaunchOptions {
+  config?: ResolvedConfig;
+  loadConfigFn?: typeof loadConfig;
+  authorize?: () => boolean;
+  firstPaint?: () => void;
+}
+
+export async function launchDefaultRepl(options: DefaultReplLaunchOptions = {}): Promise<void> {
+  // The first paint is deliberately authority-free and side-effect-free. The
+  // injected/default authority gate below still completes before provider,
+  // session, tool, or MemoryStore construction.
+  options.firstPaint?.();
+
+  if (options.authorize && !options.authorize()) return;
+
+  let replConfig = options.config;
+  let configLoadFailed = false;
+  if (!replConfig) {
+    try {
+      replConfig = await (options.loadConfigFn ?? loadConfig)();
+    } catch {
+      replConfig = undefined;
+      configLoadFailed = true;
+    }
+  }
+  if (configLoadFailed) {
+    const lang = getLanguage();
+    process.stderr.write(`NATIVE_BOOT_CONFIG_INVALID: ${getMessage('native.boot.config-invalid', lang)}\n`);
+    process.exitCode = 1;
+    return;
+  }
+  const providerName = await resolveReplProviderForCwd(replConfig);
   // TERM-1 (Sprint 351) — "hazır mıyım?" health snapshot, printed before EITHER
   // REPL mode mounts (Ink or legacy) so both paths get the same at-a-glance
   // line. buildHealthSnapshot() is already field-level fail-soft and time-
@@ -723,18 +755,34 @@ export async function launchDefaultRepl(): Promise<void> {
   const healthRoot = process.cwd();
   // TERMINAL-TOOLS-002 — ONE session-language resolution for every line this
   // boot path emits (health line, banner hint, `/` menu, loop, spinner, ticker).
-  const replLang = getLangFromConfig(healthRoot);
-  const emitHealth = async (
+  const replLang = getLanguage(replConfig?.language);
+  const authUpdate = createDeferredHealthAuthFeed(
+    (auth) => renderHealthAuthUpdate(auth, replLang),
+  );
+  const emitHealth: BootHealthEmitter = async (
     resolvedSelection?: import('./helpers/health-snapshot.js').HealthSnapshotDeps['resolvedSelection'],
     glyphs?: TerminalGlyphs,
   ): Promise<void> => {
     try {
+      const deferAuth = terminalSurface.surface === 'ink'
+        && (resolvedSelection?.auth.status ?? 'unknown') === 'unknown';
       // TERMINAL-TOOLS-007 — the snapshot names the provider THIS boot resolved
       // (env override included), never a second, divergent config read.
-      const snapshot = await buildHealthSnapshot(healthRoot, resolvedSelection ? { resolvedSelection } : { provider: providerName });
+      const snapshot = await buildHealthSnapshot(healthRoot, {
+        ...(replConfig ? { config: replConfig } : {}),
+        ...(resolvedSelection ? { resolvedSelection } : { provider: providerName }),
+        ...(deferAuth ? { deferAuth: true } : {}),
+        ...(emitHealth.memoryCount !== undefined ? { memoryCount: emitHealth.memoryCount } : {}),
+        ...(emitHealth.memoryCountProvided ? { memoryCountProvided: true } : {}),
+      });
       process.stdout.write(`${renderHealthSnapshot(snapshot, replLang, glyphs ? { glyphs } : {})}\n`);
+      if (deferAuth) authUpdate.start(snapshot);
     } catch { /* best-effort UX chrome only */ }
   };
+  emitHealth.dispose = () => { authUpdate.dispose(); };
+  emitHealth.clear = authUpdate.clear;
+  emitHealth.authFeed = authUpdate.feed;
+  if (replConfig) emitHealth.projectConfig = replConfig;
 
   // Welcome chrome. The banner shows `deckent  provider  dir` + the /help hint.
   // (Sprint 222's separate status-line print was dropped here: at boot
@@ -753,7 +801,8 @@ export async function launchDefaultRepl(): Promise<void> {
   if (terminalSurface.surface !== 'ink' && !process.argv.includes('--legacy-loop')) {
     let cfg: Awaited<ReturnType<typeof loadConfig>>;
     try {
-      cfg = await loadConfig();
+      if (!replConfig) throw new Error('config unavailable');
+      cfg = replConfig;
     } catch {
       process.stderr.write(`NATIVE_BOOT_CONFIG_INVALID: ${getMessage('native.boot.config-invalid', replLang)}\n`);
       process.exitCode = 1;
@@ -792,11 +841,15 @@ export async function launchDefaultRepl(): Promise<void> {
     // because Ink/chalk are already loaded by static import chains long
     // before this branch runs. Ink ignored NO_COLOR entirely before this.
     const { runInkRepl } = await import('./repl/run.js');
-    const outcome = await runInkRepl(providerName, () => buildReplProvider(providerName), (sel) =>
-      buildReplProvider(sel.provider as ReplProviderName, sel.model ? { model: sel.model } : {}),
-      registerReplTeardown,
-      emitHealth);
-    if (outcome?.exitCode === 1) process.exitCode = 1;
+    try {
+      const outcome = await runInkRepl(providerName, () => buildReplProvider(providerName), (sel) =>
+        buildReplProvider(sel.provider as ReplProviderName, sel.model ? { model: sel.model } : {}),
+        registerReplTeardown,
+        emitHealth);
+      if (outcome?.exitCode === 1) process.exitCode = 1;
+    } finally {
+      emitHealth.dispose?.();
+    }
     return;
   }
   let provider: ChatProviderAdapter;
@@ -966,7 +1019,7 @@ export async function launchDefaultRepl(): Promise<void> {
   // `/approve` apply to it; the tool confirm below consults it (full-auto →
   // allow, auto-edit → allow except the shell tool, suggest → ask), exactly
   // the native engine's rule.
-  const readlineCfg = await loadConfig().catch(() => undefined);
+  const readlineCfg = replConfig;
   const authority = createSessionAuthority({
     posture: resolveConfiguredPosture((readlineCfg as { terminal?: { posture?: unknown } } | undefined)?.terminal?.posture),
     approval: loadPolicy(process.cwd()).defaultMode,
@@ -985,7 +1038,7 @@ export async function launchDefaultRepl(): Promise<void> {
   const execDispatcher = createToolExecDispatcher({
     cwd: process.cwd(),
     // REPL-575 K5 — localized confirm-prompt summaries (i18n-FIRST).
-    labels: buildToolExecLabels(getLangFromConfig(process.cwd())),
+    labels: buildToolExecLabels(replLang),
     confirm: isTty
       ? (summary, toolName) => (authority.confirmPolicy(toolName) === 'allow' ? Promise.resolve(true) : askConfirm(summary, toolName))
       : async () => offTtyAutoApprove,
@@ -1281,7 +1334,14 @@ export const registerReplTeardown = registerShutdownHook;
 // tick — existing callers that never await `onSignal`'s return value (this
 // file's own `process.on` registration below, and the pre-existing
 // tests/cli/sigterm-cleanup.test.ts) keep working unchanged.
+let entryAuthorityPending = false;
+
 export async function onSignal(signal: string): Promise<void> {
+  if (entryAuthorityPending) {
+    process.stderr.write(`\nReceived ${signal}, exiting…\n`);
+    process.exit(signalExitCode(signal));
+    return;
+  }
   // Snapshot ownership before awaiting hooks: the command's finally may release
   // its scope while cleanup is in flight, but that signal still belongs to the
   // command and must never spill into sprint/tmux teardown.
@@ -1401,14 +1461,14 @@ async function runCommanderInvocation(): Promise<void> {
 // argümanlı (`help` / `serve` / `--version` / unknown / any subcommand) →
 // Commander. Verified by tests/cli/cli-bin-invocation.test.ts so the global
 // `deckent` / `npx deckent <cmd>` cannot silently fall back to the REPL.
-if (isEntryMain()) {
+function authorizeCurrentBinary(): boolean {
   const binaryAuthority = resolveWorktreeBinaryAuthority({
     argv: process.argv,
     projectRoot: process.cwd(),
     runtimeModuleUrl: import.meta.url,
     env: process.env,
   });
-  const binaryAuthorityLang = getLangFromConfig(process.cwd());
+  const binaryAuthorityLang = getLanguage();
 
   if (binaryAuthority.status === 'hold') {
     process.stderr.write(`${getMessage('cli.binary_identity.hold', binaryAuthorityLang, {
@@ -1421,6 +1481,7 @@ if (isEntryMain()) {
     process.stderr.write(`${getMessage('cli.binary_identity.hint', binaryAuthorityLang)}\n`);
     process.exitCode = 1;
     lockExitCodeContract();
+    return false;
   } else {
     if (binaryAuthority.status === 'override') {
       process.stderr.write(`${getMessage('cli.binary_identity.override', binaryAuthorityLang, {
@@ -1432,8 +1493,22 @@ if (isEntryMain()) {
         issue: binaryAuthority.issue,
       })}\n`);
     }
-    if (shouldLaunchDefaultRepl(process.argv)) {
-      launchDefaultRepl()
+    entryAuthorityPending = false;
+    return true;
+  }
+}
+
+if (isEntryMain()) {
+  if (shouldLaunchDefaultRepl(process.argv)) {
+    entryAuthorityPending = true;
+    launchDefaultRepl({
+      // A stable product-identity paint is safe before binary validation; no
+      // command, provider, session, or project-state authority is implied.
+      firstPaint: () => {
+        if (process.stdout.isTTY) process.stdout.write('deckent\n');
+      },
+      authorize: authorizeCurrentBinary,
+    })
         .catch((err: unknown) => {
           handleCliError(err);
         })
@@ -1441,7 +1516,7 @@ if (isEntryMain()) {
           // WIN665 / 417-001 — dispatch has settled; arm the exit-code contract lock.
           lockExitCodeContract();
         });
-    } else {
+  } else if (authorizeCurrentBinary()) {
       runCommanderInvocation()
         .catch((err: unknown) => {
           handleCliError(err);
@@ -1450,6 +1525,5 @@ if (isEntryMain()) {
           // WIN665 / 417-001 — dispatch has settled; arm the exit-code contract lock.
           lockExitCodeContract();
         });
-    }
   }
 }

@@ -25,7 +25,17 @@ export interface LiveFooterProviderState {
 
 export type LiveFooterAuthState = 'logged-in' | 'logged-out' | 'unknown';
 
+export interface LiveFooterTerminalRunState {
+  readonly lifecycle: 'PAUSED' | 'ORPHANED' | 'COMPLETE' | 'ABORTED';
+  readonly sprintId?: string;
+  readonly reason?: string;
+  readonly recoveryCommand?: string;
+}
+
 export interface LiveFooterState {
+  /** Fresh canonical non-running lifecycle authority. Takes render precedence
+   * over every stale activity projection below. */
+  runStatus?: LiveFooterTerminalRunState;
   /** Q1 — ne çalışıyor: what's currently running (task id / phase / action label). */
   running?: string;
   /** Q2 — ne kadar oldu: ISO timestamp the current run started; elapsed computed vs `options.now`. */
@@ -50,6 +60,13 @@ export interface LiveFooterLabels {
   unknown: string;
   loggedIn: string;
   loggedOut: string;
+  status: string;
+  reason: string;
+  failed: string;
+  paused: string;
+  orphaned: string;
+  complete: string;
+  inspectFailure: string;
   /** Elapsed-time unit suffixes (`2h 5m`, `10m`, `30s`) — catalog rows
    *  live_footer.unit_*; the mechanism owns no `h`/`m`/`s` literal. */
   unitHours: string;
@@ -61,6 +78,7 @@ export interface LiveFooterLabels {
 export const LIVE_FOOTER_LABEL_FIELDS: readonly (keyof LiveFooterLabels)[] = Object.freeze([
   'idle', 'running', 'elapsed', 'provider', 'auth', 'next',
   'healthy', 'degraded', 'unknown', 'loggedIn', 'loggedOut',
+  'status', 'reason', 'failed', 'paused', 'orphaned', 'complete', 'inspectFailure',
   'unitHours', 'unitMinutes', 'unitSeconds',
 ] as const);
 
@@ -128,6 +146,35 @@ function authLine(auth: LiveFooterAuthState, labels: LiveFooterLabels): FooterLi
   return { text: `${labels.auth}: ${labels.unknown}`, colorize: (s) => theme.muted(s) };
 }
 
+function terminalRunLines(
+  runStatus: LiveFooterTerminalRunState,
+  labels: LiveFooterLabels,
+): FooterLine[] {
+  const lifecycleLabel = runStatus.lifecycle === 'ABORTED'
+    ? labels.failed
+    : runStatus.lifecycle === 'PAUSED'
+      ? labels.paused
+      : runStatus.lifecycle === 'ORPHANED'
+        ? labels.orphaned
+        : labels.complete;
+  const identity = runStatus.sprintId
+    ? `${runStatus.sprintId} · ${lifecycleLabel}`
+    : lifecycleLabel;
+  const colorize = runStatus.lifecycle === 'COMPLETE'
+    ? (text: string): string => theme.success(text)
+    : runStatus.lifecycle === 'ABORTED'
+      ? (text: string): string => theme.error(text)
+      : (text: string): string => theme.warning(text);
+  const lines: FooterLine[] = [{ text: `${labels.status}: ${identity}`, colorize }];
+  if (runStatus.reason) lines.push({ text: `${labels.reason}: ${runStatus.reason}` });
+  if (runStatus.lifecycle !== 'COMPLETE') {
+    lines.push({
+      text: `${labels.next}: ${runStatus.recoveryCommand ?? labels.inspectFailure}`,
+    });
+  }
+  return lines;
+}
+
 // ─── Public: buildLiveFooter ────────────────────────────────────────────────
 
 /**
@@ -144,6 +191,13 @@ export function buildLiveFooter(state: LiveFooterState, options: LiveFooterOptio
   const now = options.now ?? new Date();
 
   const lines: FooterLine[] = [];
+
+  if (state.runStatus !== undefined) {
+    return terminalRunLines(state.runStatus, labels).map(({ text, colorize }) => {
+      const truncated = truncate(text, width);
+      return colorize ? colorize(truncated) : truncated;
+    });
+  }
 
   if (state.running !== undefined && state.running.length > 0) {
     lines.push({ text: `${labels.running}: ${state.running}` });

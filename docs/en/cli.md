@@ -16,3 +16,28 @@ Run `deckent <path> --help` for the same contract at the terminal. Set
 The internal `gateway-runtime` child is intentionally omitted from public reference pages; it
 remains present in the machine manifest with `hidden: true` so registration drift is still
 checked.
+
+## Terminal output and splash behavior
+
+Deckent separates three contracts on the terminal:
+
+- **Artwork** — the Kraken splash uses Unicode block art on capable terminals. When the
+  environment cannot trust Unicode (for example `TERM=dumb`, a non‑UTF‑8 locale, or
+  `DECKENT_ASCII=1`), the CLI falls back to printable ASCII art. Locale resolution follows
+  `LC_ALL` → `LC_CTYPE` → `LANG`; unset locale keys are treated as absent. Terminal-owned
+  decoration only is affected — localized user text remains UTF‑8.
+- **Color** — suppression priority is `--no-color` (flag) → `FORCE_COLOR=0` → `NO_COLOR`
+  (presence, including an empty string) when `FORCE_COLOR` is unset. When `FORCE_COLOR` is
+  set to a positive value (`1`, `2`, or `3`), color is enabled and `NO_COLOR` is ignored
+  (Node emits a warning in that combination). Color suppression does not change whether
+  Unicode or ASCII artwork is selected.
+- **Machine output** — when stdout is not a TTY, `deckent --version` prints exactly one plain
+  version line with no splash or ANSI decoration. Use `deckent --version-json` for structured
+  JSON on pipes; stdout must remain parseable JSON without banner text mixed in (multi-line
+  JSON is allowed).
+
+For localized help text, set `DECKENT_LANGUAGE=tr` (or your configured language) before running
+`deckent --help`. Turkish help uses localized headings such as `Kullanım:` instead of `Usage:`.
+Pipe and redirect scenarios should rely on the machine-safe surfaces above rather than decorative
+terminal output. Behavior documented here is verified on Linux/WSL; other platforms are not
+claimed by this guide.

@@ -56,6 +56,12 @@ export interface ExecutionTopology {
   readonly verdict: 'pass' | 'block';
 }
 
+/** Minimal host-owned plan shape consumed by topology derivation. Keeping the
+ * contract structural lets the planner validate a proposed DAG before Task
+ * IDs/status/runtime state exist, while the canonical post-plan gate continues
+ * to pass full Tasks through the same implementation. */
+export type ExecutionTopologyTask = Pick<Task, 'id' | 'title' | 'dependencies' | 'scope'>;
+
 export type PortableWriterPathResult =
   | { readonly ok: true; readonly path: string; readonly collisionKey: string }
   | { readonly ok: false };
@@ -108,7 +114,7 @@ export function normalizePortableWriterPath(raw: string): PortableWriterPathResu
   return { ok: true, path, collisionKey: path.toLowerCase() };
 }
 
-function resolveDependencySlots(tasks: readonly Task[]): {
+function resolveDependencySlots(tasks: readonly ExecutionTopologyTask[]): {
   readonly edges: ExecutionTopologyEdge[];
   readonly findings: ExecutionTopologyFinding[];
 } {
@@ -247,7 +253,7 @@ function buildWaves(
 }
 
 export function deriveExecutionTopology(
-  tasks: readonly Task[],
+  tasks: readonly ExecutionTopologyTask[],
   options: { readonly maxWorkers: number },
 ): ExecutionTopology {
   const configuredMaxWorkers = Number.isFinite(options.maxWorkers)

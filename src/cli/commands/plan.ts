@@ -45,6 +45,7 @@ import {
 } from '../repl/plan-preview-card.js';
 import { DeckentError } from '../../core/errors.js';
 import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
+import { formatPlannerEvidenceRefusal } from '../helpers/planner-evidence-presentation.js';
 import {
   bindExecutionWriteScopePolicy,
   normalizeExecutionWriteScopePolicy,
@@ -635,7 +636,13 @@ export function registerPlan(program: Command): void {
           }));
         }
       } catch (error) {
-        const surfacedError = error instanceof TaskArtifactProjectionError
+        const planningRefusal = formatPlannerEvidenceRefusal(
+          error,
+          (key) => getMessage(key, lang),
+        );
+        const surfacedError = planningRefusal !== null
+          ? new Error(planningRefusal, { cause: error })
+          : error instanceof TaskArtifactProjectionError
           ? new Error(getMessage(
             error.code === 'TASK_ARTIFACT_ID_INVALID'
               ? 'plan.task_projection_invalid_id'

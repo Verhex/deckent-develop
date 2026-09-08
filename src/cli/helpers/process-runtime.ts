@@ -12,15 +12,12 @@ import { createAuditedCapabilityRegistry } from '../../core/capability-runtime.j
 import { buildErpConnectorFromConfig } from '../../core/erp/index.js';
 import { writeAuditEvent } from '../../core/audit-writer.js';
 import { runTaskMode } from '../../orchestra/task-mode-runner.js';
-import { runSprint as runSprintLifecycle } from '../../orchestra/sprint-controller.js';
 import { makeProcessController, type ProcessController } from '../../orchestra/process-controller.js';
-import { createCanonicalExactSprintExecutor } from '../../orchestra/exact-plan-start-service.js';
-import { captureGitBase } from '../../orchestra/run-diff-service.js';
-import { createRunFlowCoordinator } from '../../orchestra/run-flow-coordinator.js';
 import { waitForRunResult } from '../commands/run.js';
-import { SprintStatus, type ModelType } from '../../core/types.js';
+import type { ModelType } from '../../core/types.js';
 import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootstrap.js';
 import { openLocalProviderAuthorityRuntime } from '../../providers/provider-authority-runtime-bootstrap.js';
+import { createLiveExactSprintExecutor } from './exact-sprint-runtime.js';
 
 /**
  * Assemble a live ProcessController for `projectRoot`. Wires the same execution
@@ -74,64 +71,9 @@ export async function buildProcessController(projectRoot: string): Promise<Proce
     });
   }, erpConnector ? { erp: { connector: erpConnector } } : {});
 
-  const exactSprintExecutor = createCanonicalExactSprintExecutor({
-    executeInProcess: async (context) => {
-      const gitBase = await captureGitBase(context.projectRoot);
-      const result = await runSprintLifecycle(
-        context.projectRoot,
-        { ...context.config, deckent_style: 'sprint' },
-        {
-          preplannedSprint: context.sprint,
-          exactPlanAuthority: {
-            ...context.exactRef,
-            ...(context.snapshot.sourceAuthority !== undefined
-              ? { sourceAuthority: context.snapshot.sourceAuthority }
-              : {}),
-          },
-          flowId: context.exactRef.flowId,
-          onExactPlanMaterialize: (_sprint, materializationOptions) =>
-            context.onExactPlanMaterialize(materializationOptions),
-          onExecutionAdmitted: (sprint) => {
-            context.onExecutionAdmitted({
-              flowId: context.exactRef.flowId,
-              jobId: sprint.id,
-              logRef: sprint.id,
-            }, gitBase);
-          },
-          providerAuthority,
-          ...(approvalAuthority.state === 'ready'
-            ? {
-                attendedExecutionApprovalAuthority:
-                  approvalAuthority.runtime.attendedExecutionApprovalAuthority,
-              }
-            : {}),
-        },
-      );
-      return result.status === SprintStatus.COMPLETE
-        ? { terminalState: 'COMPLETED', reasonCode: 'SPRINT_COMPLETE' }
-        : result.status === SprintStatus.ABORTED
-          ? { terminalState: 'CANCELLED', reasonCode: 'SPRINT_ABORTED' }
-          : { terminalState: 'BLOCKED', reasonCode: `SPRINT_${result.status}` };
-    },
-    spawnDetached: () => {
-      throw new Error('PROCESS_EXACT_SPRINT_DETACHED_EXECUTOR_UNWIRED');
-    },
-    lifecycle: {
-      publishStartRequested: ({ projectRoot: root, exactRef, attempt }) => {
-        createRunFlowCoordinator({ root }).requestStart({
-          flowId: exactRef.flowId,
-          revision: exactRef.revision,
-          planDigest: exactRef.planDigest,
-          commandId: `exact-start:${attempt.attemptId}:requested`,
-        });
-      },
-      publishRunStarted: ({ projectRoot: root, attempt, handle }) => {
-        createRunFlowCoordinator({ root }).recordRunStarted({
-          handle,
-          commandId: `exact-start:${attempt.attemptId}:admitted`,
-        });
-      },
-    },
+  const exactSprintExecutor = createLiveExactSprintExecutor({
+    providerAuthority,
+    approvalAuthority,
   });
 
   try {

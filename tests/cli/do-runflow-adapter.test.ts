@@ -46,6 +46,7 @@ vi.mock('../../src/orchestra/planner.js', () => ({
       goNogo: { goCriteria: 'The planned change works.', noGoCriteria: 'The planned change breaks.', techDebtAcceptable: '' },
     }],
   })),
+  callZeroConfigPlannerWithReason: vi.fn(),
   normalizePlannerDependencies: vi.fn(() => ({ resolvedCount: 0, dropped: [] })),
 }));
 
@@ -73,6 +74,10 @@ vi.mock('../../src/core/provider.js', async (importOriginal) => {
 vi.mock('../../src/orchestra/brain.js', () => ({
   planSprint: vi.fn(),
   readContext: vi.fn(),
+}));
+
+vi.mock('../../src/core/approval-authority-bootstrap.js', () => ({
+  bootstrapApprovalAuthority: vi.fn(() => ({ state: 'disabled' as const })),
 }));
 
 vi.mock('../../src/cli/helpers/process.js', () => ({
@@ -110,11 +115,14 @@ import { SprintStatus, SprintPhase, TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task, ResolvedConfig, BrainContext } from '../../src/core/types.js';
 import type { PlanPreview } from '../../src/core/run-flow-contract.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
+import { callZeroConfigPlannerWithReason } from '../../src/orchestra/planner.js';
+import { acceptedPlannerFixture } from '../helpers/accepted-planner-fixture.js';
 
 const mockLoadConfig = vi.mocked(loadConfig);
 const mockPlanSprint = vi.mocked(planSprint);
 const mockReadContext = vi.mocked(readContext);
 const mockResolveProjectRoot = vi.mocked(resolveProjectRoot);
+const mockCallZeroConfigPlannerWithReason = vi.mocked(callZeroConfigPlannerWithReason);
 
 // ─── Fixtures (mirrors tests/cli/run-flow-mount.test.ts's own style) ───────
 
@@ -144,6 +152,27 @@ function makeBrainContext(): BrainContext {
   return {
     directives: '', memory: '', retro: '', debt: [], patterns: '', decisions: '',
     existingTasks: [], projectState: { gitStatus: '', fileTree: [] },
+  };
+}
+
+function makePlannerResult() {
+  return {
+    reasoning: 'canned single-task plan (hermetic planner boundary)',
+    tasks: [{
+      title: 'Planned task',
+      description: 'Canned single-task plan for RunFlow tests (429-001 planner-seam).',
+      scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/planned.ts'] },
+      dependencies: [],
+      model: 'claude-sonnet-5' as const,
+      effort: 'normal' as const,
+      priority: 'NORMAL' as const,
+      reason: 'canned',
+      goNogo: {
+        goCriteria: 'The planned change works.',
+        noGoCriteria: 'The planned change breaks.',
+        techDebtAcceptable: '',
+      },
+    }],
   };
 }
 
@@ -212,6 +241,11 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
     vi.clearAllMocks();
     process.exitCode = undefined;
     tmpRoot = mkdtempSync(join(tmpdir(), 'deckent-do-runflow-'));
+    mockCallZeroConfigPlannerWithReason.mockImplementation((...args) => {
+      const receiptContext = args[7];
+      if (!receiptContext) throw new Error('planner receipt context missing');
+      return acceptedPlannerFixture(makePlannerResult(), receiptContext);
+    });
     mockResolveProjectRoot.mockReturnValue(tmpRoot);
     mockReadContext.mockReturnValue(makeBrainContext());
     mockPlanSprint.mockReturnValue(makeSprint() as any);
@@ -229,8 +263,8 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
     expect(cmd!.options.map((o) => o.long)).toEqual(expect.arrayContaining(['--run', '--yes']));
   });
 
-  describe('flag-off — legacy golden-flow path is untouched', () => {
-    it('keeps the provider-free legacy preview available while authority is held', async () => {
+  describe('flag-off/absent — canonical interactive foreground posture', () => {
+    it('holds provider authority before controller/planner work', async () => {
       mockLoadConfig.mockResolvedValue(makeConfig());
       const authority = {
         state: 'hold',
@@ -244,39 +278,59 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
         providerAuthority: authority,
       });
 
-      expect(output()).toContain('plan preview');
+      expect(output()).not.toContain('plan preview');
       expect(bootstrapProviders).not.toHaveBeenCalled();
-      expect(printError).not.toHaveBeenCalled();
+      expect(printError).toHaveBeenCalledWith(expect.stringContaining('keyring_unavailable'));
+      expect(process.exitCode).toBe(1);
+    });
+
+    it('confirms, approves with the real local actor, and awaits the exact snapshot in-process', async () => {
+      mockLoadConfig.mockResolvedValue(makeConfig()); // no `terminal` block at all
+      const confirm = vi.fn().mockResolvedValue(true);
+      const { factory: createRunFlowControllerFake } = makeControllerFactory();
+      const controllerFactorySpy = vi.fn(createRunFlowControllerFake);
+      const execute = vi.fn().mockResolvedValue({
+        status: 'settled',
+        settlement: { state: 'COMPLETED', code: 'SPRINT_COMPLETE' },
+      });
+      const executorFactory = vi.fn(() => ({ execute })) as any;
+
+      await runCommand(['do', 'ship the widget', '--run'], {
+        confirm,
+        createRunFlowController: controllerFactorySpy,
+        createLiveExactSprintExecutor: executorFactory,
+      });
+
+      expect(controllerFactorySpy).toHaveBeenCalledTimes(1);
+      expect(confirm).toHaveBeenCalledWith('Proceed and start this run now?');
+      expect(execute).toHaveBeenCalledWith(expect.objectContaining({
+        projectRoot: tmpRoot,
+        executionMode: 'in-process',
+        source: expect.objectContaining({
+          kind: 'exact-ref',
+          ref: expect.objectContaining({ flowId: 'flow-1', revision: 1 }),
+        }),
+        lineage: expect.objectContaining({ authorization: { kind: 'approved-actor' } }),
+      }));
+      expect(output()).toContain('Run settled — COMPLETED (SPRINT_COMPLETE).');
       expect(process.exitCode).toBeUndefined();
     });
 
-    it('never invokes the RunFlow controller factory; legacy confirm/spawnStart seams still drive the run', async () => {
-      mockLoadConfig.mockResolvedValue(makeConfig()); // no `terminal` block at all
-      const confirm = vi.fn().mockResolvedValue(true);
-      const spawnStart = vi.fn().mockResolvedValue({ exitCode: 0 });
-      const { factory: createRunFlowControllerFake } = makeControllerFactory();
-      const controllerFactorySpy = vi.fn(createRunFlowControllerFake);
-
-      await runCommand(['do', 'ship the widget', '--run'], {
-        confirm, spawnStart, createRunFlowController: controllerFactorySpy,
-      });
-
-      expect(controllerFactorySpy).not.toHaveBeenCalled();
-      expect(confirm).toHaveBeenCalledWith('Proceed and start this run now?');
-      expect(spawnStart).toHaveBeenCalledWith(tmpRoot);
-      expect(output()).toContain('Sprint finished — exitCode 0 (success)');
-    });
-
-    it('explicit run_flow_v2: false takes the same legacy path', async () => {
+    it('explicit false preserves decline without approving or executing', async () => {
       mockLoadConfig.mockResolvedValue(makeConfig({ terminal: { run_flow_v2: false } as any }));
       const confirm = vi.fn().mockResolvedValue(false);
-      const spawnStart = vi.fn();
+      const execute = vi.fn();
+      const { factory } = makeControllerFactory();
 
-      await runCommand(['do', 'a goal', '--run'], { confirm, spawnStart });
+      await runCommand(['do', 'a goal', '--run'], {
+        confirm,
+        createRunFlowController: factory,
+        createLiveExactSprintExecutor: vi.fn(() => ({ execute })) as any,
+      });
 
       expect(confirm).toHaveBeenCalled();
-      expect(spawnStart).not.toHaveBeenCalled();
-      expect(output()).toContain('Cancelled at stage "approve"');
+      expect(execute).not.toHaveBeenCalled();
+      expect(output()).toContain('operator-declined');
     });
   });
 
@@ -307,12 +361,11 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
     it('prints the real RunFlow preview and exact continuation command without approving, starting or replanning', async () => {
       mockLoadConfig.mockResolvedValue(makeFlagOnConfig());
       const legacyConfirm = vi.fn();
-      const legacySpawnStart = vi.fn();
       const spawnStart = vi.fn();
       const { factory, getController } = makeControllerFactory(spawnStart);
 
       await runCommand(['do', 'ship the widget exporter'], {
-        confirm: legacyConfirm, spawnStart: legacySpawnStart, createRunFlowController: factory,
+        confirm: legacyConfirm, createRunFlowController: factory,
       });
 
       const out = output();
@@ -320,7 +373,6 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
       expect(out).toContain(getMessage('do.dry_run_complete', 'en'));
       expect(out).toContain('deckent runs flow-1 --approve --start');
       expect(legacyConfirm).not.toHaveBeenCalled();
-      expect(legacySpawnStart).not.toHaveBeenCalled();
       expect(spawnStart).not.toHaveBeenCalled();
       expect(existsSync(join(tmpRoot, DIRECTIVES_FILE))).toBe(false);
       expect(getController().getContext().state).toBe('AWAITING_APPROVAL');
@@ -366,16 +418,18 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
       expect(loadApprovedSnapshot(tmpRoot, 'flow-1')).toBeUndefined();
     });
 
-    it('fails closed instead of ignoring --write-allowlist on the legacy path', async () => {
+    it('applies --write-allowlist on the flag-off canonical path', async () => {
       mockLoadConfig.mockResolvedValue(makeConfig());
+      const { factory, getController } = makeControllerFactory();
 
-      await runCommand(['do', 'ship safely', '--write-allowlist', 'src/a.ts']);
+      await runCommand(['do', 'ship safely', '--write-allowlist', 'src/a.ts'], {
+        createRunFlowController: factory,
+      });
 
-      expect(printError).toHaveBeenCalledWith(
-        getMessage('do.write_allowlist_requires_run_flow', 'en'),
-      );
-      expect(mockPlanSprint).not.toHaveBeenCalled();
-      expect(process.exitCode).toBe(1);
+      expect(getController().getContext().preview?.planDigestContext?.writeScopePolicy).toEqual({
+        mode: 'closed-allowlist', filesWrite: ['src/a.ts'],
+      });
+      expect(process.exitCode).toBeUndefined();
     });
   });
 
@@ -403,14 +457,13 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
     it('drives propose -> approve -> startApproved through the REAL services and prints a rich started result', async () => {
       mockLoadConfig.mockResolvedValue(makeFlagOnConfig());
       const legacyConfirm = vi.fn();
-      const legacySpawnStart = vi.fn();
       const spawnStart = vi.fn((_context: SpawnExactProcessContext): SpawnExactProcessResult => ({
         pid: process.pid,
       }));
       const { factory, getController } = makeControllerFactory(spawnStart);
 
       await runCommand(['do', 'ship the widget exporter', '--run', '--yes'], {
-        confirm: legacyConfirm, spawnStart: legacySpawnStart, createRunFlowController: factory,
+        confirm: legacyConfirm, createRunFlowController: factory,
       });
 
       expect(spawnStart).toHaveBeenCalledTimes(1);
@@ -419,7 +472,6 @@ describe('do command — RunFlow compatibility adapter (terminal.run_flow_v2, 42
         capability: expect.objectContaining({ flowId: 'flow-1' }),
       }));
       expect(legacyConfirm).not.toHaveBeenCalled();
-      expect(legacySpawnStart).not.toHaveBeenCalled();
       expect(getController().getContext().state).toBe('STARTING');
       expect(output()).toContain(getMessage('runFlow.mount.started', 'en', { jobId: 'flow-1' }));
 
@@ -502,7 +554,7 @@ describe('runDoRunFlow — structural guard (swap/sync-spawn organs never called
     const source = readFileSync(new URL('../../src/cli/commands/do.ts', import.meta.url), 'utf-8');
     const start = source.indexOf('export async function runDoRunFlow');
     expect(start).toBeGreaterThan(-1);
-    const end = source.indexOf('\n// ═══ DIRECTIVES.md transient swap', start);
+    const end = source.indexOf('\n// ═══ Command registration', start);
     expect(end).toBeGreaterThan(start);
     const body = source.slice(start, end);
     expect(body).not.toContain('swapDirectives(');

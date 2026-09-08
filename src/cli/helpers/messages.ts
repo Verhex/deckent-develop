@@ -22,6 +22,22 @@ type MessageMap = Record<string, Record<string, string>>;
  * `getMessage()`.
  */
 const BASE_MESSAGES: MessageMap = {
+  'planner_evidence.refusal.hold': {
+    en: 'Planner evidence could not be verified.',
+    tr: 'Planner kanıtı doğrulanamadı.',
+  },
+  'planner_evidence.refusal.replan_required': {
+    en: 'The retained plan is not admitted for a new execution.',
+    tr: 'Saklanan plan yeni bir yürütme için kabul edilmedi.',
+  },
+  'planner_evidence.next.inspect_evidence': {
+    en: 'Next: inspect the evidence before continuing.',
+    tr: 'Sonraki adım: devam etmeden önce kanıtı inceleyin.',
+  },
+  'planner_evidence.next.replan': {
+    en: 'Next: create and review a new plan.',
+    tr: 'Sonraki adım: yeni bir plan oluşturun ve inceleyin.',
+  },
   'tui.ink_probe.detail': {
     en: 'Ink build probe ready — React {version}',
     tr: 'Ink build probe hazır — React {version}',
@@ -221,11 +237,15 @@ const BASE_MESSAGES: MessageMap = {
   'inspect.column.settled_at': { en: 'Settled at', tr: 'Sonuçlanma zamanı' },
   'inspect.field.task_id': { en: 'Task ID', tr: 'Görev ID' },
   'inspect.field.status': { en: 'Status', tr: 'Durum' },
+  'inspect.field.task_projection_status': { en: 'Task projection status', tr: 'Görev projeksiyon durumu' },
   'inspect.field.agent': { en: 'Agent', tr: 'Agent' },
   'inspect.field.model': { en: 'Model', tr: 'Model' },
   'inspect.field.heartbeat': { en: 'Heartbeat', tr: 'Heartbeat' },
   'inspect.field.plan_truncated': { en: 'Plan truncated', tr: 'Plan kısaltıldı' },
   'inspect.field.self_assessment': { en: 'Self-assessment', tr: 'Öz değerlendirme' },
+  'inspect.field.current_run_lifecycle': { en: 'Current run lifecycle', tr: 'Geçerli run yaşam döngüsü' },
+  'inspect.field.current_run_status': { en: 'Current run status', tr: 'Geçerli run durumu' },
+  'inspect.field.current_run_cause': { en: 'Current run cause', tr: 'Geçerli run nedeni' },
   'inspect.field.lineage': { en: 'Lineage', tr: 'Lineage' },
   'inspect.log_tail.header': {
     en: 'Log tail ({count} lines, truncated: {truncated}):',
@@ -238,6 +258,10 @@ const BASE_MESSAGES: MessageMap = {
   'inspect.follow.task_status': {
     en: 'Task {taskId} · status: {status} · heartbeat: {heartbeat} · revision: {revision}',
     tr: 'Görev {taskId} · durum: {status} · heartbeat: {heartbeat} · revizyon: {revision}',
+  },
+  'inspect.follow.task_status_current_run': {
+    en: 'Task {taskId} · status: {status} · heartbeat: {heartbeat} · current run: {runLifecycle}/{runStatus} · cause: {runCause} · revision: {revision}',
+    tr: 'Görev {taskId} · durum: {status} · heartbeat: {heartbeat} · geçerli run: {runLifecycle}/{runStatus} · neden: {runCause} · revizyon: {revision}',
   },
   'inspect.error.follow_json': {
     en: 'INSPECT_FOLLOW_JSON_UNSUPPORTED: --follow cannot be combined with --json',
@@ -5549,6 +5573,17 @@ const BASE_MESSAGES: MessageMap = {
   'recover.preview_stale_locks': { en: '  Stale locks:     {count} would be cleared', tr: '  Bayat kilitler:  {count} temizlenecek' },
   'recover.preview_stale_spawnlocks': { en: '  Stale spawnlocks:{count} would be cleared', tr: '  Bayat spawnlock: {count} temizlenecek' },
   'recover.preview_task_files': { en: '  Task files:      {count} would be archived', tr: '  Görev dosyaları: {count} arşivlenecek' },
+  'recover.preview_exact_custody': { en: '  Exact custody recovery: {count} pending reservations, {held} held admission graphs, {unresolved} unresolved total', tr: '  Exact custody recovery: {count} bekleyen reservation, {held} HOLD admission graph, toplam {unresolved} çözümlenmemiş' },
+  'recover.invalid_dispatch_request_id': { en: 'Expected an exact dreq- dispatch ID followed by 64 lowercase hexadecimal characters.', tr: 'dreq- öneki ardından 64 küçük onaltılık karakter içeren exact dispatch ID gerekli.' },
+  'recover.retain_started_failed_option': { en: 'Retain one stopped, started-failed dispatch attempt as historical evidence; no archive or resume.', tr: 'Durmuş started-failed dispatch attempt kanıtını tarihsel olarak koru; archive veya resume yapmaz.' },
+  'recover.retain_started_failed_conflict': { en: 'Started-failed retention cannot be combined with resume or restore-tasks.', tr: 'Started-failed koruma, resume veya restore-tasks ile birleştirilemez.' },
+  'recover.retain_started_failed_confirm': { en: 'Retain exact stopped dispatch {dispatchRequestId}; preserve worker/task artifacts and do not resume work.', tr: 'Durmuş exact dispatch {dispatchRequestId} kanıtını koru; worker/task artifactlerini muhafaza et ve işi sürdürme.' },
+  'recover.started_failed_result': { en: 'Started-failed retention: {state}; dispatch {dispatchRequestId}; evidence {evidenceDigest}', tr: 'Started-failed koruma: {state}; dispatch {dispatchRequestId}; kanıt {evidenceDigest}' },
+  'recover.retain_committed_unsettled_option': { en: 'Retain one committed-journal, release-pending dispatch attempt with unresolved settlement; no archive or resume.', tr: 'COMMITTED_JOURNAL_RELEASE_PENDING ve settlement UNRESOLVED olan tek dispatch attempt kaydını koru; archive veya resume yapma.' },
+  'recover.retain_committed_unsettled_conflict': { en: 'Committed-unsettled retention cannot be combined with resume or restore-tasks.', tr: 'Committed-unsettled koruma, resume veya restore-tasks ile birleştirilemez.' },
+  'recover.retain_committed_unsettled_confirm': { en: 'Retain committed-journal, release-pending dispatch {dispatchRequestId}; preserve unresolved settlement evidence and do not resume work.', tr: 'COMMITTED_JOURNAL_RELEASE_PENDING dispatch {dispatchRequestId} kaydını koru; çözümlenmemiş settlement kanıtını muhafaza et ve işi sürdürme.' },
+  'recover.committed_unsettled_result': { en: 'Committed-unsettled retention: {state}; dispatch {dispatchRequestId}; evidence {evidenceDigest}', tr: 'Committed-unsettled koruma: {state}; dispatch {dispatchRequestId}; kanıt {evidenceDigest}' },
+  'recover.retention_modes_conflict': { en: 'Started-failed and committed-unsettled retention modes are mutually exclusive.', tr: 'Started-failed ve committed-unsettled koruma modları birlikte kullanılamaz.' },
   'recover.checkpoint_disposition': { en: '  Resume checkpoint: {disposition} ({digest})', tr: '  Sürdürme checkpoint’i: {disposition} ({digest})' },
   'recover.paused_remediation': { en: '  Run is PAUSED. Resume with `{resumeCommand}` or finalize with `{finalizeCommand}`.', tr: '  Run PAUSED durumda. `{resumeCommand}` ile sürdürün veya `{finalizeCommand}` ile sonlandırın.' },
   'recover.preview_run_to_execute': { en: '\n  Run without --dry-run to execute.\n', tr: '\n  Çalıştırmak için --dry-run olmadan tekrar deneyin.\n' },
@@ -5565,6 +5600,7 @@ const BASE_MESSAGES: MessageMap = {
   'recover.result_stale_locks': { en: '  Stale locks:     {count} cleared', tr: '  Bayat kilitler:  {count} temizlendi' },
   'recover.result_stale_spawnlocks': { en: '  Stale spawnlocks:{count} cleared', tr: '  Bayat spawnlock: {count} temizlendi' },
   'recover.result_task_files': { en: '  Task files:      {archived} archived, {preserved} preserved', tr: '  Görev dosyaları: {archived} arşivlendi, {preserved} korundu' },
+  'recover.result_exact_custody': { en: '  Exact custody:   {admitted} admitted from staged snapshots, {retired} retired before admission, {quarantined} historical no-effect admissions quarantined', tr: '  Exact custody:   {admitted} staged snapshot ile admit edildi, {retired} admission öncesi emekliye ayrıldı, {quarantined} tarihsel no-effect admission quarantine edildi' },
   'recover.complete': { en: '\n  ✓ Recovery complete. Run {sprintId} is ready for restart.\n', tr: '\n  ✓ Kurtarma tamamlandı. {sprintId} run\'ı yeniden başlatmaya hazır.\n' },
   'recover.restore_success': { en: '  ✓ Restored {count} task file(s) from the {sprintId} pre-archive snapshot (rollback).', tr: '  ✓ {sprintId} pre-archive snapshot\'ından {count} task dosyası geri yüklendi (rollback).' },
   'recover.restore_failed': { en: '  Restore failed for {sprintId}: {error}', tr: '  {sprintId} için geri-yükleme başarısız: {error}' },
@@ -5694,6 +5730,22 @@ const BASE_MESSAGES: MessageMap = {
   'prompt_gate.satisfiability_message': {
     en: '[{code}] {message}',
     tr: '[{code}] {message}',
+  },
+  'prompt_gate.criterion_evidence_not_readable': {
+    en: '[CRITERION_EVIDENCE_NOT_READABLE] Criterion {criterionId} requires evidence from "{path}" outside its declared read scope.',
+    tr: '[CRITERION_EVIDENCE_NOT_READABLE] {criterionId} kriteri, beyan edilen okuma kapsamı dışındaki "{path}" yolundan kanıt istiyor.',
+  },
+  'prompt_gate.contradictory_file_criteria': {
+    en: '[CONTRADICTORY_FILE_CRITERIA] GO {goId} and NO_GO {noGoId} require the same file-presence predicate.',
+    tr: '[CONTRADICTORY_FILE_CRITERIA] GO {goId} ve NO_GO {noGoId} aynı dosya-varlığı koşulunu istiyor.',
+  },
+  'prompt_gate.contradictory_file_criteria_fix': {
+    en: 'Keep both acceptance conditions. Use assertion evidence for semantic content conditions; file evidence proves only presence. Do not mix assertions with file alternatives or remove NO_GO criteria. Unresolved assertions require configured confirmation before acceptance.',
+    tr: 'Her iki kabul koşulunu koruyun. Semantik içerik koşullarında assertion kanıtı kullanın; file kanıtı yalnız varlığı kanıtlar. Assertion ile file alternatiflerini karıştırmayın veya NO_GO kriterlerini silmeyin. Çözümlenmemiş assertion kabul öncesinde yapılandırılmış doğrulama gerektirir.',
+  },
+  'prompt_gate.criterion_evidence_read_scope_fix': {
+    en: 'Reconcile the evidence requirement with authorized reads for "{path}". Declared read scope does not prove snapshot delivery or path existence; do not expand protected mounts.',
+    tr: 'Kanıt gereksinimini "{path}" için yetkili okuma kapsamıyla uzlaştırın. Beyan edilen kapsam snapshot teslimini veya yolun varlığını kanıtlamaz; korumalı mount kapsamını genişletmeyin.',
   },
   'prompt_gate.satisfiability_fix_proof_path_missing': {
     en: "Fix the proof command's path or add '{path}' to scope.filesWrite (new-file proofs are legitimate only with write authority).",
@@ -6253,6 +6305,13 @@ const BASE_MESSAGES: MessageMap = {
   'live_footer.unknown': { en: 'unknown', tr: 'bilinmiyor' },
   'live_footer.logged_in': { en: 'logged-in', tr: 'oturum açık' },
   'live_footer.logged_out': { en: 'logged-out', tr: 'oturum kapalı' },
+  'live_footer.status': { en: 'Status', tr: 'Durum' },
+  'live_footer.reason': { en: 'Reason', tr: 'Neden' },
+  'live_footer.failed': { en: 'Failed', tr: 'Başarısız' },
+  'live_footer.paused': { en: 'Paused', tr: 'Duraklatıldı' },
+  'live_footer.orphaned': { en: 'Orphaned', tr: 'Sahipsiz kaldı' },
+  'live_footer.complete': { en: 'Complete', tr: 'Tamamlandı' },
+  'live_footer.inspect_failure': { en: 'Inspect with /status', tr: '/status ile inceleyin' },
 
   // ─── TERM-CONNECT /connect step descriptions (Task 16 — MESSAGES-KEYS-2,
   // sole-authority addition; cited by 353-010's docImpact note — the exact 7
@@ -6740,6 +6799,14 @@ const BASE_MESSAGES: MessageMap = {
   'do.finished': {
     en: 'Run finished — exitCode {exitCode} ({outcome}).',
     tr: 'Run tamamlandı — exitCode {exitCode} ({outcome}).',
+  },
+  'do.exact_settled': {
+    en: 'Run settled — {state} ({reason}).',
+    tr: 'Run sonuçlandı — {state} ({reason}).',
+  },
+  'do.exact_not_completed': {
+    en: 'Run did not complete — {status} ({reason}).',
+    tr: 'Run tamamlanmadı — {status} ({reason}).',
   },
   'do.outcome_success': { en: 'success', tr: 'başarılı' },
   'do.outcome_failure': { en: 'failure', tr: 'başarısız' },
@@ -7688,20 +7755,28 @@ const BASE_MESSAGES: MessageMap = {
 
   // ─── CLI command descriptions (559-002: commander .description() single source) ───
   'sprint.notify_started_title': {
-    en: 'Sprint {sprintId} started',
-    tr: 'Sprint {sprintId} başladı',
+    en: 'Sprint {sprintId}: worker dispatch admitted',
+    tr: 'Sprint {sprintId}: worker gönderimi kabul edildi',
   },
   'sprint.notify_started_summary': {
-    en: 'Sprint {sprintId} spawned successfully with {tasks} task(s); execution is underway.',
-    tr: 'Sprint {sprintId} {tasks} görevle başarıyla başlatıldı; yürütme sürüyor.',
+    en: '{workers} worker dispatch(es) admitted. Exact provider release is proven for {providerReleases}.',
+    tr: '{workers} worker gönderimi kabul edildi. Exact provider release {providerReleases} için kanıtlandı.',
+  },
+  'sprint.notify_no_dispatch_title': {
+    en: 'Sprint {sprintId}: no worker dispatch admitted',
+    tr: 'Sprint {sprintId}: worker gönderimi kabul edilmedi',
+  },
+  'sprint.notify_no_dispatch_summary': {
+    en: 'The SPAWN phase produced no admitted worker dispatch or proven provider execution. The run is held for inspection.',
+    tr: 'SPAWN fazı kabul edilmiş bir worker gönderimi veya kanıtlanmış provider execution üretmedi. Run inceleme için HOLD durumunda.',
   },
   'sprint.notify_fix_started_title': {
-    en: 'Sprint {sprintId} entered the FIX phase',
-    tr: 'Sprint {sprintId} FIX fazına girdi',
+    en: 'Sprint {sprintId}: repair dispatch admitted',
+    tr: 'Sprint {sprintId}: onarım gönderimi kabul edildi',
   },
   'sprint.notify_fix_started_summary': {
-    en: 'Evaluation found unresolved work in sprint {sprintId}; repair tasks are being dispatched.',
-    tr: 'Değerlendirme sprint {sprintId} içinde çözülmemiş iş buldu; onarım görevleri gönderiliyor.',
+    en: '{workers} repair worker dispatch admitted. Exact provider release is proven for {providerReleases}.',
+    tr: '{workers} onarım worker gönderimi kabul edildi. Exact provider release {providerReleases} için kanıtlandı.',
   },
   'cli.gateway.listen.desc': {
     en: 'Run the gateway listener in the foreground (attaches every paired connector)',

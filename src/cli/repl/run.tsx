@@ -44,6 +44,20 @@ import type { ShortcutsPanel } from './input-bar.js';
 export type { ShortcutsPanel } from './input-bar.js';
 
 type BootHealthSelection = { provider: HealthField; model: HealthField; auth: HealthField };
+export interface BootHealthEmitter {
+  (selection?: BootHealthSelection, glyphs?: TerminalGlyphs): Promise<void>;
+  /** Single config value resolved by entry.ts for this launch. */
+  projectConfig?: ResolvedConfig;
+  /** Projection from the REPL-owned store, assigned before emission. */
+  memoryCount?: number;
+  memoryCountProvided?: boolean;
+  dispose?: () => void;
+  clear?: () => void;
+  authFeed?: {
+    getSnapshot: () => string | null;
+    subscribe: (listener: () => void) => () => void;
+  };
+}
 
 export interface NativeBootFailure {
   exitCode: 1;
@@ -176,6 +190,7 @@ import { createRunFlowController, type RunFlowController, type RunFlowController
 import { ensureProvidersBootstrapped } from './provider-bootstrap.js';
 import { buildPlanPreviewCardLabels } from './plan-preview-card.js';
 import type { RunFlowMountLabels, DoSlashLabels } from './app.js';
+import { formatPlannerEvidenceRefusal } from '../helpers/planner-evidence-presentation.js';
 import { renderRunsCommand, buildInboxLabels, collectInboxRows } from './run-flow-inbox.js';
 import { executeInboxDecision } from '../commands/runs.js';
 import type { ResolvedConfig } from '../../core/types.js';
@@ -203,7 +218,8 @@ import { classifyTool } from './tool-permissions.js';
 import { buildSlashRegistry } from '../commands/chat-slash-registry.js';
 import { dispatchMcpSlash, type McpConnectPlan, type ReplMcpBridge } from './mcp-bridge.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
-import { colorTier, isColorSuppressed, isDumbTerminal } from '../helpers/theme.js';
+import { colorTier, isColorSuppressed } from '../helpers/theme.js';
+import { resolveTerminalAscii } from '../helpers/terminal-capabilities.js';
 import { InkPaletteProvider } from './ink-palette-context.js';
 import { TerminalGlyphProvider } from './terminal-glyph-context.js';
 import { renderTerminalOwnedTemplate, resolveTerminalGlyphs, type TerminalGlyphs } from '../helpers/terminal-glyphs.js';
@@ -288,11 +304,7 @@ export type NativeErrorPhase = 'boot' | 'switch';
 /** TERMINAL-PICKER-002 — Unicode glyphs are trusted only under a UTF-8 locale
  *  (LC_ALL > LC_CTYPE > LANG); an unset locale is treated as UTF-8-capable on
  *  modern hosts, an explicit non-UTF-8 one is not. */
-export function hasUtf8Locale(env: Record<string, string | undefined>): boolean {
-  const locale = env['LC_ALL'] || env['LC_CTYPE'] || env['LANG'];
-  if (!locale) return true;
-  return /utf-?8/i.test(locale);
-}
+export { hasUtf8Locale } from '../helpers/terminal-capabilities.js';
 
 // TERMINAL-SESSION-AUTHORITY-001 — the `/config` entry helpers moved to the
 // Ink-free config-entries.ts so the readline loop lists the SAME keys/values;
@@ -508,6 +520,13 @@ export function buildLiveFooterLabels(t: (key: string) => string): LiveFooterLab
     unknown: t('live_footer.unknown'),
     loggedIn: t('live_footer.logged_in'),
     loggedOut: t('live_footer.logged_out'),
+    status: t('live_footer.status'),
+    reason: t('live_footer.reason'),
+    failed: t('live_footer.failed'),
+    paused: t('live_footer.paused'),
+    orphaned: t('live_footer.orphaned'),
+    complete: t('live_footer.complete'),
+    inspectFailure: t('live_footer.inspect_failure'),
     unitHours: t('live_footer.unit_hours'),
     unitMinutes: t('live_footer.unit_minutes'),
     unitSeconds: t('live_footer.unit_seconds'),
@@ -678,6 +697,13 @@ export function buildRunFlowMountLabels(t: (key: string) => string): RunFlowMoun
     rejected: t('runFlow.mount.rejected'),
     error: t('runFlow.mount.error'),
   };
+}
+
+/** Production-owned closed refusal renderer injected into the string-free App. */
+export function buildPlannerEvidenceRefusalRenderer(
+  t: (key: string) => string,
+): (error: unknown) => string | null {
+  return (error) => formatPlannerEvidenceRefusal(error, t);
 }
 
 /**
@@ -1526,7 +1552,7 @@ export async function runInkRepl(
   createLegacyProvider: LegacyProviderFactory,
   rebuild: ProviderRebuild,
   registerTeardown: ReplTeardownRegistrar,
-  onBootSelection?: (selection?: BootHealthSelection, glyphs?: TerminalGlyphs) => Promise<void>,
+  onBootSelection?: BootHealthEmitter,
 ): Promise<void | NativeBootFailure> {
   // Project config is loaded once here and reused by boot admission and the
   // surface wire. A load failure is an honest typed boot refusal: silently
@@ -1552,11 +1578,15 @@ export async function runInkRepl(
     local_llm?: NativeTransportConfig['local_llm'];
   } = {};
   let configLoadFailed = false;
-  try { projectCfg = await loadConfig() as typeof projectCfg; } catch { configLoadFailed = true; }
+  if (onBootSelection?.projectConfig) {
+    projectCfg = onBootSelection.projectConfig;
+  } else {
+    try { projectCfg = await loadConfig() as typeof projectCfg; } catch { configLoadFailed = true; }
+  }
   let lang = 'en';
   try { lang = getLanguage(projectCfg.language); } catch { /* default en */ }
   const t = (key: string, vars?: Record<string, string>): string => getMessage(key, lang, vars);
-  const terminalAscii = isDumbTerminal() || process.env['DECKENT_ASCII'] === '1' || !hasUtf8Locale(process.env);
+  const terminalAscii = resolveTerminalAscii(process.env);
   const terminalGlyphs = resolveTerminalGlyphs(terminalAscii);
   // Only catalog templates pass through this adapter, before callers insert
   // identifiers or provider/user values into their placeholders.
@@ -1993,6 +2023,7 @@ export async function runInkRepl(
         live.provider = next.providerName;
         nativeSelection = { provider: live.provider, model: live.model };
         probeEffectiveContext(next.contextStatus);
+        onBootSelection?.clear?.();
         return { provider: live.provider, model: live.model };
       };
 
@@ -2191,7 +2222,22 @@ export async function runInkRepl(
 
   // Health is emitted only after the native authority's single boot resolution.
   // Undefined preserves the legacy host selection/probe path.
-  await onBootSelection?.(bootHealthSelection, terminalGlyphs);
+  let bootMemoryCount: number | undefined;
+  try { bootMemoryCount = memory?.totalCount(); } catch { bootMemoryCount = undefined; }
+  if (onBootSelection) {
+    onBootSelection.memoryCount = bootMemoryCount;
+    onBootSelection.memoryCountProvided = true;
+  }
+  const unregisterBootHealthTeardown = registerTeardown(async () => {
+    onBootSelection?.dispose?.();
+  });
+  try {
+    await onBootSelection?.(bootHealthSelection, terminalGlyphs);
+  } catch (error) {
+    unregisterBootHealthTeardown();
+    onBootSelection?.dispose?.();
+    throw error;
+  }
 
   // NATIVE-BUDGET-RENEWAL (557-002) — register `/renew` on the native path ONLY.
   // The command is answered by the wrapper (engine seam + localized confirmation,
@@ -2273,8 +2319,9 @@ export async function runInkRepl(
         // Native engine active → the switch must retarget the REAL backend the
         // turns run on (the legacy proxy is unused there). Legacy path unchanged.
         if (nativeSwitch) return nativeSwitch(sel);
-        switcher.switchTo(sel);
-        return switcher.current();
+        const switched = switcher.switchTo(sel);
+        if (!switched.switchError) onBootSelection?.clear?.();
+        return switched;
       }}
       onApprovalMode={(m) => { approvalMode = m; }}
       {...(memory ? { memory } : {})}
@@ -2343,6 +2390,7 @@ export async function runInkRepl(
       startupRecentSessions={projectCfg.terminal?.startup?.recent_sessions === true}
       {...(stateFeed ? { stateFeed } : {})}
       liveFooterLabels={buildLiveFooterLabels(terminalLabel)}
+      {...(onBootSelection?.authFeed ? { healthAuthFeed: onBootSelection.authFeed } : {})}
       approvalsEnabled={approvalsEnabled}
       {...(approvalChannel ? { approvalChannel } : {})}
       nativePermissionIntent={{
@@ -2353,6 +2401,7 @@ export async function runInkRepl(
       {...(bgTurnsEnabled ? { registerBgEventSink: (enqueue: (event: ChatTurnBgEvent) => void) => { bgEventSink = enqueue; } } : {})}
       runFlowCardLabels={buildPlanPreviewCardLabels(lang, terminalGlyphs)}
       runFlowMountLabels={buildRunFlowMountLabels(terminalLabel)}
+      renderPlannerEvidenceRefusal={buildPlannerEvidenceRefusalRenderer(terminalLabel)}
       {...(runFlowController ? {
         runFlowController,
         registerRunFlowResultSink: (enqueue: (event: ChatTurnBgEvent) => void) => { runFlowResultSink = enqueue; },
@@ -2367,15 +2416,23 @@ export async function runInkRepl(
     onFailure: ({ code }) => { process.stderr.write(`${terminalLabel('tui.resize.failed').replace('{code}', () => code)}\n`); },
   });
   const inkTree = <TerminalViewportProvider mediator={resizeMediator}>{appElement}</TerminalViewportProvider>;
-  const inkInstance = render(
-    inkTree,
-    // TERMINAL-TOOLS-006 — Ctrl-C is a policy decision (interrupt-policy.ts,
-    // app.tsx handleInterrupt), never Ink's unconditional unmount: a draft is
-    // discarded, a running turn is interrupted, and only a second press
-    // inside the window exits. External SIGINT/SIGTERM still run the
-    // registered teardown (entry.ts onSignal).
-    { exitOnCtrlC: false, stdout: resizeMediator.stdout },
-  );
+  let inkInstance: ReturnType<typeof render>;
+  try {
+    inkInstance = render(
+      inkTree,
+      // TERMINAL-TOOLS-006 — Ctrl-C is a policy decision (interrupt-policy.ts,
+      // app.tsx handleInterrupt), never Ink's unconditional unmount: a draft is
+      // discarded, a running turn is interrupted, and only a second press
+      // inside the window exits. External SIGINT/SIGTERM still run the
+      // registered teardown (entry.ts onSignal).
+      { exitOnCtrlC: false, stdout: resizeMediator.stdout },
+    );
+  } catch (error) {
+    unregisterBootHealthTeardown();
+    onBootSelection?.dispose?.();
+    resizeMediator.dispose();
+    throw error;
+  }
   resizeMediator.bind(inkInstance);
   const { unmount, waitUntilExit } = inkInstance;
 
@@ -2398,13 +2455,21 @@ export async function runInkRepl(
     ...(nativeEngine ? { nativeEngineClose: () => nativeEngine?.close?.({ keepForRecoveryMs: NATIVE_SCRATCH_KEEP_MS }) } : {}),
     switcherExit: () => switcher.exit(),
   });
-  const unregisterTeardown = registerTeardown(teardown);
+  const unregisterTeardown = registerTeardown(async () => {
+    onBootSelection?.dispose?.();
+    await teardown();
+  });
 
-  await waitUntilExit();
+  try {
+    await waitUntilExit();
+  } finally {
+    unregisterTeardown();
+    unregisterBootHealthTeardown();
+    onBootSelection?.dispose?.();
+  }
 
   // Deterministic exit (Ink unmount + restored stdin can otherwise keep the
   // event loop alive) — bounded so a slow MCP close() cannot hang a plain `/exit`.
-  unregisterTeardown();
   resizeMediator.dispose();
   await Promise.race([teardown(), new Promise((r) => setTimeout(r, REPL_TEARDOWN_TIMEOUT_MS))]);
   sessionContentStore.close();

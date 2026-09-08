@@ -73,6 +73,7 @@ vi.mock('../../src/orchestra/planner.js', () => ({
     return { resolvedCount: 0, dropped: [] };
   }),
   callZeroConfigPlanner: vi.fn(),
+  callZeroConfigPlannerWithReason: vi.fn(),
 }));
 
 vi.mock('../../src/cli/helpers/process.js', () => ({
@@ -86,7 +87,7 @@ vi.mock('../../src/cli/helpers/output.js', () => ({
 
 import { loadConfig } from '../../src/core/config.js';
 import { planSprint, readContext } from '../../src/orchestra/brain.js';
-import { callZeroConfigPlanner } from '../../src/orchestra/planner.js';
+import { callZeroConfigPlannerWithReason } from '../../src/orchestra/planner.js';
 import { resolveProjectRoot } from '../../src/cli/helpers/process.js';
 import { print, printError } from '../../src/cli/helpers/output.js';
 import { registerDo, type DoSeamDeps } from '../../src/cli/commands/do.js';
@@ -102,11 +103,12 @@ import type {
 } from '../../src/core/types.js';
 import type { PromptGateResult } from '../../src/core/prompt-gate-types.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
+import { acceptedPlannerFixture } from '../helpers/accepted-planner-fixture.js';
 
 const mockLoadConfig = vi.mocked(loadConfig);
 const mockPlanSprint = vi.mocked(planSprint);
 const mockReadContext = vi.mocked(readContext);
-const mockCallZeroConfigPlanner = vi.mocked(callZeroConfigPlanner);
+const mockCallZeroConfigPlannerWithReason = vi.mocked(callZeroConfigPlannerWithReason);
 const mockResolveProjectRoot = vi.mocked(resolveProjectRoot);
 
 // ─── Fixtures ───────────────────────────────────────────────────────────────
@@ -312,6 +314,11 @@ describe('deckent do — flag-on, fake-planner-driven real multi-task plan (N678
     mockResolveProjectRoot.mockReturnValue(tmpRoot);
     mockReadContext.mockReturnValue(makeBrainContext());
     mockLoadConfig.mockResolvedValue(makeConfig());
+    mockCallZeroConfigPlannerWithReason.mockImplementation((...args) => {
+      const receiptContext = args[7];
+      if (!receiptContext) throw new Error('planner receipt context missing');
+      return acceptedPlannerFixture(makeRealMultiTaskPlan(), receiptContext);
+    });
   });
 
   afterEach(() => {
@@ -321,7 +328,6 @@ describe('deckent do — flag-on, fake-planner-driven real multi-task plan (N678
 
   describe('gate-green: propose -> real multi-task preview(digest) -> approve -> exact-snapshot start', () => {
     it('drives the fake-planner plan through the REAL compileRunProposal/buildDirectives chain, then approves + starts via the real RunFlow services (runSprint mock)', async () => {
-      mockCallZeroConfigPlanner.mockReturnValue(makeRealMultiTaskPlan());
       mockPlanSprint.mockReturnValue(makeGreenSprint() as any);
       const spawnStart = vi.fn(() => ({ pid: process.pid }));
       const { factory, getController } = makeControllerFactory(spawnStart);
@@ -331,8 +337,8 @@ describe('deckent do — flag-on, fake-planner-driven real multi-task plan (N678
 
       // ── the fake-planner boundary really drove compileRunProposal (429-001's
       // seam), reachable from deckent do's own call path — not a hardcoded scaffold ──
-      expect(mockCallZeroConfigPlanner).toHaveBeenCalledTimes(1);
-      const [description, model] = mockCallZeroConfigPlanner.mock.calls[0]!;
+      expect(mockCallZeroConfigPlannerWithReason).toHaveBeenCalledTimes(1);
+      const [description, model] = mockCallZeroConfigPlannerWithReason.mock.calls[0]!;
       expect(description).toBe(goal);
       expect(model).toBe('claude-sonnet-5');
 
@@ -387,7 +393,6 @@ describe('deckent do — flag-on, fake-planner-driven real multi-task plan (N678
 
   describe('gate-red (criteria-less plan): honest reject, never starts', () => {
     it('still builds the real fake-planner multi-task plan, honestly shows GATE: FAIL / POLICY: NEEDS APPROVAL, and rejects without --yes', async () => {
-      mockCallZeroConfigPlanner.mockReturnValue(makeRealMultiTaskPlan());
       mockPlanSprint.mockReturnValue(makeRedSprint() as any);
       const spawnStart = vi.fn();
       const { factory, getController } = makeControllerFactory(spawnStart);
@@ -397,7 +402,7 @@ describe('deckent do — flag-on, fake-planner-driven real multi-task plan (N678
 
       // The fake-planner boundary still ran for real — a red gate does not
       // short-circuit plan compilation, only the approve/start decision.
-      expect(mockCallZeroConfigPlanner).toHaveBeenCalledTimes(1);
+      expect(mockCallZeroConfigPlannerWithReason).toHaveBeenCalledTimes(1);
 
       const controller = getController();
       const preview = controller.getContext().preview!;

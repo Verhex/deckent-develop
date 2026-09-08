@@ -44,6 +44,20 @@ vi.mock('../../src/orchestra/planner.js', () => ({
       goNogo: { goCriteria: 'The planned change works.', noGoCriteria: 'The planned change breaks.', techDebtAcceptable: '' },
     }],
   })),
+  callZeroConfigPlannerWithReason: vi.fn(async (...args: unknown[]) => {
+    const { acceptedPlannerFixture } = await import('../helpers/accepted-planner-fixture.js');
+    return acceptedPlannerFixture({
+      reasoning: 'canned single-task plan (hermetic planner boundary)',
+      tasks: [{
+        title: 'Planned task',
+        description: 'Canned single-task plan for RunFlow tests (429-001 planner-seam).',
+        scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/planned.ts'] },
+        dependencies: [],
+        model: 'claude-sonnet-5', effort: 'normal', priority: 'NORMAL', reason: 'canned',
+        goNogo: { goCriteria: 'The planned change works.', noGoCriteria: 'The planned change breaks.', techDebtAcceptable: '' },
+      }],
+    }, args[7] as Parameters<typeof acceptedPlannerFixture>[1]);
+  }),
 }));
 
 vi.mock('../../src/orchestra/brain.js', () => ({

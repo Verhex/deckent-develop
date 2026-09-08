@@ -865,6 +865,15 @@ export function formatRunFlowOutcomeLine(outcome: RunFlowOutcome, labels: RunFlo
   }
 }
 
+/** Caller-localized projection for the closed planner-evidence refusal set. */
+export function formatRunFlowError(
+  error: unknown,
+  renderPlannerEvidenceRefusal?: (error: unknown) => string | null,
+): string {
+  return renderPlannerEvidenceRefusal?.(error)
+    ?? (error instanceof Error ? error.message : String(error));
+}
+
 /** Localized labels for the two NON-run edges of the REPL `/do <goal>` slash
  *  (452-002 REPL-DO-SLASH-WIRE). `flagOff` = terminal.run_flow_v2 off (no
  *  controller mounted); `usage` = bare `/do` with no goal. Injected by run.tsx's
@@ -912,6 +921,8 @@ export interface ReplDoSlashDeps {
   setPreview: (preview: PlanPreview | null) => void;
   /** Report a controller error as a transcript line (formatRunFlowOutcomeLine). */
   reportError: (message: string) => void;
+  /** Caller-owned closed refusal formatter; null preserves the existing error path. */
+  renderPlannerEvidenceRefusal?: (error: unknown) => string | null;
   /** Caller-owned unavailable-value punctuation. */
   emptyValue?: string;
 }
@@ -950,7 +961,7 @@ export async function runReplDoSlash(goal: string, deps: ReplDoSlashDeps): Promi
       deps.reportError(formatDoSlashNoProviders(deps.labels.noProviders, err.details, deps.emptyValue));
       return;
     }
-    deps.reportError(err instanceof Error ? err.message : String(err));
+    deps.reportError(formatRunFlowError(err, deps.renderPlannerEvidenceRefusal));
   }
 }
 
@@ -1483,6 +1494,11 @@ export interface ReplAppProps {
    * `live_footer.*` catalog rows) — required; live-footer.ts validates the
    * full set and owns no English default (TERMINAL-TOOLS-002). */
   liveFooterLabels: LiveFooterLabels;
+  /** Caller-localized, auth-only startup update owned by the mounted Ink tree. */
+  healthAuthFeed?: {
+    getSnapshot: () => string | null;
+    subscribe: (listener: () => void) => () => void;
+  };
   /** Registers the sink used to enqueue a background-completed event.
    * Buffered by ChatTurnQueue and drained as brand-new turn(s) at turn-end —
    * NEVER injected mid-turn (Hermes rule, chat-turn-queue.ts). */
@@ -1517,6 +1533,8 @@ export interface ReplAppProps {
   /** Localized approve/reject/error transcript lines (run.tsx
    * buildRunFlowMountLabels(t), `runFlow.mount.*`) — required. */
   runFlowMountLabels: RunFlowMountLabels;
+  /** Localized closed planner-evidence refusal projection from the host. */
+  renderPlannerEvidenceRefusal?: (error: unknown) => string | null;
   /** 452-002 — labels for the `/do <goal>` slash's two non-run edges (flag-off
    * notice + bare-usage hint). Injected by run.tsx's buildDoSlashLabels(t) —
    * required. The run edge reuses `runFlowController` (no new string). */
@@ -1697,7 +1715,7 @@ export async function routeNativeMcpInput(options: NativeMcpRouteOptions): Promi
 
 export function ReplApp(props: ReplAppProps): ReactElement {
   const palette = useInkPalette();
-  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, nativeMcpSlash, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, startupRecentSessions = false, sprintHistoricalContext, renderSprintContextReason, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, nativePermissionIntent, registerNativeApprovalRetire, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false, reducedMotion = false, dualStreamOverflow, toolRead } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, nativeMcpSlash, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, startupRecentSessions = false, sprintHistoricalContext, renderSprintContextReason, stateFeed, liveFooterLabels, healthAuthFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, nativePermissionIntent, registerNativeApprovalRetire, runFlowController, runFlowCardLabels, runFlowMountLabels, renderPlannerEvidenceRefusal, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false, reducedMotion = false, dualStreamOverflow, toolRead } = props;
   const glyphs = useTerminalGlyphs();
   const resumeLedgerOptions: LedgerStoreOptions = { ...props.resumeLedgerOptions, cwd: props.cwd };
   const { exit, suspendTerminal } = useApp();
@@ -1720,6 +1738,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     statusLabel: string; cancelRequested: boolean; startedAt: number; generation: number;
   } | null>(null);
   const [nativeToolNow, setNativeToolNow] = useState(0);
+  const [healthAuthLine, setHealthAuthLine] = useState<string | null>(() => healthAuthFeed?.getSnapshot() ?? null);
   const nativeToolGenerationRef = useRef(0);
   const nativeRequestAttributionRef = useRef(0);
   const [nativeRequestMeasurement, setNativeRequestMeasurement] = useState<{
@@ -2301,6 +2320,13 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [replSurfaceEnabled, stateFeed, liveFooterLabels, columns, dualStreamOverflow]);
+
+  useEffect(() => {
+    if (!healthAuthFeed) { setHealthAuthLine(null); return; }
+    const refresh = (): void => setHealthAuthLine(healthAuthFeed.getSnapshot());
+    refresh();
+    return healthAuthFeed.subscribe(refresh);
+  }, [healthAuthFeed]);
 
   useEffect(() => {
     if (!nativeToolActivity || !replSurfaceEnabled) return;
@@ -3037,6 +3063,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         setPreview: setRunFlowPreview,
         reportError: (message) =>
           pushTurn('bg', formatRunFlowOutcomeLine({ kind: 'error', message }, runFlowMountLabels)),
+        ...(renderPlannerEvidenceRefusal ? { renderPlannerEvidenceRefusal } : {}),
         emptyValue: glyphs.dash,
       });
       return;
@@ -3123,7 +3150,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       const finalCtx = runFlowController.startApproved ? runFlowController.startApproved() : runFlowController.getContext();
       pushTurn('bg', formatRunFlowOutcomeLine({ kind: 'started', jobId: finalCtx.handle?.jobId ?? preview.flowId }, mountLabels));
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = formatRunFlowError(err, renderPlannerEvidenceRefusal);
       pushTurn('bg', formatRunFlowOutcomeLine({ kind: 'error', message }, mountLabels));
     }
   };
@@ -3397,6 +3424,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       )}
 
       {/* Persistent status anchor (always present → "where am I / busy or done"). */}
+      {healthAuthLine ? <Text {...palette.muted}>{healthAuthLine}</Text> : null}
       <Box marginTop={1}>
         {/* TERMINAL-TOOLS-013: while a card owns stdin the anchor SAYS so
             instead of promising "your turn" (textual carrier, not layout). */}

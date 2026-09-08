@@ -39,6 +39,8 @@ import {
 import { startRunFlow } from '../../orchestra/run-flow-decision-service.js';
 import { spawnDetachedDeckent } from '../../cli/helpers/detached-start.js';
 import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
+import { formatPlannerEvidenceRefusal } from '../../cli/helpers/planner-evidence-presentation.js';
+import { resolvePlannerEvidenceRefusal } from '../../core/planner-evidence-refusal.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
 import { preflightProviderRoleExecutionIngress } from '../../core/provider-execution-ingress-authority.js';
 import { mcpToolDescription, getMcpToolDescriptionLanguage } from './description-catalog.js';
@@ -676,26 +678,32 @@ export function registerStartTool(
         };
       } catch (error) {
         const errLang = getLanguage();
-        const message = error instanceof BrainError
+        const planningRefusal = resolvePlannerEvidenceRefusal(error);
+        const planningMessage = formatPlannerEvidenceRefusal(
+          error,
+          (key) => getMessage(key, errLang),
+        );
+        const message = planningMessage ?? (error instanceof BrainError
           ? getMessage('mcp.start.run_failed_at_phase', errLang, {
               phase: error.phase ?? getMessage('mcp.start.phase_unknown', errLang),
               message: error.message,
             })
-          : error instanceof Error ? error.message : String(error);
-        const code = (
+          : error instanceof Error ? error.message : String(error));
+        const code = planningRefusal?.code ?? ((
           typeof error === 'object'
           && error !== null
           && 'code' in error
           && typeof error.code === 'string'
         )
           ? error.code
-          : undefined;
+          : undefined);
 
         const errData = {
           error: true,
           success: false,
           message,
           ...(code !== undefined ? { code } : {}),
+          ...(planningRefusal ? { nextAction: planningRefusal.nextAction } : {}),
           ...(error instanceof BrainError && error.plannerProof
             ? { plannerProof: error.plannerProof }
             : {}),

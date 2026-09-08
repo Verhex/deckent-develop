@@ -48,6 +48,19 @@ import { getNextSprintId } from '../../src/core/utils.js';
 
 const ACTOR = { id: 'decision-service-test' } as const;
 
+function legacyDirectivesAuthority() {
+  return {
+    schemaVersion: 1 as const,
+    sourceKind: 'directives' as const,
+    contentSha256: '1'.repeat(64),
+    configSha256: '2'.repeat(64),
+    proposalSha256: '3'.repeat(64),
+    planningInputSha256: '4'.repeat(64),
+    scopeInputSha256: '5'.repeat(64),
+    lineageSha256: '6'.repeat(64),
+  };
+}
+
 function testSprint(id = 'sprint-decision-test'): Sprint {
   return {
     id,
@@ -101,16 +114,7 @@ describe('run-flow-decision-service — shared decide/start (SURF-6)', () => {
   it('approve → APPROVED + the durable snapshot is persisted from the planned sprint', () => {
     const flowId = generateFlowId('decide-approve');
     appendProposalToCompletionChain({ root, flowId, through: 'PREVIEW_READY' });
-    const sourceAuthority = {
-      schemaVersion: 1 as const,
-      sourceKind: 'intent' as const,
-      contentSha256: '1'.repeat(64),
-      configSha256: '2'.repeat(64),
-      proposalSha256: '3'.repeat(64),
-      planningInputSha256: '4'.repeat(64),
-      scopeInputSha256: '5'.repeat(64),
-      lineageSha256: '6'.repeat(64),
-    };
+    const sourceAuthority = legacyDirectivesAuthority();
     savePlannedSprint(root, flowId, {
       revision: 1,
       sprint: testSprint(),
@@ -131,7 +135,11 @@ describe('run-flow-decision-service — shared decide/start (SURF-6)', () => {
   it('the SAME approve from a second surface converges idempotently (deterministic commandId)', () => {
     const flowId = generateFlowId('decide-idempotent');
     appendProposalToCompletionChain({ root, flowId, through: 'PREVIEW_READY' });
-    savePlannedSprint(root, flowId, { revision: 1, sprint: testSprint() });
+    savePlannedSprint(root, flowId, {
+      revision: 1,
+      sprint: testSprint(),
+      sourceAuthority: legacyDirectivesAuthority(),
+    });
 
     decideRunFlow(root, flowId, { decision: 'approve', actor: ACTOR });
     const afterFirst = readFlowEvents(root, flowId).length;
@@ -169,6 +177,82 @@ describe('run-flow-decision-service — shared decide/start (SURF-6)', () => {
     expect(() => decideRunFlow(root, flowId, { decision: 'approve', actor: ACTOR })).toThrowError(
       /planned sprint record missing/,
     );
+  });
+
+  it('refuses a legacy intent plan without accepted planner evidence before approval', () => {
+    const flowId = generateFlowId('decide-legacy-intent');
+    appendProposalToCompletionChain({ root, flowId, through: 'PREVIEW_READY' });
+    savePlannedSprint(root, flowId, {
+      revision: 1,
+      sprint: testSprint(),
+      sourceAuthority: { ...legacyDirectivesAuthority(), sourceKind: 'intent' },
+    });
+    const before = readFlowEvents(root, flowId).length;
+
+    expect(() => decideRunFlow(root, flowId, { decision: 'approve', actor: ACTOR }))
+      .toThrowError(expect.objectContaining({ code: 'PLANNER_EVIDENCE_REPLAN_REQUIRED' }));
+    expect(readFlowEvents(root, flowId)).toHaveLength(before);
+  });
+
+  it('refuses malformed v2 planning evidence before approval', () => {
+    const flowId = generateFlowId('decide-malformed-v2');
+    appendProposalToCompletionChain({ root, flowId, through: 'PREVIEW_READY' });
+    savePlannedSprint(root, flowId, {
+      revision: 1,
+      sprint: testSprint(),
+      sourceAuthority: {
+        ...legacyDirectivesAuthority(),
+        schemaVersion: 2,
+        planningEvidence: null,
+      } as never,
+    });
+    const before = readFlowEvents(root, flowId).length;
+
+    expect(() => decideRunFlow(root, flowId, { decision: 'approve', actor: ACTOR }))
+      .toThrowError(expect.objectContaining({ code: 'PLANNER_EVIDENCE_HOLD' }));
+    expect(readFlowEvents(root, flowId)).toHaveLength(before);
+  });
+
+  it('refuses v5 context downgraded to legacy directives authority before approval', () => {
+    const flowId = generateFlowId('decide-v5-downgrade');
+    const planDigest = 'v5-downgrade-digest';
+    const planDigestContext: ExecutionPlanDigestContext = {
+      configuredProvider: null,
+      configuredModel: null,
+      configuredBackend: null,
+      configuredAuthMode: 'subscription',
+      fallbackProvider: null,
+      fallbackPolicy: null,
+      executionBudgetPolicy: null,
+      planningEvidence: { kind: 'accepted-planner-invocation', binding: {} as never },
+      sourceAuthoritySha256: '0'.repeat(64),
+    };
+    appendProposalToCompletionChain({ root, flowId, through: 'PREVIEW_STARTED' });
+    getRunFlowCoordinator(root).recordPreview({
+      preview: {
+        flowId,
+        revision: 1,
+        planDigest,
+        planDigestVersion: 5,
+        planDigestContext,
+        taskSummaries: [],
+        policyDecision: 'allow',
+        gateResult: 'pass',
+      },
+    });
+    savePlannedSprint(root, flowId, {
+      revision: 1,
+      sprint: testSprint(),
+      planDigest,
+      planDigestVersion: 5,
+      planDigestContext,
+      sourceAuthority: legacyDirectivesAuthority(),
+    });
+    const before = readFlowEvents(root, flowId).length;
+
+    expect(() => decideRunFlow(root, flowId, { decision: 'approve', actor: ACTOR }))
+      .toThrowError(expect.objectContaining({ code: 'PLANNER_EVIDENCE_HOLD' }));
+    expect(readFlowEvents(root, flowId)).toHaveLength(before);
   });
 
   it('approve refuses a digest-valid v3 structural topology blocker before APPROVAL_GRANTED', () => {
@@ -231,6 +315,7 @@ describe('run-flow-decision-service — shared decide/start (SURF-6)', () => {
       planDigest: digest.digest,
       planDigestVersion: EXECUTION_PLAN_DIGEST_VERSION,
       planDigestContext: digestContext,
+      sourceAuthority: legacyDirectivesAuthority(),
     });
 
     let caught: unknown;
@@ -271,6 +356,7 @@ describe('run-flow-decision-service — shared decide/start (SURF-6)', () => {
       revision: 1,
       sprint,
       proposal: chain.proposal,
+      sourceAuthority: legacyDirectivesAuthority(),
     });
     decideRunFlow(root, flowId, { decision: 'approve', actor: ACTOR });
     // Refuse-mint contract (2026-08-25): the sprint-ordinal persist path only
@@ -313,6 +399,7 @@ describe('run-flow-decision-service — shared decide/start (SURF-6)', () => {
       revision: 1,
       sprint,
       proposal: chain.proposal,
+      sourceAuthority: legacyDirectivesAuthority(),
     });
     decideRunFlow(root, flowId, { decision: 'approve', actor: ACTOR });
     writeRetirementTasks(root, [{ ...task, title: 'drifted' }]);
@@ -331,6 +418,7 @@ describe('run-flow-decision-service — shared decide/start (SURF-6)', () => {
       revision: 1,
       sprint: testSprint(),
       proposal: chain.proposal,
+      sourceAuthority: legacyDirectivesAuthority(),
       lineage: {
         tenantId: chain.proposal.tenant,
         actor: chain.proposal.actor,

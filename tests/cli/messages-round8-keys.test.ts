@@ -18,13 +18,13 @@
  * translations only).
  *
  * Hermetic: reads committed source + imports getMessage/
- * formatDoPlanPreview only (all pure, no gitignored state, no Ink render).
+ * formatRunFlowDoPreview only (all pure, no gitignored state, no Ink render).
  */
 
 import { describe, it, expect } from 'vitest';
 import { getMessage } from '../../src/cli/helpers/messages.js';
-import { formatDoPlanPreview } from '../../src/cli/commands/do.js';
-import type { GoldenFlowPlanPreview } from '../../src/orchestra/golden-flow.js';
+import { formatRunFlowDoPreview } from '../../src/cli/commands/do.js';
+import type { PlanPreview } from '../../src/core/run-flow-contract.js';
 
 // ─── approval_card.* (355-011 APP-APPROVAL-WIRE) ───────────────────────────
 
@@ -81,13 +81,13 @@ describe('approval_card.* keys (355-011 docImpact — the only source since TERM
 
 // ─── do.* (355-010 GOLDENFLOW-CMD) ──────────────────────────────────────────
 
-function fakePreview(taskCount: number): GoldenFlowPlanPreview {
+function fakePreview(taskCount: number): PlanPreview {
   return {
-    directivesMarkdown: '',
-    taskCount,
-    tasks: [
-      { title: 'Example task', files: ['a.ts', 'b.ts'], scope: ['src/'], goCriteria: ['tsc clean'] },
-    ],
+    flowId: 'flow-1', revision: 1, planDigest: 'abcdef0123456789',
+    taskSummaries: Array.from({ length: taskCount }, (_, index) => ({
+      title: `Example task ${index + 1}`, summary: 'Canonical task summary',
+    })),
+    gateResult: 'pass', policyDecision: 'allow',
   };
 }
 
@@ -149,29 +149,22 @@ describe('do.* keys (355-010 docImpact — "A follow-up task should add do.* key
     expect(getMessage('do.task_go_criteria', 'tr')).toBe('goCriteria: {goCriteria}');
   });
 
-  it('en preview banner (run) is byte-identical to formatDoPlanPreview\'s real first line', () => {
-    const rendered = formatDoPlanPreview(fakePreview(2), true);
+  it('en preview banner (run) is byte-identical to the canonical formatter first line', () => {
+    const rendered = formatRunFlowDoPreview(fakePreview(2), true, 'en');
     const bannerLine = rendered.split('\n')[0];
     expect(getMessage('do.preview_banner_run', 'en', { count: '2' })).toBe(bannerLine);
   });
 
-  it('en preview banner (dry-run) is byte-identical to formatDoPlanPreview\'s real first line', () => {
-    const rendered = formatDoPlanPreview(fakePreview(2), false);
+  it('en preview banner (dry-run) is byte-identical to the canonical formatter first line', () => {
+    const rendered = formatRunFlowDoPreview(fakePreview(2), false, 'en');
     const bannerLine = rendered.split('\n')[0];
     expect(getMessage('do.preview_banner_dry_run', 'en', { count: '2' })).toBe(bannerLine);
   });
 
-  it('en "What will happen:" heading is byte-identical to formatDoPlanPreview\'s real heading line', () => {
-    const rendered = formatDoPlanPreview(fakePreview(1), true);
-    const lines = rendered.split('\n');
-    expect(getMessage('do.what_will_happen', 'en')).toBe(lines[2]);
-  });
-
-  it('en files/scope/goCriteria labels are byte-identical (modulo indent) to formatDoPlanPreview\'s real task lines', () => {
-    const rendered = formatDoPlanPreview(fakePreview(1), true);
-    expect(rendered).toContain(getMessage('do.task_files', 'en', { files: 'a.ts, b.ts' }));
-    expect(rendered).toContain(getMessage('do.task_scope', 'en', { scope: 'src/' }));
-    expect(rendered).toContain(getMessage('do.task_go_criteria', 'en', { goCriteria: 'tsc clean' }));
+  it('the canonical formatter genuinely localizes the full preview', () => {
+    expect(formatRunFlowDoPreview(fakePreview(1), true, 'en')).not.toBe(
+      formatRunFlowDoPreview(fakePreview(1), true, 'tr'),
+    );
   });
 });
 

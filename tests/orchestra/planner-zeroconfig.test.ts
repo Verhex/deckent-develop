@@ -74,7 +74,7 @@ function makeValidPlannerJSON(taskCount: number): string {
     effort: 'normal',
     priority: 'NORMAL',
     reason: `Standard task ${i + 1}`,
-    scope: { directories: ['src/'], filesRead: [], filesWrite: [`src/feature-${i + 1}.ts`] },
+    scope: { directories: [], filesRead: [], filesWrite: [`docs/feature-${i + 1}.md`] },
     dependencies: [],
     goNogo: { goCriteria: 'Tests pass', noGoCriteria: 'Build fails', techDebtAcceptable: 'Minor' },
   }));
@@ -99,14 +99,14 @@ describe('buildPlanPrompt with zeroConfigDescription', () => {
     expect(prompt).toContain('Add login page with Google OAuth');
   });
 
-  it('instructs AI to split into 3-5 tasks', () => {
+  it('uses the admitted one-to-five intent-decomposition contract', () => {
     const prompt = buildPlanPrompt(
       makeContext(),
       makeRecommendation(),
       'my-app',
       'Add login page with Google OAuth',
     );
-    expect(prompt).toContain('3-5');
+    expect(prompt).toContain('Create between 1 and 5 tasks');
   });
 
   it('provides splitting example in zero-config context', () => {
@@ -144,10 +144,9 @@ describe('buildZeroConfigPlanPrompt', () => {
     expect(prompt).toContain('awesome-project');
   });
 
-  it('instructs to produce 3-5 tasks', () => {
+  it('instructs the provider with the admitted one-to-five task contract', () => {
     const prompt = buildZeroConfigPlanPrompt('Add feature', 'app');
-    expect(prompt).toContain('3');
-    expect(prompt).toContain('5');
+    expect(prompt).toContain('Create between 1 and 5 tasks');
   });
 
   it('includes JSON output format instruction', () => {
@@ -169,9 +168,10 @@ describe('buildZeroConfigPlanPrompt', () => {
     expect(prompt).toContain('Auth API endpoints');
   });
 
-  it('instructs last task to be integration/test task', () => {
+  it('keeps integration ownership intent-derived rather than forcing a final task', () => {
     const prompt = buildZeroConfigPlanPrompt('Add feature', 'app');
-    expect(prompt).toContain('The last task MUST be an integration/test task');
+    expect(prompt).toContain('Each task must have one coherent owner');
+    expect(prompt).not.toContain('The last task MUST be an integration/test task');
   });
 
   it('includes file tree when provided', () => {
@@ -206,7 +206,8 @@ describe('buildZeroConfigPlanPrompt', () => {
     // SURF-6 kuyruk-D: goCriteria↔scope consistency rule (the youtube-plan
     // real-claude dogfood's gate-blocker class — planner must be told upfront)
     expect(prompt).toContain('goNogo.goCriteria/noGoCriteria MUST also appear');
-    expect(prompt).toContain('scope-satisfiability');
+    expect(prompt).toContain('a mutation criterion still requires write authority');
+    expect(prompt).toContain('a read-only or unchanged proof target belongs in scope.filesRead');
   });
 
   it('includes task splitting parallelism rules', () => {
@@ -258,6 +259,63 @@ describe('callZeroConfigPlanner', () => {
     const { fn, calls } = makeSpawnFn({ status: 0, stdout: 'not valid json' });
     await expect(callZeroConfigPlanner('Add feature', 'claude-sonnet-5', 'app', [], mockAdapter, undefined, fn)).resolves.toBeNull();
     expect(calls).toHaveLength(2); // initial + one schema-feedback retry
+  });
+
+  it('reports the final typed validation failure without exposing provider output or stderr', async () => {
+    const secret = 'SECRET_PROVIDER_STDERR_MUST_NOT_ESCAPE';
+    const invalidSchema = makeValidPlannerJSON(1).replace('"effort":"normal"', '"effort":"medium"');
+    const { fn, calls } = makeSpawnFn({ stdout: invalidSchema, stderr: secret });
+    let observed: unknown;
+
+    const result = await callZeroConfigPlanner(
+      'Add feature', 'claude-sonnet-5', 'app', [], mockAdapter, undefined, fn,
+      undefined, undefined, undefined,
+      (failure: unknown) => { observed = failure; },
+    );
+
+    expect(result).toBeNull();
+    expect(calls).toHaveLength(2);
+    expect(observed).toMatchObject({
+      ok: false,
+      reason: 'validation_failed',
+      evidence: {
+        provider: 'claude',
+        model: 'claude-sonnet-5',
+        parserStage: 'planner-schema',
+        stderrBytes: secret.length,
+      },
+    });
+    expect(JSON.stringify(observed)).toContain('tasks.0.effort');
+    expect(JSON.stringify(observed)).not.toContain(secret);
+  });
+
+  it('rejects production-source tasks without a registered wiring proposal', async () => {
+    const runtimePlan = JSON.parse(makeValidPlannerJSON(3)) as {
+      tasks: Array<{ scope: { directories: string[]; filesRead: string[]; filesWrite: string[] } }>;
+    };
+    runtimePlan.tasks.forEach((task, index) => {
+      task.scope = {
+        directories: [],
+        filesRead: [],
+        filesWrite: [`src/feature-${index + 1}.ts`],
+      };
+    });
+    const { fn, calls } = makeSpawnFn({ stdout: JSON.stringify(runtimePlan) });
+    let observed: unknown;
+
+    const result = await callZeroConfigPlanner(
+      'Add production feature', 'claude-sonnet-5', 'app', [], mockAdapter, undefined, fn,
+      undefined, undefined, undefined,
+      (failure: unknown) => { observed = failure; },
+    );
+
+    expect(result).toBeNull();
+    expect(calls).toHaveLength(2);
+    expect(observed).toMatchObject({
+      ok: false,
+      reason: 'validation_failed',
+      evidence: { parserStage: 'planner-wiring' },
+    });
   });
 
   it('passes model parameter to the planner spawn', async () => {

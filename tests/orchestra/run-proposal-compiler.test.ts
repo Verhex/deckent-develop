@@ -13,8 +13,10 @@
 // clean, delimiter-free, single-task compile, proving the plumbing produces a
 // well-formed DirectiveBuildIntent and DIRECTIVES markdown end to end.
 
+import { createHash } from 'node:crypto';
 import { describe, it, expect } from 'vitest';
 import { compileRunProposal, compileRunProposalIntent, type RunProposalPlanner } from '../../src/orchestra/run-proposal-compiler.js';
+import { canonicalJson } from '../../src/core/audit-writer.js';
 import { extractStructuredGoNogo } from '../../src/orchestra/directives-builder.js';
 import { parsePlannerResponse } from '../../src/orchestra/planner.js';
 import { parseStructuredDirectives } from '../../src/orchestra/task-builder.js';
@@ -107,6 +109,82 @@ describe('compileRunProposalIntent/compileRunProposal — baseline contract', ()
     expect(extractStructuredGoNogo(parsed[0]!.description).items).toEqual(
       makePlannerTask().goNogo.items,
     );
+  });
+
+  it('carries exact planner-result and directives digests only for an explicit receipt envelope', async () => {
+    const proposal = makeProposal();
+    const plan = { reasoning: 'r', tasks: [makePlannerTask()] };
+    const receiptRef = {
+      schemaVersion: 1 as const,
+      tenantId: proposal.tenant,
+      projectId: 'project-binding',
+      invocationId: 'inv-binding',
+    };
+    const result = await compileRunProposal(proposal, () => ({ data: plan, receiptRef }));
+
+    expect(result.plannerInvocation).toEqual({
+      receiptRef,
+      plannerResultSha256: createHash('sha256').update(canonicalJson(plan)).digest('hex'),
+      directivesSha256: createHash('sha256').update(result.directivesMarkdown).digest('hex'),
+    });
+  });
+
+  it('does not manufacture planner authority for the legacy raw injectable seam', async () => {
+    const result = await compileRunProposal(makeProposal(), () => ({
+      reasoning: 'raw test plan',
+      tasks: [makePlannerTask()],
+    }));
+
+    expect(result.plannerInvocation).toBeUndefined();
+  });
+
+  it('rejects a malformed injected receipt envelope with a typed planner failure', async () => {
+    const proposal = makeProposal({ flowId: 'flow-malformed-envelope' });
+    const malformed = {
+      data: null,
+      receiptRef: {
+        schemaVersion: 1,
+        tenantId: proposal.tenant,
+        projectId: 'project-binding',
+        invocationId: 'inv-binding',
+      },
+    } as unknown as Awaited<ReturnType<RunProposalPlanner>>;
+
+    await expect(compileRunProposal(proposal, () => malformed)).rejects.toMatchObject({
+      name: 'RunProposalPlanError',
+      code: 'PLAN_UNAVAILABLE',
+      flowId: proposal.flowId,
+    });
+  });
+
+  it('does not turn the planner/config model into a directive forceModel override', async () => {
+    const proposal = makeProposal();
+    const fakePlanner: RunProposalPlanner = () => ({
+      reasoning: 'model came from effective planning policy',
+      tasks: [makePlannerTask({ model: 'gpt-5.6-terra' })],
+    });
+
+    const { directivesMarkdown, intent } = await compileRunProposal(proposal, fakePlanner);
+    const [parsed] = parseStructuredDirectives(directivesMarkdown);
+
+    expect(intent.tasks[0]!.model).toBeUndefined();
+    expect(directivesMarkdown).not.toContain('- Model:');
+    expect(parsed!.forceModel).toBeUndefined();
+  });
+
+  it('preserves an explicit owner forceModel through directives and parsing', async () => {
+    const proposal = makeProposal();
+    const fakePlanner: RunProposalPlanner = () => ({
+      reasoning: 'owner requested this model explicitly',
+      tasks: [makePlannerTask({ model: 'claude-sonnet-5', forceModel: 'gpt-5.6-terra' })],
+    });
+
+    const { directivesMarkdown, intent } = await compileRunProposal(proposal, fakePlanner);
+    const [parsed] = parseStructuredDirectives(directivesMarkdown);
+
+    expect(intent.tasks[0]!.model).toBe('gpt-5.6-terra');
+    expect(directivesMarkdown).toContain('- Model: gpt-5.6-terra');
+    expect(parsed!.forceModel).toBe('gpt-5.6-terra');
   });
 
   it('canonicalizes planner structured items and gives legacy strings typed generic items', () => {

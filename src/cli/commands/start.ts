@@ -34,6 +34,7 @@ import { prepareZeroConfig, cleanupZeroConfig } from './quick-start.js';
 import { isSprintLocked } from '../../core/multi-ide.js';
 import { detectOrphan, archiveOrphan, listPidFiles } from '../../orchestra/sprint-pid-manager.js';
 import { createSandboxBackend } from '../../orchestra/spawn-backend.js';
+import { formatSpawnBackendRecoveryDiagnostic } from '../../orchestra/spawn-backend-recovery-diagnostic.js';
 import { captureGitBase } from '../../orchestra/run-diff-service.js';
 import { loadApprovedSnapshot, loadStartAttempt, listFlowIds, loadRunHandle } from '../../core/run-flow-store.js';
 import { isTerminalRunFlowState } from '../../core/run-flow-contract.js';
@@ -60,8 +61,10 @@ import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provi
 import { preflightCliBrainProviderAuthority } from '../provider-authority-process-runtime.js';
 import { ProviderExecutionIngressHoldError } from '../../core/provider-execution-ingress-authority.js';
 import { readCanonicalRunStatus } from '../../core/run-status-authority.js';
+import { publishCanonicalRunStatusReadModel } from '../../core/run-status-read-model.js';
 import { DeckentError } from '../../core/errors.js';
 import { cliContractMessage, bindArgumentDescriptions } from '../helpers/message-catalog/cli-run.js';
+import { formatPlannerEvidenceRefusal } from '../helpers/planner-evidence-presentation.js';
 
 // ─── Provider Cache ───────────────────────────────────────────────
 
@@ -665,6 +668,8 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
               flowId,
             });
           } catch (err) {
+            const failureDetail = formatSpawnBackendRecoveryDiagnostic(err)
+              ?? (err instanceof Error ? err.message : String(err));
             try {
               settleExactRunAttempt({
                 root,
@@ -674,7 +679,7 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
                 settlement: {
                   state: 'FAILED',
                   code: 'EXACT_CHILD_RUNTIME_FAILED',
-                  detail: err instanceof Error ? err.message : String(err),
+                  detail: failureDetail,
                   settledAt: new Date().toISOString(),
                 },
               });
@@ -682,10 +687,18 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
             try {
               coordinator.recordRunFailure({
                 flowId,
-                error: `run crashed before completion: ${err instanceof Error ? err.message : String(err)}`,
+                error: `run crashed before completion: ${failureDetail}`,
                 commandId: `child-crash-${flowId}`,
               });
             } catch { /* attempt journal remains canonical */ }
+            // runSprint retires live coordinator authority before this exact
+            // detached child records RUN_FAILED. Republish only after both
+            // facts are durable so every surface consumes the terminal model.
+            try {
+              publishCanonicalRunStatusReadModel(root);
+            } catch (publicationError) {
+              debugLog('start:exact-child-failure:publishRunStatus', publicationError);
+            }
             throw err;
           }
           if (sprintResult.status === 'PAUSED') {
@@ -870,8 +883,14 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
                   }));
                 }
               } catch (err) {
-                if (err instanceof RunFlowDecisionError) {
-                  printError(err);
+                const planningRefusal = formatPlannerEvidenceRefusal(
+                  err,
+                  (key) => getMessage(key, lang),
+                );
+                if (planningRefusal !== null || err instanceof RunFlowDecisionError) {
+                  printError(planningRefusal !== null
+                    ? new Error(planningRefusal, { cause: err })
+                    : err);
                   process.exitCode = 1;
                   return;
                 }
@@ -1218,7 +1237,13 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
           print(`   Agent: ${agentStr}`);
         }
       } catch (error) {
-        if (error instanceof ProviderExecutionIngressHoldError) {
+        const planningRefusal = formatPlannerEvidenceRefusal(
+          error,
+          (key) => getMessage(key, lang),
+        );
+        if (planningRefusal !== null) {
+          printError(new Error(planningRefusal, { cause: error }));
+        } else if (error instanceof ProviderExecutionIngressHoldError) {
           printError(new Error(getMessage('run.provider_authority_hold', lang, {
             reason: error.reasonCode,
             evidence: error.authorityEvidenceRefs.join(','),

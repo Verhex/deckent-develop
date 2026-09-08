@@ -500,6 +500,12 @@ describe('known-consumer allowlist (Sprint-1 pin evolved for Sprint-2: preview-s
       // module contract — the durable event log stays the only transition
       // authority; reducer mutation remains owned by run-flow-coordinator.
       'core/run-jobs-read.ts',
+      // 7099 L1 accepted planner evidence: the V5 digest consumes only the
+      // immutable PlanningEvidence contract; it does not own Flow mutation.
+      'core/execution-plan-digest.ts',
+      // Store-backed receipt verification returns the same immutable binding
+      // contract while keeping invocation-ledger I/O outside the reducer.
+      'core/planner-invocation-binding.ts',
     ];
     expect(offenders.filter((o) => !KNOWN_CONSUMERS.includes(o))).toEqual([]);
   });

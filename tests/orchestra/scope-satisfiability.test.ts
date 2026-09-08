@@ -51,6 +51,56 @@ function findingsOf(code: SatisfiabilityFinding['code'], findings: Satisfiabilit
   return findings.filter(f => f.code === code);
 }
 
+describe('typed GO evidence read authority', () => {
+  const go = (evidenceRequirements: string[]) => ({ id: 'go-health', polarity: 'go' as const, evidenceRequirements });
+
+  it('blocks and deduplicates private evidence paths absent from declared reads', () => {
+    const result = lintScopeSatisfiability(base({
+      criteria: [go(['Evidence from .brain/ERRORS-critical.md:12',
+        'Health from .brain/exports/summary.md', 'Again .brain/ERRORS-critical.md'])],
+      filesWrite: ['docs/execution/canary/CANARY-NOTE.md'],
+    }));
+    expect(result).toEqual([
+      expect.objectContaining({ code: 'CRITERION_EVIDENCE_NOT_READABLE', severity: 'BLOCK',
+        criterionId: 'go-health', path: '.brain/ERRORS-critical.md' }),
+      expect.objectContaining({ code: 'CRITERION_EVIDENCE_NOT_READABLE', severity: 'BLOCK',
+        criterionId: 'go-health', path: '.brain/exports/summary.md' }),
+    ]);
+  });
+
+  it('checks absence assertions without requiring the granted path to exist', () => {
+    const input = base({ criteria: [go(['Prove src/obsolete.ts is absent'])] });
+    expect(lintScopeSatisfiability(input)).toEqual([
+      expect.objectContaining({ code: 'CRITERION_EVIDENCE_NOT_READABLE', path: 'src/obsolete.ts' }),
+    ]);
+    expect(lintScopeSatisfiability({ ...input, filesRead: ['src/obsolete.ts'] })).toEqual([]);
+  });
+
+  it('accepts exact reads, writes and directory grants without inventing write demands', () => {
+    expect(lintScopeSatisfiability(base({
+      criteria: [go(['Evidence from src/input.ts, docs/output.md and fixtures/new.json'])],
+      filesRead: ['src/input.ts'], filesWrite: ['docs/output.md'], directories: ['fixtures'],
+    }))).toEqual([]);
+  });
+
+  it('ignores NO-GO examples, URI/reference and code tokens', () => {
+    expect(lintScopeSatisfiability(base({ criteria: [
+      { id: 'no-go', polarity: 'no-go', evidenceRequirements: ['Forbidden mutation to src/private.ts'] },
+      go(['https://example.com/docs/reference.md skill://package/docs/guide.md',
+        'receipt:source/docs/evidence.md Date.now/process.env $2.23/4.25dk']),
+    ] }))).toEqual([]);
+  });
+
+  it('uses canonical file values directly, without guessing paths from typed assertions or commands', () => {
+    const criteria = [go(['file:"Dockerfile"', 'file:"README.md"',
+      'assertion:"Document the literal .brain/private.md"', 'command:"node scripts/check.mjs"'])];
+    expect(lintScopeSatisfiability(base({ criteria, trackedFiles: [] })).map(f => f.path))
+      .toEqual(['Dockerfile', 'README.md']);
+    expect(lintScopeSatisfiability(base({ criteria, trackedFiles: [], filesRead: ['Dockerfile', 'README.md'] })))
+      .toEqual([]);
+  });
+});
+
 // ─── Rule 1a: MENTIONED_NOT_WRITABLE (goCriteria authority) ───────────
 
 describe('lintScopeSatisfiability — rule 1a (goCriteria)', () => {

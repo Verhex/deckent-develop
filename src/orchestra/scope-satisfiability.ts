@@ -11,6 +11,8 @@
 // it was ordered to consume) — the write-side gate warned on that class of
 // mismatch already; the read side was blind until now.
 
+import { isRealPathCandidate } from '../core/task-builder-scope.js';
+
 export interface SatisfiabilityInput {
   description: string;
   goCriteria: string;
@@ -22,19 +24,27 @@ export interface SatisfiabilityInput {
    * Absent/omitted callers simply never trigger MENTIONED_NOT_READABLE beyond
    * what `directories`/`filesWrite` already cover. */
   filesRead?: readonly string[];
+  /** Authored acceptance sources, not mutation targets or proof of physical delivery. */
+  criteria?: readonly {
+    readonly id: string;
+    readonly polarity: 'go' | 'no-go';
+    readonly evidenceRequirements: readonly string[];
+  }[];
 }
 
 export type SatisfiabilityFindingCode =
   | 'MENTIONED_NOT_WRITABLE'
   | 'PROOF_PATH_MISSING'
   | 'UNCHANGED_IN_WRITE'
-  | 'MENTIONED_NOT_READABLE';
+  | 'MENTIONED_NOT_READABLE'
+  | 'CRITERION_EVIDENCE_NOT_READABLE';
 
 export interface SatisfiabilityFinding {
   severity: 'BLOCK' | 'WARN';
   code: SatisfiabilityFindingCode;
   path: string;
   message: string;
+  criterionId?: string;
 }
 
 // ─── Path-mention extraction ─────────────────────────────────────────
@@ -326,6 +336,53 @@ function isReadable(token: string, input: SatisfiabilityInput): boolean {
   );
 }
 
+/** Typed GO evidence requires read authority even when asserting path absence.
+ * This checks declared compatibility only; delivery/existence is a separate gate.
+ * Kept callable independently of Git inventory and the legacy prose lints. */
+export function lintCriterionEvidenceReadScope(input: SatisfiabilityInput): SatisfiabilityFinding[] {
+  const findings: SatisfiabilityFinding[] = [];
+  const seen = new Set<string>();
+  for (const criterion of input.criteria ?? []) {
+    if (criterion.polarity !== 'go') continue;
+    for (const requirement of criterion.evidenceRequirements) {
+      // Canonical file evidence is explicit even for root/extensionless names.
+      // Command/assertion values are not file locators; do not reinterpret them.
+      const explicit = /^(file|command|assertion):(.*)$/su.exec(requirement);
+      let explicitPath: string | undefined;
+      if (explicit) {
+        if (explicit[1] !== 'file') continue;
+        try {
+          const value: unknown = JSON.parse(explicit[2]!);
+          if (typeof value !== 'string' || !value.trim()) continue;
+          explicitPath = value.trim();
+        } catch { continue; }
+      }
+      // URI and opaque reference tokens are not workspace file authorities.
+      const text = requirement.replace(/(?<![\w./\\-])[A-Za-z][A-Za-z0-9+.-]*:(?!\d+(?:\b|$))[^\s`"<>]+/g,
+        value => ' '.repeat(value.length));
+      const paths = explicitPath !== undefined ? [explicitPath] : extractMentions(text)
+        .filter(mention => mention.kind !== 'bare' || isRootTrackedFile(mention.token, input.trackedFiles))
+        .map(mention => mention.token)
+        .filter(isRealPathCandidate);
+      for (const path of paths) {
+        if (isReadable(path, input)) continue;
+        const key = JSON.stringify([criterion.id, path]);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        findings.push({
+          severity: 'BLOCK',
+          code: 'CRITERION_EVIDENCE_NOT_READABLE',
+          path,
+          criterionId: criterion.id,
+          // User-facing wording is supplied by the localized prompt-gate adapter.
+          message: 'CRITERION_EVIDENCE_NOT_READABLE',
+        });
+      }
+    }
+  }
+  return findings;
+}
+
 function lintMentionedNotReadable(input: SatisfiabilityInput): SatisfiabilityFinding[] {
   const findings: SatisfiabilityFinding[] = [];
   const seen = new Set<string>();
@@ -436,6 +493,7 @@ function lintUnchangedInWrite(input: SatisfiabilityInput): SatisfiabilityFinding
 
 export function lintScopeSatisfiability(input: SatisfiabilityInput): SatisfiabilityFinding[] {
   return [
+    ...lintCriterionEvidenceReadScope(input),
     ...lintMentionedNotWritable(input),
     ...lintMentionedNotReadable(input),
     ...lintProofPathMissing(input),

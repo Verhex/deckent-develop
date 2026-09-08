@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -10,8 +11,10 @@ import {
   loadRunHandle,
   loadStartAttempt,
   saveApprovedSnapshot,
+  savePlannedSprint,
   type StoredApprovedSnapshot,
 } from '../../src/core/run-flow-store.js';
+import { canonicalJson } from '../../src/core/audit-writer.js';
 import { SprintPhase, SprintStatus } from '../../src/core/sprint-types.js';
 import { TaskStatus } from '../../src/core/task-types.js';
 import {
@@ -26,6 +29,7 @@ import {
 import {
   inspectStructuredCriteriaProjectionAdoption,
 } from '../../src/orchestra/task-artifact-projection.js';
+import { parsePlannerResponse } from '../../src/orchestra/planner.js';
 
 function snapshot(root: string, flowId = 'flow-1'): StoredApprovedSnapshot {
   const approved: StoredApprovedSnapshot = {
@@ -34,6 +38,16 @@ function snapshot(root: string, flowId = 'flow-1'): StoredApprovedSnapshot {
     planDigest: 'digest-1',
     approvedBy: { id: 'approver' },
     approvedAt: '2026-07-28T09:59:00.000Z',
+    sourceAuthority: {
+      schemaVersion: 1,
+      sourceKind: 'directives',
+      contentSha256: '1'.repeat(64),
+      configSha256: '2'.repeat(64),
+      proposalSha256: '3'.repeat(64),
+      planningInputSha256: '4'.repeat(64),
+      scopeInputSha256: '5'.repeat(64),
+      lineageSha256: '6'.repeat(64),
+    },
     proposal: {
       flowId,
       tenant: 'tenant-1',
@@ -94,6 +108,145 @@ const identityDeps = {
 };
 
 describe('exact-plan start attempt lifecycle', () => {
+  it('refuses a legacy intent snapshot before PREPARED or process birth', () => {
+    const root = mkdtempSync(join(tmpdir(), 'exact-start-legacy-intent-'));
+    const base = snapshot(root);
+    const approved: StoredApprovedSnapshot = {
+      ...base,
+      sourceAuthority: { ...base.sourceAuthority!, sourceKind: 'intent' },
+    };
+    const spawnProcess = vi.fn(() => ({ pid: 200, startToken: 's200' }));
+
+    expect(() => prepareAndSpawnExactRun({
+      root,
+      exactRef: { schemaVersion: 1, flowId: 'flow-1', revision: 1, planDigest: 'digest-1' },
+      approvedSnapshot: approved,
+      lineage: lineage(),
+      preparerProcess: { pid: 100, startToken: 's100', evidence: 'verified' },
+      identityDeps,
+      spawnProcess,
+    })).toThrowError(expect.objectContaining({
+      code: 'EXACT_START_PLANNER_EVIDENCE_REPLAN_REQUIRED',
+    }));
+    expect(spawnProcess).not.toHaveBeenCalled();
+    expect(loadStartAttempt(root, 'flow-1', 1)).toBeUndefined();
+  });
+
+  it('refuses an authority downgrade with no source binding before PREPARED', () => {
+    const root = mkdtempSync(join(tmpdir(), 'exact-start-authority-downgrade-'));
+    const { sourceAuthority: _sourceAuthority, ...approved } = snapshot(root);
+    const spawnProcess = vi.fn(() => ({ pid: 200, startToken: 's200' }));
+
+    expect(() => prepareAndSpawnExactRun({
+      root,
+      exactRef: { schemaVersion: 1, flowId: 'flow-1', revision: 1, planDigest: 'digest-1' },
+      approvedSnapshot: approved,
+      lineage: lineage(),
+      preparerProcess: { pid: 100, startToken: 's100', evidence: 'verified' },
+      identityDeps,
+      spawnProcess,
+    })).toThrowError(expect.objectContaining({
+      code: 'EXACT_START_PLANNER_EVIDENCE_REPLAN_REQUIRED',
+    }));
+    expect(spawnProcess).not.toHaveBeenCalled();
+    expect(loadStartAttempt(root, 'flow-1', 1)).toBeUndefined();
+  });
+
+  it('refuses v5 planning context downgraded to legacy directives before PREPARED or process birth', () => {
+    const root = mkdtempSync(join(tmpdir(), 'exact-start-authority-tamper-'));
+    const base = snapshot(root);
+    const planningEvidence = { kind: 'not-applicable' as const, sourceKind: 'directives' as const };
+    const approved: StoredApprovedSnapshot = {
+      ...base,
+      planDigestVersion: 5,
+      planDigestContext: {
+        configuredProvider: null,
+        configuredModel: null,
+        configuredBackend: null,
+        configuredAuthMode: 'subscription',
+        fallbackProvider: null,
+        fallbackPolicy: null,
+        executionBudgetPolicy: null,
+        planningEvidence,
+        sourceAuthoritySha256: '0'.repeat(64),
+      },
+      sourceAuthority: {
+        ...base.sourceAuthority!,
+        schemaVersion: 1,
+      },
+    };
+    const spawnProcess = vi.fn(() => ({ pid: 200, startToken: 's200' }));
+
+    expect(() => prepareAndSpawnExactRun({
+      root,
+      exactRef: { schemaVersion: 1, flowId: 'flow-1', revision: 1, planDigest: 'digest-1' },
+      approvedSnapshot: approved,
+      lineage: lineage(),
+      preparerProcess: { pid: 100, startToken: 's100', evidence: 'verified' },
+      identityDeps,
+      spawnProcess,
+    })).toThrowError(expect.objectContaining({
+      code: 'EXACT_START_PLANNER_EVIDENCE_HOLD',
+    }));
+    expect(spawnProcess).not.toHaveBeenCalled();
+    expect(loadStartAttempt(root, 'flow-1', 1)).toBeUndefined();
+  });
+
+  it('requires the exact planned v5 authority before lower exact-ref start', () => {
+    const root = mkdtempSync(join(tmpdir(), 'exact-start-planned-authority-'));
+    const base = snapshot(root);
+    const planningEvidence = { kind: 'not-applicable' as const, sourceKind: 'directives' as const };
+    const sourceAuthority = {
+      ...base.sourceAuthority!,
+      schemaVersion: 2 as const,
+      planningEvidence,
+    };
+    const approved: StoredApprovedSnapshot = {
+      ...base,
+      planDigestVersion: 5,
+      planDigestContext: {
+        configuredProvider: null,
+        configuredModel: null,
+        configuredBackend: null,
+        configuredAuthMode: 'subscription',
+        fallbackProvider: null,
+        fallbackPolicy: null,
+        executionBudgetPolicy: null,
+        planningEvidence,
+        sourceAuthoritySha256: createHash('sha256')
+          .update(canonicalJson(sourceAuthority)).digest('hex'),
+      },
+      sourceAuthority,
+    };
+    const spawnProcess = vi.fn(() => ({ pid: 200, startToken: 's200' }));
+    const attempt = () => prepareAndSpawnExactRun({
+      root,
+      exactRef: { schemaVersion: 1, flowId: 'flow-1', revision: 1, planDigest: 'digest-1' },
+      approvedSnapshot: approved,
+      lineage: lineage(),
+      preparerProcess: { pid: 100, startToken: 's100', evidence: 'verified' as const },
+      identityDeps,
+      spawnProcess,
+    });
+
+    expect(attempt).toThrowError(expect.objectContaining({
+      code: 'EXACT_START_PLANNER_EVIDENCE_HOLD',
+    }));
+    savePlannedSprint(root, 'flow-1', {
+      revision: 1,
+      sprint: approved.sprint,
+      planDigest: approved.planDigest,
+      planDigestVersion: 5,
+      planDigestContext: approved.planDigestContext!,
+      sourceAuthority: { ...sourceAuthority, contentSha256: 'f'.repeat(64) },
+    });
+    expect(attempt).toThrowError(expect.objectContaining({
+      code: 'EXACT_START_PLANNER_EVIDENCE_HOLD',
+    }));
+    expect(spawnProcess).not.toHaveBeenCalled();
+    expect(loadStartAttempt(root, 'flow-1', 1)).toBeUndefined();
+  });
+
   it('orders PREPARED → START_REQUESTED → process birth and publishes handle only at ADMITTED', () => {
     const root = mkdtempSync(join(tmpdir(), 'exact-start-'));
     const approved = snapshot(root);
@@ -500,6 +653,7 @@ describe('exact-plan start attempt lifecycle', () => {
       lifecycle: {
         publishStartRequested: () => lifecycle.push('START_REQUESTED'),
         publishRunStarted: () => lifecycle.push('RUN_STARTED'),
+        publishSettlement: ({ settlement }) => lifecycle.push(`SETTLED:${settlement.state}`),
       },
       spawnDetached: vi.fn(() => ({ pid: 200, startToken: 's200' })),
       executeInProcess: async (context) => {
@@ -528,8 +682,198 @@ describe('exact-plan start attempt lifecycle', () => {
       expect(outcome.attempt.state).toBe('COMPLETED');
       expect(outcome.settlement.state).toBe('COMPLETED');
     }
-    expect(lifecycle).toEqual(['START_REQUESTED', 'RUN_STARTED']);
+    expect(lifecycle).toEqual(['START_REQUESTED', 'RUN_STARTED', 'SETTLED:COMPLETED']);
     expect(loadStartAttempt(root, outcome.status === 'settled' ? outcome.attempt.attemptId : '')?.state)
       .toBe('COMPLETED');
+  });
+
+  it.each([
+    { admitted: false, expectedCode: 'EXACT_RUNTIME_FAILED_BEFORE_ADMISSION' },
+    { admitted: true, expectedCode: 'EXACT_RUNTIME_FAILED_AFTER_ADMISSION' },
+  ])('publishes a persisted runtime failure after admission=$admitted', async ({ admitted, expectedCode }) => {
+    const root = mkdtempSync(join(tmpdir(), 'exact-start-failure-publication-'));
+    const approved = snapshot(root);
+    saveApprovedSnapshot(root, approved);
+    const publications: string[] = [];
+    const executor = createCanonicalExactSprintExecutor({
+      identityDeps,
+      lifecycle: {
+        publishStartRequested: () => undefined,
+        publishRunStarted: () => undefined,
+        publishSettlement: ({ attempt, settlement }) => {
+          expect(attempt.settlement).toEqual(settlement);
+          publications.push(settlement.code);
+        },
+      },
+      spawnDetached: vi.fn(() => ({ pid: 200, startToken: 's200' })),
+      executeInProcess: async (context) => {
+        if (admitted) {
+          context.onExecutionAdmitted({ flowId: 'flow-1', jobId: 'job-failure', logRef: 'log-failure' });
+        }
+        throw new Error('fixture runtime failure');
+      },
+    });
+    const outcome = await executor.execute({
+      projectRoot: root,
+      config: {} as never,
+      source: {
+        kind: 'exact-ref',
+        ref: { schemaVersion: 1, flowId: 'flow-1', revision: 1, planDigest: 'digest-1' },
+        ingress: { kind: 'terminal', id: 'terminal-session' },
+      },
+      lineage: lineage(`failure-${admitted}`),
+      executionMode: 'in-process',
+    });
+    expect(outcome).toMatchObject({ status: 'failed', reasonCode: expectedCode });
+    expect(publications).toEqual([expectedCode]);
+  });
+
+  it('holds after a persisted settlement when terminal lifecycle publication fails', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'exact-start-publication-hold-'));
+    const approved = snapshot(root);
+    saveApprovedSnapshot(root, approved);
+    const executor = createCanonicalExactSprintExecutor({
+      identityDeps,
+      lifecycle: {
+        publishStartRequested: () => undefined,
+        publishRunStarted: () => undefined,
+        publishSettlement: () => { throw new Error('projection unavailable'); },
+      },
+      spawnDetached: vi.fn(() => ({ pid: 200, startToken: 's200' })),
+      executeInProcess: async (context) => {
+        context.onExecutionAdmitted({ flowId: 'flow-1', jobId: 'job-hold', logRef: 'log-hold' });
+        return { terminalState: 'COMPLETED', reasonCode: 'DONE' };
+      },
+    });
+    const outcome = await executor.execute({
+      projectRoot: root,
+      config: {} as never,
+      source: {
+        kind: 'exact-ref',
+        ref: { schemaVersion: 1, flowId: 'flow-1', revision: 1, planDigest: 'digest-1' },
+        ingress: { kind: 'terminal', id: 'terminal-session' },
+      },
+      lineage: lineage('publication-hold'),
+      executionMode: 'in-process',
+    });
+    expect(outcome).toMatchObject({
+      status: 'held',
+      reasonCode: 'EXACT_START_LIFECYCLE_PUBLICATION_HOLD',
+      attempt: { state: 'COMPLETED', settlement: { state: 'COMPLETED', code: 'DONE' } },
+    });
+  });
+
+  it('publishes blocked no-admission truth and republishes it idempotently on duplicate replay', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'exact-start-no-admission-'));
+    const approved = snapshot(root);
+    saveApprovedSnapshot(root, approved);
+    const publications: string[] = [];
+    const executor = createCanonicalExactSprintExecutor({
+      identityDeps,
+      lifecycle: {
+        publishStartRequested: () => undefined,
+        publishRunStarted: () => undefined,
+        publishSettlement: ({ settlement }) => publications.push(settlement.code),
+      },
+      spawnDetached: vi.fn(() => ({ pid: 200, startToken: 's200' })),
+      executeInProcess: async () => ({ terminalState: 'COMPLETED', reasonCode: 'UNREACHABLE' }),
+    });
+    const input = {
+      projectRoot: root,
+      config: {} as never,
+      source: {
+        kind: 'exact-ref' as const,
+        ref: { schemaVersion: 1 as const, flowId: 'flow-1', revision: 1, planDigest: 'digest-1' },
+        ingress: { kind: 'terminal' as const, id: 'terminal-session' },
+      },
+      lineage: lineage('no-admission'),
+      executionMode: 'in-process' as const,
+    };
+    await expect(executor.execute(input)).resolves.toMatchObject({
+      status: 'held',
+      reasonCode: 'EXACT_START_ADMISSION_REQUIRED',
+    });
+    await expect(executor.execute(input)).resolves.toMatchObject({ status: 'duplicate' });
+    expect(publications).toEqual([
+      'EXACT_START_ADMISSION_REQUIRED',
+      'EXACT_START_ADMISSION_REQUIRED',
+    ]);
+  });
+
+  it('facade preserves an unplanned planner-evidence refusal as held with no process birth', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'exact-start-unplanned-evidence-'));
+    const lifecycle = {
+      publishStartRequested: vi.fn(),
+      publishRunStarted: vi.fn(),
+    };
+    const spawnDetached = vi.fn(() => ({ pid: 200, startToken: 's200' }));
+    const executeInProcess = vi.fn(async () => ({
+      terminalState: 'COMPLETED' as const,
+      reasonCode: 'DONE',
+    }));
+    const executor = createCanonicalExactSprintExecutor({
+      identityDeps,
+      lifecycle,
+      spawnDetached,
+      executeInProcess,
+    });
+
+    const normalizedPlan = parsePlannerResponse(JSON.stringify({
+      reasoning: 'fixture',
+      tasks: [{
+        title: 'Task', description: 'Do the exact task.', model: 'gpt-5.6-sol',
+        effort: 'normal', priority: 'NORMAL', reason: 'fixture',
+        scope: { directories: [], filesRead: [], filesWrite: ['docs/evidence.md'] },
+        dependencies: [],
+        goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
+      }],
+    }));
+    if (!normalizedPlan) throw new Error('planner fixture did not normalize');
+
+    const outcome = await executor.execute({
+      projectRoot: root,
+      config: {
+        activeModeConfig: { max_workers: 1, default_model: 'gpt-5.6-sol' },
+        language: 'en',
+      } as never,
+      source: {
+        kind: 'unplanned',
+        proposal: {
+          flowId: 'flow-unplanned',
+          tenant: 'tenant-1',
+          project: root,
+          actor: { id: 'planner' },
+          origin: 'terminal',
+          revision: 1,
+          intentSummary: 'plan through injected fixture planner',
+        },
+        planSource: {
+          sourceKind: 'intent',
+          baseContext: {
+            directives: '', memory: '', retro: '', debt: [], patterns: '', decisions: '',
+            existingTasks: [], projectState: { gitStatus: '', fileTree: [] },
+          },
+          planner: () => normalizedPlan,
+        },
+        recommendation: { size: 'small', maxWorkers: 1, modelConstraint: null, reason: 'fixture' },
+        ingress: { kind: 'terminal', id: 'terminal-session' },
+      },
+      lineage: {
+        ...lineage('unplanned-evidence-idempotency'),
+        actor: { id: 'planner' },
+        origin: 'terminal',
+      },
+      executionMode: 'detached',
+    });
+
+    expect(outcome, JSON.stringify(outcome)).toMatchObject({
+      status: 'held',
+      reasonCode: 'PLANNER_EVIDENCE_HOLD',
+      detail: 'PLANNER_EVIDENCE_HOLD',
+    });
+    expect(spawnDetached).not.toHaveBeenCalled();
+    expect(executeInProcess).not.toHaveBeenCalled();
+    expect(lifecycle.publishStartRequested).not.toHaveBeenCalled();
+    expect(lifecycle.publishRunStarted).not.toHaveBeenCalled();
   });
 });

@@ -1,8 +1,9 @@
 // ─── Node Builtins ─────────────────────────────────────────────────
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 
 import { framedOutputDigest } from '../core/output-digest.js';
+import { canonicalJson } from '../core/audit-writer.js';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -26,6 +27,7 @@ import {
   resolveCanonicalModelIdentity,
 } from '../core/model-registry.js';
 import type { RegistryProviderNameExt } from '../core/model-registry.js';
+import { isModelExecutable } from '../core/model-equivalence.js';
 import type { RoleInvocationResolution } from '../core/role-invocation-resolver.js';
 import { resolveBrainModel } from '../core/config.js';
 import { debugLog } from '../core/utils.js';
@@ -45,7 +47,7 @@ import {
   completeProductionWiringFromProposal,
   productionWiringContractV2InputFromCanonical,
 } from '../core/production-wiring-contract.js';
-import { TERMINAL_NATIVE_PROVIDER_PROOF_IDENTITY } from '../core/production-wiring-host-proof.js';
+import { listRegisteredProductionWiringHostProofProposalIdentities } from '../core/production-wiring-host-proof.js';
 import {
   INVOCATION_RECEIPT_SCHEMA_VERSION,
   type InvocationAuthMode,
@@ -78,6 +80,13 @@ import {
 } from './task-builder.js';
 import type { PostSettlementPlanProjection } from '../core/types.js';
 import { normalizePlannerResult } from './planner-normalize.js';
+import {
+  derivePlannerPlanContract,
+  renderPlannerPlanContract,
+  validatePlannerClosedWriteScope,
+  validatePlannerPlanContract,
+  type PlannerPlanContract,
+} from './planner-plan-contract.js';
 
 // ─── Zod Schemas ──────────────────────────────────────────────────
 const PlannerCriterionItemSchema = z.object({
@@ -128,8 +137,9 @@ const PlannerResultSchema = z.object({
 /** Secret-safe description of why a planner response was rejected. */
 export interface PlannerParseFailure {
   /** `json` = not parseable JSON; `schema` = valid JSON violating PlannerResultSchema;
+   *  `plan-contract` = schema-valid output exceeded host authority;
    *  `wiring` = production-wiring contract rejected. */
-  readonly stage: 'json' | 'schema' | 'wiring' | 'identity';
+  readonly stage: 'json' | 'schema' | 'plan-contract' | 'wiring' | 'identity';
   /** Dotted Zod issue paths with their codes (`tasks.2.dependencies.0:invalid_type`),
    *  capped — never a byte of the model's output. */
   readonly issues: readonly string[];
@@ -193,6 +203,11 @@ export function describePlannerParseFailure(failure: PlannerParseFailure | undef
       ? `production wiring contract rejected at ${failure.issues.join(', ')} (every task that writes production source must carry a valid productionWiring V2 block)`
       : 'production wiring contract rejected';
   }
+  if (failure.stage === 'plan-contract') {
+    return failure.issues.length > 0
+      ? `plan contract violations at ${failure.issues.join(', ')}`
+      : 'plan contract violation';
+  }
   if (failure.stage === 'identity') return `model identity rejected (${failure.issues.join(', ')})`;
   return failure.issues.length > 0
     ? `schema violations at ${failure.issues.join(', ')}`
@@ -200,7 +215,10 @@ export function describePlannerParseFailure(failure: PlannerParseFailure | undef
 }
 
 function consumerReasonFor(failure: PlannerParseFailure | undefined): 'parse_failed' | 'validation_failed' {
-  return failure?.stage === 'schema' || failure?.stage === 'wiring' || failure?.stage === 'identity'
+  return failure?.stage === 'schema'
+    || failure?.stage === 'plan-contract'
+    || failure?.stage === 'wiring'
+    || failure?.stage === 'identity'
     ? 'validation_failed'
     : 'parse_failed';
 }
@@ -216,6 +234,8 @@ export interface PlannerContractViolation {
 export function describePlannerContractViolation(
   detailed: { result: PlannerResult | null; failure?: PlannerParseFailure },
   policy: PlannerTaskModelPolicy,
+  planContract?: PlannerPlanContract,
+  trackedFiles: readonly string[] = [],
 ): PlannerContractViolation | null {
   if (!detailed.result) {
     return { reasonCode: consumerReasonFor(detailed.failure), description: describePlannerParseFailure(detailed.failure) };
@@ -223,13 +243,63 @@ export function describePlannerContractViolation(
   const disallowed = detailed.result.tasks
     .map((task, index) => ({ index, model: task.model }))
     .filter(({ model }) => !policy.allowedModels.includes(model));
-  if (disallowed.length === 0) return null;
+  if (disallowed.length > 0) {
+    return {
+      reasonCode: 'validation_failed',
+      description: `model outside the allowed worker policy at ${disallowed
+        .slice(0, PLANNER_ISSUE_CAP)
+        .map(({ index, model }) => `tasks.${index}.model:${model}`)
+        .join(', ')}`,
+    };
+  }
+  const planIssues = validatePlannerPlanContract(
+    detailed.result,
+    planContract ?? derivePlannerPlanContract(),
+    trackedFiles,
+  );
+  return planIssues.length > 0
+    ? {
+        reasonCode: 'validation_failed',
+        description: `plan contract violations at ${planIssues.slice(0, PLANNER_ISSUE_CAP).join(', ')}`,
+      }
+    : null;
+}
+
+/** Deterministic producer boundary for the exact plan the consumer will use.
+ * The explicit project root, never ambient cwd, owns import/file completion. */
+export function normalizePlannerResultForContract(
+  result: PlannerResult,
+  input: Readonly<{
+    projectRoot: string;
+    trackedFiles: readonly string[];
+    readFile?: (repoRelativePath: string) => string | null;
+  }>,
+): PlannerResult {
+  const readFile = input.readFile ?? ((repoRelativePath: string): string | null => {
+    try {
+      return readFileSync(join(input.projectRoot, repoRelativePath), 'utf8');
+    } catch {
+      return null;
+    }
+  });
+  return normalizePlannerResult(result, {
+    trackedFiles: input.trackedFiles,
+    readFile,
+  });
+}
+
+function normalizeDetailedPlannerResult(
+  detailed: { result: PlannerResult | null; failure?: PlannerParseFailure },
+  projectRoot: string,
+  trackedFiles: readonly string[],
+): { result: PlannerResult | null; failure?: PlannerParseFailure } {
+  if (!detailed.result) return detailed;
   return {
-    reasonCode: 'validation_failed',
-    description: `model outside the allowed worker policy at ${disallowed
-      .slice(0, PLANNER_ISSUE_CAP)
-      .map(({ index, model }) => `tasks.${index}.model:${model}`)
-      .join(', ')}`,
+    ...detailed,
+    result: normalizePlannerResultForContract(detailed.result, {
+      projectRoot,
+      trackedFiles,
+    }),
   };
 }
 
@@ -385,7 +455,8 @@ export function buildPlanPrompt(
 
   let zeroConfigText = '';
   if (zeroConfigDescription) {
-    zeroConfigText = `ZERO-CONFIG MODE:\nUser started sprint with: "${zeroConfigDescription}"\nSplit into ${zeroConfigTaskRange().min}-${zeroConfigTaskRange().max} independent tasks. Each must be completable on its own.\nExample: "Add login page with Google OAuth" → 1) Auth API endpoints, 2) Google OAuth integration, 3) Login page UI, 4) Tests`;
+    const cardinality = derivePlannerPlanContract().taskCardinality;
+    zeroConfigText = `ZERO-CONFIG MODE:\nUser started sprint with: "${zeroConfigDescription}"\nCreate between ${cardinality.min} and ${cardinality.max} tasks. Choose task boundaries from the intent and ownership graph; each task must be completable on its own.\nExample: "Add login page with Google OAuth" → 1) Auth API endpoints, 2) Google OAuth integration, 3) Login page UI, 4) Tests`;
   }
 
   // Sections with priority: DIRECTIVES(1) > MEMORY(2) > DEBT(3) > PATTERNS(4) > others(5+)
@@ -430,12 +501,15 @@ RULES:
 - Write GO/NO-GO criteria for each task
 - Emit one goNogo.items object per authored criterion. Do not split free text on semicolons.
 - Every item needs a polarity, one atomic statement, and concrete evidenceRequirements.
+- Evidence grammar: file:<JSON string> proves ONLY that the exact file exists, never its contents or the truth of the statement. Use it only for existence conditions (including a NO_GO forbidden-file presence condition).
+- Semantic content, preservation, correctness and negative assertions MUST use assertion:<JSON string> describing the condition and relevant source paths. Keep GO and NO_GO conditions; never delete a failure criterion to obtain acceptance.
+- Do not mix file and assertion/command requirements in one item: deterministic file alternatives can short-circuit semantic confirmation. Assertion-only criteria remain undecidable until the configured confirmation adapter supplies genuine evidence; they are not automatic success.
 - Criterion IDs are host-derived after parsing; do not emit an id field.
 - For every production mutation, emit the identity-only productionWiringProposal described below.
 
 ${FILE_PATH_RULES}
 
-${PRODUCTION_WIRING_PROPOSAL_RULES}
+${renderProductionWiringProposalRules()}
 
 ${buildAdrConstraintsPlannerBlock()}
 MODEL SELECTION CRITERIA (CHOOSE ONE EXACT API ID FOR EACH TASK):
@@ -515,7 +589,10 @@ function stripCodeFences(text: string): string {
 export function parsePlannerResponseDetailed(
   raw: string,
   adapter?: ProviderAdapter,
-  context: Readonly<{ readonly projectRoot?: string }> = {},
+  context: Readonly<{
+    readonly projectRoot?: string;
+    readonly planContract?: PlannerPlanContract;
+  }> = {},
 ): { result: PlannerResult | null; failure?: PlannerParseFailure } {
   try {
     // Step 1: provider-specific envelope unwrap (Claude/Gemini/Codex)
@@ -554,6 +631,18 @@ export function parsePlannerResponseDetailed(
       debugLog('parsePlannerResponse:validation', result.error);
       return { result: null, failure: { stage: 'schema', issues: summarizeZodIssues(result.error) } };
     }
+    if (context.planContract?.writeScopePolicy) {
+      const closedScopeIssues = validatePlannerClosedWriteScope(
+        result.data as PlannerResult,
+        context.planContract,
+      );
+      if (closedScopeIssues.length > 0) {
+        return {
+          result: null,
+          failure: { stage: 'plan-contract', issues: closedScopeIssues.slice(0, PLANNER_ISSUE_CAP) },
+        };
+      }
+    }
     const productionWiring = new Map<number, ReturnType<typeof createProductionWiringPlanEvidenceV2>>();
     for (let index = 0; index < result.data.tasks.length; index++) {
       const task = result.data.tasks[index]!;
@@ -562,6 +651,8 @@ export function parsePlannerResponseDetailed(
         ...(provider ? { provider } : {}),
         registerParametric: false,
       });
+      const productionWiringApplicability = deriveProductionWiringApplicability(task.scope);
+      if (productionWiringApplicability.state === 'not-applicable') continue;
       if (task.productionWiringProposal !== undefined && task.productionWiring !== undefined) {
         return { result: null, failure: { stage: 'wiring', issues: [`tasks.${index}.productionWiringProposal:ambiguous`] } };
       }
@@ -586,8 +677,9 @@ export function parsePlannerResponseDetailed(
           };
         }
       }
-      if (deriveProductionWiringApplicability(task.scope).state === 'required'
-        && !productionWiring.has(index)) return { result: null, failure: { stage: 'wiring', issues: [`tasks.${index}.productionWiringProposal:required`] } };
+      if (!productionWiring.has(index)) {
+        return { result: null, failure: { stage: 'wiring', issues: [`tasks.${index}.productionWiringProposal:required`] } };
+      }
     }
     const value = {
       ...result.data,
@@ -875,6 +967,24 @@ export type PlannerCallResult =
       evidence?: PlannerFailureEvidence;
     };
 
+export type PlannerCallFailure = Extract<PlannerCallResult, { ok: false }>;
+
+/** Optional in-process projection of an already-redacted planner failure.
+ * Diagnostic observation must never change dispatch/settlement semantics. */
+export type PlannerFailureObserver = (failure: PlannerCallFailure) => void;
+
+function observePlannerFailure(
+  observer: PlannerFailureObserver | undefined,
+  failure: PlannerCallFailure,
+): void {
+  if (!observer) return;
+  try {
+    observer(Object.freeze(failure));
+  } catch {
+    // Observability is subordinate to the canonical invocation settlement.
+  }
+}
+
 
 export interface PlannerReceiptContext {
   readonly tenantId: string;
@@ -1023,8 +1133,12 @@ async function beginPlannerReceipt(
   }
 }
 
-function receiptFailure(message: string, receiptRef?: InvocationReceiptRef): PlannerCallResult {
+function receiptFailure(message: string, receiptRef?: InvocationReceiptRef): PlannerCallFailure {
   return { ok: false, reason: 'receipt_failed', message, receiptRef };
+}
+
+function plannerResultEvidenceRef(result: PlannerResult): string {
+  return `planner-result:sha256:${createHash('sha256').update(canonicalJson(result), 'utf8').digest('hex')}`;
 }
 
 /**
@@ -1266,7 +1380,7 @@ export async function callBrainPlannerWithReason(
     reason: PlannerFailureReason,
     reasonCode: InvocationReasonCode,
     message: string,
-  ): Promise<PlannerCallResult> => {
+  ): Promise<PlannerCallFailure> => {
     if (!receiptContext) return { ok: false, reason, message };
     let receipt: PlannerReceiptSession;
     try {
@@ -1319,13 +1433,29 @@ export async function callBrainPlannerWithReason(
 
   let cmdInfo: PlannerSpawnSpec;
   let nativeInvocation: ProviderPlannerInvocation | undefined;
+  const resolvedProvider = canonicalProviderFromAdapter(resolved);
+  if (!isModelExecutable(model, resolvedProvider as Parameters<typeof isModelExecutable>[1])) {
+    return rejectedBeforeDispatch(
+      {
+        resolvedProvider,
+        resolvedModel: model,
+        calledProvider: null,
+        calledModel: null,
+        transport: 'cli',
+        executionBackend: 'host-subprocess',
+        missingReason: 'execution_admission_rejected',
+      },
+      'validation_failed',
+      'execution_admission_rejected',
+      `MODEL_INACTIVE: provider=${resolvedProvider} model=${model}`,
+    );
+  }
   try {
     nativeInvocation = resolved.buildPlannerInvocation?.(prompt, model);
     cmdInfo = nativeInvocation
       ? normalizeNativePlannerInvocation(resolved, nativeInvocation, model)
       : buildPlannerSpawnArgs(resolved, prompt, model);
   } catch (e) {
-    const detail = e instanceof Error ? e.message : String(e);
     return rejectedBeforeDispatch(
       {
         resolvedProvider: canonicalProviderFromAdapter(resolved),
@@ -1338,7 +1468,7 @@ export async function callBrainPlannerWithReason(
       },
       'spawn_failed',
       'command_build_failed',
-      `Could not build planner command for provider=${resolved.name}: ${detail}`,
+      `Could not build planner command for provider=${resolved.name}`,
     );
   }
 
@@ -1368,7 +1498,14 @@ export async function callBrainPlannerWithReason(
       };
     }
     try {
-      receipt.append({ type: 'dispatch_started', payload: { attempt: 1 } });
+      receipt.append({
+        type: 'dispatch_started',
+        payload: {
+          attempt: 1,
+          calledProvider: cmdInfo.calledProvider,
+          calledModel: cmdInfo.calledModel,
+        },
+      });
     } catch {
       const receiptRef = receipt.ref;
       receipt.close();
@@ -1561,7 +1698,7 @@ export async function callBrainPlannerWithReason(
       },
       {
         type: 'consumer_settled',
-        payload: { outcome: 'accepted', reasonCode: 'none' },
+        payload: { outcome: 'accepted', reasonCode: 'none', evidenceRefs: [plannerResultEvidenceRef(parsed)] },
       },
     ],
     { ok: true, data: parsed },
@@ -1607,20 +1744,10 @@ export async function callBrainPlanner(
 
 // ─── Zero-Config AI Planner ───────────────────────────────────────
 
-// U2-G6 (PCOMP-8): the 3-5 hardcode structurally violated the 20-40-micro-task
-// law (scale_up — CC'nin kayıtlı ihlal-itirafı). The range now comes from
-// config/env; the historical 3-5 stays as the ABSOLUTE fallback so foreign
-// projects without config keep today's behavior.
-function zeroConfigTaskRange(): { min: number; max: number } {
-  const min = Number(process.env['DECKENT_PLANNER_MIN_TASKS'] ?? '') || 3;
-  const max = Number(process.env['DECKENT_PLANNER_MAX_TASKS'] ?? '') || 5;
-  return min <= max ? { min, max } : { min: 3, max: 5 };
-}
-
 /**
  * Build a prompt specifically for splitting a single natural-language description
- * into structured tasks (range from zeroConfigTaskRange()) that the AI planner
- * can assign to workers.
+ * into structured tasks under a host-derived intent/cardinality contract that
+ * the AI planner can assign to workers.
  *
  * SINGLE English prompt (PCOMP-8 U3 language unification, Alperen 2026-07-14):
  * the former TR/EN fork had drifted — the ADR-constraints block existed only in
@@ -1641,7 +1768,8 @@ const FILE_PATH_RULES = `FILE PATH RULES:
 - scope.filesRead may ONLY list files that actually exist (see the file tree when provided) — never claim a file you have not seen
 - Creating NEW files is allowed and normal — put each one under a directory-qualified path
 - Never use absolute paths, "~" or ".." segments
-- Every file path mentioned in goNogo.goCriteria/noGoCriteria MUST also appear in that task's scope.filesWrite or scope.directories — a criterion referencing an unwritable file fails the prompt gate (scope-satisfiability)`;
+- Classify every path reference by intent: a mutation target belongs in scope.filesWrite; a read-only or unchanged proof target belongs in scope.filesRead; use scope.directories only for a genuine tree-wide read/write boundary
+- Every file path mentioned in goNogo.goCriteria/noGoCriteria MUST also appear in that task's scope.filesWrite, scope.filesRead, or scope.directories with the semantic classification above — a mutation criterion still requires write authority`;
 
 /** F-1: sparse/greenfield guidance — shown INSTEAD of a file tree when the
  *  project has no visible tracked files. Deliberately avoids the literal
@@ -1649,25 +1777,29 @@ const FILE_PATH_RULES = `FILE PATH RULES:
 const GREENFIELD_NOTE = `PROJECT STATE: greenfield — no tracked files are visible yet.
 Choose conventional directories for new files (src/, tests/, docs/); every path still needs its directory prefix.`;
 
-const TERMINAL_NATIVE_PROVIDER_PROPOSAL_EXAMPLE = Object.freeze({
-  version: 1 as const,
-  changeKind: 'runtime-change' as const,
-  ...TERMINAL_NATIVE_PROVIDER_PROOF_IDENTITY,
-  disposition: Object.freeze({ kind: 'production-wiring' as const }),
-});
+function renderProductionWiringProposalRules(): string {
+  const registeredExamples = listRegisteredProductionWiringHostProofProposalIdentities().map(identity => ({
+    version: 1 as const,
+    changeKind: 'runtime-change' as const,
+    ...identity,
+    disposition: Object.freeze({ kind: 'production-wiring' as const }),
+  }));
 
-const PRODUCTION_WIRING_PROPOSAL_RULES = `PRODUCTION WIRING PROPOSAL RULES:
+  return `PRODUCTION WIRING PROPOSAL RULES:
 - For every production mutation, emit productionWiringProposal version 1 with identity fields only: changeKind, producer, canonicalConsumer, affectedIngresses, enablementAuthority, disposition, and proofTargets.
 - Never emit hostProofProgram, verifierAssets, executable paths, argv, platform support claims, probe/program/contract digests, evidenceRefs, or completion claims. Those are host-owned.
 - The host admits only exact identity tuples backed by a code-owned proof profile. Never invent or rename an identity to bypass admission.
-- Registered profile for the Terminal native-provider resolution topology (use only when the task actually changes this topology):
-${JSON.stringify(TERMINAL_NATIVE_PROVIDER_PROPOSAL_EXAMPLE)}`;
+- A registered example may be used only when the task changes its entire exact topology. Never combine, subset, extend, or alter a registered tuple.
+- Registered identity-only examples (registry-derived; no executable or digest authority):
+${JSON.stringify(registeredExamples)}`;
+}
 
 export function buildZeroConfigPlanPrompt(
   description: string,
   projectName: string,
   fileTree: string[] = [],
   modelPolicy?: PlannerTaskModelPolicy,
+  planContract: PlannerPlanContract = derivePlannerPlanContract(),
 ): string {
   const treeSection = fileTree.length > 0
     ? `\nFILE TREE (first ${Math.min(fileTree.length, 50)}):\n${fileTree.slice(0, 50).join('\n')}`
@@ -1675,29 +1807,34 @@ export function buildZeroConfigPlanPrompt(
 
   const effectiveModelPolicy = resolvePlannerTaskModelPolicy(modelPolicy);
   const modelSelection = renderPlannerModelPolicy(effectiveModelPolicy);
+  const contractRules = renderPlannerPlanContract(planContract);
 
   return `You are a software project orchestrator. A user requested a feature in natural language.
-Split this request into ${zeroConfigTaskRange().min}-${zeroConfigTaskRange().max} independent, parallel-executable tasks.
+Decompose this request only as far as the host plan contract permits.
 
 PROJECT: ${projectName}
 USER REQUEST: "${description}"${treeSection}
 
 TASK SPLITTING RULES:
-- Each task must be independently executable (parallel execution possible)
+- Each task must have one coherent owner; parallel execution is optional and comes only from the authored dependency DAG
 - Specify dependencies if any (e.g., UI depends on backend API)
-- Create exactly ${zeroConfigTaskRange().min}-${zeroConfigTaskRange().max} tasks (no more, no less)
 - Define scope (directories + filesWrite) for each task
 - EVERY task's scope.filesWrite MUST contain at least one file path — an empty filesWrite array is invalid
+- If two tasks write the same path, their authored dependencies MUST totally order every writer pair; prefer one owner when separation is unnecessary
 - A task's "title" MUST NOT contain a comma (,) character — rephrase with "and"/a dash instead
 - Write GO/NO-GO criteria for each task
 - Emit one goNogo.items object per authored criterion. Do not split free text on semicolons.
 - Every item needs a polarity, one atomic statement, and concrete evidenceRequirements.
+- Evidence grammar: file:<JSON string> proves ONLY that the exact file exists, never its contents or the truth of the statement. Use it only for existence conditions (including a NO_GO forbidden-file presence condition).
+- Semantic content, preservation, correctness and negative assertions MUST use assertion:<JSON string> describing the condition and relevant source paths. Keep GO and NO_GO conditions; never delete a failure criterion to obtain acceptance.
+- Do not mix file and assertion/command requirements in one item: deterministic file alternatives can short-circuit semantic confirmation. Assertion-only criteria remain undecidable until the configured confirmation adapter supplies genuine evidence; they are not automatic success.
 - Criterion IDs are host-derived after parsing; do not emit an id field.
-- The last task MUST be an integration/test task
+
+${contractRules}
 
 ${FILE_PATH_RULES}
 
-${PRODUCTION_WIRING_PROPOSAL_RULES}
+${renderProductionWiringProposalRules()}
 
 EXAMPLE SPLIT:
 "Add login page with Google OAuth" →
@@ -1750,7 +1887,7 @@ OUTPUT FORMAT (JSON ONLY, nothing else):
 
 /**
  * Call the AI planner with a zero-config (single natural-language) description.
- * The AI splits the description into structured tasks (range from zeroConfigTaskRange()).
+ * The AI splits the description into structured tasks under a host-derived plan contract.
  *
  * Falls back to null if the AI call fails; callers should fall back to
  * structured (single-task) mode in that case.
@@ -1758,7 +1895,7 @@ OUTPUT FORMAT (JSON ONLY, nothing else):
  * @param adapter  Optional ProviderAdapter. If omitted, uses ProviderRegistry.getDefault().
  *                 Throws if no provider is available (no silent fallback).
  */
-export async function callZeroConfigPlanner(
+export async function callZeroConfigPlannerWithReason(
   description: string,
   model: ModelType,
   projectName: string,
@@ -1768,18 +1905,41 @@ export async function callZeroConfigPlanner(
   spawnFn: PlannerSpawnFn = defaultPlannerSpawn,
   receiptContext?: PlannerReceiptContext,
   taskModelPolicy?: PlannerTaskModelPolicy,
-): Promise<PlannerResult | null> {
+  planContract: PlannerPlanContract = derivePlannerPlanContract(),
+  failureObserver?: PlannerFailureObserver,
+): Promise<PlannerCallResult> {
   const modelPolicy = resolvePlannerTaskModelPolicy(
     taskModelPolicy ?? createPlannerTaskModelPolicy(model),
   );
-  const prompt = buildZeroConfigPlanPrompt(description, projectName, fileTree, modelPolicy);
-  const resolved = resolveAdapter(adapter, model, receiptContext?.requestedProvider);
+  const prompt = buildZeroConfigPlanPrompt(description, projectName, fileTree, modelPolicy, planContract);
   const timeoutMs = timeout ?? BRAIN_PLAN_TIMEOUT_MS;
   interface ZeroConfigAttempt {
     readonly outcome: PlannerSpawnOutcome;
     readonly receipt?: PlannerReceiptSession;
     readonly durationMs: number;
+    readonly preDispatchFailure?: PlannerCallFailure;
   }
+  const evidenceFor = (
+    attempt: ZeroConfigAttempt,
+    parserStage?: string,
+  ): PlannerFailureEvidence => {
+    const { outcome } = attempt;
+    return {
+      provider: canonicalProviderFromAdapter(resolved),
+      model,
+      durationMs: attempt.durationMs,
+      exitCode: outcome.status,
+      signal: outcome.signal,
+      stdoutBytes: Buffer.byteLength(outcome.stdout, 'utf8'),
+      stderrBytes: Buffer.byteLength(outcome.stderr, 'utf8'),
+      outputDigest: framedOutputDigest([outcome.stdout, outcome.stderr]),
+      ...(parserStage ? { parserStage } : {}),
+    };
+  };
+  const fail = (failure: PlannerCallFailure): PlannerCallResult => {
+    observePlannerFailure(failureObserver, failure);
+    return failure;
+  };
   const contextForAttempt = (attempt: number): PlannerReceiptContext | undefined => {
     if (!receiptContext || attempt === 1) return receiptContext;
     const baseInvocationId = receiptContext.invocationId ?? deterministicInvocationId(receiptContext);
@@ -1791,6 +1951,81 @@ export async function callZeroConfigPlanner(
       callId: `${invocationId}:call-1`,
     };
   };
+  const rejectedBeforeDispatch = async (
+    context: PlannerReceiptContext | undefined,
+    facts: PlannerReceiptFacts,
+    reason: PlannerFailureReason,
+    reasonCode: InvocationReasonCode,
+    message: string,
+  ): Promise<PlannerCallFailure> => {
+    if (!context) {
+      return { ok: false, reason, message };
+    }
+    let receipt: PlannerReceiptSession;
+    try {
+      receipt = await beginPlannerReceipt(context, facts);
+    } catch {
+      return receiptFailure('INVOCATION_RECEIPT_DECLARE_FAILED');
+    }
+    if (!receipt.created) {
+      receipt.close();
+      return {
+        ok: false,
+        reason: 'receipt_replay_blocked',
+        message: 'INVOCATION_RECEIPT_DUPLICATE_DISPATCH_BLOCKED',
+        receiptRef: receipt.ref,
+      };
+    }
+    try {
+      receipt.append({ type: 'dispatch_rejected', payload: { reasonCode } });
+      receipt.append({ type: 'consumer_settled', payload: { outcome: 'rejected', reasonCode } });
+      return { ok: false, reason, message, receiptRef: receipt.ref };
+    } catch {
+      return receiptFailure('INVOCATION_RECEIPT_EVENT_WRITE_FAILED', receipt.ref);
+    } finally {
+      receipt.close();
+    }
+  };
+  let resolved: ProviderAdapter;
+  try {
+    resolved = resolveAdapter(adapter, model, receiptContext?.requestedProvider);
+  } catch (error) {
+    const failure = await rejectedBeforeDispatch(
+      receiptContext,
+      {
+        resolvedProvider: null,
+        resolvedModel: null,
+        calledProvider: null,
+        calledModel: null,
+        transport: 'cli',
+        executionBackend: 'host-subprocess',
+        missingReason: 'no_provider',
+      },
+      'no_providers',
+      'no_provider',
+      `Provider registry empty or missing requested provider: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return fail(failure);
+  }
+  const resolvedProvider = canonicalProviderFromAdapter(resolved);
+  if (!isModelExecutable(model, resolvedProvider as Parameters<typeof isModelExecutable>[1])) {
+    const failure = await rejectedBeforeDispatch(
+      receiptContext,
+      {
+        resolvedProvider,
+        resolvedModel: model,
+        calledProvider: null,
+        calledModel: null,
+        transport: 'cli',
+        executionBackend: 'host-subprocess',
+        missingReason: 'execution_admission_rejected',
+      },
+      'validation_failed',
+      'execution_admission_rejected',
+      `MODEL_INACTIVE: provider=${resolvedProvider} model=${model}`,
+    );
+    return fail(failure);
+  }
   const invoke = async (plannerPrompt: string, attempt: number): Promise<ZeroConfigAttempt> => {
     let nativeInvocation: ProviderPlannerInvocation | undefined;
     let spec: PlannerSpawnSpec;
@@ -1800,12 +2035,28 @@ export async function callZeroConfigPlanner(
         ? normalizeNativePlannerInvocation(resolved, nativeInvocation, model)
         : buildPlannerSpawnArgs(resolved, plannerPrompt, model);
     } catch (error) {
+      const failure = await rejectedBeforeDispatch(
+        contextForAttempt(attempt),
+        {
+          resolvedProvider,
+          resolvedModel: model,
+          calledProvider: null,
+          calledModel: null,
+          transport: 'cli',
+          executionBackend: 'host-subprocess',
+          missingReason: 'command_build_failed',
+        },
+        'spawn_failed',
+        'command_build_failed',
+        `Could not build planner command for provider=${resolved.name}`,
+      );
       return {
         outcome: {
           status: null, signal: null, stdout: '', stderr: '',
           error: error instanceof Error ? error : new Error(String(error)),
         },
         durationMs: 0,
+        preDispatchFailure: failure,
       };
     }
     let receipt: PlannerReceiptSession | undefined;
@@ -1822,6 +2073,7 @@ export async function callZeroConfigPlanner(
           missingReason: 'none',
         });
         if (!receipt.created) {
+          const receiptRef = receipt.ref;
           receipt.close();
           return {
             outcome: {
@@ -1829,9 +2081,35 @@ export async function callZeroConfigPlanner(
               error: new Error('INVOCATION_RECEIPT_DUPLICATE_DISPATCH_BLOCKED'),
             },
             durationMs: 0,
+            preDispatchFailure: {
+              ok: false,
+              reason: 'receipt_replay_blocked',
+              message: 'INVOCATION_RECEIPT_DUPLICATE_DISPATCH_BLOCKED',
+              receiptRef,
+            },
           };
         }
-        receipt.append({ type: 'dispatch_started', payload: { attempt } });
+        try {
+          receipt.append({
+            type: 'dispatch_started',
+            payload: {
+              attempt,
+              calledProvider: spec.calledProvider,
+              calledModel: spec.calledModel,
+            },
+          });
+        } catch {
+          const receiptRef = receipt.ref;
+          receipt.close();
+          return {
+            outcome: { status: null, signal: null, stdout: '', stderr: '' },
+            durationMs: 0,
+            preDispatchFailure: receiptFailure(
+              'INVOCATION_RECEIPT_PRE_DISPATCH_WRITE_FAILED',
+              receiptRef,
+            ),
+          };
+        }
       } catch (error) {
         receipt?.close();
         return {
@@ -1840,6 +2118,7 @@ export async function callZeroConfigPlanner(
             error: error instanceof Error ? error : new Error(String(error)),
           },
           durationMs: 0,
+          preDispatchFailure: receiptFailure('INVOCATION_RECEIPT_DECLARE_FAILED'),
         };
       }
     }
@@ -1870,6 +2149,7 @@ export async function callZeroConfigPlanner(
     attempt: ZeroConfigAttempt,
     consumerOutcome: 'accepted' | 'rejected',
     consumerReason: InvocationReasonCode,
+    evidenceRefs?: readonly string[],
   ): boolean => {
     if (!attempt.receipt) return true;
     const { outcome } = attempt;
@@ -1900,7 +2180,7 @@ export async function callZeroConfigPlanner(
       });
       attempt.receipt.append({
         type: 'consumer_settled',
-        payload: { outcome: consumerOutcome, reasonCode: consumerReason },
+        payload: { outcome: consumerOutcome, reasonCode: consumerReason, ...(evidenceRefs ? { evidenceRefs } : {}) },
       });
       return true;
     } catch {
@@ -1911,15 +2191,45 @@ export async function callZeroConfigPlanner(
   };
 
   const firstAttempt = await invoke(prompt, 1);
+  if (firstAttempt.preDispatchFailure) return fail(firstAttempt.preDispatchFailure);
   const result = firstAttempt.outcome;
 
   if (result.status !== 0 || !result.stdout) {
-    settle(firstAttempt, 'rejected', result.signal === 'SIGTERM' ? 'timeout' : result.error ? 'spawn_error' : result.status !== 0 ? 'nonzero_exit' : 'empty_output');
-    return null;
+    const consumerReason = result.signal === 'SIGTERM'
+      ? 'timeout'
+      : result.error
+        ? 'spawn_error'
+        : result.status !== 0
+          ? 'nonzero_exit'
+          : 'empty_output';
+    const receiptRef = firstAttempt.receipt?.ref;
+    if (!settle(firstAttempt, 'rejected', consumerReason)) {
+      return fail({
+        ok: false,
+        reason: 'receipt_failed',
+        message: 'INVOCATION_RECEIPT_SETTLEMENT_WRITE_FAILED',
+        ...(receiptRef ? { receiptRef } : {}),
+        evidence: evidenceFor(firstAttempt),
+      });
+    }
+    const reason: PlannerFailureReason = result.signal === 'SIGTERM' ? 'timeout' : 'spawn_failed';
+    return fail({
+      ok: false,
+      reason,
+      message: `provider=${canonicalProviderFromAdapter(resolved)} planner transport did not produce usable output (${consumerReason})`,
+      ...(receiptRef ? { receiptRef } : {}),
+      evidence: evidenceFor(firstAttempt),
+    });
   }
-  let detailed = parsePlannerResponseDetailed(result.stdout, resolved, {
-    projectRoot: receiptContext?.projectRoot ?? process.cwd(),
-  });
+  const plannerProjectRoot = receiptContext?.projectRoot ?? process.cwd();
+  let detailed = normalizeDetailedPlannerResult(
+    parsePlannerResponseDetailed(result.stdout, resolved, {
+      projectRoot: plannerProjectRoot,
+      planContract,
+    }),
+    plannerProjectRoot,
+    fileTree,
+  );
   let acceptedAttempt = firstAttempt;
 
   // U2 (PCOMP-8) + 3332: ONE corrective round-trip for every output-contract
@@ -1928,52 +2238,106 @@ export async function callZeroConfigPlanner(
   // The retry names the exact violation (secret-safe paths, codes, model API
   // IDs) and restates the contract; a second violation settles typed and returns
   // null, which upstream reports honestly instead of as "provider unavailable".
-  let violation = describePlannerContractViolation(detailed, modelPolicy);
+  let violation = describePlannerContractViolation(detailed, modelPolicy, planContract, fileTree);
   if (violation) {
     debugLog('planner:contractViolation', `attempt 1 rejected — ${violation.description}`);
-    if (!settle(firstAttempt, 'rejected', violation.reasonCode)) return null;
+    const firstReceiptRef = firstAttempt.receipt?.ref;
+    if (!settle(firstAttempt, 'rejected', violation.reasonCode)) {
+      return fail({
+        ok: false,
+        reason: 'receipt_failed',
+        message: 'INVOCATION_RECEIPT_SETTLEMENT_WRITE_FAILED',
+        ...(firstReceiptRef ? { receiptRef: firstReceiptRef } : {}),
+        evidence: evidenceFor(firstAttempt),
+      });
+    }
     const retryPrompt = `${prompt}\n\nYOUR PREVIOUS RESPONSE WAS INVALID (${violation.description}). Respond again with ONLY the requested JSON schema and no other text. The "dependencies" array must contain the exact task title strings of OTHER tasks in this plan — never task numbers. Every task "model" must be exactly one of these allowed API IDs: ${modelPolicy.allowedModels.join(', ')}.`;
     const retryAttempt = await invoke(retryPrompt, 2);
+    if (retryAttempt.preDispatchFailure) return fail(retryAttempt.preDispatchFailure);
     const retry = retryAttempt.outcome;
     const retryTransportOk = retry.status === 0 && Boolean(retry.stdout);
     if (retryTransportOk) {
-      detailed = parsePlannerResponseDetailed(retry.stdout, resolved, {
-        projectRoot: receiptContext?.projectRoot ?? process.cwd(),
-      });
-      violation = describePlannerContractViolation(detailed, modelPolicy);
+      detailed = normalizeDetailedPlannerResult(
+        parsePlannerResponseDetailed(retry.stdout, resolved, {
+          projectRoot: plannerProjectRoot,
+          planContract,
+        }),
+        plannerProjectRoot,
+        fileTree,
+      );
+      violation = describePlannerContractViolation(detailed, modelPolicy, planContract, fileTree);
     }
     if (!retryTransportOk || violation || !detailed.result) {
       if (violation) debugLog('planner:contractViolation', `attempt 2 rejected — ${violation.description}`);
-      settle(
+      const retryReceiptRef = retryAttempt.receipt?.ref;
+      const retryConsumerReason = retryTransportOk
+        ? (violation?.reasonCode ?? 'parse_failed')
+        : retry.signal === 'SIGTERM' ? 'timeout' : retry.error ? 'spawn_error' : retry.status !== 0 ? 'nonzero_exit' : 'empty_output';
+      if (!settle(
         retryAttempt,
         'rejected',
-        retryTransportOk
-          ? (violation?.reasonCode ?? 'parse_failed')
-          : retry.signal === 'SIGTERM' ? 'timeout' : retry.error ? 'spawn_error' : retry.status !== 0 ? 'nonzero_exit' : 'empty_output',
-      );
-      return null;
+        retryConsumerReason,
+      )) {
+        return fail({
+          ok: false,
+          reason: 'receipt_failed',
+          message: 'INVOCATION_RECEIPT_SETTLEMENT_WRITE_FAILED',
+          ...(retryReceiptRef ? { receiptRef: retryReceiptRef } : {}),
+          evidence: evidenceFor(retryAttempt),
+        });
+      }
+      const reason: PlannerFailureReason = retryTransportOk
+        ? (violation?.reasonCode ?? 'parse_failed')
+        : retry.signal === 'SIGTERM'
+          ? 'timeout'
+          : 'spawn_failed';
+      const parserStage = retryTransportOk
+        ? `planner-${detailed.failure?.stage ?? (violation?.reasonCode === 'validation_failed' ? 'contract' : 'json')}`
+        : undefined;
+      return fail({
+        ok: false,
+        reason,
+        message: retryTransportOk
+          ? `provider=${canonicalProviderFromAdapter(resolved)} ${violation?.description ?? 'planner output was rejected'}`
+          : `provider=${canonicalProviderFromAdapter(resolved)} planner retry transport did not produce usable output (${retryConsumerReason})`,
+        ...(retryReceiptRef ? { receiptRef: retryReceiptRef } : {}),
+        evidence: evidenceFor(retryAttempt, parserStage),
+      });
     }
     acceptedAttempt = retryAttempt;
   }
-  let parsed: PlannerResult = detailed.result!;
+  const acceptedReceiptRef = acceptedAttempt.receipt?.ref;
+  if (!settle(acceptedAttempt, 'accepted', 'none', [plannerResultEvidenceRef(detailed.result!)])) {
+    const receiptRef = acceptedAttempt.receipt?.ref;
+    return fail({
+      ok: false,
+      reason: 'receipt_failed',
+      message: 'INVOCATION_RECEIPT_SETTLEMENT_WRITE_FAILED',
+      ...(receiptRef ? { receiptRef } : {}),
+      evidence: evidenceFor(acceptedAttempt),
+    });
+  }
+  return { ok:true, data:detailed.result!, ...(acceptedReceiptRef ? { receiptRef:acceptedReceiptRef } : {}) };
+}
 
-  // U2 output-contract completion (deterministic): filesRead mentioned+import
-  // completion + mirror-test create-if-missing. Fail-soft I/O — a completion
-  // that cannot run leaves the plan as-is.
-  try {
-    const cwd = process.cwd();
-    const ls = spawnSync('git', ['ls-files'], { encoding: 'utf-8', cwd });
-    const trackedFiles = ls.status === 0 ? ls.stdout.trim().split('\n') : [];
-    if (trackedFiles.length > 0) {
-      parsed = normalizePlannerResult(parsed, {
-        trackedFiles,
-        readFile: (rel) => { try { return readFileSync(join(cwd, rel), 'utf-8'); } catch { return null; } },
-      });
-    }
-  } catch { /* normalization is best-effort; linter W-checks remain witnesses */ }
-
-  if (!settle(acceptedAttempt, 'accepted', 'none')) return null;
-  return parsed;
+/** Legacy compatibility wrapper: missing provider still throws; other typed failures collapse to null. */
+export async function callZeroConfigPlanner(
+  description: string,
+  model: ModelType,
+  projectName: string,
+  fileTree: string[] = [],
+  adapter?: ProviderAdapter,
+  timeout?: number,
+  spawnFn: PlannerSpawnFn = defaultPlannerSpawn,
+  receiptContext?: PlannerReceiptContext,
+  taskModelPolicy?: PlannerTaskModelPolicy,
+  planContract: PlannerPlanContract = derivePlannerPlanContract(),
+  failureObserver?: PlannerFailureObserver,
+): Promise<PlannerResult | null> {
+  const result = await callZeroConfigPlannerWithReason(description,model,projectName,fileTree,adapter,timeout,spawnFn,receiptContext,taskModelPolicy,planContract,failureObserver);
+  if (result.ok) return result.data;
+  if (result.reason === 'no_providers') throw new ProviderError(result.message, adapter?.name ?? '');
+  return null;
 }
 
 // ─── Bug Y2: Plan-time Ground-Truth Audit (Sprint 166) ───────────────

@@ -162,7 +162,7 @@ describe('boot-time native engine failure is worded as a boot outcome, not a swi
     expect(entry).toMatch(/registerReplTeardown,\s*emitHealth\)/);
     expect(run).toMatch(/resolveNativeProvider[\s\S]*bootHealthSelection[\s\S]*onBootSelection/);
     expect(run).toContain('onBootSelection?.(bootHealthSelection, terminalGlyphs)');
-    expect(entry).toMatch(/emitHealth = async \([\s\S]*glyphs\?: TerminalGlyphs[\s\S]*renderHealthSnapshot\(snapshot, replLang, glyphs \? \{ glyphs \} : \{\}\)/);
+    expect(entry).toMatch(/emitHealth(?:: BootHealthEmitter)? = async \([\s\S]*glyphs\?: TerminalGlyphs[\s\S]*renderHealthSnapshot\(snapshot, replLang, glyphs \? \{ glyphs \} : \{\}\)/);
   });
 
   it('keeps a one-argument boot callback structurally compatible with the optional glyph argument', async () => {

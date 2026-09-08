@@ -37,6 +37,83 @@ vi.mock('../../src/orchestra/planner.js', () => ({
       goNogo: { goCriteria: 'The planned change works.', noGoCriteria: 'The planned change breaks.', techDebtAcceptable: '' },
     }],
   })),
+  callZeroConfigPlannerWithReason: vi.fn(async (
+    _description: string,
+    _model: string,
+    _projectName: string,
+    _fileTree: string[],
+    _adapter: unknown,
+    _timeout: number,
+    _spawn: unknown,
+    receiptContext: {
+      tenantId: string;
+      projectRoot: string;
+      runId: string;
+      configuredProvider?: string | null;
+      configuredModel?: string | null;
+    },
+  ) => {
+    const data = {
+      reasoning: 'canned single-task plan (hermetic planner boundary)',
+      tasks: [{
+        title: 'Planned task',
+        description: 'Canned single-task plan for RunFlow tests (429-001 planner-seam).',
+        scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/planned.ts'] },
+        dependencies: [],
+        model: 'claude-sonnet-5', effort: 'normal', priority: 'NORMAL', reason: 'canned',
+        goNogo: { goCriteria: 'The planned change works.', noGoCriteria: 'The planned change breaks.', techDebtAcceptable: '' },
+      }],
+    };
+    const [{ InvocationReceiptStore }, { createHash }, { canonicalJson }] = await Promise.all([
+      import('../../src/core/invocation-receipt-store.js'),
+      import('node:crypto'),
+      import('../../src/core/audit-writer.js'),
+    ]);
+    const store = new InvocationReceiptStore(receiptContext.projectRoot);
+    const invocationId = `fixture-${createHash('sha256').update(receiptContext.runId).digest('hex').slice(0, 24)}`;
+    const provider = receiptContext.configuredProvider ?? 'codex';
+    const model = receiptContext.configuredModel ?? 'gpt-5.6-sol';
+    const receipt = {
+      schemaVersion: 1 as const,
+      invocationId,
+      idempotencyKey: invocationId,
+      tenantId: receiptContext.tenantId,
+      projectId: store.projectId,
+      runId: receiptContext.runId,
+      taskId: null,
+      callId: `${invocationId}:call`,
+      role: 'brain' as const,
+      purpose: 'sprint-planning' as const,
+      configured: { provider, model, source: 'config' as const, reasonCode: 'none' as const },
+      requested: { provider, model, source: 'config' as const, reasonCode: 'none' as const },
+      resolved: { provider, model, source: 'config' as const, reasonCode: 'none' as const },
+      called: { provider, model, source: 'wire' as const, reasonCode: 'none' as const },
+      backend: { transport: 'cli' as const, executionBackend: 'host-subprocess' as const },
+      auth: { mode: 'subscription' as const, accountRefHash: null },
+      fallbackChain: [],
+      reachability: { state: 'known' as const, evidenceRef: 'fixture:reachability' },
+      limits: { state: 'known' as const, evidenceRefs: ['fixture:limits'] },
+      createdAt: '2026-09-08T00:00:00.000Z',
+    };
+    const declaration = store.declare(receipt);
+    store.append(receipt, invocationId, {
+      eventId: `${invocationId}:dispatch`, type: 'dispatch_started',
+      payload: { attempt: 1, calledProvider: provider, calledModel: model },
+    });
+    store.append(receipt, invocationId, {
+      eventId: `${invocationId}:transport`, type: 'transport_settled',
+      payload: { outcome: 'succeeded', exitCode: 0, signal: null, reasonCode: 'none', durationMs: 1 },
+    });
+    store.append(receipt, invocationId, {
+      eventId: `${invocationId}:consumer`, type: 'consumer_settled',
+      payload: {
+        outcome: 'accepted', reasonCode: 'none',
+        evidenceRefs: [`planner-result:sha256:${createHash('sha256').update(canonicalJson(data)).digest('hex')}`],
+      },
+    });
+    store.close();
+    return { ok: true as const, data, receiptRef: declaration.ref };
+  }),
 }));
 
 vi.mock('../../src/orchestra/brain.js', () => ({
@@ -50,13 +127,20 @@ import {
   resolveRunFlowCardActive,
   resolveInboxCardActive,
   formatRunFlowOutcomeLine,
+  formatRunFlowError,
+  runReplDoSlash,
 } from '../../src/cli/repl/app.js';
-import { wireRunFlowMount, buildRunFlowMountLabels } from '../../src/cli/repl/run.js';
+import {
+  wireRunFlowMount,
+  buildRunFlowMountLabels,
+  buildPlannerEvidenceRefusalRenderer,
+} from '../../src/cli/repl/run.js';
 import { createRunFlowController, type RunFlowController, type RunFlowControllerDeps } from '../../src/cli/repl/run-flow-controller.js';
 import { loadApprovedSnapshot, loadRunHandle } from '../../src/core/run-flow-store.js';
 import type { RunFlowContext } from '../../src/core/run-flow-contract.js';
 import type { RunHandle } from '../../src/orchestra/run-job-service.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
+import { formatPlannerEvidenceRefusal } from '../../src/cli/helpers/planner-evidence-presentation.js';
 
 /** en mount labels — app.tsx owns no default object since TERMINAL-TOOLS-002. */
 const EN_MOUNT_LABELS = buildRunFlowMountLabels((k) => getMessage(k, 'en'));
@@ -215,6 +299,55 @@ describe('formatRunFlowOutcomeLine', () => {
       started: '{jobId} başlatıldı', rejected: 'reddedildi', error: 'hata: {error}',
     };
     expect(formatRunFlowOutcomeLine({ kind: 'started', jobId: 'x' }, trLabels)).toBe('x başlatıldı');
+  });
+});
+
+describe('native planner-evidence refusal presentation', () => {
+  const codes = [
+    'PLANNER_EVIDENCE_HOLD',
+    'PLANNER_EVIDENCE_REPLAN_REQUIRED',
+    'EXACT_START_PLANNER_EVIDENCE_HOLD',
+    'EXACT_START_PLANNER_EVIDENCE_REPLAN_REQUIRED',
+  ] as const;
+
+  it.each(['en', 'tr'] as const)('%s mounted /do reports all refusal codes without raw evidence', async (lang) => {
+    for (const code of codes) {
+      const hostile = Object.assign(new Error('SECRET receipt /private/path'), { code });
+      const controller = fakeController();
+      vi.mocked(controller.proposeRun).mockRejectedValueOnce(hostile);
+      const reportError = vi.fn();
+
+      await runReplDoSlash('continue safely', {
+        controller,
+        labels: { flagOff: 'off', usage: 'usage', noProviders: 'provider' },
+        emit: vi.fn(),
+        setPreview: vi.fn(),
+        reportError,
+        renderPlannerEvidenceRefusal: (error) => formatPlannerEvidenceRefusal(
+          error,
+          (key) => getMessage(key, lang),
+        ),
+      });
+
+      expect(reportError).toHaveBeenCalledWith(expect.stringContaining(code));
+      expect(String(reportError.mock.calls[0]![0])).not.toContain('SECRET');
+    }
+  });
+
+  it('keeps unknown mounted errors on the established path', () => {
+    const error = Object.assign(new Error('existing error'), { code: 'UNKNOWN' });
+    expect(formatRunFlowError(error, (value) => formatPlannerEvidenceRefusal(
+      value,
+      (key) => getMessage(key, 'en'),
+    ))).toBe('existing error');
+  });
+
+  it.each(['en', 'tr'] as const)('%s production renderer binds catalog text for the App', (lang) => {
+    const render = buildPlannerEvidenceRefusalRenderer((key) => getMessage(key, lang));
+    const error = Object.assign(new Error('SECRET'), { code: 'PLANNER_EVIDENCE_HOLD' });
+
+    expect(render(error)).toBe(formatPlannerEvidenceRefusal(error, (key) => getMessage(key, lang)));
+    expect(render(error)).not.toContain('SECRET');
   });
 });
 

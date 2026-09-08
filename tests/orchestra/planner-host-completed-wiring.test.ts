@@ -10,8 +10,13 @@ import {
   productionWiringContractV2InputFromCanonical,
 } from '../../src/core/production-wiring-contract.js';
 import {
+  listRegisteredProductionWiringHostProofProposalIdentities,
+  MEMORY_COMPACT_READ_EXPORT_PROOF_IDENTITY,
+  TERMINAL_NATIVE_AUTH_HEALTH_PROOF_IDENTITY,
+  TERMINAL_NATIVE_BOOT_HEALTH_PROOF_IDENTITY,
   PRODUCTION_WIRING_HOST_PROOF_PLATFORMS,
   TERMINAL_NATIVE_PROVIDER_PROOF_IDENTITY,
+  TERMINAL_REPL_SURFACE_PROOF_IDENTITY,
 } from '../../src/core/production-wiring-host-proof.js';
 import {
   buildPlanPrompt,
@@ -198,7 +203,30 @@ describe('planner host-completed production wiring', () => {
     });
   });
 
-  it('both planner prompts request identities only and publish the registered tuple', () => {
+  it('discards a model wiring proposal when host scope proves wiring is not applicable', () => {
+    const envelope = JSON.parse(plannerEnvelope({
+      ...terminalProposal(), producer: { producerId: 'invented' },
+    })) as { tasks: Array<Record<string, unknown>> };
+    envelope.tasks[0]!.scope = {
+      directories: ['docs'],
+      filesRead: [],
+      filesWrite: ['docs/CANARY-RESULT.md'],
+    };
+
+    const parsed = parsePlannerResponseDetailed(JSON.stringify(envelope), undefined, {
+      projectRoot: process.cwd(),
+    });
+
+    expect(parsed.failure).toBeUndefined();
+    expect(parsed.result?.tasks[0]?.productionWiringApplicability).toEqual({
+      state: 'not-applicable',
+      reasonCode: 'documentation-only-scope',
+    });
+    expect(parsed.result?.tasks[0]?.productionWiring).toBeUndefined();
+    expect(parsed.result?.tasks[0]).not.toHaveProperty('productionWiringProposal');
+  });
+
+  it('both planner prompts request identities only and publish every real registry tuple', () => {
     const context = {
       directives: 'Unify native provider resolution',
       memory: '', patterns: '', retro: '', decisions: '', projectIdentity: '',
@@ -212,10 +240,24 @@ describe('planner host-completed production wiring', () => {
 
     for (const prompt of prompts) {
       expect(prompt).toContain('"productionWiringProposal"');
-      expect(prompt).toContain(TERMINAL_NATIVE_PROVIDER_PROOF_IDENTITY.producer.producerId);
       expect(prompt).not.toContain('"hostProofProgram"');
       expect(prompt).not.toContain('sha256:<64 lowercase hex>');
+      for (const identity of listRegisteredProductionWiringHostProofProposalIdentities()) {
+        expect(prompt).toContain(identity.producer.producerId);
+        expect(prompt).toContain(identity.canonicalConsumer.consumerId);
+      }
     }
+
+    const registered = listRegisteredProductionWiringHostProofProposalIdentities();
+    expect(registered).toEqual(expect.arrayContaining([
+      TERMINAL_NATIVE_AUTH_HEALTH_PROOF_IDENTITY,
+      TERMINAL_NATIVE_PROVIDER_PROOF_IDENTITY,
+      TERMINAL_NATIVE_BOOT_HEALTH_PROOF_IDENTITY,
+      TERMINAL_REPL_SURFACE_PROOF_IDENTITY,
+      MEMORY_COMPACT_READ_EXPORT_PROOF_IDENTITY,
+    ]));
+    expect(new Set(registered.map(identity => JSON.stringify(identity))).size)
+      .toBe(registered.length);
   });
 
   it('preserves host-completed authority through compiler and structured DIRECTIVES admission', async () => {

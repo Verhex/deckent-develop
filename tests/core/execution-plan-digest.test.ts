@@ -6,9 +6,12 @@ import {
   computeExecutionPlanDigestByVersion,
   computeExecutionPlanDigestV3,
   computeExecutionPlanDigestV4,
+  computeExecutionPlanDigestV5,
   EXECUTION_PLAN_DIGEST_VERSION,
   EXECUTION_PLAN_DIGEST_VERSION_V2,
   EXECUTION_PLAN_DIGEST_VERSION_V3,
+  EXECUTION_PLAN_DIGEST_VERSION_V4,
+  EXECUTION_PLAN_DIGEST_VERSION_V5,
 } from '../../src/core/execution-plan-digest.js';
 import type { ExecutionBudgetPolicyConfig, ResolvedConfig } from '../../src/core/config-types.js';
 import type { Sprint, Task } from '../../src/core/types.js';
@@ -295,6 +298,35 @@ describe('execution plan digest v4 structured-criterion binding', () => {
       .toBe(computeExecutionPlanDigestV4(left, context).digest);
     expect(computeExecutionPlanDigestV4(reorderedCriteria, context).digest)
       .not.toBe(computeExecutionPlanDigestV4(left, context).digest);
+  });
+});
+
+describe('execution plan digest v5 planner authority binding', () => {
+  const planningEvidence = {
+    kind: 'accepted-planner-invocation' as const,
+    binding: {
+      schemaVersion: 1 as const, flowId: 'flow-a', revision: 1,
+      receiptRef: { schemaVersion: 1 as const, invocationId: 'inv-a', tenantId: 'tenant-a', projectId: 'project-a' },
+      receiptSha256: '1'.repeat(64), terminalEventHash: '2'.repeat(64), plannerResultSha256: '3'.repeat(64), directivesSha256: '4'.repeat(64),
+    },
+  };
+  it('binds planner and source authority while preserving explicit historical dispatch', () => {
+    const planned = sprint();
+    const context = { ...buildExecutionPlanDigestContext(config(), 'subscription', 4), planningEvidence, sourceAuthoritySha256: '5'.repeat(64) };
+    const v5 = computeExecutionPlanDigestV5(planned, context);
+    expect(v5.version).toBe(EXECUTION_PLAN_DIGEST_VERSION_V5);
+    expect(computeExecutionPlanDigestByVersion(EXECUTION_PLAN_DIGEST_VERSION_V5, planned, context).digest).toBe(v5.digest);
+    expect(computeExecutionPlanDigestByVersion(EXECUTION_PLAN_DIGEST_VERSION_V4, planned, context).digest).toBe(computeExecutionPlanDigestV4(planned, context).digest);
+    expect(computeExecutionPlanDigestV4(planned, context).projection).not.toHaveProperty('planningEvidence');
+    expect(computeExecutionPlanDigestV5(planned, { ...context, sourceAuthoritySha256: '6'.repeat(64) }).digest).not.toBe(v5.digest);
+    expect(computeExecutionPlanDigestV5(planned, { ...context, planningEvidence: { ...planningEvidence, binding: { ...planningEvidence.binding, terminalEventHash: '7'.repeat(64) } } }).digest).not.toBe(v5.digest);
+  });
+  it('rejects missing or malformed V5 authority without changing legacy defaults', () => {
+    const planned = sprint();
+    const context = buildExecutionPlanDigestContext(config(), 'subscription', 4);
+    expect(computeExecutionPlanDigest(planned, context).version).toBe(EXECUTION_PLAN_DIGEST_VERSION_V2);
+    expect(() => computeExecutionPlanDigestV5(planned, context)).toThrow(/planningEvidence/u);
+    expect(() => computeExecutionPlanDigestV5(planned, { ...context, planningEvidence, sourceAuthoritySha256: 'bad' })).toThrow(/sourceAuthoritySha256/u);
   });
 });
 

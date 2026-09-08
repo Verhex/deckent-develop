@@ -86,6 +86,7 @@ import { resolveCallerTenant, TenantScopeError } from '../core/principal.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
 import { preflightApiBrainProviderAuthority } from './provider-authority-ingress.js';
 import { attendedExecutionProjectId } from '../core/attended-execution-approval.js';
+import { resolvePlannerEvidenceRefusal } from '../core/planner-evidence-refusal.js';
 
 // PRINCIPAL-001 P1a: the API principal's provenance rides into the actor —
 // authorization can now SEE whether it is trusting verified claims, merely
@@ -168,6 +169,17 @@ function sendJson(res: ServerResponse, data: unknown, status = 200): void {
 
 function sendError(res: ServerResponse, status: number, message: string): void {
   sendJson(res, { error: message }, status);
+}
+
+function sendPlannerEvidenceError(res: ServerResponse, error: unknown): boolean {
+  const refusal = resolvePlannerEvidenceRefusal(error);
+  if (!refusal) return false;
+  sendJson(res, {
+    error: refusal.code,
+    code: refusal.code,
+    nextAction: refusal.nextAction,
+  }, 409);
+  return true;
 }
 
 /** Mirrors run-flow-controller.ts's own defaultRecommendation — duplicated
@@ -313,6 +325,7 @@ async function handlePropose(
     sendJson(res, result.context, 201);
     return true;
   } catch (err) {
+    if (sendPlannerEvidenceError(res, err)) return true;
     // A proposal that cannot be planned is a typed failure, never a
     // silently degraded scaffold (mirrors RunProposalPlanError's own
     // contract) — nothing is persisted to flowStore for a failed proposal.
@@ -378,6 +391,7 @@ function handleDecision(
       actor: apiPrincipalToActor(principal),
     });
   } catch (err) {
+    if (sendPlannerEvidenceError(res, err)) return true;
     if (
       err instanceof RunFlowDecisionError ||
       err instanceof RunFlowTransitionError ||
@@ -472,6 +486,7 @@ function handleStart(
     }, 202);
     return true;
   } catch (err) {
+    if (sendPlannerEvidenceError(res, err)) return true;
     if (
       err instanceof RunJobError ||
       err instanceof RunFlowTransitionError ||

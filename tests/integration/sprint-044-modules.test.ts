@@ -10,7 +10,11 @@ import { tmpdir } from 'node:os';
 import { detectEnvironment } from '../../src/core/environment.js';
 import { Connector } from '../../src/orchestra/connector.js';
 import { routeTask } from '../../src/orchestra/task-router.js';
-import { showSplash, KRAKEN_ASCII } from '../../src/cli/helpers/splash.js';
+import {
+  showSplash,
+  KRAKEN_ASCII,
+  KRAKEN_PRINTABLE_ASCII,
+} from '../../src/cli/helpers/splash.js';
 import { formatRichSprintSummary } from '../../src/cli/helpers/sprint-summary-rich.js';
 import { createDefaultConfig } from '../../src/core/config.js';
 import { parseDeckFile, createDeckTemplate, KNOWN_DECK_KEYS } from '../../src/core/deck-file.js';
@@ -75,6 +79,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
@@ -101,14 +106,40 @@ describe('Full init flow', () => {
     expect(KNOWN_DECK_KEYS.length).toBe(9);
   });
 
-  it('showSplash() returns string with KRAKEN_ASCII and DECKENT text', () => {
+  it('showSplash() renders the Unicode Kraken in an explicit UTF-8 terminal', () => {
+    vi.stubEnv('LC_ALL', 'en_US.UTF-8');
+    vi.stubEnv('LC_CTYPE', 'en_US.UTF-8');
+    vi.stubEnv('LANG', 'en_US.UTF-8');
+    vi.stubEnv('TERM', 'xterm-256color');
+    vi.stubEnv('DECKENT_ASCII', '0');
+    vi.stubEnv('NO_COLOR', '1');
+    vi.stubEnv('FORCE_COLOR', undefined);
+    vi.stubEnv('COLORTERM', undefined);
+
     const output = showSplash('1.0.0');
     expect(output).toContain('DECKENT');
-    // The raw ASCII lines should be embedded in the output
     for (const line of KRAKEN_ASCII.split('\n').filter(l => l.trim())) {
-      // The colored version wraps each line, so check the trimmed content exists
       expect(output).toContain(line.trim());
     }
+    expect(output).toContain('1.0.0');
+  });
+
+  it('showSplash() renders the printable Kraken when ASCII is explicitly forced', () => {
+    vi.stubEnv('LC_ALL', 'en_US.UTF-8');
+    vi.stubEnv('LC_CTYPE', 'en_US.UTF-8');
+    vi.stubEnv('LANG', 'en_US.UTF-8');
+    vi.stubEnv('TERM', 'xterm-256color');
+    vi.stubEnv('DECKENT_ASCII', '1');
+    vi.stubEnv('NO_COLOR', '1');
+    vi.stubEnv('FORCE_COLOR', undefined);
+    vi.stubEnv('COLORTERM', undefined);
+
+    const output = showSplash('1.0.0');
+    expect(output).toContain('DECKENT');
+    for (const line of KRAKEN_PRINTABLE_ASCII.split('\n').filter(l => l.trim())) {
+      expect(output).toContain(line.trim());
+    }
+    expect(output).not.toContain('▄████▄');
     expect(output).toContain('1.0.0');
   });
 });

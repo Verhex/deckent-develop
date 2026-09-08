@@ -39,6 +39,7 @@ import {
 } from '../core/run-flow-store.js';
 import type {
   RunFlowContext,
+  RunFlowPlanSourceAuthority,
   RunFlowProjectionAdoptionRecord,
   StartAttemptRecord,
 } from '../core/run-flow-contract.js';
@@ -57,7 +58,9 @@ import type { Sprint } from '../core/types.js';
 import { validateTaskId } from '../core/validators.js';
 import {
   computeExecutionPlanDigestByVersion,
+  EXECUTION_PLAN_DIGEST_VERSION_V5,
 } from '../core/execution-plan-digest.js';
+import { verifyPlannerInvocationBinding } from '../core/planner-invocation-binding.js';
 import type { PlanPreview } from '../core/run-flow-contract.js';
 import {
   prepareAndSpawnExactRun,
@@ -74,6 +77,8 @@ export type RunFlowDecisionRefusalCode =
   | 'PLANNED_SPRINT_MISSING'
   | 'PLANNED_SPRINT_DIGEST_MISMATCH'
   | 'TOPOLOGY_BLOCKED'
+  | 'PLANNER_EVIDENCE_HOLD'
+  | 'PLANNER_EVIDENCE_REPLAN_REQUIRED'
   | 'ADOPTION_AUTHORITY_MISMATCH'
   | 'NOT_APPROVED'
   | 'RETIRE_NOT_APPROVED'
@@ -87,9 +92,107 @@ export class RunFlowDecisionError extends Error {
   constructor(
     readonly code: RunFlowDecisionRefusalCode,
     message: string,
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
     this.name = 'RunFlowDecisionError';
+  }
+}
+
+function verifyPlanningAuthority(
+  projectRoot: string,
+  flowId: string,
+  planned: NonNullable<ReturnType<typeof loadPlannedSprint>>,
+): void {
+  const authority = planned.sourceAuthority as RunFlowPlanSourceAuthority | undefined;
+  if (!authority || typeof authority !== 'object' || Array.isArray(authority)) {
+    throw new RunFlowDecisionError(
+      'PLANNER_EVIDENCE_REPLAN_REQUIRED',
+      'run-flow: accepted planner evidence is unavailable; create a fresh plan',
+    );
+  }
+  if (authority.schemaVersion === 1) {
+    if (authority.sourceKind === 'directives') {
+      if (
+        planned.planDigestVersion === EXECUTION_PLAN_DIGEST_VERSION_V5
+        || planned.planDigestContext?.planningEvidence !== undefined
+        || planned.planDigestContext?.sourceAuthoritySha256 !== undefined
+      ) {
+        throw new RunFlowDecisionError(
+          'PLANNER_EVIDENCE_HOLD',
+          'run-flow: v5 planning evidence cannot be downgraded to legacy directives authority',
+        );
+      }
+      return;
+    }
+    if (authority.sourceKind === 'intent') {
+      throw new RunFlowDecisionError(
+        'PLANNER_EVIDENCE_REPLAN_REQUIRED',
+        'run-flow: accepted planner evidence is unavailable; create a fresh plan',
+      );
+    }
+  }
+  if (
+    authority.schemaVersion !== 2
+    || (authority.sourceKind !== 'intent' && authority.sourceKind !== 'directives')
+  ) {
+    throw new RunFlowDecisionError(
+      'PLANNER_EVIDENCE_HOLD',
+      'run-flow: planning authority envelope is invalid',
+    );
+  }
+
+  const context = planned.planDigestContext;
+  const evidence = authority.planningEvidence;
+  if (
+    planned.planDigestVersion !== EXECUTION_PLAN_DIGEST_VERSION_V5
+    || !context
+    || !evidence
+    || typeof evidence !== 'object'
+    || canonicalJson(context.planningEvidence) !== canonicalJson(evidence)
+    || context.sourceAuthoritySha256 !== createHash('sha256').update(canonicalJson(authority)).digest('hex')
+  ) {
+    throw new RunFlowDecisionError(
+      'PLANNER_EVIDENCE_HOLD',
+      'run-flow: planning evidence does not match the exact plan authority',
+    );
+  }
+  if (authority.sourceKind === 'directives') {
+    if (
+      evidence.kind !== 'not-applicable'
+      || evidence.sourceKind !== 'directives'
+    ) {
+      throw new RunFlowDecisionError(
+        'PLANNER_EVIDENCE_HOLD',
+        'run-flow: directives plan carries invalid planner evidence',
+      );
+    }
+    return;
+  }
+  const proposal = planned.proposal;
+  if (
+    evidence.kind !== 'accepted-planner-invocation'
+    || !proposal
+    || proposal.flowId !== flowId
+    || proposal.revision !== planned.revision
+  ) {
+    throw new RunFlowDecisionError(
+      'PLANNER_EVIDENCE_HOLD',
+      'run-flow: accepted planner evidence is incomplete',
+    );
+  }
+  try {
+    verifyPlannerInvocationBinding(projectRoot, evidence.binding, {
+      flowId,
+      revision: planned.revision,
+      tenantId: proposal.tenant,
+    });
+  } catch (cause) {
+    throw new RunFlowDecisionError(
+      'PLANNER_EVIDENCE_HOLD',
+      'run-flow: accepted planner evidence could not be verified',
+      { cause },
+    );
   }
 }
 
@@ -120,6 +223,7 @@ function loadAndVerifyPlannedSprint(
       'run-flow: exact planned sprint record missing for this revision/digest',
     );
   }
+  verifyPlanningAuthority(projectRoot, flowId, planned);
   if (preview.planDigestVersion !== undefined) {
     const context = planned.planDigestContext;
     let digestResult;
@@ -547,7 +651,7 @@ export function startRunFlow(
     throw new RunFlowDecisionError('NOT_APPROVED', `run-flow: flow is ${existing.state}, not APPROVED`);
   }
 
-  loadAndVerifyPlannedSprint(projectRoot, flowId, {
+  const planned = loadAndVerifyPlannedSprint(projectRoot, flowId, {
     revision: snapshot.revision,
     planDigest: snapshot.planDigest,
     ...(existing.preview?.planDigestVersion !== undefined
@@ -562,6 +666,12 @@ export function startRunFlow(
     throw new RunFlowDecisionError(
       'PLANNED_SPRINT_MISSING',
       'run-flow: durable approved exact snapshot is missing',
+    );
+  }
+  if (canonicalJson(stored.sourceAuthority) !== canonicalJson(planned.sourceAuthority)) {
+    throw new RunFlowDecisionError(
+      'PLANNER_EVIDENCE_HOLD',
+      'run-flow: approved planning authority does not match the planned record',
     );
   }
   const result = prepareAndSpawnExactRun({

@@ -58,14 +58,10 @@ import { recoverBacklog } from '../../orchestra/autonomous/execution-pool.js';
 import { atomicWriteFileSync } from '../../agents/worker-lifecycle.js';
 import type { BacklogEntry } from '../../orchestra/autonomous/backlog-types.js';
 import { runTaskMode } from '../../orchestra/task-mode-runner.js';
-import { runSprint as runSprintLifecycle } from '../../orchestra/sprint-controller.js';
 import {
-  createCanonicalExactSprintExecutor,
   type CanonicalExactSprintExecutionOutcome,
-  type ExactStartAuthorizationVerifier,
 } from '../../orchestra/exact-plan-start-service.js';
-import { captureGitBase } from '../../orchestra/run-diff-service.js';
-import { createRunFlowCoordinator } from '../../orchestra/run-flow-coordinator.js';
+import { createLiveExactSprintExecutor } from '../helpers/exact-sprint-runtime.js';
 import { waitForRunResult, formatModelError } from './run.js';
 import { resolveExecutionModelIdentity } from '../../orchestra/execution-request-builder.js';
 import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.js';
@@ -100,7 +96,7 @@ import { loadConfig, resolveBrainModel, resolveDefaultModel } from '../../core/c
 import { DECKENT_DIR, PROJECT_CONFIG_PATH, RECENT_WORKS_DIR } from '../../core/constants.js';
 import { bootstrapProviders, orderedRoleProviders } from '../../core/provider.js';
 import type { ModelType, ResolvedConfig } from '../../core/types.js';
-import { ALL_PROVIDER_NAMES, SprintStatus } from '../../core/types.js';
+import { ALL_PROVIDER_NAMES } from '../../core/types.js';
 import { getEquivalentModel } from '../../core/model-equivalence.js';
 import { defaultRoleInvocationPolicy } from '../../core/role-invocation-resolver.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
@@ -131,75 +127,6 @@ import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootst
 import { ApprovalBroker } from '../../core/approval-broker.js';
 import { ApprovalStore } from '../../core/approval-store.js';
 import { MissionApprovalCoordinator } from '../../orchestra/autonomous/mission-store/mission-approval-coordinator.js';
-
-function createLiveAutonomousExactSprintExecutor(input: {
-  providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
-  approvalAuthority?: ReturnType<typeof bootstrapApprovalAuthority>;
-  verifyStartAuthorization?: ExactStartAuthorizationVerifier;
-}) {
-  return createCanonicalExactSprintExecutor({
-    executeInProcess: async (context) => {
-      const gitBase = await captureGitBase(context.projectRoot);
-      const sprint = await runSprintLifecycle(
-        context.projectRoot,
-        { ...context.config, deckent_style: 'sprint' },
-        {
-          preplannedSprint: context.sprint,
-          exactPlanAuthority: {
-            ...context.exactRef,
-            ...(context.snapshot.sourceAuthority !== undefined
-              ? { sourceAuthority: context.snapshot.sourceAuthority }
-              : {}),
-          },
-          flowId: context.exactRef.flowId,
-          onExactPlanMaterialize: (_sprint, materializationOptions) =>
-            context.onExactPlanMaterialize(materializationOptions),
-          onExecutionAdmitted: (admittedSprint) => {
-            context.onExecutionAdmitted({
-              flowId: context.exactRef.flowId,
-              jobId: admittedSprint.id,
-              logRef: admittedSprint.id,
-            }, gitBase);
-          },
-          ...(input.providerAuthority ? { providerAuthority: input.providerAuthority } : {}),
-          ...(input.approvalAuthority?.state === 'ready'
-            ? {
-                attendedExecutionApprovalAuthority:
-                  input.approvalAuthority.runtime.attendedExecutionApprovalAuthority,
-              }
-            : {}),
-        },
-      );
-      return sprint.status === SprintStatus.COMPLETE
-        ? { terminalState: 'COMPLETED', reasonCode: 'SPRINT_COMPLETE' }
-        : sprint.status === SprintStatus.ABORTED
-          ? { terminalState: 'CANCELLED', reasonCode: 'SPRINT_ABORTED' }
-          : { terminalState: 'BLOCKED', reasonCode: `SPRINT_${sprint.status}` };
-    },
-    spawnDetached: () => {
-      throw new DeckentError('E_AUTONOMOUS_EXACT_SPRINT_DETACHED_EXECUTOR_UNWIRED', 'AUTONOMOUS_EXACT_SPRINT_DETACHED_EXECUTOR_UNWIRED');
-    },
-    ...(input.verifyStartAuthorization
-      ? { verifyStartAuthorization: input.verifyStartAuthorization }
-      : {}),
-    lifecycle: {
-      publishStartRequested: ({ projectRoot, exactRef, attempt }) => {
-        createRunFlowCoordinator({ root: projectRoot }).requestStart({
-          flowId: exactRef.flowId,
-          revision: exactRef.revision,
-          planDigest: exactRef.planDigest,
-          commandId: `exact-start:${attempt.attemptId}:requested`,
-        });
-      },
-      publishRunStarted: ({ projectRoot, attempt, handle }) => {
-        createRunFlowCoordinator({ root: projectRoot }).recordRunStarted({
-          handle,
-          commandId: `exact-start:${attempt.attemptId}:admitted`,
-        });
-      },
-    },
-  });
-}
 
 function missionExactOutcomeResult(
   outcome: CanonicalExactSprintExecutionOutcome,
@@ -1137,7 +1064,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
           throw ErrorRegistry.createError('DECKENT_E095', { message: 'MISSION_WORKER_EXACT_ROUTE_LOCK_UNAVAILABLE' });
         },
         executeSprint: async (context) => {
-          const exactExecutor = createLiveAutonomousExactSprintExecutor({
+          const exactExecutor = createLiveExactSprintExecutor({
             providerAuthority,
             approvalAuthority,
             verifyStartAuthorization: (authorization) => {
@@ -1227,7 +1154,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
   // runTaskMode requires task-style config. Exact Sprint execution receives
   // its style-scoped config inside the canonical executor.
   const taskConfig = { ...resolvedConfig, deckent_style: 'task' as const };
-  const exactSprintExecutor = createLiveAutonomousExactSprintExecutor({
+  const exactSprintExecutor = createLiveExactSprintExecutor({
     ...(providerAuthority ? { providerAuthority } : {}),
     ...(approvalAuthority ? { approvalAuthority } : {}),
   });

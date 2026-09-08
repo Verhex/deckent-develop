@@ -7,7 +7,10 @@ const mocks = vi.hoisted(() => ({
   compileRunProposal: vi.fn(),
   normalizePlannerDependencies: vi.fn(),
   computeExecutionPlanDigestV4: vi.fn(),
+  computeExecutionPlanDigestV5: vi.fn(),
   computeExecutionPlanDigestByVersion: vi.fn(),
+  createPlannerInvocationBinding: vi.fn(),
+  verifyPlannerInvocationBinding: vi.fn(),
   inspectStructuredCriteriaProjectionAdoption: vi.fn(),
   evaluateScopeGate: vi.fn(),
   applyScopeResolutions: vi.fn(),
@@ -51,8 +54,15 @@ vi.mock('../../src/orchestra/planner.js', () => ({
 }));
 
 vi.mock('../../src/core/execution-plan-digest.js', () => ({
+  EXECUTION_PLAN_DIGEST_VERSION_V5: 5,
   computeExecutionPlanDigestV4: mocks.computeExecutionPlanDigestV4,
+  computeExecutionPlanDigestV5: mocks.computeExecutionPlanDigestV5,
   computeExecutionPlanDigestByVersion: mocks.computeExecutionPlanDigestByVersion,
+}));
+
+vi.mock('../../src/core/planner-invocation-binding.js', () => ({
+  createPlannerInvocationBinding: mocks.createPlannerInvocationBinding,
+  verifyPlannerInvocationBinding: mocks.verifyPlannerInvocationBinding,
 }));
 
 vi.mock('../../src/orchestra/task-artifact-projection.js', () => ({
@@ -214,7 +224,36 @@ describe('run-flow-plan-service', () => {
     mocks.operationOrder.length = 0;
     mocks.trackedFilesAvailable = true;
     mocks.generatePlanPreview.mockResolvedValue(preview());
-    mocks.compileRunProposal.mockResolvedValue({ directivesMarkdown: '# Compiled' });
+    mocks.compileRunProposal.mockResolvedValue({
+      directivesMarkdown: '# Compiled',
+      plannerInvocation: {
+        receiptRef: {
+          schemaVersion: 1,
+          tenantId: 'tenant-1',
+          projectId: 'project-binding',
+          invocationId: 'inv-flow-1',
+        },
+        plannerResultSha256: '8'.repeat(64),
+        directivesSha256: '9'.repeat(64),
+      },
+    });
+    const binding = {
+      schemaVersion: 1,
+      flowId: 'flow-1',
+      revision: 1,
+      receiptRef: {
+        schemaVersion: 1,
+        tenantId: 'tenant-1',
+        projectId: 'project-binding',
+        invocationId: 'inv-flow-1',
+      },
+      receiptSha256: 'a'.repeat(64),
+      terminalEventHash: 'b'.repeat(64),
+      plannerResultSha256: '8'.repeat(64),
+      directivesSha256: '9'.repeat(64),
+    };
+    mocks.createPlannerInvocationBinding.mockReturnValue(binding);
+    mocks.verifyPlannerInvocationBinding.mockReturnValue(binding);
     mocks.normalizePlannerDependencies.mockImplementation((tasks: any[]) => {
       const byTitle = new Map(tasks.map(item => [item.title, item.id]));
       for (const item of tasks) {
@@ -234,8 +273,18 @@ describe('run-flow-plan-service', () => {
     });
     mocks.computeExecutionPlanDigestByVersion.mockImplementation(
       (_version: number, plannedSprint: any) =>
-        mocks.computeExecutionPlanDigestV4(plannedSprint),
+        mocks.computeExecutionPlanDigestV5(plannedSprint),
     );
+    mocks.computeExecutionPlanDigestV5.mockImplementation((plannedSprint: any) => {
+      mocks.operationOrder.push(`digest:${plannedSprint.tasks.flatMap((item: any) => item.dependencies).join(',')}`);
+      return {
+        digest: 'digest-final',
+        version: 5,
+        projection: {},
+        budgetHolds: [],
+        topology,
+      };
+    });
     mocks.evaluateScopeGate.mockReturnValue({
       ok: true,
       verdicts: [],
@@ -346,11 +395,13 @@ describe('run-flow-plan-service', () => {
       'preview-event',
     ]);
     expect(result.sourceAuthority).toMatchObject({
+      schemaVersion: 2,
       sourceKind: 'directives',
       contentSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
       configSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
       planningInputSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
       scopeInputSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+      planningEvidence: { kind: 'not-applicable', sourceKind: 'directives' },
     });
   });
 
@@ -360,10 +411,28 @@ describe('run-flow-plan-service', () => {
         sourceKind: 'intent',
         baseContext: input().source.brainContext,
       },
+      previewOptions: {
+        mode: 'structured',
+        writeScopePolicy: {
+          mode: 'closed-allowlist',
+          filesWrite: ['src/a.ts'],
+        },
+      },
       approval: { actor: { id: 'owner-1' } },
     }));
 
     expect(mocks.compileRunProposal).toHaveBeenCalledOnce();
+    expect(mocks.compileRunProposal.mock.calls[0]?.[3]).toEqual({
+      projectRoot: '/project',
+      planContract: {
+        schemaVersion: 1,
+        taskCardinality: { min: 1, max: 1, basis: 'single-exact-write' },
+        writeScopePolicy: {
+          mode: 'closed-allowlist',
+          filesWrite: ['src/a.ts'],
+        },
+      },
+    });
     expect(mocks.generatePlanPreview).toHaveBeenCalledOnce();
     expect(mocks.generatePlanPreview.mock.calls[0]?.[2]).toMatchObject({
       directives: '# Compiled',
@@ -374,6 +443,30 @@ describe('run-flow-plan-service', () => {
       actor: { id: 'owner-1' },
     });
     expect(result.approval).toBe('approved');
+    expect(mocks.createPlannerInvocationBinding).toHaveBeenCalledOnce();
+    expect(result.sourceAuthority).toMatchObject({
+      schemaVersion: 2,
+      planningEvidence: {
+        kind: 'accepted-planner-invocation',
+        binding: { receiptSha256: 'a'.repeat(64) },
+      },
+    });
+  });
+
+  it('refuses a raw custom planner result before preview or durable publication', async () => {
+    mocks.compileRunProposal.mockResolvedValueOnce({ directivesMarkdown: '# Raw' });
+
+    await expect(planRunFlow(input({
+      source: {
+        sourceKind: 'intent',
+        baseContext: input().source.brainContext,
+        planner: vi.fn(),
+      },
+    }))).rejects.toMatchObject({ code: 'PLANNER_EVIDENCE_HOLD' });
+
+    expect(mocks.generatePlanPreview).not.toHaveBeenCalled();
+    expect(mocks.storedPlans.size).toBe(0);
+    expect(mocks.proposeFlow).not.toHaveBeenCalled();
   });
 
   it('reuses an exact durable plan on idempotent retry without compiling or planning again', async () => {
@@ -385,6 +478,57 @@ describe('run-flow-plan-service', () => {
     expect(second.reusedDurablePlan).toBe(true);
     expect(second.planDigest).toBe(first.planDigest);
     expect(mocks.compileRunProposal).not.toHaveBeenCalled();
+    expect(mocks.generatePlanPreview).not.toHaveBeenCalled();
+  });
+
+  it('requires a fresh plan when a legacy intent record has no accepted receipt binding', async () => {
+    const intentInput = input({
+      source: {
+        sourceKind: 'intent',
+        baseContext: input().source.brainContext,
+      },
+    });
+    await planRunFlow(intentInput);
+    const stored = mocks.storedPlans.get('flow-1');
+    stored.sourceAuthority = {
+      ...stored.sourceAuthority,
+      schemaVersion: 1,
+    };
+    delete stored.sourceAuthority.planningEvidence;
+
+    await expect(planRunFlow(intentInput)).rejects.toMatchObject({
+      code: 'PLANNER_EVIDENCE_REPLAN_REQUIRED',
+    });
+    expect(mocks.compileRunProposal).toHaveBeenCalledOnce();
+    expect(mocks.generatePlanPreview).toHaveBeenCalledOnce();
+  });
+
+  it('holds malformed persisted v2 evidence before reuse or approval', async () => {
+    await planRunFlow(input());
+    const stored = mocks.storedPlans.get('flow-1');
+    stored.sourceAuthority = { ...stored.sourceAuthority, planningEvidence: null };
+    vi.clearAllMocks();
+
+    await expect(planRunFlow(input({ approval: { actor: { id: 'owner-1' } } })))
+      .rejects.toMatchObject({ code: 'PLANNER_EVIDENCE_HOLD' });
+    expect(mocks.generatePlanPreview).not.toHaveBeenCalled();
+    expect(mocks.decideRunFlow).not.toHaveBeenCalled();
+  });
+
+  it('refuses a v5 authority downgrade to legacy directives before reuse', async () => {
+    await planRunFlow(input());
+    const stored = mocks.storedPlans.get('flow-1');
+    stored.sourceAuthority = {
+      ...stored.sourceAuthority,
+      schemaVersion: 1,
+    };
+    delete stored.sourceAuthority.planningEvidence;
+    vi.clearAllMocks();
+
+    await expect(planRunFlow(input())).rejects.toMatchObject({
+      code: 'PLANNER_EVIDENCE_HOLD',
+      details: { reason: 'legacy_directives_authority_downgrade' },
+    });
     expect(mocks.generatePlanPreview).not.toHaveBeenCalled();
   });
 
@@ -406,9 +550,9 @@ describe('run-flow-plan-service', () => {
   });
 
   it('keeps topology-denied plans unapproved even when an approval actor is supplied', async () => {
-    mocks.computeExecutionPlanDigestV4.mockReturnValue({
+    mocks.computeExecutionPlanDigestV5.mockReturnValue({
       digest: 'digest-blocked',
-      version: 4,
+      version: 5,
       projection: {},
       budgetHolds: [],
       topology: { ...topology, verdict: 'block' },
@@ -558,9 +702,9 @@ describe('run-flow-plan-service', () => {
 
   it('binds an explicit owner-authorized legacy projection without writing through it', async () => {
     const actor = { id: 'owner-1' };
-    mocks.computeExecutionPlanDigestV4.mockReturnValue({
+    mocks.computeExecutionPlanDigestV5.mockReturnValue({
       digest: 'c'.repeat(64),
-      version: 4,
+      version: 5,
       projection: {},
       budgetHolds: [],
       topology,
@@ -590,9 +734,9 @@ describe('run-flow-plan-service', () => {
   });
 
   it('holds adoption when its approval actor differs from the bound owner', async () => {
-    mocks.computeExecutionPlanDigestV4.mockReturnValue({
+    mocks.computeExecutionPlanDigestV5.mockReturnValue({
       digest: 'c'.repeat(64),
-      version: 4,
+      version: 5,
       projection: {},
       budgetHolds: [],
       topology,

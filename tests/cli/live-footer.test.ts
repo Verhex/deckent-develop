@@ -26,6 +26,8 @@ const buildLiveFooter = (state: LiveFooterState, options: Omit<LiveFooterOptions
 const EN: LiveFooterLabels = {
   idle: 'idle', running: 'Running', elapsed: 'Elapsed', provider: 'Provider', auth: 'Auth', next: 'Next',
   healthy: 'healthy', degraded: 'degraded', unknown: 'unknown', loggedIn: 'logged-in', loggedOut: 'logged-out',
+  status: 'Status', reason: 'Reason', failed: 'Failed', paused: 'Paused', orphaned: 'Orphaned', complete: 'Complete',
+  inspectFailure: 'Inspect with /status',
   unitHours: 'h', unitMinutes: 'm', unitSeconds: 's',
 };
 
@@ -61,6 +63,46 @@ describe('buildLiveFooter — empty state', () => {
 // ─── Per-question line presence (1-5 lines) ─────────────────────────────────
 
 describe('buildLiveFooter — per-question lines', () => {
+  it('renders a terminal failure without stale running or elapsed language', () => {
+    const lines = buildLiveFooter({
+      running: 'sprint-714 · SPAWN',
+      startedAt: '2026-09-04T11:07:49.000Z',
+      next: '714-001',
+      runStatus: {
+        lifecycle: 'ABORTED',
+        sprintId: 'sprint-714',
+        reason: 'PRIVATE_IPC_AUTHORITY_UNAVAILABLE',
+      },
+    }, { labels: EN });
+
+    expect(lines).toEqual([
+      'Status: sprint-714 · Failed',
+      'Reason: PRIVATE_IPC_AUTHORITY_UNAVAILABLE',
+      'Next: Inspect with /status',
+    ]);
+  });
+
+  it('renders an ORPHANED/dead run without stale activity and preserves recovery', () => {
+    const lines = buildLiveFooter({
+      running: 'sprint-716 · FIX',
+      startedAt: '2026-09-04T11:07:49.000Z',
+      workers: 1,
+      next: '716-001',
+      runStatus: {
+        lifecycle: 'ORPHANED',
+        sprintId: 'sprint-716',
+        reason: 'coordinator-dead',
+        recoveryCommand: 'deckent recover sprint-716 --resume',
+      },
+    }, { labels: EN });
+
+    expect(lines).toEqual([
+      'Status: sprint-716 · Orphaned',
+      'Reason: coordinator-dead',
+      'Next: deckent recover sprint-716 --resume',
+    ]);
+  });
+
   it('renders exactly one line when only "running" (Q1) is supplied', () => {
     const lines = buildLiveFooter({ running: 'task-353-007 · EXECUTE' }, { labels: EN });
     expect(lines).toHaveLength(1);

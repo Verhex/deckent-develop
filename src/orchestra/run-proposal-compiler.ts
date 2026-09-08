@@ -17,15 +17,14 @@
 // (`RunProposalPlanner`): production delegates to the same AI/structured
 // planner core sprint-planner.ts itself uses for NL splitting
 // (`callZeroConfigPlanner`, orchestra/planner.ts) to turn `intentSummary`
-// into a REAL multi-task plan (task decomposition + file scope + per-task
+// into a REAL intent-sized plan (task decomposition + file scope + per-task
 // verifiable goCriteria/nogo). Tests inject a hermetic fake planner instead
 // — never a real AI/provider call. A planner failure is a typed
 // `RunProposalPlanError`, never a silent fall-back to a scaffold.
 //
-// `buildPlanNlIntent` (cli/commands/plan-nl.ts) draws the same single-task
-// scaffold boundary for a raw NL goal string — it stays canonical-dead here;
-// this module does not import or revive it, it goes straight to the
-// planner core instead.
+// The deprecated `plan-nl` command is only a forwarding alias to `do`; raw NL
+// goals reach this compiler through the canonical RunFlow proposal path and
+// go straight to the planner core without a local single-task scaffold.
 //
 // Proposal metadata (flowId/tenant/project/actor/origin/revision) is folded
 // into each task's description as plain traceability prose — never as a
@@ -34,22 +33,36 @@
 
 import type { RunProposal } from '../core/run-flow-contract.js';
 import type { DeckentConfig, PlannerResult, PlannerTask } from '../core/types.js';
+import type { InvocationReceiptRef } from '../core/invocation-receipt.js';
+import { canonicalJson } from '../core/audit-writer.js';
 import { createGoNoGoCriterionItem } from '../core/task-types.js';
+import { TaskAttemptCustodyHold } from '../core/task-attempt-custody-store.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 import { readAuthMode, resolveBrainModel, resolveDefaultModel } from '../core/config.js';
 import { getEquivalentModel } from '../core/model-equivalence.js';
+import { modelRegistry } from '../core/model-registry.js';
 import { providerRegistry } from '../core/provider.js';
 import { buildDirectives, type DirectiveBuildIntent, type DirectiveBuildTask } from './directives-builder.js';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
-  callZeroConfigPlanner,
+  callZeroConfigPlannerWithReason,
   createPlannerTaskModelPolicy,
   resolvePlanTimeoutMs,
 } from './planner.js';
+import type { PlannerPlanContract } from './planner-plan-contract.js';
+import { preflightPlanningExecutionAuthority } from './spawn-backend.js';
 
 export interface RunProposalCompileResult {
   readonly intent: DirectiveBuildIntent;
   readonly directivesMarkdown: string;
+  readonly plannerInvocation?: RunProposalPlannerInvocation;
+}
+
+export interface RunProposalPlannerInvocation {
+  readonly receiptRef: InvocationReceiptRef;
+  readonly plannerResultSha256: string;
+  readonly directivesSha256: string;
 }
 
 /**
@@ -64,10 +77,25 @@ export interface RunProposalCompileResult {
  *  so call sites can forward a live `ResolvedConfig` directly (born-690). */
 export type RunProposalPlannerConfig = Partial<DeckentConfig> | Partial<ResolvedConfig>;
 
+export interface RunProposalPlannerEnvelope {
+  readonly data: PlannerResult;
+  readonly receiptRef: InvocationReceiptRef;
+}
+
 export type RunProposalPlanner = (
   proposal: RunProposal,
   config?: RunProposalPlannerConfig,
-) => PlannerResult | Promise<PlannerResult>;
+  planningContext?: RunProposalPlanningContext,
+) => PlannerResult | RunProposalPlannerEnvelope | Promise<PlannerResult | RunProposalPlannerEnvelope>;
+
+export interface RunProposalPlanningContext {
+  readonly projectRoot: string;
+  readonly planContract: PlannerPlanContract;
+}
+
+export type RunProposalPlanErrorCode =
+  | 'PLAN_UNAVAILABLE'
+  | 'EXECUTION_ADMISSION_HOLD';
 
 /**
  * Thrown when NL -> plan compilation fails to produce a real, usable plan —
@@ -78,11 +106,28 @@ export type RunProposalPlanner = (
  */
 export class RunProposalPlanError extends Error {
   public readonly flowId: string;
+  public readonly code: RunProposalPlanErrorCode;
+  public readonly reasonCode?: string;
+  public readonly retryable: boolean;
+  public readonly receiptId?: string;
+  public readonly safeDetail?: string;
 
-  constructor(flowId: string, message: string, options?: { cause?: unknown }) {
-    super(message, options);
+  constructor(flowId: string, message: string, options?: {
+    cause?: unknown;
+    code?: RunProposalPlanErrorCode;
+    reasonCode?: string;
+    retryable?: boolean;
+    receiptId?: string;
+    safeDetail?: string;
+  }) {
+    super(message, options?.cause === undefined ? undefined : { cause: options.cause });
     this.name = 'RunProposalPlanError';
     this.flowId = flowId;
+    this.code = options?.code ?? 'PLAN_UNAVAILABLE';
+    this.reasonCode = options?.reasonCode;
+    this.retryable = options?.retryable ?? true;
+    this.receiptId = options?.receiptId;
+    this.safeDetail = options?.safeDetail;
   }
 }
 
@@ -118,7 +163,7 @@ function describeActor(proposal: RunProposal): string {
  *  original): the daemon serves /api/run-flow/propose on this path, so even a
  *  fast `git ls-files` must not block the event loop — same F-2 discipline as
  *  the planner LLM calls, with a SIGTERM deadline against a hung git. */
-function readTrackedFileTree(timeoutMs = 10_000): Promise<string[]> {
+function readTrackedFileTree(projectRoot: string, timeoutMs = 10_000): Promise<string[]> {
   return new Promise((resolve) => {
     let stdout = '';
     let done = false;
@@ -130,7 +175,7 @@ function readTrackedFileTree(timeoutMs = 10_000): Promise<string[]> {
     };
     let child: ReturnType<typeof spawn>;
     try {
-      child = spawn('git', ['ls-files'], { cwd: process.cwd(), stdio: ['ignore', 'pipe', 'ignore'] });
+      child = spawn('git', ['ls-files'], { cwd: projectRoot, stdio: ['ignore', 'pipe', 'ignore'] });
     } catch {
       resolve([]);
       return;
@@ -156,28 +201,80 @@ function readTrackedFileTree(timeoutMs = 10_000): Promise<string[]> {
   });
 }
 
-async function defaultRunProposalPlanner(proposal: RunProposal, config?: RunProposalPlannerConfig): Promise<PlannerResult> {
+async function defaultRunProposalPlanner(
+  proposal: RunProposal,
+  config?: RunProposalPlannerConfig,
+  planningContext?: RunProposalPlanningContext,
+): Promise<RunProposalPlannerEnvelope> {
   const description = proposal.intentSummary.trim();
-  const projectRoot = process.cwd();
+  const projectRoot = planningContext?.projectRoot ?? process.cwd();
   const configuredBrainModel = resolveBrainModel(config);
   // loadConfig projects the effective grouped provider onto brain_provider,
   // then applies env overrides to that flat field. Raw planner-seam callers may
   // still supply only the grouped authoring form, so it is a fallback — never
   // allowed to override an already-resolved flat value.
   const configuredProvider = config?.brain_provider ?? config?.providers?.brain ?? null;
-  const brainModel = configuredProvider && providerRegistry.hasProvider(configuredProvider)
+  const configuredModelOwner = modelRegistry.get(configuredBrainModel)?.provider;
+  const brainModel = configuredProvider
+    && providerRegistry.hasProvider(configuredProvider)
+    && configuredModelOwner !== undefined
+    && configuredModelOwner !== configuredProvider
     ? getEquivalentModel(configuredBrainModel, configuredProvider)
     : configuredBrainModel;
   const taskModelPolicy = createPlannerTaskModelPolicy(
     resolveDefaultModel(config),
     config?.worker_provider,
   );
+  if (planningContext) {
+    try {
+      preflightPlanningExecutionAuthority({
+        projectRoot,
+        backend: config?.spawn_backend ?? 'auto',
+      });
+    } catch (error) {
+      const recoveryHold = error !== null && typeof error === 'object'
+        && (error as { code?: unknown }).code === 'EXACT_CUSTODY_RECOVERY_REQUIRED'
+        ? error as {
+            code: 'EXACT_CUSTODY_RECOVERY_REQUIRED';
+            unresolved?: unknown;
+          }
+        : null;
+      if (error instanceof TaskAttemptCustodyHold || recoveryHold !== null) {
+        const reasonCode = recoveryHold?.code ?? (error as TaskAttemptCustodyHold).message;
+        const boundedRecoveryEvidence = recoveryHold && Array.isArray(recoveryHold.unresolved)
+          ? recoveryHold.unresolved.slice(0, 10).flatMap((entry) => {
+              if (entry === null || typeof entry !== 'object') return [];
+              const taskId = (entry as { taskId?: unknown }).taskId;
+              const issue = (entry as { reasonCode?: unknown }).reasonCode;
+              if (typeof taskId !== 'string' || typeof issue !== 'string'
+                || taskId.length === 0 || taskId.length > 512
+                || issue.length === 0 || issue.length > 128
+                || /[\r\n\0]/u.test(taskId) || /[^A-Z0-9_]/u.test(issue)) return [];
+              return [`${taskId}:${issue}`];
+            }).join(',')
+          : '';
+        throw new RunProposalPlanError(
+          proposal.flowId,
+          `run-proposal-compiler: execution admission HOLD before external planning ` +
+            `(${reasonCode}${boundedRecoveryEvidence ? `;${boundedRecoveryEvidence}` : ''}) ` +
+            `for flowId=${proposal.flowId}.`,
+          {
+            cause: error,
+            code: 'EXECUTION_ADMISSION_HOLD',
+            reasonCode,
+            retryable: false,
+          },
+        );
+      }
+      throw error;
+    }
+  }
   // F-2: async planner call (event loop stays free — `deckent do` can render
   // its planning heartbeat) + the SAME config-resolved timeout every planning
   // path uses (resolvePlanTimeoutMs — brain_plan_timeout_ms honored here too).
   // F-1: the real tracked file tree grounds the planner (no more blind planning).
-  const result = await callZeroConfigPlanner(
-    description, brainModel, proposal.project, await readTrackedFileTree(), undefined,
+  const result = await callZeroConfigPlannerWithReason(
+    description, brainModel, proposal.project, await readTrackedFileTree(projectRoot), undefined,
     resolvePlanTimeoutMs(config as { brain_plan_timeout_ms?: number; ai_planner_timeout?: number } | undefined),
     undefined,
     {
@@ -191,15 +288,33 @@ async function defaultRunProposalPlanner(proposal: RunProposal, config?: RunProp
       authMode: await readAuthMode(projectRoot),
     },
     taskModelPolicy,
+    planningContext?.planContract,
   );
-  if (!result) {
+  if (!result.ok) {
+    const reasonCode = result.reason;
+    const safeDetail = result.message;
+    const receiptId = result.receiptRef?.invocationId;
     throw new RunProposalPlanError(
       proposal.flowId,
-      'AI planner core returned no usable plan (provider unavailable, timed out, or produced an ' +
-        'unparseable response).',
+      `AI planner rejected the plan (${reasonCode}): ${safeDetail}` +
+        `${receiptId ? `; receipt=${receiptId}` : ''}.`,
+      {
+        code: 'PLAN_UNAVAILABLE',
+        reasonCode,
+        retryable: reasonCode === 'timeout' || reasonCode === 'spawn_failed' || reasonCode === 'no_providers',
+        ...(receiptId ? { receiptId } : {}),
+        safeDetail,
+      },
     );
   }
-  return result;
+  if (!result.receiptRef) {
+    throw new RunProposalPlanError(
+      proposal.flowId,
+      `run-proposal-compiler: accepted planner result has no durable receipt for flowId=${proposal.flowId}.`,
+      { code: 'PLAN_UNAVAILABLE', reasonCode: 'receipt_failed', retryable: false },
+    );
+  }
+  return { data: result.data, receiptRef: result.receiptRef };
 }
 
 /**
@@ -296,7 +411,11 @@ function toDirectiveTask(task: PlannerTask, proposal: RunProposal): DirectiveBui
     files: [...task.scope.filesWrite],
     scope: [...task.scope.directories],
     deps: task.dependencies.map(canonicalTaskTitle),
-    model: task.model,
+    // `model` is planner/config-resolved execution context, not owner intent.
+    // Only the explicitly supplied forceModel may round-trip through the
+    // directive's `Model:` field, which the parser correctly treats as an
+    // override. Emitting task.model here fabricated a user override.
+    model: task.forceModel,
     effort: task.effort,
     skills: task.forceSkills,
     goCriteria: [task.goNogo.goCriteria],
@@ -307,7 +426,7 @@ function toDirectiveTask(task: PlannerTask, proposal: RunProposal): DirectiveBui
 }
 
 /**
- * Map a `RunProposal` to a real, multi-task {@link DirectiveBuildIntent} via
+ * Map a `RunProposal` to a real, host-bounded {@link DirectiveBuildIntent} via
  * the injectable planner seam (`planner` defaults to the production AI/
  * structured planner core — see {@link defaultRunProposalPlanner}). Throws
  * {@link RunProposalPlanError} rather than degrading to a scaffold when the
@@ -319,12 +438,39 @@ export async function compileRunProposalIntent(
   proposal: RunProposal,
   planner: RunProposalPlanner = defaultRunProposalPlanner,
   config?: RunProposalPlannerConfig,
+  planningContext?: RunProposalPlanningContext,
 ): Promise<DirectiveBuildIntent> {
-  let plan: PlannerResult;
+  return (await compileRunProposalIntentWithAuthority(
+    proposal,
+    planner,
+    config,
+    planningContext,
+  )).intent;
+}
+
+interface CompiledRunProposalIntent {
+  readonly intent: DirectiveBuildIntent;
+  readonly plan: PlannerResult;
+  readonly receiptRef?: InvocationReceiptRef;
+}
+
+function isPlannerEnvelope(value: unknown): value is RunProposalPlannerEnvelope {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const keys = Object.keys(value).sort().join(',');
+  return keys === 'data,receiptRef';
+}
+
+async function compileRunProposalIntentWithAuthority(
+  proposal: RunProposal,
+  planner: RunProposalPlanner,
+  config?: RunProposalPlannerConfig,
+  planningContext?: RunProposalPlanningContext,
+): Promise<CompiledRunProposalIntent> {
+  let output: PlannerResult | RunProposalPlannerEnvelope;
   try {
     // F-2: the seam accepts sync AND async planners — await tolerates both,
     // so every existing hermetic fake planner stays assignable unchanged.
-    plan = await planner(proposal, config);
+    output = await planner(proposal, config, planningContext);
   } catch (e) {
     if (e instanceof RunProposalPlanError) throw e;
     throw new RunProposalPlanError(
@@ -334,7 +480,16 @@ export async function compileRunProposalIntent(
       { cause: e },
     );
   }
-  if (!plan.tasks || plan.tasks.length === 0) {
+  const receiptRef = isPlannerEnvelope(output) ? output.receiptRef : undefined;
+  const plan = isPlannerEnvelope(output) ? output.data : output;
+  if (!plan || typeof plan !== 'object' || !Array.isArray((plan as Partial<PlannerResult>).tasks)) {
+    throw new RunProposalPlanError(
+      proposal.flowId,
+      `run-proposal-compiler: planner returned an invalid result for flowId=${proposal.flowId}.`,
+      { code: 'PLAN_UNAVAILABLE', reasonCode: 'validation_failed', retryable: false },
+    );
+  }
+  if (plan.tasks.length === 0) {
     throw new RunProposalPlanError(
       proposal.flowId,
       `run-proposal-compiler: planner returned zero tasks for flowId=${proposal.flowId} — ` +
@@ -343,9 +498,13 @@ export async function compileRunProposalIntent(
   }
 
   return {
+    plan,
+    ...(receiptRef ? { receiptRef } : {}),
+    intent: {
     title: `RunProposal ${proposal.flowId}`,
     goal: escapeGoalHeadingCollisions(proposal.intentSummary.trim()),
     tasks: plan.tasks.map((task) => toDirectiveTask(task, proposal)),
+    },
   };
 }
 
@@ -359,8 +518,15 @@ export async function compileRunProposal(
   proposal: RunProposal,
   planner: RunProposalPlanner = defaultRunProposalPlanner,
   config?: RunProposalPlannerConfig,
+  planningContext?: RunProposalPlanningContext,
 ): Promise<RunProposalCompileResult> {
-  const intent = await compileRunProposalIntent(proposal, planner, config);
+  const compiled = await compileRunProposalIntentWithAuthority(
+    proposal,
+    planner,
+    config,
+    planningContext,
+  );
+  const { intent } = compiled;
   let directivesMarkdown: string;
   try {
     directivesMarkdown = buildDirectives(intent);
@@ -378,5 +544,17 @@ export async function compileRunProposal(
       { cause: e },
     );
   }
-  return { intent, directivesMarkdown };
+  return {
+    intent,
+    directivesMarkdown,
+    ...(compiled.receiptRef
+      ? {
+          plannerInvocation: {
+            receiptRef: compiled.receiptRef,
+            plannerResultSha256: createHash('sha256').update(canonicalJson(compiled.plan)).digest('hex'),
+            directivesSha256: createHash('sha256').update(directivesMarkdown).digest('hex'),
+          },
+        }
+      : {}),
+  };
 }
