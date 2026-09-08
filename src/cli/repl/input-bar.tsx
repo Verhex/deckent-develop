@@ -7,10 +7,7 @@
 // and the user can always SEE where they are. i18n-free: labels via props.
 
 import { Box, Text, useInput } from 'ink';
-import { useState, useRef, type ReactElement } from 'react';
-import { appendFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { useEffect, useState, useRef, type ReactElement } from 'react';
 import type { Key } from 'node:readline';
 import { editInput, EMPTY_INPUT, InputHistory, type InputState } from './line-edit.js';
 import { segmentGraphemes } from './cursor-model.js';
@@ -21,6 +18,7 @@ import { activeAtQuery, filterAtPaths, completeAtToken, type ActiveAtToken } fro
 import { requireInjectedLabel } from '../helpers/injected-label.js';
 import { useInkPalette } from './ink-palette-context.js';
 import { useTerminalGlyphs } from './terminal-glyph-context.js';
+import { createInputDebugSink, debugKeylogPath } from './input-debug.js';
 
 // TERMINAL-READABILITY-001 — no color literal: the frame and chevrons take the
 // decorative accent role, the selected menu row the focus role (inverse), key
@@ -187,9 +185,7 @@ export function resolvePasteChunk(buffer: string, input: string): PasteChunkResu
  * native Windows (non-WSL, Law #2 "every environment") has no `/tmp`, so the
  * write throws ENOENT and the surrounding try/catch silently swallows it:
  * `DECKENT_INK_DEBUG=1` would do nothing there with zero signal. */
-export function debugKeylogPath(): string {
-  return process.env['DECKENT_INK_DEBUG_LOG'] ?? join(tmpdir(), 'ink-keys.log');
-}
+export { debugKeylogPath };
 
 /** Map an Ink keypress to the node:readline Key shape editInput expects.
  * `key.home`/`key.end` are the properties Ink's own `useInput` hook actually
@@ -292,6 +288,16 @@ export function InputBar(props: InputBarProps): ReactElement {
   const persistentHistoryRef = useRef<HistoryController | null>(null);
   if (persistentHistoryRef.current === null) persistentHistoryRef.current = createHistoryController(projectRoot);
   const persistentHistory = persistentHistoryRef.current;
+  const debugSink = useRef<ReturnType<typeof createInputDebugSink> | null>(null);
+  useEffect(() => {
+    if (process.env['DECKENT_INK_DEBUG'] !== '1') return undefined;
+    const ownedSink = createInputDebugSink();
+    debugSink.current = ownedSink;
+    return () => {
+      ownedSink.close();
+      if (debugSink.current === ownedSink) debugSink.current = null;
+    };
+  }, []);
   const set = (s: InputState): void => { stateRef.current = s; setState(s); };
   const setSel = (n: number): void => { menuSelRef.current = n; setMenuSel(n); };
   const setSearchBoth = (s: { q: string; idx: number } | null): void => { searchRef.current = s; setSearch(s); };
@@ -304,9 +310,7 @@ export function InputBar(props: InputBarProps): ReactElement {
     // atomic from the product's perspective: a stale InputBar listener cannot
     // consume the approval key during the effect gap.
     if (!active) return;
-    if (process.env['DECKENT_INK_DEBUG'] === '1') {
-      try { appendFileSync(debugKeylogPath(), JSON.stringify({ input, key }) + '\n'); } catch { /* ignore */ }
-    }
+    debugSink.current?.record(input, key as Record<string, unknown>);
 
     if (key.ctrl && (input === 'l' || input === '\f')) { onClear?.(); return; } // Ctrl-L → clear
 

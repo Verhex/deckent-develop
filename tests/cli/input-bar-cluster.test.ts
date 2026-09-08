@@ -132,7 +132,7 @@ describe('debugKeylogPath — cross-platform resolution', () => {
 
   it('defaults to the OS temp dir, never a hardcoded POSIX /tmp literal', () => {
     delete process.env[ENV_KEY];
-    expect(debugKeylogPath()).toBe(join(tmpdir(), 'ink-keys.log'));
+    expect(debugKeylogPath(process.env, process.pid, 'test-id')).toBe(join(tmpdir(), `deckent-ink-input-${process.pid}-test-id.jsonl`));
   });
 
   it('honors an explicit DECKENT_INK_DEBUG_LOG override', () => {

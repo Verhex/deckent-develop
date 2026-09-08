@@ -99,6 +99,6 @@ describe('debugKeylogPath — cross-platform smoke lock (full matrix: input-bar-
 
   it('resolves via os.tmpdir(), never a hardcoded POSIX /tmp literal', () => {
     delete process.env[ENV_KEY];
-    expect(debugKeylogPath()).toBe(join(tmpdir(), 'ink-keys.log'));
+    expect(debugKeylogPath(process.env, process.pid, 'test-id')).toBe(join(tmpdir(), `deckent-ink-input-${process.pid}-test-id.jsonl`));
   });
 });
