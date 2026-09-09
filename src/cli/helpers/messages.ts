@@ -120,6 +120,10 @@ const BASE_MESSAGES: MessageMap = {
     en: 'Display curated help topics',
     tr: 'Seçilmiş yardım konularını göster',
   },
+  'cli.root_help.help_command_topic_desc': {
+    en: 'Help topic to display (advanced)',
+    tr: 'Gösterilecek yardım konusu (advanced)',
+  },
 
   // ─── runtime hygiene operator vocabulary (RH14-I18N) ────────────────
   // Only bounded aggregate fields cross this presentation boundary. In
@@ -2686,6 +2690,10 @@ const BASE_MESSAGES: MessageMap = {
   'checkpoint.list_empty': {
     en: 'No checkpoints found.',
     tr: 'Checkpoint bulunamadı.',
+  },
+  'checkpoint.list_tenant_scope_hold': {
+    en: 'Checkpoint {id} has no tenant scope; strict tenant isolation refuses to display it.',
+    tr: 'Checkpoint {id} için tenant kapsamı yok; sıkı tenant izolasyonu bunu göstermeyi reddediyor.',
   },
   'checkpoint.col_sprint': { en: 'Run', tr: 'Run' },
   'checkpoint.col_phase': { en: 'Phase', tr: 'Faz' },

@@ -27,7 +27,7 @@ This reference covers every public command path, option, positional argument, ef
 | [`deckent config import`](#deckent-config-import) | Import config from a JSON file | Local write | Apply | Operator | Text |
 | [`deckent config list`](#deckent-config-list) | List all config parameters grouped by category | Read-only | Read | Open | Text |
 | [`deckent config keys`](#deckent-config-keys) | List all config parameter keys | Read-only | Read | Open | Text |
-| [`deckent config migrate`](#deckent-config-migrate) | Migrate config.json to the latest full format (adds missing fields with defaults) | Local write | Apply | Operator | Text |
+| [`deckent config migrate`](#deckent-config-migrate) | Migrate config.json to the latest full format (adds missing fields with defaults) | Local write | Apply | Operator | Text and JSON |
 | [`deckent config nervous`](#deckent-config-nervous) | Configure Nervous System authority mode and action overrides | Local write | Apply | Operator | Text |
 | [`deckent config nervous set`](#deckent-config-nervous-set) | Set a nervous system configuration value | Local write | Apply | Operator | Text |
 | [`deckent config nervous override`](#deckent-config-nervous-override) | Set a per-action policy override | Local write | Apply | Operator | Text |
@@ -53,10 +53,16 @@ This reference covers every public command path, option, positional argument, ef
 | [`deckent archive terminal-inspect`](#deckent-archive-terminal-inspect) | Inspect canonical hot/archive journal parity without changing state | Read-only | Read | Open | Text and JSON |
 | [`deckent archive terminal-verify`](#deckent-archive-terminal-verify) | Verify terminal receipt, archive integrity, and Brain adoption without changing state | Read-only | Read | Open | Text and JSON |
 | [`deckent archive terminal-repair`](#deckent-archive-terminal-repair) | Repair one proven strict-prefix terminal journal with receipt-bound authority | Local write | Apply | Operator | Text and JSON |
-| [`deckent dashboard`](#deckent-dashboard) | Show terminal dashboard with auto-refresh (see also: deckent status --watch) | Read-only | Read | Open | Text and JSON |
+| [`deckent dashboard`](#deckent-dashboard) | Show terminal dashboard with auto-refresh (see also: deckent status --watch) | Read-only | Read | Open | Text |
 | [`deckent serve`](#deckent-serve) | Start HTTP API server with SSE support | Process control | Apply | Operator | Text |
 | [`deckent sync`](#deckent-sync) | Sync adapter files and detect out-of-band changes since last sprint | Local write | Apply | Operator | Text and JSON |
 | [`deckent watch`](#deckent-watch) | Follow a live worker (docker logs / tmux pane / subprocess log) with --follow <taskId>, or open the tmux dashboard split | Read-only | Read | Open | Stream |
+| [`deckent watch output`](#deckent-watch-output) | Read or follow exact worker output without changing worker execution | Read-only | Read | Open | Text and JSON |
+| [`deckent intelligence`](#deckent-intelligence) | Inspect and run competitor intelligence | Command group (help only) | Read | Open | Text |
+| [`deckent intelligence watch`](#deckent-intelligence-watch) | Manage competitor-watch execution | Command group (help only) | Read | Open | Text |
+| [`deckent intelligence watch run`](#deckent-intelligence-watch-run) | Run the canonical competitor-watch capability | Local write | Apply | Operator | Text |
+| [`deckent intelligence schedule`](#deckent-intelligence-schedule) | Ensure and report the canonical daily watch flow | Local write | Apply | Operator | Text |
+| [`deckent intelligence status`](#deckent-intelligence-status) | Show watch event history and last-run state | Read-only | Read | Open | Text |
 | [`deckent run`](#deckent-run) | Run a single one-shot task without a sprint cycle | Process control | Apply | Operator | Text |
 | [`deckent run start`](#deckent-run-start) | Note: 'run start\|status\|retro\|history' are aliases for the top-level 'deckent start\|status\|retro\|history' commands — identical behavior, same handler. 'sprint' terminology is being renamed to 'run'. | Process control | Apply | Operator | Text |
 | [`deckent run status`](#deckent-run-status) | Note: 'run start\|status\|retro\|history' are aliases for the top-level 'deckent start\|status\|retro\|history' commands — identical behavior, same handler. 'sprint' terminology is being renamed to 'run'. | Read-only | Read | Open | Text |
@@ -80,6 +86,7 @@ This reference covers every public command path, option, positional argument, ef
 | [`deckent agent reclassify`](#deckent-agent-reclassify) | Reclassify a recorded task outcome (delta-applies agent/skill stats) | Local write | Apply | Operator | Text |
 | [`deckent agent info`](#deckent-agent-info) | Show detailed agent information | Read-only | Read | Open | Text |
 | [`deckent skill`](#deckent-skill) | Manage skill pool | Command group (help only) | Read | Open | Text |
+| [`deckent skill attribution`](#deckent-skill-attribution) | Inspect or apply the causal skill-attribution cutover | Local write | Preview; explicit apply required | Operator | Text and JSON |
 | [`deckent skill list`](#deckent-skill-list) | List all skills | Read-only | Read | Open | Text and JSON |
 | [`deckent skill create`](#deckent-skill-create) | Create a custom skill | Local write | Apply | Operator | Text |
 | [`deckent skill install`](#deckent-skill-install) | Install a skill from local path or git URL (supports version pinning: url#tag) | Local write | Apply | Operator | Text |
@@ -92,14 +99,14 @@ This reference covers every public command path, option, positional argument, ef
 | [`deckent skill publish`](#deckent-skill-publish) | Validate, sign (Ed25519) and publish a skill to the marketplace | Local write | Apply | Operator | Text |
 | [`deckent review`](#deckent-review) | Review sprint tasks with evaluations | Local write | Apply | Operator | Text and JSON |
 | [`deckent finalize`](#deckent-finalize) | Finalize a sprint: update MEMORY.md, RETRO.md, IDENTITY.md, config, and run decay | Local write | Apply | Operator | Text |
-| [`deckent explain`](#deckent-explain) | Explain what the last sprint did in human-friendly language | Read-only | Read | Open | Text and JSON |
+| [`deckent explain`](#deckent-explain) | Explain what the last sprint did in human-friendly language | Read-only | Read | Open | Text |
 | [`deckent set-directives`](#deckent-set-directives) | Write sprint goals to DIRECTIVES.md (content, file, or stdin) | Local write | Apply | Operator | Text |
 | [`deckent connect`](#deckent-connect) | Diagnose provider/MCP/IDE/shell connection status (read-only — no changes are made) | Read-only | Read | Open | Text and JSON |
 | [`deckent plan-nl`](#deckent-plan-nl) | Turn a free-form goal into a DIRECTIVES.md scaffold (single-task template; preview by default) | Read by default; explicit options may mutate state | Read | Operator | Text |
 | [`deckent do`](#deckent-do) | Golden-flow: turn a goal into a sprint plan (dry-run preview by default; --run to actually start it) | Process control | Preview; explicit apply required | Operator | Text |
 | [`deckent heartbeat`](#deckent-heartbeat) | Run proactive heartbeat tasks from .deckent/HEARTBEAT.md | Process control | Apply | Operator | Text |
 | [`deckent chat`](#deckent-chat) | Start a conversational session with Deckent. Uses your installed AI CLI. | Process control | Apply | Operator | Text |
-| [`deckent checkpoint`](#deckent-checkpoint) | Manage human checkpoints — list, approve, or reject pending checkpoints | Command group (help only) | Read | Open | Text |
+| [`deckent checkpoint`](#deckent-checkpoint) | Manage human checkpoints — list, approve, or reject pending checkpoints | Read by default; explicit options may mutate state | Read | Operator | Text |
 | [`deckent checkpoint list`](#deckent-checkpoint-list) | List all checkpoints | Read-only | Read | Open | Text and JSON |
 | [`deckent checkpoint approve`](#deckent-checkpoint-approve) | Approve a pending checkpoint | Local write | Apply | Operator | Text |
 | [`deckent checkpoint reject`](#deckent-checkpoint-reject) | Reject a pending checkpoint | Local write | Apply | Operator | Text |
@@ -120,9 +127,11 @@ This reference covers every public command path, option, positional argument, ef
 | [`deckent cost show`](#deckent-cost-show) | Display model pricing (read-only) | Read-only | Read | Open | Text |
 | [`deckent cost update`](#deckent-cost-update) | Fetch latest pricing from LiteLLM + OpenRouter | Local write | Apply | Operator | Text |
 | [`deckent cost budget`](#deckent-cost-budget) | View or set cost budgets | Read by default; explicit options may mutate state | Read | Operator | Text |
-| [`deckent recall`](#deckent-recall) | Search project memory — ADRs, sprint learnings, patterns, debt | Read-only | Read | Open | Text and JSON |
+| [`deckent recall`](#deckent-recall) | Search project memory — ADRs, sprint learnings, patterns, debt | Read-only | Read | Open | Text |
 | [`deckent remember`](#deckent-remember) | Store a note in project memory | Local write | Apply | Operator | Text |
 | [`deckent memory`](#deckent-memory) | Memory V2 management | Command group (help only) | Read | Open | Text |
+| [`deckent memory recall`](#deckent-memory-recall) | Search project memory — ADRs, sprint learnings, patterns, debt | Read-only | Read | Open | Text and JSON |
+| [`deckent memory remember`](#deckent-memory-remember) | Store a note in project memory | Local write | Apply | Operator | Text |
 | [`deckent memory rebuild`](#deckent-memory-rebuild) | Rebuild memory.db from .brain/exports/*.md files | Local write | Apply | Operator | Text |
 | [`deckent memory export`](#deckent-memory-export) | Export memory.db to .brain/exports/*.md | Local write | Apply | Operator | Text |
 | [`deckent memory stats`](#deckent-memory-stats) | Show memory.db statistics | Read-only | Read | Open | Text |
@@ -159,15 +168,16 @@ This reference covers every public command path, option, positional argument, ef
 | [`deckent features`](#deckent-features) | List features from .deckent/settings/features-manifest.json by category | Read-only | Read | Open | Text and JSON |
 | [`deckent truth`](#deckent-truth) | Resolve the 4-level feature truth-chain (code → wired → enabled → proof) for manifest truth-blocks | Read by default; explicit options may mutate state | Read | Operator | Text and JSON |
 | [`deckent audit`](#deckent-audit) | Run Brain Self-Audit Gate for a sprint, or query/export/retain audit log events (query \| compliance \| forward \| retention) | Process control | Preview; explicit apply required | Operator | Text and JSON |
-| [`deckent audit-verify`](#deckent-audit-verify) | Verify the audit log HMAC chain for tamper evidence | Read-only | Read | Open | Text and JSON |
+| [`deckent audit verify`](#deckent-audit-verify) | Verify the audit log HMAC chain for tamper evidence | Read-only | Read | Open | Text and JSON |
+| [`deckent audit-verify`](#deckent-audit-verify) | Verify the audit log HMAC chain for tamper evidence | Read-only | Read | Open | Text |
 | [`deckent recover`](#deckent-recover) | Recover a crashed or stuck sprint through the canonical recovery operation | Local write | Apply | Operator | Text and JSON |
 | [`deckent models`](#deckent-models) | Manage and browse the model catalog | Command group (help only) | Read | Open | Text |
-| [`deckent models list`](#deckent-models-list) | List available models from the catalog | Read-only | Read | Owner | Text |
+| [`deckent models list`](#deckent-models-list) | List available models from the catalog | Read-only | Read | Owner | Text and JSON |
 | [`deckent models activate`](#deckent-models-activate) | Allow a detected model to enter the routing pool | Local write | Apply | Owner | Text |
 | [`deckent models deactivate`](#deckent-models-deactivate) | Remove a model from the routing pool (detection still sees it) | Local write | Apply | Owner | Text |
 | [`deckent models activation`](#deckent-models-activation) | Show recorded model activation decisions (unrecorded = active) | Read-only | Read | Open | Text |
 | [`deckent models policy`](#deckent-models-policy) | Show or set a provider activation policy (implicit-active \| explicit-active) | Read by default; explicit options may mutate state | Read | Owner | Text |
-| [`deckent models active-set`](#deckent-models-active-set) | Show the resolved owner active execution set + snapshot digest | Read-only | Read | Open | Text |
+| [`deckent models active-set`](#deckent-models-active-set) | Show the resolved owner active execution set + snapshot digest | Read-only | Read | Open | Text and JSON |
 | [`deckent models refresh`](#deckent-models-refresh) | Force-refresh the model catalog (invalidates 24h cache) | Local write | Apply | Owner | Text |
 | [`deckent models tier`](#deckent-models-tier) | Look up the tier of a specific model by ID or API ID | Local write | Apply | Owner | Text |
 | [`deckent flow`](#deckent-flow) | Manage scheduled flows (process mode) | Command group (help only) | Read | Open | Text |
@@ -183,6 +193,10 @@ This reference covers every public command path, option, positional argument, ef
 | [`deckent evolve`](#deckent-evolve) | Evolution analysis — cross-sprint trends and prompt suggestions | Command group (help only) | Read | Open | Text |
 | [`deckent evolve report`](#deckent-evolve-report) | Show cross-sprint agent/skill trend report | Read-only | Read | Open | Text and JSON |
 | [`deckent autonomous`](#deckent-autonomous) | Autonomous runtime — authority-bounded continuous loop | Command group (help only) | Read | Open | Text |
+| [`deckent autonomous mission`](#deckent-autonomous-mission) | Manage autonomous missions created from work lists or goals | Command group (help only) | Read | Open | Text |
+| [`deckent autonomous mission create-list`](#deckent-autonomous-mission-create-list) | Create an autonomous mission from one or more work items | Autonomous loop control | Apply | Owner | Text |
+| [`deckent autonomous mission create-goal`](#deckent-autonomous-mission-create-goal) | Create an autonomous mission that runs until its goal is reached | Autonomous loop control | Apply | Owner | Text |
+| [`deckent autonomous mission list`](#deckent-autonomous-mission-list) | List all missions (summary table) | Read-only | Read | Owner | Text and JSON |
 | [`deckent autonomous enable`](#deckent-autonomous-enable) | Enable autonomous mode (one command instead of editing config; default stays OFF) | Autonomous loop control | Apply | Owner | Text |
 | [`deckent autonomous start`](#deckent-autonomous-start) | Start the autonomous loop (default-deny + human-approval gate) | Autonomous loop control | Apply | Owner | Text |
 | [`deckent autonomous plan`](#deckent-autonomous-plan) | Decompose a high-level goal into pending autonomous backlog items | Autonomous loop control | Apply | Owner | Text |
@@ -196,7 +210,7 @@ This reference covers every public command path, option, positional argument, ef
 | [`deckent autonomous backlog add`](#deckent-autonomous-backlog-add) | Add a new entry to the autonomous backlog | Autonomous loop control | Apply | Owner | Text |
 | [`deckent autonomous backlog list`](#deckent-autonomous-backlog-list) | List autonomous backlog entries | Read-only | Read | Owner | Text |
 | [`deckent autonomous backlog remove`](#deckent-autonomous-backlog-remove) | Remove an entry from the autonomous backlog (positional id or --id) | Destructive process control | Apply | Owner | Text |
-| [`deckent autonomous-mission`](#deckent-autonomous-mission) | Manage autonomous missions created from work lists or goals | Command group (help only) | Read | Open | Text |
+| [`deckent autonomous-mission`](#deckent-autonomous-mission) | Manage autonomous missions created from work lists or goals | Read by default; explicit options may mutate state | Read | Operator | Text |
 | [`deckent autonomous-mission create-list`](#deckent-autonomous-mission-create-list) | Create an autonomous mission from one or more work items | Autonomous loop control | Apply | Owner | Text |
 | [`deckent autonomous-mission create-goal`](#deckent-autonomous-mission-create-goal) | Create an autonomous mission that runs until its goal is reached | Autonomous loop control | Apply | Owner | Text |
 | [`deckent autonomous-mission list`](#deckent-autonomous-mission-list) | List all missions (summary table) | Read-only | Read | Owner | Text and JSON |
@@ -230,16 +244,17 @@ This reference covers every public command path, option, positional argument, ef
 | [`deckent approvals`](#deckent-approvals) | Runtime-wide approval inbox — list pending requests and decide them over the live-authenticated local-terminal channel | Command group (help only) | Read | Open | Text |
 | [`deckent approvals list`](#deckent-approvals-list) | List pending approval requests | Read-only | Read | Owner | Text |
 | [`deckent approvals decide`](#deckent-approvals-decide) | Decide one pending approval request; requires an interactive TTY re-authentication | Local write | Apply | Owner | Text |
+| [`deckent approvals run`](#deckent-approvals-run) | Run pending LLM-adapter confirmations through cross-provider adjudication (xverify runtime) | Process control | Apply | Owner | Text |
 | [`deckent approvals rules`](#deckent-approvals-rules) | Persistent approval rules (approval-rules.json) — list, disable, enable, remove | Command group (help only) | Read | Open | Text |
 | [`deckent approvals rules list`](#deckent-approvals-rules-list) | List rules with status | Read-only | Read | Owner | Text |
 | [`deckent approvals rules apply`](#deckent-approvals-rules-apply) | Apply active rules to the current pending inbox (routine-tier automatable kinds only) | Local write | Apply | Owner | Text |
 | [`deckent approvals rules disable`](#deckent-approvals-rules-disable) | Disable a rule (kept for audit; re-enable any time) | Local write | Apply | Owner | Text |
 | [`deckent approvals rules enable`](#deckent-approvals-rules-enable) | Re-enable a disabled rule | Local write | Apply | Owner | Text |
 | [`deckent approvals rules remove`](#deckent-approvals-rules-remove) | Remove a rule permanently | Destructive process control | Apply | Owner | Text |
-| [`deckent confirmations`](#deckent-confirmations) | Custom-confirmation inbox — pending acceptance-matrix routes (llm/human/code adapters) | Command group (help only) | Read | Open | Text |
-| [`deckent confirmations list`](#deckent-confirmations-list) | List pending confirmation requests | Read-only | Read | Owner | Text |
-| [`deckent confirmations decide`](#deckent-confirmations-decide) | Decide one HUMAN-adapter confirmation (interactive terminal, single-shot) | Local write | Apply | Owner | Text |
-| [`deckent confirmations run`](#deckent-confirmations-run) | Run pending LLM-adapter confirmations through cross-provider adjudication (xverify runtime) | Local write | Apply | Owner | Text |
+| [`deckent confirmations`](#deckent-confirmations) | Custom-confirmation inbox — pending acceptance-matrix routes (llm/human/code adapters) | Read by default; explicit options may mutate state | Read | Operator | Text |
+| [`deckent confirmations list`](#deckent-confirmations-list) | List pending approval requests | Read-only | Read | Owner | Text |
+| [`deckent confirmations decide`](#deckent-confirmations-decide) | Decide one pending approval request; requires an interactive TTY re-authentication | Local write | Apply | Owner | Text |
+| [`deckent confirmations run`](#deckent-confirmations-run) | Run pending LLM-adapter confirmations through cross-provider adjudication (xverify runtime) | Process control | Apply | Owner | Text |
 | [`deckent provider-authority`](#deckent-provider-authority) | Inspect and provision the host-scoped provider authority keyring (owner-gated) | Command group (help only) | Read | Open | Text |
 | [`deckent provider-authority keyring`](#deckent-provider-authority-keyring) | Provider authority keyring — status / init / rotate | Command group (help only) | Read | Open | Text |
 | [`deckent provider-authority keyring status`](#deckent-provider-authority-keyring-status) | Show keyring location and revision state (never prints key material) | Read-only | Read | Owner | Text |
@@ -409,6 +424,7 @@ Projects the current run lifecycle, logical task progress, worker evidence, and 
 | `--no-color` | Disable ANSI color in rendered text output. |
 | `--graph` | Render the active run dependency graph as Mermaid text. |
 | `--mode <mode>` | Select a render identifier currently accepted by the handler: explainatory (explanatory view), standart (standard view), verbose, or json. |
+| `--debt` | Show the DB-first tech-debt summary and exit |
 
 ---
 
@@ -445,7 +461,10 @@ Inspect canonical runs or task detail
 
 Attach to the tmux orchestra session
 
-**Usage:** `deckent attach`
+**Usage:** `deckent attach [args...]`
+
+> Command "attach" is deprecated; use "watch" instead.
+> `deckent watch` — Follow a live worker (docker logs / tmux pane / subprocess log) with --follow <taskId>, or open the tmux dashboard split
 
 ### Execution contract
 
@@ -453,11 +472,11 @@ Attach to the tmux orchestra session
 |---|---|---|---|---|---|
 | Process control | Apply | Operator | Text | `darwin`, `linux`, `win32` | None |
 
-### Options
+### Arguments
 
-| Flags | Description |
-|---|---|
-| `--list` | List all tmux windows without attaching |
+| Argument | Description | Required | Variadic |
+|---|---|---|---|
+| `[args...]` | Arguments forwarded verbatim to the top-level command this alias delegates to | No | Yes |
 
 ---
 
@@ -540,6 +559,8 @@ Show the latest sprint retrospective
 | `--json` | Emit the read-model projection as JSON instead of a rendered table |
 | `--perf` | Add the agent and skill performance projections |
 | `--trend [n]` | Add a success-rate trend projection across the last N sprint entries (default: 5) |
+| `--explain` | Explain the retrospective task evidence |
+| `--task <id>` | Explain one specific task |
 
 ---
 
@@ -748,13 +769,16 @@ Migrate config.json to the latest full format (adds missing fields with defaults
 
 | Effect | Default execution | Authority | Output | Platforms | Aliases |
 |---|---|---|---|---|---|
-| Local write | Apply | Operator | Text | `darwin`, `linux`, `win32` | None |
+| Local write | Apply | Operator | Text and JSON | `darwin`, `linux`, `win32` | None |
 
 ### Options
 
 | Flags | Description |
 |---|---|
 | `--dry-run` | Show what would be changed without modifying files |
+| `--native-provider <provider>` | Explicit native provider target (requires --native-model) |
+| `--native-model <model>` | Exact native model ID; no legacy aliases or surrounding whitespace (requires --native-provider) |
+| `--json` | Print a structured migration result |
 
 ---
 
@@ -1150,7 +1174,10 @@ Analyze project stack, size, and recommended methodology
 
 Report tech-debt status (DB-first; resolved debt is auto-managed in memory.db)
 
-**Usage:** `deckent archive-debt`
+**Usage:** `deckent archive-debt [args...]`
+
+> Command "archive-debt" is deprecated; use "status --debt" instead.
+> `deckent status --debt` — Show the current run dashboard
 
 ### Execution contract
 
@@ -1158,12 +1185,11 @@ Report tech-debt status (DB-first; resolved debt is auto-managed in memory.db)
 |---|---|---|---|---|---|
 | Read-only | Read | Open | Text | `darwin`, `linux`, `win32` | None |
 
-### Options
+### Arguments
 
-| Flags | Description |
-|---|---|
-| `--count` | Project only the open/resolved counts, not the individual entries |
-| `--before <sprint>` | Also project resolved entries that originate before this sprint ID |
+| Argument | Description | Required | Variadic |
+|---|---|---|---|
+| `[args...]` | Arguments forwarded verbatim to the top-level command this alias delegates to | No | Yes |
 
 ---
 
@@ -1333,21 +1359,22 @@ Repair one proven strict-prefix terminal journal with receipt-bound authority
 
 Show terminal dashboard with auto-refresh (see also: deckent status --watch)
 
-**Usage:** `deckent dashboard`
+**Usage:** `deckent dashboard [args...]`
+
+> Command "dashboard" is deprecated; use "status --watch" instead.
+> `deckent status --watch` — Show the current run dashboard
 
 ### Execution contract
 
 | Effect | Default execution | Authority | Output | Platforms | Aliases |
 |---|---|---|---|---|---|
-| Read-only | Read | Open | Text and JSON | `darwin`, `linux`, `win32` | None |
+| Read-only | Read | Open | Text | `darwin`, `linux`, `win32` | None |
 
-### Options
+### Arguments
 
-| Flags | Description |
-|---|---|
-| `--interval <ms>` | Refresh interval in milliseconds (used as fallback when fs.watch unavailable) |
-| `--no-color` | Disable ANSI colors (also respects NO_COLOR env var) |
-| `--json` | Output dashboard state as raw JSON and exit (shared format with deckent status --raw) |
+| Argument | Description | Required | Variadic |
+|---|---|---|---|
+| `[args...]` | Arguments forwarded verbatim to the top-level command this alias delegates to | No | Yes |
 
 ---
 
@@ -1421,6 +1448,121 @@ Follow a live worker (docker logs / tmux pane / subprocess log) with --follow <t
 
 ---
 
+<a id="deckent-watch-output"></a>
+## `deckent watch output`
+
+Read or follow exact worker output without changing worker execution
+
+**Usage:** `deckent watch output <taskId>`
+
+### Execution contract
+
+| Effect | Default execution | Authority | Output | Platforms | Aliases |
+|---|---|---|---|---|---|
+| Read-only | Read | Open | Text and JSON | `darwin`, `linux`, `win32` | None |
+
+### Options
+
+| Flags | Description |
+|---|---|
+| `--tail <n>` | Show at most the last N complete lines |
+| `--follow` | Continue observing new output; stopping the view does not stop the worker |
+| `--sprint-id <id>` | Require an exact sprint identifier |
+| `--attempt-id <id>` | Select an exact attempt identifier |
+| `--dispatch-request-id <id>` | Select an exact dispatch request identifier |
+| `--json` | Emit machine-readable NDJSON events |
+| `--lang <lang>` | Output language (en or tr) |
+
+### Arguments
+
+| Argument | Description | Required | Variadic |
+|---|---|---|---|
+| `<taskId>` | Exact worker task identifier | Yes | No |
+
+---
+
+<a id="deckent-intelligence"></a>
+## `deckent intelligence`
+
+Inspect and run competitor intelligence
+
+**Usage:** `deckent intelligence`
+
+### Execution contract
+
+| Effect | Default execution | Authority | Output | Platforms | Aliases |
+|---|---|---|---|---|---|
+| Command group (help only) | Read | Open | Text | `darwin`, `linux`, `win32` | None |
+
+---
+
+<a id="deckent-intelligence-watch"></a>
+## `deckent intelligence watch`
+
+Manage competitor-watch execution
+
+**Usage:** `deckent intelligence watch`
+
+### Execution contract
+
+| Effect | Default execution | Authority | Output | Platforms | Aliases |
+|---|---|---|---|---|---|
+| Command group (help only) | Read | Open | Text | `darwin`, `linux`, `win32` | None |
+
+---
+
+<a id="deckent-intelligence-watch-run"></a>
+## `deckent intelligence watch run`
+
+Run the canonical competitor-watch capability
+
+**Usage:** `deckent intelligence watch run`
+
+### Execution contract
+
+| Effect | Default execution | Authority | Output | Platforms | Aliases |
+|---|---|---|---|---|---|
+| Local write | Apply | Operator | Text | `darwin`, `linux`, `win32` | None |
+
+### Options
+
+| Flags | Description |
+|---|---|
+| `--dry-run` | Preview without persisting events, cursors, or notifications |
+| `--input <fixture>` | Read source definitions from a JSON fixture |
+
+---
+
+<a id="deckent-intelligence-schedule"></a>
+## `deckent intelligence schedule`
+
+Ensure and report the canonical daily watch flow
+
+**Usage:** `deckent intelligence schedule`
+
+### Execution contract
+
+| Effect | Default execution | Authority | Output | Platforms | Aliases |
+|---|---|---|---|---|---|
+| Local write | Apply | Operator | Text | `darwin`, `linux`, `win32` | None |
+
+---
+
+<a id="deckent-intelligence-status"></a>
+## `deckent intelligence status`
+
+Show watch event history and last-run state
+
+**Usage:** `deckent intelligence status`
+
+### Execution contract
+
+| Effect | Default execution | Authority | Output | Platforms | Aliases |
+|---|---|---|---|---|---|
+| Read-only | Read | Open | Text | `darwin`, `linux`, `win32` | None |
+
+---
+
 <a id="deckent-run"></a>
 ## `deckent run`
 
@@ -1446,6 +1588,8 @@ Runs one provider-backed task and waits for its recorded result; it does not exe
 | `--provider <name>` | Explicit provider ownership (claude\|codex\|gemini\|cursor\|ollama\|openrouter\|local-llm) — required to register an unseen versioned model ID; validated against the canonical registry. |
 | `--model-effort <level>` | Native model reasoning-effort (claude: low\|medium\|high\|xhigh\|max, codex: minimal\|low\|medium\|high). Opt-in; unsupported or invalid levels are ignored |
 | `--scope <dir>` | Worker scope directory (default: ./) |
+| `--files-write <paths...>` | Exact repo-relative files this task may WRITE (repeat paths after the option). A directory scope alone carries no file authority, so a run that needs a landing checkpoint requires this. |
+| `--files-read <paths...>` | Exact repo-relative files this task may READ as context (repeat paths after the option). |
 | `--timeout <ms>` | Maximum wait time in milliseconds (default: 300000) |
 | `--keep` | Keep task files after completion (skip cleanup) |
 | `--auto-approve` | Pass auto-approve flag to the worker |
@@ -1987,6 +2131,28 @@ Manage skill pool
 
 ---
 
+<a id="deckent-skill-attribution"></a>
+## `deckent skill attribution`
+
+Inspect or apply the causal skill-attribution cutover
+
+**Usage:** `deckent skill attribution`
+
+### Execution contract
+
+| Effect | Default execution | Authority | Output | Platforms | Aliases |
+|---|---|---|---|---|---|
+| Local write | Preview; explicit apply required | Operator | Text and JSON | `darwin`, `linux`, `win32` | None |
+
+### Options
+
+| Flags | Description |
+|---|---|
+| `--apply` | Apply the lossless cutover and write its immutable receipt |
+| `--json` | Emit the read-model projection as JSON instead of a rendered table |
+
+---
+
 <a id="deckent-skill-list"></a>
 ## `deckent skill list`
 
@@ -2279,22 +2445,22 @@ Finalize a sprint: update MEMORY.md, RETRO.md, IDENTITY.md, config, and run deca
 
 Explain what the last sprint did in human-friendly language
 
-**Usage:** `deckent explain`
+**Usage:** `deckent explain [args...]`
+
+> Command "explain" is deprecated; use "retro --explain" instead.
+> `deckent retro --explain` — Show the latest sprint retrospective
 
 ### Execution contract
 
 | Effect | Default execution | Authority | Output | Platforms | Aliases |
 |---|---|---|---|---|---|
-| Read-only | Read | Open | Text and JSON | `darwin`, `linux`, `win32` | None |
+| Read-only | Read | Open | Text | `darwin`, `linux`, `win32` | None |
 
-### Options
+### Arguments
 
-| Flags | Description |
-|---|---|
-| `--sprint <id>` | Project a single stored sprint entry by its sprint ID |
-| `--task <taskId>` | Project the stored routing-decision log for one task ID |
-| `--json` | Emit the read-model projection as JSON instead of a rendered table |
-| `--verbose` | Project every stored learning and the full task detail (default caps learnings at 3) |
+| Argument | Description | Required | Variadic |
+|---|---|---|---|
+| `[args...]` | Arguments forwarded verbatim to the top-level command this alias delegates to | No | Yes |
 
 ---
 
@@ -2347,7 +2513,10 @@ Diagnose provider/MCP/IDE/shell connection status (read-only — no changes are 
 
 Turn a free-form goal into a DIRECTIVES.md scaffold (single-task template; preview by default)
 
-**Usage:** `deckent plan-nl <goal>`
+**Usage:** `deckent plan-nl [args...]`
+
+> Command "plan-nl" is deprecated; use "do" instead.
+> `deckent do` — Golden-flow: turn a goal into a sprint plan (dry-run preview by default; --run to actually start it)
 
 ### Execution contract
 
@@ -2355,17 +2524,11 @@ Turn a free-form goal into a DIRECTIVES.md scaffold (single-task template; previ
 |---|---|---|---|---|---|
 | Read by default; explicit options may mutate state | Read | Operator | Text | `darwin`, `linux`, `win32` | None |
 
-### Options
-
-| Flags | Description |
-|---|---|
-| `--write` | Write the scaffold to DIRECTIVES.md (any existing file is backed up first) |
-
 ### Arguments
 
 | Argument | Description | Required | Variadic |
 |---|---|---|---|
-| `<goal>` | Free-form description of what the sprint should accomplish | Yes | No |
+| `[args...]` | Arguments forwarded verbatim to the top-level command this alias delegates to | No | Yes |
 
 ---
 
@@ -2459,13 +2622,22 @@ Start a conversational session with Deckent. Uses your installed AI CLI.
 
 Manage human checkpoints — list, approve, or reject pending checkpoints
 
-**Usage:** `deckent checkpoint`
+**Usage:** `deckent checkpoint [args...]`
+
+> Command "checkpoint" is deprecated; use "approvals" instead.
+> `deckent approvals` — Runtime-wide approval inbox — list pending requests and decide them over the live-authenticated local-terminal channel
 
 ### Execution contract
 
 | Effect | Default execution | Authority | Output | Platforms | Aliases |
 |---|---|---|---|---|---|
-| Command group (help only) | Read | Open | Text | `darwin`, `linux`, `win32` | None |
+| Read by default; explicit options may mutate state | Read | Operator | Text | `darwin`, `linux`, `win32` | None |
+
+### Arguments
+
+| Argument | Description | Required | Variadic |
+|---|---|---|---|
+| `[args...]` | Arguments forwarded verbatim to the top-level command this alias delegates to | No | Yes |
 
 ---
 
@@ -2764,6 +2936,9 @@ Show captured output for a specific worker task
 
 **Usage:** `deckent output <taskId>`
 
+> Command "output" is deprecated; use "watch output" instead.
+> `deckent watch output` — Read or follow exact worker output without changing worker execution
+
 ### Execution contract
 
 | Effect | Default execution | Authority | Output | Platforms | Aliases |
@@ -2774,16 +2949,19 @@ Show captured output for a specific worker task
 
 | Flags | Description |
 |---|---|
-| `--tail <n>` | Show the last N lines of the persisted worker output (default: 50) |
-| `--follow` | Re-read the persisted output file every 2 seconds (polling, not a live process attach) |
-| `--sprint-id <sprintId>` | Sprint to read the persisted evidence from (defaults to the current sprint) |
-| `--json` | Output raw JSON |
+| `--tail <n>` | Show at most the last N complete lines |
+| `--follow` | Continue observing new output; stopping the view does not stop the worker |
+| `--sprint-id <id>` | Require an exact sprint identifier |
+| `--attempt-id <id>` | Select an exact attempt identifier |
+| `--dispatch-request-id <id>` | Select an exact dispatch request identifier |
+| `--json` | Emit machine-readable NDJSON events |
+| `--lang <lang>` | Output language (en or tr) |
 
 ### Arguments
 
 | Argument | Description | Required | Variadic |
 |---|---|---|---|
-| `<taskId>` | Worker task whose persisted output evidence should be read | Yes | No |
+| `<taskId>` | Exact worker task identifier | Yes | No |
 
 ---
 
@@ -2822,7 +3000,10 @@ Inspect a task settlement plan; apply only with explicit operator attestation
 | `--apply` | Apply an evidence-eligible reconciliation (default: dry-run) |
 | `--attestation-reason <text>` | Operator-authored reason for the reconciliation (required with --apply) |
 | `--operator <id>` | Stable operator identifier; only its hash-bound opaque reference is persisted (required with --apply) |
-| `--reason-code <code>` | Typed pre-dispatch reason for a declared eventless receipt (no_provider\|budget_capability_unsupported\|provider_authority_rejected\|execution_admission_rejected\|command_build_failed\|fallback_unreachable\|fallback_limit_hold\|fallback_exhausted) |
+| `--reason-code <code>` | Typed pre-dispatch reason for a declared eventless receipt (no_provider\|budget_capability_unsupported\|provider_authority_rejected\|routing_authority_rejected\|execution_admission_rejected\|command_build_failed\|fallback_unreachable\|fallback_limit_hold\|fallback_exhausted) |
+| `--abandon-dispatch` | Terminalize a dispatch that started and then died without a result. The disposition is derived from the absence probe, never chosen: it settles as manual_review_required and refuses while any liveness evidence remains. |
+| `--from-result` | Terminalize a dispatch whose worker DID finish and persist a result while the caller stopped waiting. The disposition is read from the worker's own selfAssessment, never chosen. |
+| `--reproject-status` | Make the task file's status agree with its own TERMINAL receipt. Writes nothing new — the receipt is the authority; this only resolves a task surface left behind by a caller that stopped waiting. |
 | `--json` | Emit the stable machine-readable settlement DTO |
 
 ### Arguments
@@ -2921,7 +3102,70 @@ View or set cost budgets
 
 Search project memory — ADRs, sprint learnings, patterns, debt
 
-**Usage:** `deckent recall <query>`
+**Usage:** `deckent recall [args...]`
+
+> Command "recall" is deprecated; use "memory recall" instead.
+> `deckent memory recall` — Search project memory — ADRs, sprint learnings, patterns, debt
+
+### Execution contract
+
+| Effect | Default execution | Authority | Output | Platforms | Aliases |
+|---|---|---|---|---|---|
+| Read-only | Read | Open | Text | `darwin`, `linux`, `win32` | None |
+
+### Arguments
+
+| Argument | Description | Required | Variadic |
+|---|---|---|---|
+| `[args...]` | Arguments forwarded verbatim to the top-level command this alias delegates to | No | Yes |
+
+---
+
+<a id="deckent-remember"></a>
+## `deckent remember`
+
+Store a note in project memory
+
+**Usage:** `deckent remember [args...]`
+
+> Command "remember" is deprecated; use "memory remember" instead.
+> `deckent memory remember` — Store a note in project memory
+
+### Execution contract
+
+| Effect | Default execution | Authority | Output | Platforms | Aliases |
+|---|---|---|---|---|---|
+| Local write | Apply | Operator | Text | `darwin`, `linux`, `win32` | None |
+
+### Arguments
+
+| Argument | Description | Required | Variadic |
+|---|---|---|---|
+| `[args...]` | Arguments forwarded verbatim to the top-level command this alias delegates to | No | Yes |
+
+---
+
+<a id="deckent-memory"></a>
+## `deckent memory`
+
+Memory V2 management
+
+**Usage:** `deckent memory`
+
+### Execution contract
+
+| Effect | Default execution | Authority | Output | Platforms | Aliases |
+|---|---|---|---|---|---|
+| Command group (help only) | Read | Open | Text | `darwin`, `linux`, `win32` | None |
+
+---
+
+<a id="deckent-memory-recall"></a>
+## `deckent memory recall`
+
+Search project memory — ADRs, sprint learnings, patterns, debt
+
+**Usage:** `deckent memory recall [query]`
 
 ### Execution contract
 
@@ -2938,21 +3182,23 @@ Search project memory — ADRs, sprint learnings, patterns, debt
 | `--sprint-min <n>` | Drop entries recorded before this sprint number |
 | `-m, --mode <mode>` | Full-text token join: or (default, broader) \| and (every token must match) |
 | `--json` | Emit the read-model projection as JSON instead of a rendered table |
+| `--cursor <cursor>` | Continue the same scoped memory query using its next-page reference |
+| `--detail <detailRef>` | Read the complete source record using its exact detail reference |
 
 ### Arguments
 
 | Argument | Description | Required | Variadic |
 |---|---|---|---|
-| `<query>` | Full-text query matched against stored memory entries (title, summary, content) | Yes | No |
+| `[query]` | Full-text query matched against stored memory entries (title, summary, content) | No | No |
 
 ---
 
-<a id="deckent-remember"></a>
-## `deckent remember`
+<a id="deckent-memory-remember"></a>
+## `deckent memory remember`
 
 Store a note in project memory
 
-**Usage:** `deckent remember <note>`
+**Usage:** `deckent memory remember <note>`
 
 ### Execution contract
 
@@ -2973,21 +3219,6 @@ Store a note in project memory
 | Argument | Description | Required | Variadic |
 |---|---|---|---|
 | `<note>` | Note body stored as the entry content | Yes | No |
-
----
-
-<a id="deckent-memory"></a>
-## `deckent memory`
-
-Memory V2 management
-
-**Usage:** `deckent memory`
-
-### Execution contract
-
-| Effect | Default execution | Authority | Output | Platforms | Aliases |
-|---|---|---|---|---|---|
-| Command group (help only) | Read | Open | Text | `darwin`, `linux`, `win32` | None |
 
 ---
 
@@ -3759,11 +3990,11 @@ Run Brain Self-Audit Gate for a sprint, or query/export/retain audit log events 
 ---
 
 <a id="deckent-audit-verify"></a>
-## `deckent audit-verify`
+## `deckent audit verify`
 
 Verify the audit log HMAC chain for tamper evidence
 
-**Usage:** `deckent audit-verify`
+**Usage:** `deckent audit verify`
 
 ### Execution contract
 
@@ -3776,6 +4007,30 @@ Verify the audit log HMAC chain for tamper evidence
 | Flags | Description |
 |---|---|
 | `--json` | Emit the raw projection as JSON and print nothing else |
+
+---
+
+<a id="deckent-audit-verify"></a>
+## `deckent audit-verify`
+
+Verify the audit log HMAC chain for tamper evidence
+
+**Usage:** `deckent audit-verify [args...]`
+
+> Command "audit-verify" is deprecated; use "audit verify" instead.
+> `deckent audit verify` — Verify the audit log HMAC chain for tamper evidence
+
+### Execution contract
+
+| Effect | Default execution | Authority | Output | Platforms | Aliases |
+|---|---|---|---|---|---|
+| Read-only | Read | Open | Text | `darwin`, `linux`, `win32` | None |
+
+### Arguments
+
+| Argument | Description | Required | Variadic |
+|---|---|---|---|
+| `[args...]` | Arguments forwarded verbatim to the top-level command this alias delegates to | No | Yes |
 
 ---
 
@@ -3800,6 +4055,8 @@ Recover a crashed or stuck sprint through the canonical recovery operation
 | `--force` | Skip interactive confirmation |
 | `--skip-audit` | Skip the audit gate |
 | `--restore-tasks` | Restore task files from the pre-archive snapshot instead of recovering forward |
+| `--retain-started-failed <dispatch-request-id>` | Retain one stopped, started-failed dispatch attempt as historical evidence; no archive or resume. |
+| `--retain-committed-unsettled <dispatch-request-id>` | Retain one committed-journal, release-pending dispatch attempt with unresolved settlement; no archive or resume. |
 | `--resume` | Resume a canonically PAUSED/ORPHANED run through its durable checkpoint |
 | `--auto-approve` | Forward auto-approval to the resumed worker run |
 | `--force-scope` | Preserve explicit approval for intentional new write paths while resuming |
@@ -3839,14 +4096,15 @@ List available models from the catalog
 
 | Effect | Default execution | Authority | Output | Platforms | Aliases |
 |---|---|---|---|---|---|
-| Read-only | Read | Owner | Text | `darwin`, `linux`, `win32` | None |
+| Read-only | Read | Owner | Text and JSON | `darwin`, `linux`, `win32` | None |
 
 ### Options
 
 | Flags | Description |
 |---|---|
-| `--provider <name>` | Restrict the catalog projection to one provider (claude, codex, gemini, ollama, cursor) |
+| `--provider <name>` | Restrict the catalog projection to one provider (claude, codex, cursor, gemini, ollama) |
 | `--offline` | Read the cached or bundled catalog only; never reach the network |
+| `--json` | Emit the read-model projection as JSON instead of a rendered table |
 
 ---
 
@@ -3855,7 +4113,7 @@ List available models from the catalog
 
 Allow a detected model to enter the routing pool
 
-**Usage:** `deckent models activate <model>`
+**Usage:** `deckent models activate [model]`
 
 ### Execution contract
 
@@ -3868,12 +4126,13 @@ Allow a detected model to enter the routing pool
 | Flags | Description |
 |---|---|
 | `--provider <name>` | Provider that serves this model |
+| `--offline` | Read the cached or bundled catalog only; never reach the network |
 
 ### Arguments
 
 | Argument | Description | Required | Variadic |
 |---|---|---|---|
-| `<model>` | Model ID exactly as the catalog entry records it | Yes | No |
+| `[model]` | Model ID exactly as the catalog entry records it | No | No |
 
 ---
 
@@ -3882,7 +4141,7 @@ Allow a detected model to enter the routing pool
 
 Remove a model from the routing pool (detection still sees it)
 
-**Usage:** `deckent models deactivate <model>`
+**Usage:** `deckent models deactivate [model]`
 
 ### Execution contract
 
@@ -3895,12 +4154,13 @@ Remove a model from the routing pool (detection still sees it)
 | Flags | Description |
 |---|---|
 | `--provider <name>` | Provider that serves this model |
+| `--offline` | Read the cached or bundled catalog only; never reach the network |
 
 ### Arguments
 
 | Argument | Description | Required | Variadic |
 |---|---|---|---|
-| `<model>` | Model ID exactly as the catalog entry records it | Yes | No |
+| `[model]` | Model ID exactly as the catalog entry records it | No | No |
 
 ---
 
@@ -3952,7 +4212,14 @@ Show the resolved owner active execution set + snapshot digest
 
 | Effect | Default execution | Authority | Output | Platforms | Aliases |
 |---|---|---|---|---|---|
-| Read-only | Read | Open | Text | `darwin`, `linux`, `win32` | None |
+| Read-only | Read | Open | Text and JSON | `darwin`, `linux`, `win32` | None |
+
+### Options
+
+| Flags | Description |
+|---|---|
+| `--offline` | Read the cached or bundled catalog only; never reach the network |
+| `--json` | Emit the read-model projection as JSON instead of a rendered table |
 
 ---
 
@@ -4256,6 +4523,105 @@ Autonomous runtime — authority-bounded continuous loop
 | Effect | Default execution | Authority | Output | Platforms | Aliases |
 |---|---|---|---|---|---|
 | Command group (help only) | Read | Open | Text | `darwin`, `linux`, `win32` | None |
+
+---
+
+<a id="deckent-autonomous-mission"></a>
+## `deckent autonomous mission`
+
+Manage autonomous missions created from work lists or goals
+
+**Usage:** `deckent autonomous mission`
+
+### Execution contract
+
+| Effect | Default execution | Authority | Output | Platforms | Aliases |
+|---|---|---|---|---|---|
+| Command group (help only) | Read | Open | Text | `darwin`, `linux`, `win32` | None |
+
+---
+
+<a id="deckent-autonomous-mission-create-list"></a>
+## `deckent autonomous mission create-list`
+
+Create an autonomous mission from one or more work items
+
+**Usage:** `deckent autonomous mission create-list <title>`
+
+### Execution contract
+
+| Effect | Default execution | Authority | Output | Platforms | Aliases |
+|---|---|---|---|---|---|
+| Autonomous loop control | Apply | Owner | Text | `darwin`, `linux`, `win32` | None |
+
+### Options
+
+| Flags | Description |
+|---|---|
+| `--item <kind:spec>` | Work item to add, as kind or kind:json-spec. Repeat the flag once per item. |
+| `--items-file <path>` | JSON file holding the array of mission items to create the list from. |
+| `--id <id>` | Mission identifier; one is generated when the flag is omitted. |
+| `--tenant <tenant>` | Record the entry under this tenant identifier instead of the default tenant. |
+| `--deliver-to <channel>` | Channel the settled-mission notification is delivered to. |
+
+### Arguments
+
+| Argument | Description | Required | Variadic |
+|---|---|---|---|
+| `<title>` | Human-readable title of the mission list to create. | Yes | No |
+
+---
+
+<a id="deckent-autonomous-mission-create-goal"></a>
+## `deckent autonomous mission create-goal`
+
+Create an autonomous mission that runs until its goal is reached
+
+**Usage:** `deckent autonomous mission create-goal <goal>`
+
+### Execution contract
+
+| Effect | Default execution | Authority | Output | Platforms | Aliases |
+|---|---|---|---|---|---|
+| Autonomous loop control | Apply | Owner | Text | `darwin`, `linux`, `win32` | None |
+
+### Options
+
+| Flags | Description |
+|---|---|
+| `--accept <criteria>` | Acceptance criteria the mission is settled against. |
+| `--title <title>` | Mission title; defaults to the goal text when omitted. |
+| `--id <id>` | Mission identifier; one is generated when the flag is omitted. |
+| `--tenant <tenant>` | Record the entry under this tenant identifier instead of the default tenant. |
+| `--deliver-to <channel>` | Channel the settled-mission notification is delivered to. |
+
+### Arguments
+
+| Argument | Description | Required | Variadic |
+|---|---|---|---|
+| `<goal>` | Goal statement the mission planner should decompose. | Yes | No |
+
+---
+
+<a id="deckent-autonomous-mission-list"></a>
+## `deckent autonomous mission list`
+
+List all missions (summary table)
+
+**Usage:** `deckent autonomous mission list`
+
+### Execution contract
+
+| Effect | Default execution | Authority | Output | Platforms | Aliases |
+|---|---|---|---|---|---|
+| Read-only | Read | Owner | Text and JSON | `darwin`, `linux`, `win32` | None |
+
+### Options
+
+| Flags | Description |
+|---|---|
+| `--json` | Emit the result as one machine-readable JSON document instead of formatted text. |
+| `--tenant <tenant>` | Restrict the listing to entries owned by this tenant identifier. |
 
 ---
 
@@ -4587,13 +4953,22 @@ Remove an entry from the autonomous backlog (positional id or --id)
 
 Manage autonomous missions created from work lists or goals
 
-**Usage:** `deckent autonomous-mission`
+**Usage:** `deckent autonomous-mission [args...]`
+
+> Command "autonomous-mission" is deprecated; use "autonomous mission" instead.
+> `deckent autonomous mission` — Manage autonomous missions created from work lists or goals
 
 ### Execution contract
 
 | Effect | Default execution | Authority | Output | Platforms | Aliases |
 |---|---|---|---|---|---|
-| Command group (help only) | Read | Open | Text | `darwin`, `linux`, `win32` | None |
+| Read by default; explicit options may mutate state | Read | Operator | Text | `darwin`, `linux`, `win32` | None |
+
+### Arguments
+
+| Argument | Description | Required | Variadic |
+|---|---|---|---|
+| `[args...]` | Arguments forwarded verbatim to the top-level command this alias delegates to | No | Yes |
 
 ---
 
@@ -4603,6 +4978,9 @@ Manage autonomous missions created from work lists or goals
 Create an autonomous mission from one or more work items
 
 **Usage:** `deckent autonomous-mission create-list <title>`
+
+> Command "autonomous-mission" is deprecated; use "autonomous mission" instead.
+> `deckent autonomous mission create-list` — Create an autonomous mission from one or more work items
 
 ### Execution contract
 
@@ -4635,6 +5013,9 @@ Create an autonomous mission that runs until its goal is reached
 
 **Usage:** `deckent autonomous-mission create-goal <goal>`
 
+> Command "autonomous-mission" is deprecated; use "autonomous mission" instead.
+> `deckent autonomous mission create-goal` — Create an autonomous mission that runs until its goal is reached
+
 ### Execution contract
 
 | Effect | Default execution | Authority | Output | Platforms | Aliases |
@@ -4665,6 +5046,9 @@ Create an autonomous mission that runs until its goal is reached
 List all missions (summary table)
 
 **Usage:** `deckent autonomous-mission list`
+
+> Command "autonomous-mission" is deprecated; use "autonomous mission" instead.
+> `deckent autonomous mission list` — List all missions (summary table)
 
 ### Execution contract
 
@@ -5234,6 +5618,9 @@ Check live subscription-window usage (session/week) and the configured start-gat
 | Flags | Description |
 |---|---|
 | `--json` | Emit the result as one machine-readable JSON document instead of formatted text. |
+| `--claude` | Show Claude provider limits |
+| `--codex` | Show Codex provider limits |
+| `--cursor` | Show Cursor provider limits |
 
 ---
 
@@ -5321,6 +5708,12 @@ List pending approval requests
 |---|---|---|---|---|---|
 | Read-only | Read | Owner | Text | `darwin`, `linux`, `win32` | None |
 
+### Options
+
+| Flags | Description |
+|---|---|
+| `--class <name>` | Filter the federated inbox by class |
+
 ---
 
 <a id="deckent-approvals-decide"></a>
@@ -5350,6 +5743,29 @@ Decide one pending approval request; requires an interactive TTY re-authenticati
 | Argument | Description | Required | Variadic |
 |---|---|---|---|
 | `<requestId>` | Pending approval request identifier to decide. | Yes | No |
+
+---
+
+<a id="deckent-approvals-run"></a>
+## `deckent approvals run`
+
+Run pending LLM-adapter confirmations through cross-provider adjudication (xverify runtime)
+
+**Usage:** `deckent approvals run`
+
+### Execution contract
+
+| Effect | Default execution | Authority | Output | Platforms | Aliases |
+|---|---|---|---|---|---|
+| Process control | Apply | Owner | Text | `darwin`, `linux`, `win32` | None |
+
+### Options
+
+| Flags | Description |
+|---|---|
+| `--id <id>` | run a single pending llm confirmation |
+| `--author <provider>` | author provider when the request carries none |
+| `--timeout <ms>` | verifier timeout in milliseconds |
 
 ---
 
@@ -5466,22 +5882,34 @@ Remove a rule permanently
 
 Custom-confirmation inbox — pending acceptance-matrix routes (llm/human/code adapters)
 
-**Usage:** `deckent confirmations`
+**Usage:** `deckent confirmations [args...]`
+
+> Command "confirmations" is deprecated; use "approvals" instead.
+> `deckent approvals` — Runtime-wide approval inbox — list pending requests and decide them over the live-authenticated local-terminal channel
 
 ### Execution contract
 
 | Effect | Default execution | Authority | Output | Platforms | Aliases |
 |---|---|---|---|---|---|
-| Command group (help only) | Read | Open | Text | `darwin`, `linux`, `win32` | None |
+| Read by default; explicit options may mutate state | Read | Operator | Text | `darwin`, `linux`, `win32` | None |
+
+### Arguments
+
+| Argument | Description | Required | Variadic |
+|---|---|---|---|
+| `[args...]` | Arguments forwarded verbatim to the top-level command this alias delegates to | No | Yes |
 
 ---
 
 <a id="deckent-confirmations-list"></a>
 ## `deckent confirmations list`
 
-List pending confirmation requests
+List pending approval requests
 
 **Usage:** `deckent confirmations list`
+
+> Command "confirmations" is deprecated; use "approvals" instead.
+> `deckent approvals list` — List pending approval requests
 
 ### Execution contract
 
@@ -5489,14 +5917,23 @@ List pending confirmation requests
 |---|---|---|---|---|---|
 | Read-only | Read | Owner | Text | `darwin`, `linux`, `win32` | None |
 
+### Options
+
+| Flags | Description |
+|---|---|
+| `--class <name>` | Filter the federated inbox by class |
+
 ---
 
 <a id="deckent-confirmations-decide"></a>
 ## `deckent confirmations decide`
 
-Decide one HUMAN-adapter confirmation (interactive terminal, single-shot)
+Decide one pending approval request; requires an interactive TTY re-authentication
 
-**Usage:** `deckent confirmations decide <id>`
+**Usage:** `deckent confirmations decide <requestId>`
+
+> Command "confirmations" is deprecated; use "approvals" instead.
+> `deckent approvals decide` — Decide one pending approval request; requires an interactive TTY re-authentication
 
 ### Execution contract
 
@@ -5508,15 +5945,16 @@ Decide one HUMAN-adapter confirmation (interactive terminal, single-shot)
 
 | Flags | Description |
 |---|---|
-| `--confirm` | record a CONFIRMED verdict |
-| `--reject` | record a FAILED verdict |
-| `--reason <text>` | why (recorded verbatim on the settlement) |
+| `--allow` | Approve the request |
+| `--deny` | Deny the request |
+| `--reason <text>` | Optional decision reason recorded with the outcome |
+| `--always` | after deciding, promote this decision into a persistent routine-tier rule (approval-rules.json) |
 
 ### Arguments
 
 | Argument | Description | Required | Variadic |
 |---|---|---|---|
-| `<id>` | Pending confirmation identifier; decisions are routed to the authenticated approval surface. | Yes | No |
+| `<requestId>` | Pending approval request identifier to decide. | Yes | No |
 
 ---
 
@@ -5527,11 +5965,14 @@ Run pending LLM-adapter confirmations through cross-provider adjudication (xveri
 
 **Usage:** `deckent confirmations run`
 
+> Command "confirmations" is deprecated; use "approvals" instead.
+> `deckent approvals run` — Run pending LLM-adapter confirmations through cross-provider adjudication (xverify runtime)
+
 ### Execution contract
 
 | Effect | Default execution | Authority | Output | Platforms | Aliases |
 |---|---|---|---|---|---|
-| Local write | Apply | Owner | Text | `darwin`, `linux`, `win32` | None |
+| Process control | Apply | Owner | Text | `darwin`, `linux`, `win32` | None |
 
 ### Options
 

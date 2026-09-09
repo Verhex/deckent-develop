@@ -27,7 +27,7 @@ Bu referans her public command path, option, positional argument, effect, defaul
 | [`deckent config import`](#deckent-config-import) | Config'i bir JSON dosyasından içe aktarın | Yerel yazma | Uygula | Operator | Metin |
 | [`deckent config list`](#deckent-config-list) | Tüm config parametrelerini kategoriye göre gruplu listeleyin | Salt-okunur | Oku | Açık | Metin |
 | [`deckent config keys`](#deckent-config-keys) | Tüm config parametre anahtarlarını listeleyin | Salt-okunur | Oku | Açık | Metin |
-| [`deckent config migrate`](#deckent-config-migrate) | config.json'ı en güncel tam formata taşıyın (eksik alanları varsayılanlarla ekler) | Yerel yazma | Uygula | Operator | Metin |
+| [`deckent config migrate`](#deckent-config-migrate) | config.json'ı en güncel tam formata taşıyın (eksik alanları varsayılanlarla ekler) | Yerel yazma | Uygula | Operator | Metin ve JSON |
 | [`deckent config nervous`](#deckent-config-nervous) | Nervous System yetki modunu ve aksiyon override'larını yapılandırın | Yerel yazma | Uygula | Operator | Metin |
 | [`deckent config nervous set`](#deckent-config-nervous-set) | Bir nervous system yapılandırma değeri atayın | Yerel yazma | Uygula | Operator | Metin |
 | [`deckent config nervous override`](#deckent-config-nervous-override) | Aksiyon bazlı bir policy override'ı atayın | Yerel yazma | Uygula | Operator | Metin |
@@ -53,10 +53,16 @@ Bu referans her public command path, option, positional argument, effect, defaul
 | [`deckent archive terminal-inspect`](#deckent-archive-terminal-inspect) | Durumu değiştirmeden canonical hot/archive journal eşliğini inceleyin | Salt-okunur | Oku | Açık | Metin ve JSON |
 | [`deckent archive terminal-verify`](#deckent-archive-terminal-verify) | Durumu değiştirmeden terminal receipt, arşiv bütünlüğü ve Brain adoption doğrulayın | Salt-okunur | Oku | Açık | Metin ve JSON |
 | [`deckent archive terminal-repair`](#deckent-archive-terminal-repair) | Kanıtlanmış tek strict-prefix terminal journal’ı receipt-bound authority ile onarın | Yerel yazma | Uygula | Operator | Metin ve JSON |
-| [`deckent dashboard`](#deckent-dashboard) | Terminal dashboard'u otomatik yenilemeyle gösterin (ayrıca bkz. deckent status --watch) | Salt-okunur | Oku | Açık | Metin ve JSON |
+| [`deckent dashboard`](#deckent-dashboard) | Terminal dashboard'u otomatik yenilemeyle gösterin (ayrıca bkz. deckent status --watch) | Salt-okunur | Oku | Açık | Metin |
 | [`deckent serve`](#deckent-serve) | HTTP API sunucusunu SSE desteğiyle başlatın | Process kontrolü | Uygula | Operator | Metin |
 | [`deckent sync`](#deckent-sync) | Adapter dosyalarını eşitleyin ve son sprint'ten bu yana oluşan dış değişiklikleri tespit edin | Yerel yazma | Uygula | Operator | Metin ve JSON |
 | [`deckent watch`](#deckent-watch) | Canlı bir worker'ı --follow <taskId> ile takip edin (docker logs / tmux pane / subprocess log) veya tmux dashboard split'ini açın | Salt-okunur | Oku | Açık | Stream |
+| [`deckent watch output`](#deckent-watch-output) | Worker execution’ını değiştirmeden tam worker çıktısını oku veya izle | Salt-okunur | Oku | Açık | Metin ve JSON |
+| [`deckent intelligence`](#deckent-intelligence) | Rakip istihbaratını inceleyin ve çalıştırın | Komut grubu (yalnız help) | Oku | Açık | Metin |
+| [`deckent intelligence watch`](#deckent-intelligence-watch) | Rakip izleme çalıştırmasını yönetin | Komut grubu (yalnız help) | Oku | Açık | Metin |
+| [`deckent intelligence watch run`](#deckent-intelligence-watch-run) | Kanonik rakip izleme yeteneğini çalıştırın | Yerel yazma | Uygula | Operator | Metin |
+| [`deckent intelligence schedule`](#deckent-intelligence-schedule) | Kanonik günlük izleme akışını sağlayın ve raporlayın | Yerel yazma | Uygula | Operator | Metin |
+| [`deckent intelligence status`](#deckent-intelligence-status) | İzleme olay geçmişini ve son çalıştırma durumunu gösterin | Salt-okunur | Oku | Açık | Metin |
 | [`deckent run`](#deckent-run) | Sprint döngüsü olmadan tek seferlik bir görev çalıştırın | Process kontrolü | Uygula | Operator | Metin |
 | [`deckent run start`](#deckent-run-start) | Not: 'run start\|status\|retro\|history', üst-düzey 'deckent start\|status\|retro\|history' komutlarının takma adıdır — davranış ve işleyici birebir aynıdır. 'sprint' terimi 'run' olarak yeniden adlandırılıyor. | Process kontrolü | Uygula | Operator | Metin |
 | [`deckent run status`](#deckent-run-status) | Not: 'run start\|status\|retro\|history', üst-düzey 'deckent start\|status\|retro\|history' komutlarının takma adıdır — davranış ve işleyici birebir aynıdır. 'sprint' terimi 'run' olarak yeniden adlandırılıyor. | Salt-okunur | Oku | Açık | Metin |
@@ -80,6 +86,7 @@ Bu referans her public command path, option, positional argument, effect, defaul
 | [`deckent agent reclassify`](#deckent-agent-reclassify) | Kayıtlı bir görev sonucunu yeniden sınıflandırın (agent/skill istatistiklerine delta uygular) | Yerel yazma | Uygula | Operator | Metin |
 | [`deckent agent info`](#deckent-agent-info) | Ayrıntılı agent bilgisini gösterin | Salt-okunur | Oku | Açık | Metin |
 | [`deckent skill`](#deckent-skill) | Skill havuzunu yönetin | Komut grubu (yalnız help) | Oku | Açık | Metin |
+| [`deckent skill attribution`](#deckent-skill-attribution) | Nedensel skill-atıf geçişini inceleyin veya uygulayın | Yerel yazma | Önizleme; explicit apply gerekir | Operator | Metin ve JSON |
 | [`deckent skill list`](#deckent-skill-list) | Tüm skill'leri listeleyin | Salt-okunur | Oku | Açık | Metin ve JSON |
 | [`deckent skill create`](#deckent-skill-create) | Özel bir skill oluşturun | Yerel yazma | Uygula | Operator | Metin |
 | [`deckent skill install`](#deckent-skill-install) | Yerel yoldan veya git URL'den bir skill kurun (sürüm sabitlemeyi destekler: url#tag) | Yerel yazma | Uygula | Operator | Metin |
@@ -92,14 +99,14 @@ Bu referans her public command path, option, positional argument, effect, defaul
 | [`deckent skill publish`](#deckent-skill-publish) | Bir skill'i doğrulayın, imzalayın (Ed25519) ve marketplace'e yayınlayın | Yerel yazma | Uygula | Operator | Metin |
 | [`deckent review`](#deckent-review) | Sprint görevlerini değerlendirmeleriyle birlikte gözden geçirin | Yerel yazma | Uygula | Operator | Metin ve JSON |
 | [`deckent finalize`](#deckent-finalize) | Bir sprinti sonlandır: MEMORY.md, RETRO.md, IDENTITY.md, config ve run decay güncelle | Yerel yazma | Uygula | Operator | Metin |
-| [`deckent explain`](#deckent-explain) | Son sprint'in ne yaptığını insan diliyle açıklayın | Salt-okunur | Oku | Açık | Metin ve JSON |
+| [`deckent explain`](#deckent-explain) | Son sprint'in ne yaptığını insan diliyle açıklayın | Salt-okunur | Oku | Açık | Metin |
 | [`deckent set-directives`](#deckent-set-directives) | Sprint hedeflerini DIRECTIVES.md dosyasına yazın (içerik, dosya veya stdin) | Yerel yazma | Uygula | Operator | Metin |
 | [`deckent connect`](#deckent-connect) | Provider/MCP/IDE/shell bağlantı durumunu teşhis edin (salt-okunur — hiçbir değişiklik yapılmaz) | Salt-okunur | Oku | Açık | Metin ve JSON |
 | [`deckent plan-nl`](#deckent-plan-nl) | Serbest biçimli bir hedefi DIRECTIVES.md iskeletine dönüştürün (tek-görev şablonu; varsayılan önizleme) | Varsayılan salt-okunur; explicit seçenekler state değiştirebilir | Oku | Operator | Metin |
 | [`deckent do`](#deckent-do) | Golden-flow: bir hedefi sprint planına dönüştürün (varsayılan dry-run önizleme; gerçekten başlatmak için --run) | Process kontrolü | Önizleme; explicit apply gerekir | Operator | Metin |
 | [`deckent heartbeat`](#deckent-heartbeat) | .deckent/HEARTBEAT.md içindeki proaktif heartbeat görevlerini çalıştırın | Process kontrolü | Uygula | Operator | Metin |
 | [`deckent chat`](#deckent-chat) | Deckent ile sohbet oturumu başlatın. Kurulu AI CLI'ınızı kullanır. | Process kontrolü | Uygula | Operator | Metin |
-| [`deckent checkpoint`](#deckent-checkpoint) | İnsan checkpoint'lerini yönetin — bekleyenleri listeleyin, onaylayın veya reddedin | Komut grubu (yalnız help) | Oku | Açık | Metin |
+| [`deckent checkpoint`](#deckent-checkpoint) | İnsan checkpoint'lerini yönetin — bekleyenleri listeleyin, onaylayın veya reddedin | Varsayılan salt-okunur; explicit seçenekler state değiştirebilir | Oku | Operator | Metin |
 | [`deckent checkpoint list`](#deckent-checkpoint-list) | Tüm checkpoint'leri listeleyin | Salt-okunur | Oku | Açık | Metin ve JSON |
 | [`deckent checkpoint approve`](#deckent-checkpoint-approve) | Bekleyen bir checkpoint'i onaylayın | Yerel yazma | Uygula | Operator | Metin |
 | [`deckent checkpoint reject`](#deckent-checkpoint-reject) | Bekleyen bir checkpoint'i reddedin | Yerel yazma | Uygula | Operator | Metin |
@@ -120,9 +127,11 @@ Bu referans her public command path, option, positional argument, effect, defaul
 | [`deckent cost show`](#deckent-cost-show) | Model fiyatlandırmasını gösterin (salt-okunur) | Salt-okunur | Oku | Açık | Metin |
 | [`deckent cost update`](#deckent-cost-update) | En güncel fiyatlandırmayı LiteLLM + OpenRouter'dan çekin | Yerel yazma | Uygula | Operator | Metin |
 | [`deckent cost budget`](#deckent-cost-budget) | Maliyet bütçelerini görüntüleyin veya ayarlayın | Varsayılan salt-okunur; explicit seçenekler state değiştirebilir | Oku | Operator | Metin |
-| [`deckent recall`](#deckent-recall) | Proje belleğinde arayın — ADR'ler, sprint öğrenimleri, pattern'ler, borç | Salt-okunur | Oku | Açık | Metin ve JSON |
+| [`deckent recall`](#deckent-recall) | Proje belleğinde arayın — ADR'ler, sprint öğrenimleri, pattern'ler, borç | Salt-okunur | Oku | Açık | Metin |
 | [`deckent remember`](#deckent-remember) | Proje belleğine bir not kaydedin | Yerel yazma | Uygula | Operator | Metin |
 | [`deckent memory`](#deckent-memory) | Memory V2 yönetimi | Komut grubu (yalnız help) | Oku | Açık | Metin |
+| [`deckent memory recall`](#deckent-memory-recall) | Proje belleğinde arayın — ADR'ler, sprint öğrenimleri, pattern'ler, borç | Salt-okunur | Oku | Açık | Metin ve JSON |
+| [`deckent memory remember`](#deckent-memory-remember) | Proje belleğine bir not kaydedin | Yerel yazma | Uygula | Operator | Metin |
 | [`deckent memory rebuild`](#deckent-memory-rebuild) | memory.db'yi .brain/exports/*.md dosyalarından yeniden oluşturun | Yerel yazma | Uygula | Operator | Metin |
 | [`deckent memory export`](#deckent-memory-export) | memory.db'yi .brain/exports/*.md olarak dışa aktarın | Yerel yazma | Uygula | Operator | Metin |
 | [`deckent memory stats`](#deckent-memory-stats) | memory.db istatistiklerini gösterin | Salt-okunur | Oku | Açık | Metin |
@@ -159,15 +168,16 @@ Bu referans her public command path, option, positional argument, effect, defaul
 | [`deckent features`](#deckent-features) | .deckent/settings/features-manifest.json içindeki özellikleri kategoriye göre listeleyin | Salt-okunur | Oku | Açık | Metin ve JSON |
 | [`deckent truth`](#deckent-truth) | Manifest truth-block'ları için 4 seviyeli feature truth-chain'i çözün (code → wired → enabled → proof) | Varsayılan salt-okunur; explicit seçenekler state değiştirebilir | Oku | Operator | Metin ve JSON |
 | [`deckent audit`](#deckent-audit) | Bir sprint için Brain Self-Audit Gate çalıştırın veya audit log olaylarını sorgulayın/dışa aktarın/saklayın (query \| compliance \| forward \| retention) | Process kontrolü | Önizleme; explicit apply gerekir | Operator | Metin ve JSON |
-| [`deckent audit-verify`](#deckent-audit-verify) | Kurcalama kanıtı için audit log HMAC zincirini doğrulayın | Salt-okunur | Oku | Açık | Metin ve JSON |
+| [`deckent audit verify`](#deckent-audit-verify) | Kurcalama kanıtı için audit log HMAC zincirini doğrulayın | Salt-okunur | Oku | Açık | Metin ve JSON |
+| [`deckent audit-verify`](#deckent-audit-verify) | Kurcalama kanıtı için audit log HMAC zincirini doğrulayın | Salt-okunur | Oku | Açık | Metin |
 | [`deckent recover`](#deckent-recover) | Çökmüş veya takılmış bir sprinti canonical recovery operation ile kurtar | Yerel yazma | Uygula | Operator | Metin ve JSON |
 | [`deckent models`](#deckent-models) | Model kataloğunu yönetin ve gezinin | Komut grubu (yalnız help) | Oku | Açık | Metin |
-| [`deckent models list`](#deckent-models-list) | Katalogdaki kullanılabilir modelleri listeleyin | Salt-okunur | Oku | Owner | Metin |
+| [`deckent models list`](#deckent-models-list) | Katalogdaki kullanılabilir modelleri listeleyin | Salt-okunur | Oku | Owner | Metin ve JSON |
 | [`deckent models activate`](#deckent-models-activate) | Tespit edilen bir modelin routing havuzuna girmesine izin verin | Yerel yazma | Uygula | Owner | Metin |
 | [`deckent models deactivate`](#deckent-models-deactivate) | Bir modeli routing havuzundan çıkarın (tespit onu görmeye devam eder) | Yerel yazma | Uygula | Owner | Metin |
 | [`deckent models activation`](#deckent-models-activation) | Kayıtlı model aktivasyon kararlarını gösterin (kayıtsız = aktif) | Salt-okunur | Oku | Açık | Metin |
 | [`deckent models policy`](#deckent-models-policy) | Bir provider aktivasyon policy'sini gösterin veya ayarlayın (implicit-active \| explicit-active) | Varsayılan salt-okunur; explicit seçenekler state değiştirebilir | Oku | Owner | Metin |
-| [`deckent models active-set`](#deckent-models-active-set) | Çözümlenmiş owner aktif execution set'ini + snapshot digest'ini gösterin | Salt-okunur | Oku | Açık | Metin |
+| [`deckent models active-set`](#deckent-models-active-set) | Çözümlenmiş owner aktif execution set'ini + snapshot digest'ini gösterin | Salt-okunur | Oku | Açık | Metin ve JSON |
 | [`deckent models refresh`](#deckent-models-refresh) | Model kataloğunu zorla yenileyin (24 saatlik cache'i geçersiz kılar) | Yerel yazma | Uygula | Owner | Metin |
 | [`deckent models tier`](#deckent-models-tier) | Belirli bir modelin tier'ını ID veya API ID ile sorgulayın | Yerel yazma | Uygula | Owner | Metin |
 | [`deckent flow`](#deckent-flow) | Zamanlanmış flow'ları yönetin (process modu) | Komut grubu (yalnız help) | Oku | Açık | Metin |
@@ -183,6 +193,10 @@ Bu referans her public command path, option, positional argument, effect, defaul
 | [`deckent evolve`](#deckent-evolve) | Evrim analizi — sprint'ler arası eğilimler ve prompt önerileri | Komut grubu (yalnız help) | Oku | Açık | Metin |
 | [`deckent evolve report`](#deckent-evolve-report) | Sprint'ler arası agent/skill eğilim raporunu gösterin | Salt-okunur | Oku | Açık | Metin ve JSON |
 | [`deckent autonomous`](#deckent-autonomous) | Autonomous runtime — yetki sınırlı sürekli döngü | Komut grubu (yalnız help) | Oku | Açık | Metin |
+| [`deckent autonomous mission`](#deckent-autonomous-mission) | İş listelerinden veya hedeflerden oluşturulan autonomous mission'ları yönetin | Komut grubu (yalnız help) | Oku | Açık | Metin |
+| [`deckent autonomous mission create-list`](#deckent-autonomous-mission-create-list) | Bir veya daha fazla iş kaleminden autonomous mission oluşturun | Autonomous loop kontrolü | Uygula | Owner | Metin |
+| [`deckent autonomous mission create-goal`](#deckent-autonomous-mission-create-goal) | Hedefine ulaşılana kadar çalışan autonomous mission oluşturun | Autonomous loop kontrolü | Uygula | Owner | Metin |
+| [`deckent autonomous mission list`](#deckent-autonomous-mission-list) | Tüm mission'ları listeleyin (özet tablo) | Salt-okunur | Oku | Owner | Metin ve JSON |
 | [`deckent autonomous enable`](#deckent-autonomous-enable) | Autonomous modu etkinleştirin (config düzenlemek yerine tek komut; varsayılan OFF kalır) | Autonomous loop kontrolü | Uygula | Owner | Metin |
 | [`deckent autonomous start`](#deckent-autonomous-start) | Autonomous döngüyü başlatın (default-deny + insan onayı kapısı) | Autonomous loop kontrolü | Uygula | Owner | Metin |
 | [`deckent autonomous plan`](#deckent-autonomous-plan) | Üst düzey bir hedefi bekleyen autonomous backlog kalemlerine ayrıştırın | Autonomous loop kontrolü | Uygula | Owner | Metin |
@@ -196,7 +210,7 @@ Bu referans her public command path, option, positional argument, effect, defaul
 | [`deckent autonomous backlog add`](#deckent-autonomous-backlog-add) | Autonomous backlog'a yeni bir kayıt ekleyin | Autonomous loop kontrolü | Uygula | Owner | Metin |
 | [`deckent autonomous backlog list`](#deckent-autonomous-backlog-list) | Autonomous backlog kayıtlarını listeleyin | Salt-okunur | Oku | Owner | Metin |
 | [`deckent autonomous backlog remove`](#deckent-autonomous-backlog-remove) | Autonomous backlog'dan bir kaydı kaldırın (konumsal id veya --id) | Yıkıcı process kontrolü | Uygula | Owner | Metin |
-| [`deckent autonomous-mission`](#deckent-autonomous-mission) | İş listelerinden veya hedeflerden oluşturulan autonomous mission'ları yönetin | Komut grubu (yalnız help) | Oku | Açık | Metin |
+| [`deckent autonomous-mission`](#deckent-autonomous-mission) | İş listelerinden veya hedeflerden oluşturulan autonomous mission'ları yönetin | Varsayılan salt-okunur; explicit seçenekler state değiştirebilir | Oku | Operator | Metin |
 | [`deckent autonomous-mission create-list`](#deckent-autonomous-mission-create-list) | Bir veya daha fazla iş kaleminden autonomous mission oluşturun | Autonomous loop kontrolü | Uygula | Owner | Metin |
 | [`deckent autonomous-mission create-goal`](#deckent-autonomous-mission-create-goal) | Hedefine ulaşılana kadar çalışan autonomous mission oluşturun | Autonomous loop kontrolü | Uygula | Owner | Metin |
 | [`deckent autonomous-mission list`](#deckent-autonomous-mission-list) | Tüm mission'ları listeleyin (özet tablo) | Salt-okunur | Oku | Owner | Metin ve JSON |
@@ -230,16 +244,17 @@ Bu referans her public command path, option, positional argument, effect, defaul
 | [`deckent approvals`](#deckent-approvals) | Runtime-genelinde onay kutusu — bekleyen istekleri listele ve canlı-doğrulamalı local-terminal kanalından karara bağla | Komut grubu (yalnız help) | Oku | Açık | Metin |
 | [`deckent approvals list`](#deckent-approvals-list) | Bekleyen onay isteklerini listele | Salt-okunur | Oku | Owner | Metin |
 | [`deckent approvals decide`](#deckent-approvals-decide) | Bekleyen bir onay isteğini karara bağla; interaktif TTY yeniden-doğrulaması gerektirir | Yerel yazma | Uygula | Owner | Metin |
+| [`deckent approvals run`](#deckent-approvals-run) | Bekleyen LLM-adapter confirmation isteklerini çapraz-sağlayıcı hakemlikten geçir (xverify runtime) | Process kontrolü | Uygula | Owner | Metin |
 | [`deckent approvals rules`](#deckent-approvals-rules) | Kalıcı onay kuralları (approval-rules.json) — listele, devre-dışı bırak, etkinleştir, sil | Komut grubu (yalnız help) | Oku | Açık | Metin |
 | [`deckent approvals rules list`](#deckent-approvals-rules-list) | Kuralları durumlarıyla listele | Salt-okunur | Oku | Owner | Metin |
 | [`deckent approvals rules apply`](#deckent-approvals-rules-apply) | Aktif kuralları bekleyen kutuya uygula (yalnız routine-seviye otomatikleştirilebilir türler) | Yerel yazma | Uygula | Owner | Metin |
 | [`deckent approvals rules disable`](#deckent-approvals-rules-disable) | Kuralı devre-dışı bırak (denetim için saklanır; her an yeniden etkinleştirilebilir) | Yerel yazma | Uygula | Owner | Metin |
 | [`deckent approvals rules enable`](#deckent-approvals-rules-enable) | Devre-dışı kuralı yeniden etkinleştir | Yerel yazma | Uygula | Owner | Metin |
 | [`deckent approvals rules remove`](#deckent-approvals-rules-remove) | Kuralı kalıcı olarak sil | Yıkıcı process kontrolü | Uygula | Owner | Metin |
-| [`deckent confirmations`](#deckent-confirmations) | Custom-confirmation kutusu — bekleyen kabul-matrisi yönlendirmeleri (llm/insan/kod adapterları) | Komut grubu (yalnız help) | Oku | Açık | Metin |
-| [`deckent confirmations list`](#deckent-confirmations-list) | Bekleyen confirmation isteklerini listele | Salt-okunur | Oku | Owner | Metin |
-| [`deckent confirmations decide`](#deckent-confirmations-decide) | Bir INSAN-adapter confirmation kararı ver (interaktif terminal, tek atış) | Yerel yazma | Uygula | Owner | Metin |
-| [`deckent confirmations run`](#deckent-confirmations-run) | Bekleyen LLM-adapter confirmation isteklerini çapraz-sağlayıcı hakemlikten geçir (xverify runtime) | Yerel yazma | Uygula | Owner | Metin |
+| [`deckent confirmations`](#deckent-confirmations) | Custom-confirmation kutusu — bekleyen kabul-matrisi yönlendirmeleri (llm/insan/kod adapterları) | Varsayılan salt-okunur; explicit seçenekler state değiştirebilir | Oku | Operator | Metin |
+| [`deckent confirmations list`](#deckent-confirmations-list) | Bekleyen onay isteklerini listele | Salt-okunur | Oku | Owner | Metin |
+| [`deckent confirmations decide`](#deckent-confirmations-decide) | Bekleyen bir onay isteğini karara bağla; interaktif TTY yeniden-doğrulaması gerektirir | Yerel yazma | Uygula | Owner | Metin |
+| [`deckent confirmations run`](#deckent-confirmations-run) | Bekleyen LLM-adapter confirmation isteklerini çapraz-sağlayıcı hakemlikten geçir (xverify runtime) | Process kontrolü | Uygula | Owner | Metin |
 | [`deckent provider-authority`](#deckent-provider-authority) | Host kapsamlı provider authority keyring'ini incele ve sağla (sahip yetkisinde) | Komut grubu (yalnız help) | Oku | Açık | Metin |
 | [`deckent provider-authority keyring`](#deckent-provider-authority-keyring) | Provider authority keyring — status / init / rotate | Komut grubu (yalnız help) | Oku | Açık | Metin |
 | [`deckent provider-authority keyring status`](#deckent-provider-authority-keyring-status) | Keyring konumunu ve revizyon durumunu göster (anahtar materyali asla yazılmaz) | Salt-okunur | Oku | Owner | Metin |
@@ -409,6 +424,7 @@ Geçerli run lifecycle, logical task progress, worker evidence ve alert projeksi
 | `--no-color` | Render edilmiş metin çıktısında ANSI rengini devre dışı bırakır. |
 | `--graph` | Etkin run dependency graph’ını Mermaid metni olarak render eder. |
 | `--mode <mode>` | Handler’ın şu anda kabul ettiği render identifier’ını seçer: explainatory (açıklamalı görünüm), standart (standard görünüm), verbose veya json. |
+| `--debt` | DB-öncelikli teknik-borç özetini gösterip çık |
 
 ---
 
@@ -445,7 +461,10 @@ Canonical run veya görev ayrıntısını incele
 
 tmux orchestra oturumuna bağlanın
 
-**Usage:** `deckent attach`
+**Usage:** `deckent attach [args...]`
+
+> "attach" komutu kullanımdan kaldırılıyor; bunun yerine "watch" kullanın.
+> `deckent watch` — Canlı bir worker'ı --follow <taskId> ile takip edin (docker logs / tmux pane / subprocess log) veya tmux dashboard split'ini açın
 
 ### Yürütme sözleşmesi
 
@@ -453,11 +472,11 @@ tmux orchestra oturumuna bağlanın
 |---|---|---|---|---|---|
 | Process kontrolü | Uygula | Operator | Metin | `darwin`, `linux`, `win32` | Yok |
 
-### Seçenekler
+### Argümanlar
 
-| Bayraklar | Açıklama |
-|---|---|
-| `--list` | Hiçbir oturuma bağlanmadan tüm tmux pencerelerini listele |
+| Argüman | Açıklama | Zorunlu | Variadic |
+|---|---|---|---|
+| `[args...]` | Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar | Hayır | Evet |
 
 ---
 
@@ -540,6 +559,8 @@ En son sprint retrospektifini gösterin
 | `--json` | Render edilmiş tablo yerine read-model projeksiyonunu JSON olarak yazdır |
 | `--perf` | Agent ve skill performans projeksiyonlarını ekle |
 | `--trend [n]` | Son N sprint entry’si boyunca başarı oranı trend projeksiyonu ekle (varsayılan: 5) |
+| `--explain` | Retrospektif görev kanıtını açıklayın |
+| `--task <id>` | Belirli bir görevi açıklayın |
 
 ---
 
@@ -748,13 +769,16 @@ config.json'ı en güncel tam formata taşıyın (eksik alanları varsayılanlar
 
 | Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
 |---|---|---|---|---|---|
-| Yerel yazma | Uygula | Operator | Metin | `darwin`, `linux`, `win32` | Yok |
+| Yerel yazma | Uygula | Operator | Metin ve JSON | `darwin`, `linux`, `win32` | Yok |
 
 ### Seçenekler
 
 | Bayraklar | Açıklama |
 |---|---|
 | `--dry-run` | Hiçbir dosyayı değiştirmeden neyin değişeceğini göster |
+| `--native-provider <provider>` | Açık native provider hedefi (--native-model gerektirir) |
+| `--native-model <model>` | Tam native model ID; legacy alias veya çevreleyen boşluk kullanmayın (--native-provider gerektirir) |
+| `--json` | Yapılandırılmış geçiş sonucu yazdır |
 
 ---
 
@@ -1150,7 +1174,10 @@ Proje stack'ini, boyutunu ve önerilen metodolojiyi analiz edin
 
 Teknik borç durumunu raporlayın (DB-first; çözülen borç memory.db içinde otomatik yönetilir)
 
-**Usage:** `deckent archive-debt`
+**Usage:** `deckent archive-debt [args...]`
+
+> "archive-debt" komutu kullanımdan kaldırılıyor; bunun yerine "status --debt" kullanın.
+> `deckent status --debt` — Güncel run dashboard'ını göster
 
 ### Yürütme sözleşmesi
 
@@ -1158,12 +1185,11 @@ Teknik borç durumunu raporlayın (DB-first; çözülen borç memory.db içinde 
 |---|---|---|---|---|---|
 | Salt-okunur | Oku | Açık | Metin | `darwin`, `linux`, `win32` | Yok |
 
-### Seçenekler
+### Argümanlar
 
-| Bayraklar | Açıklama |
-|---|---|
-| `--count` | Tek tek entry’leri değil, yalnızca açık/çözülmüş sayılarını projekte et |
-| `--before <sprint>` | Bu sprint ID’sinden önce ortaya çıkan çözülmüş entry’leri de projekte et |
+| Argüman | Açıklama | Zorunlu | Variadic |
+|---|---|---|---|
+| `[args...]` | Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar | Hayır | Evet |
 
 ---
 
@@ -1333,21 +1359,22 @@ Kanıtlanmış tek strict-prefix terminal journal’ı receipt-bound authority i
 
 Terminal dashboard'u otomatik yenilemeyle gösterin (ayrıca bkz. deckent status --watch)
 
-**Usage:** `deckent dashboard`
+**Usage:** `deckent dashboard [args...]`
+
+> "dashboard" komutu kullanımdan kaldırılıyor; bunun yerine "status --watch" kullanın.
+> `deckent status --watch` — Güncel run dashboard'ını göster
 
 ### Yürütme sözleşmesi
 
 | Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
 |---|---|---|---|---|---|
-| Salt-okunur | Oku | Açık | Metin ve JSON | `darwin`, `linux`, `win32` | Yok |
+| Salt-okunur | Oku | Açık | Metin | `darwin`, `linux`, `win32` | Yok |
 
-### Seçenekler
+### Argümanlar
 
-| Bayraklar | Açıklama |
-|---|---|
-| `--interval <ms>` | Milisaniye cinsinden yenileme aralığı (fs.watch kullanılamadığında yedek olarak kullanılır) |
-| `--no-color` | ANSI renklerini kapat (NO_COLOR ortam değişkenine de uyar) |
-| `--json` | Dashboard durumunu ham JSON olarak yazdırıp çık (deckent status --raw ile aynı format) |
+| Argüman | Açıklama | Zorunlu | Variadic |
+|---|---|---|---|
+| `[args...]` | Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar | Hayır | Evet |
 
 ---
 
@@ -1421,6 +1448,121 @@ Canlı bir worker'ı --follow <taskId> ile takip edin (docker logs / tmux pane /
 
 ---
 
+<a id="deckent-watch-output"></a>
+## `deckent watch output`
+
+Worker execution’ını değiştirmeden tam worker çıktısını oku veya izle
+
+**Usage:** `deckent watch output <taskId>`
+
+### Yürütme sözleşmesi
+
+| Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
+|---|---|---|---|---|---|
+| Salt-okunur | Oku | Açık | Metin ve JSON | `darwin`, `linux`, `win32` | Yok |
+
+### Seçenekler
+
+| Bayraklar | Açıklama |
+|---|---|
+| `--tail <n>` | En fazla son N tamamlanmış satırı göster |
+| `--follow` | Yeni çıktıyı izlemeyi sürdür; görünümü kapatmak worker’ı durdurmaz |
+| `--sprint-id <id>` | Tam sprint kimliği eşleşmesini zorunlu tut |
+| `--attempt-id <id>` | Tam attempt kimliğini seç |
+| `--dispatch-request-id <id>` | Tam dispatch request kimliğini seç |
+| `--json` | Makinece okunabilir NDJSON event’leri üret |
+| `--lang <lang>` | Çıktı dili (en veya tr) |
+
+### Argümanlar
+
+| Argüman | Açıklama | Zorunlu | Variadic |
+|---|---|---|---|
+| `<taskId>` | Tam worker görev kimliği | Evet | Hayır |
+
+---
+
+<a id="deckent-intelligence"></a>
+## `deckent intelligence`
+
+Rakip istihbaratını inceleyin ve çalıştırın
+
+**Usage:** `deckent intelligence`
+
+### Yürütme sözleşmesi
+
+| Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
+|---|---|---|---|---|---|
+| Komut grubu (yalnız help) | Oku | Açık | Metin | `darwin`, `linux`, `win32` | Yok |
+
+---
+
+<a id="deckent-intelligence-watch"></a>
+## `deckent intelligence watch`
+
+Rakip izleme çalıştırmasını yönetin
+
+**Usage:** `deckent intelligence watch`
+
+### Yürütme sözleşmesi
+
+| Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
+|---|---|---|---|---|---|
+| Komut grubu (yalnız help) | Oku | Açık | Metin | `darwin`, `linux`, `win32` | Yok |
+
+---
+
+<a id="deckent-intelligence-watch-run"></a>
+## `deckent intelligence watch run`
+
+Kanonik rakip izleme yeteneğini çalıştırın
+
+**Usage:** `deckent intelligence watch run`
+
+### Yürütme sözleşmesi
+
+| Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
+|---|---|---|---|---|---|
+| Yerel yazma | Uygula | Operator | Metin | `darwin`, `linux`, `win32` | Yok |
+
+### Seçenekler
+
+| Bayraklar | Açıklama |
+|---|---|
+| `--dry-run` | Olayları, imleçleri veya bildirimleri kaydetmeden önizleyin |
+| `--input <fixture>` | Kaynak tanımlarını bir JSON fikstüründen okuyun |
+
+---
+
+<a id="deckent-intelligence-schedule"></a>
+## `deckent intelligence schedule`
+
+Kanonik günlük izleme akışını sağlayın ve raporlayın
+
+**Usage:** `deckent intelligence schedule`
+
+### Yürütme sözleşmesi
+
+| Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
+|---|---|---|---|---|---|
+| Yerel yazma | Uygula | Operator | Metin | `darwin`, `linux`, `win32` | Yok |
+
+---
+
+<a id="deckent-intelligence-status"></a>
+## `deckent intelligence status`
+
+İzleme olay geçmişini ve son çalıştırma durumunu gösterin
+
+**Usage:** `deckent intelligence status`
+
+### Yürütme sözleşmesi
+
+| Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
+|---|---|---|---|---|---|
+| Salt-okunur | Oku | Açık | Metin | `darwin`, `linux`, `win32` | Yok |
+
+---
+
 <a id="deckent-run"></a>
 ## `deckent run`
 
@@ -1446,6 +1588,8 @@ Provider-backed tek bir task çalıştırır ve kayıtlı sonucunu bekler; full 
 | `--provider <name>` | Açık sağlayıcı sahipliği (claude\|codex\|gemini\|cursor\|ollama\|openrouter\|local-llm) — görülmemiş sürümlü bir model kimliğini kaydetmek için gereklidir; kanonik registry'ye karşı doğrulanır. |
 | `--model-effort <level>` | Yerel model muhakeme-eforu (claude: low\|medium\|high\|xhigh\|max, codex: minimal\|low\|medium\|high). Opt-in; desteklenmeyen veya geçersiz seviyeler yok sayılır |
 | `--scope <dir>` | Worker kapsam dizini (varsayılan: ./) |
+| `--files-write <paths...>` | Bu görevin YAZABİLECEĞİ tam repo-relative dosyalar (yolları seçenekten sonra sıralayın). Tek başına dizin kapsamı dosya yetkisi taşımaz; landing checkpoint gerektiren koşumlar bunu ister. |
+| `--files-read <paths...>` | Bu görevin bağlam olarak OKUYABİLECEĞİ tam repo-relative dosyalar (yolları seçenekten sonra sıralayın). |
 | `--timeout <ms>` | Milisaniye cinsinden azami bekleme süresi (varsayılan: 300000) |
 | `--keep` | Tamamlandıktan sonra görev dosyalarını koru (temizliği atla) |
 | `--auto-approve` | Worker’a auto-approve bayrağını geçir |
@@ -1987,6 +2131,28 @@ Skill havuzunu yönetin
 
 ---
 
+<a id="deckent-skill-attribution"></a>
+## `deckent skill attribution`
+
+Nedensel skill-atıf geçişini inceleyin veya uygulayın
+
+**Usage:** `deckent skill attribution`
+
+### Yürütme sözleşmesi
+
+| Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
+|---|---|---|---|---|---|
+| Yerel yazma | Önizleme; explicit apply gerekir | Operator | Metin ve JSON | `darwin`, `linux`, `win32` | Yok |
+
+### Seçenekler
+
+| Bayraklar | Açıklama |
+|---|---|
+| `--apply` | Kayıpsız geçişi uygulayın ve immutable receipt yazın |
+| `--json` | Render edilmiş tablo yerine read-model projeksiyonunu JSON olarak yazdır |
+
+---
+
 <a id="deckent-skill-list"></a>
 ## `deckent skill list`
 
@@ -2279,22 +2445,22 @@ Bir sprinti sonlandır: MEMORY.md, RETRO.md, IDENTITY.md, config ve run decay g�
 
 Son sprint'in ne yaptığını insan diliyle açıklayın
 
-**Usage:** `deckent explain`
+**Usage:** `deckent explain [args...]`
+
+> "explain" komutu kullanımdan kaldırılıyor; bunun yerine "retro --explain" kullanın.
+> `deckent retro --explain` — En son sprint retrospektifini gösterin
 
 ### Yürütme sözleşmesi
 
 | Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
 |---|---|---|---|---|---|
-| Salt-okunur | Oku | Açık | Metin ve JSON | `darwin`, `linux`, `win32` | Yok |
+| Salt-okunur | Oku | Açık | Metin | `darwin`, `linux`, `win32` | Yok |
 
-### Seçenekler
+### Argümanlar
 
-| Bayraklar | Açıklama |
-|---|---|
-| `--sprint <id>` | Sprint ID’si ile tek bir kayıtlı sprint entry’sini projekte et |
-| `--task <taskId>` | Tek bir task ID için kayıtlı routing-decision günlüğünü projekte et |
-| `--json` | Render edilmiş tablo yerine read-model projeksiyonunu JSON olarak yazdır |
-| `--verbose` | Kayıtlı tüm öğrenimleri ve tam task detayını projekte et (varsayılan öğrenimleri 3 ile sınırlar) |
+| Argüman | Açıklama | Zorunlu | Variadic |
+|---|---|---|---|
+| `[args...]` | Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar | Hayır | Evet |
 
 ---
 
@@ -2347,7 +2513,10 @@ Provider/MCP/IDE/shell bağlantı durumunu teşhis edin (salt-okunur — hiçbir
 
 Serbest biçimli bir hedefi DIRECTIVES.md iskeletine dönüştürün (tek-görev şablonu; varsayılan önizleme)
 
-**Usage:** `deckent plan-nl <goal>`
+**Usage:** `deckent plan-nl [args...]`
+
+> "plan-nl" komutu kullanımdan kaldırılıyor; bunun yerine "do" kullanın.
+> `deckent do` — Golden-flow: bir hedefi sprint planına dönüştürün (varsayılan dry-run önizleme; gerçekten başlatmak için --run)
 
 ### Yürütme sözleşmesi
 
@@ -2355,17 +2524,11 @@ Serbest biçimli bir hedefi DIRECTIVES.md iskeletine dönüştürün (tek-görev
 |---|---|---|---|---|---|
 | Varsayılan salt-okunur; explicit seçenekler state değiştirebilir | Oku | Operator | Metin | `darwin`, `linux`, `win32` | Yok |
 
-### Seçenekler
-
-| Bayraklar | Açıklama |
-|---|---|
-| `--write` | İskeleti DIRECTIVES.md dosyasına yaz (mevcut dosya önce yedeklenir) |
-
 ### Argümanlar
 
 | Argüman | Açıklama | Zorunlu | Variadic |
 |---|---|---|---|
-| `<goal>` | Sprint’in ne başarması gerektiğinin serbest biçimli açıklaması | Evet | Hayır |
+| `[args...]` | Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar | Hayır | Evet |
 
 ---
 
@@ -2459,13 +2622,22 @@ Deckent ile sohbet oturumu başlatın. Kurulu AI CLI'ınızı kullanır.
 
 İnsan checkpoint'lerini yönetin — bekleyenleri listeleyin, onaylayın veya reddedin
 
-**Usage:** `deckent checkpoint`
+**Usage:** `deckent checkpoint [args...]`
+
+> "checkpoint" komutu kullanımdan kaldırılıyor; bunun yerine "approvals" kullanın.
+> `deckent approvals` — Runtime-genelinde onay kutusu — bekleyen istekleri listele ve canlı-doğrulamalı local-terminal kanalından karara bağla
 
 ### Yürütme sözleşmesi
 
 | Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
 |---|---|---|---|---|---|
-| Komut grubu (yalnız help) | Oku | Açık | Metin | `darwin`, `linux`, `win32` | Yok |
+| Varsayılan salt-okunur; explicit seçenekler state değiştirebilir | Oku | Operator | Metin | `darwin`, `linux`, `win32` | Yok |
+
+### Argümanlar
+
+| Argüman | Açıklama | Zorunlu | Variadic |
+|---|---|---|---|
+| `[args...]` | Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar | Hayır | Evet |
 
 ---
 
@@ -2764,6 +2936,9 @@ Belirli bir worker görevi için yakalanan çıktıyı gösterin
 
 **Usage:** `deckent output <taskId>`
 
+> "output" komutu kullanımdan kaldırılıyor; bunun yerine "watch output" kullanın.
+> `deckent watch output` — Worker execution’ını değiştirmeden tam worker çıktısını oku veya izle
+
 ### Yürütme sözleşmesi
 
 | Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
@@ -2774,16 +2949,19 @@ Belirli bir worker görevi için yakalanan çıktıyı gösterin
 
 | Bayraklar | Açıklama |
 |---|---|
-| `--tail <n>` | Kalıcı worker çıktısının son N satırını göster (varsayılan: 50) |
-| `--follow` | Kalıcı çıktı dosyasını her 2 saniyede yeniden oku (yoklama; canlı sürece bağlanma değil) |
-| `--sprint-id <sprintId>` | Kalıcı kanıtın okunacağı sprint (varsayılan: geçerli sprint) |
-| `--json` | Ham JSON çıktısı ver |
+| `--tail <n>` | En fazla son N tamamlanmış satırı göster |
+| `--follow` | Yeni çıktıyı izlemeyi sürdür; görünümü kapatmak worker’ı durdurmaz |
+| `--sprint-id <id>` | Tam sprint kimliği eşleşmesini zorunlu tut |
+| `--attempt-id <id>` | Tam attempt kimliğini seç |
+| `--dispatch-request-id <id>` | Tam dispatch request kimliğini seç |
+| `--json` | Makinece okunabilir NDJSON event’leri üret |
+| `--lang <lang>` | Çıktı dili (en veya tr) |
 
 ### Argümanlar
 
 | Argüman | Açıklama | Zorunlu | Variadic |
 |---|---|---|---|
-| `<taskId>` | Kalıcı çıktı kanıtı okunacak worker görevi | Evet | Hayır |
+| `<taskId>` | Tam worker görev kimliği | Evet | Hayır |
 
 ---
 
@@ -2822,7 +3000,10 @@ Görev settlement planını incele; yalnız açık operatör beyanıyla uygula
 | `--apply` | Kanıtça uygun bir uzlaştırmayı uygula (varsayılan: dry-run) |
 | `--attestation-reason <text>` | Uzlaştırma için operatörün yazdığı gerekçe (--apply ile zorunlu) |
 | `--operator <id>` | Sabit operatör kimliği; yalnız hash-bound opak referansı kalıcılaştırılır (--apply ile zorunlu) |
-| `--reason-code <code>` | Bildirilen eventless receipt için tipli pre-dispatch nedeni (no_provider\|budget_capability_unsupported\|provider_authority_rejected\|execution_admission_rejected\|command_build_failed\|fallback_unreachable\|fallback_limit_hold\|fallback_exhausted) |
+| `--reason-code <code>` | Bildirilen eventless receipt için tipli pre-dispatch nedeni (no_provider\|budget_capability_unsupported\|provider_authority_rejected\|routing_authority_rejected\|execution_admission_rejected\|command_build_failed\|fallback_unreachable\|fallback_limit_hold\|fallback_exhausted) |
+| `--abandon-dispatch` | Başlayıp sonuç üretmeden ölen bir dispatch'i terminal yapar. Disposition seçilmez, yokluk-probe'undan türetilir: manual_review_required olarak kapanır ve herhangi bir canlılık kanıtı varken reddeder. |
+| `--from-result` | Worker'ı BİTİRİP sonucunu yazdığı hâlde çağıran beklemeyi bıraktığı için takılı kalan dispatch'i terminal yapar. Disposition seçilmez, worker'ın kendi selfAssessment'ından okunur. |
+| `--reproject-status` | Görev dosyasının status alanını kendi TERMİNAL receipt'iyle uyumlu hâle getirir. Yeni bir şey yazmaz — authority receipt'tir; bu yalnız beklemeyi bırakmış bir çağıranın geride bıraktığı görev yüzeyini uzlaştırır. |
 | `--json` | Kararlı makine-okunur settlement DTO çıktısı üret |
 
 ### Argümanlar
@@ -2921,7 +3102,70 @@ Maliyet bütçelerini görüntüleyin veya ayarlayın
 
 Proje belleğinde arayın — ADR'ler, sprint öğrenimleri, pattern'ler, borç
 
-**Usage:** `deckent recall <query>`
+**Usage:** `deckent recall [args...]`
+
+> "recall" komutu kullanımdan kaldırılıyor; bunun yerine "memory recall" kullanın.
+> `deckent memory recall` — Proje belleğinde arayın — ADR'ler, sprint öğrenimleri, pattern'ler, borç
+
+### Yürütme sözleşmesi
+
+| Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
+|---|---|---|---|---|---|
+| Salt-okunur | Oku | Açık | Metin | `darwin`, `linux`, `win32` | Yok |
+
+### Argümanlar
+
+| Argüman | Açıklama | Zorunlu | Variadic |
+|---|---|---|---|
+| `[args...]` | Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar | Hayır | Evet |
+
+---
+
+<a id="deckent-remember"></a>
+## `deckent remember`
+
+Proje belleğine bir not kaydedin
+
+**Usage:** `deckent remember [args...]`
+
+> "remember" komutu kullanımdan kaldırılıyor; bunun yerine "memory remember" kullanın.
+> `deckent memory remember` — Proje belleğine bir not kaydedin
+
+### Yürütme sözleşmesi
+
+| Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
+|---|---|---|---|---|---|
+| Yerel yazma | Uygula | Operator | Metin | `darwin`, `linux`, `win32` | Yok |
+
+### Argümanlar
+
+| Argüman | Açıklama | Zorunlu | Variadic |
+|---|---|---|---|
+| `[args...]` | Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar | Hayır | Evet |
+
+---
+
+<a id="deckent-memory"></a>
+## `deckent memory`
+
+Memory V2 yönetimi
+
+**Usage:** `deckent memory`
+
+### Yürütme sözleşmesi
+
+| Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
+|---|---|---|---|---|---|
+| Komut grubu (yalnız help) | Oku | Açık | Metin | `darwin`, `linux`, `win32` | Yok |
+
+---
+
+<a id="deckent-memory-recall"></a>
+## `deckent memory recall`
+
+Proje belleğinde arayın — ADR'ler, sprint öğrenimleri, pattern'ler, borç
+
+**Usage:** `deckent memory recall [query]`
 
 ### Yürütme sözleşmesi
 
@@ -2938,21 +3182,23 @@ Proje belleğinde arayın — ADR'ler, sprint öğrenimleri, pattern'ler, borç
 | `--sprint-min <n>` | Bu sprint numarasından önce kaydedilen entry’leri ele |
 | `-m, --mode <mode>` | Tam metin token birleştirme: or (varsayılan, daha geniş) \| and (her token eşleşmeli) |
 | `--json` | Render edilmiş tablo yerine read-model projeksiyonunu JSON olarak yazdır |
+| `--cursor <cursor>` | Sonraki sayfa referansıyla aynı kapsamdaki bellek sorgusunu sürdür |
+| `--detail <detailRef>` | Kesin ayrıntı referansıyla eksiksiz kaynak kaydını oku |
 
 ### Argümanlar
 
 | Argüman | Açıklama | Zorunlu | Variadic |
 |---|---|---|---|
-| `<query>` | Kayıtlı bellek entry’lerine (başlık, özet, içerik) karşı eşleştirilen tam metin sorgusu | Evet | Hayır |
+| `[query]` | Kayıtlı bellek entry’lerine (başlık, özet, içerik) karşı eşleştirilen tam metin sorgusu | Hayır | Hayır |
 
 ---
 
-<a id="deckent-remember"></a>
-## `deckent remember`
+<a id="deckent-memory-remember"></a>
+## `deckent memory remember`
 
 Proje belleğine bir not kaydedin
 
-**Usage:** `deckent remember <note>`
+**Usage:** `deckent memory remember <note>`
 
 ### Yürütme sözleşmesi
 
@@ -2973,21 +3219,6 @@ Proje belleğine bir not kaydedin
 | Argüman | Açıklama | Zorunlu | Variadic |
 |---|---|---|---|
 | `<note>` | Entry içeriği olarak saklanan not gövdesi | Evet | Hayır |
-
----
-
-<a id="deckent-memory"></a>
-## `deckent memory`
-
-Memory V2 yönetimi
-
-**Usage:** `deckent memory`
-
-### Yürütme sözleşmesi
-
-| Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
-|---|---|---|---|---|---|
-| Komut grubu (yalnız help) | Oku | Açık | Metin | `darwin`, `linux`, `win32` | Yok |
 
 ---
 
@@ -3759,11 +3990,11 @@ Bir sprint için Brain Self-Audit Gate çalıştırın veya audit log olayların
 ---
 
 <a id="deckent-audit-verify"></a>
-## `deckent audit-verify`
+## `deckent audit verify`
 
 Kurcalama kanıtı için audit log HMAC zincirini doğrulayın
 
-**Usage:** `deckent audit-verify`
+**Usage:** `deckent audit verify`
 
 ### Yürütme sözleşmesi
 
@@ -3776,6 +4007,30 @@ Kurcalama kanıtı için audit log HMAC zincirini doğrulayın
 | Bayraklar | Açıklama |
 |---|---|
 | `--json` | Ham projeksiyonu JSON olarak yazdır ve başka hiçbir şey yazdırma |
+
+---
+
+<a id="deckent-audit-verify"></a>
+## `deckent audit-verify`
+
+Kurcalama kanıtı için audit log HMAC zincirini doğrulayın
+
+**Usage:** `deckent audit-verify [args...]`
+
+> "audit-verify" komutu kullanımdan kaldırılıyor; bunun yerine "audit verify" kullanın.
+> `deckent audit verify` — Kurcalama kanıtı için audit log HMAC zincirini doğrulayın
+
+### Yürütme sözleşmesi
+
+| Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
+|---|---|---|---|---|---|
+| Salt-okunur | Oku | Açık | Metin | `darwin`, `linux`, `win32` | Yok |
+
+### Argümanlar
+
+| Argüman | Açıklama | Zorunlu | Variadic |
+|---|---|---|---|
+| `[args...]` | Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar | Hayır | Evet |
 
 ---
 
@@ -3800,6 +4055,8 @@ Kurcalama kanıtı için audit log HMAC zincirini doğrulayın
 | `--force` | Etkileşimli onayı atla |
 | `--skip-audit` | Denetim kapısını atla |
 | `--restore-tasks` | İleri kurtarma yerine görev dosyalarını pre-archive snapshot’tan geri yükle |
+| `--retain-started-failed <dispatch-request-id>` | Durmuş started-failed dispatch attempt kanıtını tarihsel olarak koru; archive veya resume yapmaz. |
+| `--retain-committed-unsettled <dispatch-request-id>` | COMMITTED_JOURNAL_RELEASE_PENDING ve settlement UNRESOLVED olan tek dispatch attempt kaydını koru; archive veya resume yapma. |
 | `--resume` | Canonical PAUSED/ORPHANED run’ı kalıcı checkpoint üzerinden sürdür |
 | `--auto-approve` | Otomatik onayı sürdürülen worker run’ına aktar |
 | `--force-scope` | Sürdürürken bilinçli yeni yazma yolları için açık onayı koru |
@@ -3839,14 +4096,15 @@ Katalogdaki kullanılabilir modelleri listeleyin
 
 | Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
 |---|---|---|---|---|---|
-| Salt-okunur | Oku | Owner | Metin | `darwin`, `linux`, `win32` | Yok |
+| Salt-okunur | Oku | Owner | Metin ve JSON | `darwin`, `linux`, `win32` | Yok |
 
 ### Seçenekler
 
 | Bayraklar | Açıklama |
 |---|---|
-| `--provider <name>` | Katalog projeksiyonunu tek bir provider ile sınırla (claude, codex, gemini, ollama, cursor) |
+| `--provider <name>` | Katalog projeksiyonunu tek bir provider ile sınırla (claude, codex, cursor, gemini, ollama) |
 | `--offline` | Yalnızca önbellekteki veya paketlenmiş katalogu oku; ağa hiç çıkma |
+| `--json` | Render edilmiş tablo yerine read-model projeksiyonunu JSON olarak yazdır |
 
 ---
 
@@ -3855,7 +4113,7 @@ Katalogdaki kullanılabilir modelleri listeleyin
 
 Tespit edilen bir modelin routing havuzuna girmesine izin verin
 
-**Usage:** `deckent models activate <model>`
+**Usage:** `deckent models activate [model]`
 
 ### Yürütme sözleşmesi
 
@@ -3868,12 +4126,13 @@ Tespit edilen bir modelin routing havuzuna girmesine izin verin
 | Bayraklar | Açıklama |
 |---|---|
 | `--provider <name>` | Bu modeli sunan provider |
+| `--offline` | Yalnızca önbellekteki veya paketlenmiş katalogu oku; ağa hiç çıkma |
 
 ### Argümanlar
 
 | Argüman | Açıklama | Zorunlu | Variadic |
 |---|---|---|---|
-| `<model>` | Katalog entry’sinde kayıtlı olduğu şekliyle model ID’si | Evet | Hayır |
+| `[model]` | Katalog entry’sinde kayıtlı olduğu şekliyle model ID’si | Hayır | Hayır |
 
 ---
 
@@ -3882,7 +4141,7 @@ Tespit edilen bir modelin routing havuzuna girmesine izin verin
 
 Bir modeli routing havuzundan çıkarın (tespit onu görmeye devam eder)
 
-**Usage:** `deckent models deactivate <model>`
+**Usage:** `deckent models deactivate [model]`
 
 ### Yürütme sözleşmesi
 
@@ -3895,12 +4154,13 @@ Bir modeli routing havuzundan çıkarın (tespit onu görmeye devam eder)
 | Bayraklar | Açıklama |
 |---|---|
 | `--provider <name>` | Bu modeli sunan provider |
+| `--offline` | Yalnızca önbellekteki veya paketlenmiş katalogu oku; ağa hiç çıkma |
 
 ### Argümanlar
 
 | Argüman | Açıklama | Zorunlu | Variadic |
 |---|---|---|---|
-| `<model>` | Katalog entry’sinde kayıtlı olduğu şekliyle model ID’si | Evet | Hayır |
+| `[model]` | Katalog entry’sinde kayıtlı olduğu şekliyle model ID’si | Hayır | Hayır |
 
 ---
 
@@ -3952,7 +4212,14 @@ Bir provider aktivasyon policy'sini gösterin veya ayarlayın (implicit-active |
 
 | Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
 |---|---|---|---|---|---|
-| Salt-okunur | Oku | Açık | Metin | `darwin`, `linux`, `win32` | Yok |
+| Salt-okunur | Oku | Açık | Metin ve JSON | `darwin`, `linux`, `win32` | Yok |
+
+### Seçenekler
+
+| Bayraklar | Açıklama |
+|---|---|
+| `--offline` | Yalnızca önbellekteki veya paketlenmiş katalogu oku; ağa hiç çıkma |
+| `--json` | Render edilmiş tablo yerine read-model projeksiyonunu JSON olarak yazdır |
 
 ---
 
@@ -4256,6 +4523,105 @@ Autonomous runtime — yetki sınırlı sürekli döngü
 | Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
 |---|---|---|---|---|---|
 | Komut grubu (yalnız help) | Oku | Açık | Metin | `darwin`, `linux`, `win32` | Yok |
+
+---
+
+<a id="deckent-autonomous-mission"></a>
+## `deckent autonomous mission`
+
+İş listelerinden veya hedeflerden oluşturulan autonomous mission'ları yönetin
+
+**Usage:** `deckent autonomous mission`
+
+### Yürütme sözleşmesi
+
+| Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
+|---|---|---|---|---|---|
+| Komut grubu (yalnız help) | Oku | Açık | Metin | `darwin`, `linux`, `win32` | Yok |
+
+---
+
+<a id="deckent-autonomous-mission-create-list"></a>
+## `deckent autonomous mission create-list`
+
+Bir veya daha fazla iş kaleminden autonomous mission oluşturun
+
+**Usage:** `deckent autonomous mission create-list <title>`
+
+### Yürütme sözleşmesi
+
+| Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
+|---|---|---|---|---|---|
+| Autonomous loop kontrolü | Uygula | Owner | Metin | `darwin`, `linux`, `win32` | Yok |
+
+### Seçenekler
+
+| Bayraklar | Açıklama |
+|---|---|
+| `--item <kind:spec>` | Eklenecek iş maddesi; kind veya kind:json-spec biçiminde. Her madde için bayrağı tekrarlayın. |
+| `--items-file <path>` | Listenin oluşturulacağı görev maddeleri dizisini tutan JSON dosyası. |
+| `--id <id>` | Görev kimliği; bayrak verilmediğinde bir tane üretilir. |
+| `--tenant <tenant>` | Kaydı varsayılan kiracı yerine bu kiracı kimliği altında oluşturur. |
+| `--deliver-to <channel>` | Sonuçlanan görev bildiriminin iletileceği kanal. |
+
+### Argümanlar
+
+| Argüman | Açıklama | Zorunlu | Variadic |
+|---|---|---|---|
+| `<title>` | Oluşturulacak mission list’in insan-okur başlığı. | Evet | Hayır |
+
+---
+
+<a id="deckent-autonomous-mission-create-goal"></a>
+## `deckent autonomous mission create-goal`
+
+Hedefine ulaşılana kadar çalışan autonomous mission oluşturun
+
+**Usage:** `deckent autonomous mission create-goal <goal>`
+
+### Yürütme sözleşmesi
+
+| Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
+|---|---|---|---|---|---|
+| Autonomous loop kontrolü | Uygula | Owner | Metin | `darwin`, `linux`, `win32` | Yok |
+
+### Seçenekler
+
+| Bayraklar | Açıklama |
+|---|---|
+| `--accept <criteria>` | Görevin karşısında sonuçlandırıldığı kabul ölçütleri. |
+| `--title <title>` | Görev başlığı; verilmediğinde hedef metnine düşer. |
+| `--id <id>` | Görev kimliği; bayrak verilmediğinde bir tane üretilir. |
+| `--tenant <tenant>` | Kaydı varsayılan kiracı yerine bu kiracı kimliği altında oluşturur. |
+| `--deliver-to <channel>` | Sonuçlanan görev bildiriminin iletileceği kanal. |
+
+### Argümanlar
+
+| Argüman | Açıklama | Zorunlu | Variadic |
+|---|---|---|---|
+| `<goal>` | Mission planner’ın ayrıştıracağı goal ifadesi. | Evet | Hayır |
+
+---
+
+<a id="deckent-autonomous-mission-list"></a>
+## `deckent autonomous mission list`
+
+Tüm mission'ları listeleyin (özet tablo)
+
+**Usage:** `deckent autonomous mission list`
+
+### Yürütme sözleşmesi
+
+| Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
+|---|---|---|---|---|---|
+| Salt-okunur | Oku | Owner | Metin ve JSON | `darwin`, `linux`, `win32` | Yok |
+
+### Seçenekler
+
+| Bayraklar | Açıklama |
+|---|---|
+| `--json` | Sonucu biçimli metin yerine tek bir makine tarafından okunabilir JSON belgesi olarak yazar. |
+| `--tenant <tenant>` | Listelemeyi bu kiracı kimliğine ait kayıtlarla sınırlar. |
 
 ---
 
@@ -4587,13 +4953,22 @@ Autonomous backlog'dan bir kaydı kaldırın (konumsal id veya --id)
 
 İş listelerinden veya hedeflerden oluşturulan autonomous mission'ları yönetin
 
-**Usage:** `deckent autonomous-mission`
+**Usage:** `deckent autonomous-mission [args...]`
+
+> "autonomous-mission" komutu kullanımdan kaldırılıyor; bunun yerine "autonomous mission" kullanın.
+> `deckent autonomous mission` — İş listelerinden veya hedeflerden oluşturulan autonomous mission'ları yönetin
 
 ### Yürütme sözleşmesi
 
 | Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
 |---|---|---|---|---|---|
-| Komut grubu (yalnız help) | Oku | Açık | Metin | `darwin`, `linux`, `win32` | Yok |
+| Varsayılan salt-okunur; explicit seçenekler state değiştirebilir | Oku | Operator | Metin | `darwin`, `linux`, `win32` | Yok |
+
+### Argümanlar
+
+| Argüman | Açıklama | Zorunlu | Variadic |
+|---|---|---|---|
+| `[args...]` | Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar | Hayır | Evet |
 
 ---
 
@@ -4603,6 +4978,9 @@ Autonomous backlog'dan bir kaydı kaldırın (konumsal id veya --id)
 Bir veya daha fazla iş kaleminden autonomous mission oluşturun
 
 **Usage:** `deckent autonomous-mission create-list <title>`
+
+> "autonomous-mission" komutu kullanımdan kaldırılıyor; bunun yerine "autonomous mission" kullanın.
+> `deckent autonomous mission create-list` — Bir veya daha fazla iş kaleminden autonomous mission oluşturun
 
 ### Yürütme sözleşmesi
 
@@ -4635,6 +5013,9 @@ Hedefine ulaşılana kadar çalışan autonomous mission oluşturun
 
 **Usage:** `deckent autonomous-mission create-goal <goal>`
 
+> "autonomous-mission" komutu kullanımdan kaldırılıyor; bunun yerine "autonomous mission" kullanın.
+> `deckent autonomous mission create-goal` — Hedefine ulaşılana kadar çalışan autonomous mission oluşturun
+
 ### Yürütme sözleşmesi
 
 | Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
@@ -4665,6 +5046,9 @@ Hedefine ulaşılana kadar çalışan autonomous mission oluşturun
 Tüm mission'ları listeleyin (özet tablo)
 
 **Usage:** `deckent autonomous-mission list`
+
+> "autonomous-mission" komutu kullanımdan kaldırılıyor; bunun yerine "autonomous mission" kullanın.
+> `deckent autonomous mission list` — Tüm mission'ları listeleyin (özet tablo)
 
 ### Yürütme sözleşmesi
 
@@ -5234,6 +5618,9 @@ Canlı abonelik-penceresi kullanımını (oturum/hafta) ve yapılandırılmış 
 | Bayraklar | Açıklama |
 |---|---|
 | `--json` | Sonucu biçimli metin yerine tek bir makine tarafından okunabilir JSON belgesi olarak yazar. |
+| `--claude` | Claude sağlayıcı limitlerini göster |
+| `--codex` | Codex sağlayıcı limitlerini göster |
+| `--cursor` | Cursor sağlayıcı limitlerini göster |
 
 ---
 
@@ -5321,6 +5708,12 @@ Bekleyen onay isteklerini listele
 |---|---|---|---|---|---|
 | Salt-okunur | Oku | Owner | Metin | `darwin`, `linux`, `win32` | Yok |
 
+### Seçenekler
+
+| Bayraklar | Açıklama |
+|---|---|
+| `--class <name>` | Federe gelen kutusunu sınıfa göre filtrele |
+
 ---
 
 <a id="deckent-approvals-decide"></a>
@@ -5350,6 +5743,29 @@ Bekleyen bir onay isteğini karara bağla; interaktif TTY yeniden-doğrulaması 
 | Argüman | Açıklama | Zorunlu | Variadic |
 |---|---|---|---|
 | `<requestId>` | Karara bağlanacak pending approval request kimliği. | Evet | Hayır |
+
+---
+
+<a id="deckent-approvals-run"></a>
+## `deckent approvals run`
+
+Bekleyen LLM-adapter confirmation isteklerini çapraz-sağlayıcı hakemlikten geçir (xverify runtime)
+
+**Usage:** `deckent approvals run`
+
+### Yürütme sözleşmesi
+
+| Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
+|---|---|---|---|---|---|
+| Process kontrolü | Uygula | Owner | Metin | `darwin`, `linux`, `win32` | Yok |
+
+### Seçenekler
+
+| Bayraklar | Açıklama |
+|---|---|
+| `--id <id>` | tek bir bekleyen llm confirmation isteğini işle |
+| `--author <provider>` | istek yazar-sağlayıcı taşımıyorsa kullanılacak sağlayıcı |
+| `--timeout <ms>` | hakem zaman aşımı (milisaniye) |
 
 ---
 
@@ -5466,22 +5882,34 @@ Kuralı kalıcı olarak sil
 
 Custom-confirmation kutusu — bekleyen kabul-matrisi yönlendirmeleri (llm/insan/kod adapterları)
 
-**Usage:** `deckent confirmations`
+**Usage:** `deckent confirmations [args...]`
+
+> "confirmations" komutu kullanımdan kaldırılıyor; bunun yerine "approvals" kullanın.
+> `deckent approvals` — Runtime-genelinde onay kutusu — bekleyen istekleri listele ve canlı-doğrulamalı local-terminal kanalından karara bağla
 
 ### Yürütme sözleşmesi
 
 | Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
 |---|---|---|---|---|---|
-| Komut grubu (yalnız help) | Oku | Açık | Metin | `darwin`, `linux`, `win32` | Yok |
+| Varsayılan salt-okunur; explicit seçenekler state değiştirebilir | Oku | Operator | Metin | `darwin`, `linux`, `win32` | Yok |
+
+### Argümanlar
+
+| Argüman | Açıklama | Zorunlu | Variadic |
+|---|---|---|---|
+| `[args...]` | Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar | Hayır | Evet |
 
 ---
 
 <a id="deckent-confirmations-list"></a>
 ## `deckent confirmations list`
 
-Bekleyen confirmation isteklerini listele
+Bekleyen onay isteklerini listele
 
 **Usage:** `deckent confirmations list`
+
+> "confirmations" komutu kullanımdan kaldırılıyor; bunun yerine "approvals" kullanın.
+> `deckent approvals list` — Bekleyen onay isteklerini listele
 
 ### Yürütme sözleşmesi
 
@@ -5489,14 +5917,23 @@ Bekleyen confirmation isteklerini listele
 |---|---|---|---|---|---|
 | Salt-okunur | Oku | Owner | Metin | `darwin`, `linux`, `win32` | Yok |
 
+### Seçenekler
+
+| Bayraklar | Açıklama |
+|---|---|
+| `--class <name>` | Federe gelen kutusunu sınıfa göre filtrele |
+
 ---
 
 <a id="deckent-confirmations-decide"></a>
 ## `deckent confirmations decide`
 
-Bir INSAN-adapter confirmation kararı ver (interaktif terminal, tek atış)
+Bekleyen bir onay isteğini karara bağla; interaktif TTY yeniden-doğrulaması gerektirir
 
-**Usage:** `deckent confirmations decide <id>`
+**Usage:** `deckent confirmations decide <requestId>`
+
+> "confirmations" komutu kullanımdan kaldırılıyor; bunun yerine "approvals" kullanın.
+> `deckent approvals decide` — Bekleyen bir onay isteğini karara bağla; interaktif TTY yeniden-doğrulaması gerektirir
 
 ### Yürütme sözleşmesi
 
@@ -5508,15 +5945,16 @@ Bir INSAN-adapter confirmation kararı ver (interaktif terminal, tek atış)
 
 | Bayraklar | Açıklama |
 |---|---|
-| `--confirm` | CONFIRMED verdict kaydet |
-| `--reject` | FAILED verdict kaydet |
-| `--reason <text>` | gerekçe (settlement üzerine aynen kaydedilir) |
+| `--allow` | İsteği onayla |
+| `--deny` | İsteği reddet |
+| `--reason <text>` | Sonuçla birlikte kaydedilecek isteğe bağlı karar gerekçesi |
+| `--always` | karardan sonra bu kararı kalıcı routine-seviye kurala terfi ettir (approval-rules.json) |
 
 ### Argümanlar
 
 | Argüman | Açıklama | Zorunlu | Variadic |
 |---|---|---|---|
-| `<id>` | Pending confirmation kimliği; kararlar authenticated approval yüzeyine yönlendirilir. | Evet | Hayır |
+| `<requestId>` | Karara bağlanacak pending approval request kimliği. | Evet | Hayır |
 
 ---
 
@@ -5527,11 +5965,14 @@ Bekleyen LLM-adapter confirmation isteklerini çapraz-sağlayıcı hakemlikten g
 
 **Usage:** `deckent confirmations run`
 
+> "confirmations" komutu kullanımdan kaldırılıyor; bunun yerine "approvals" kullanın.
+> `deckent approvals run` — Bekleyen LLM-adapter confirmation isteklerini çapraz-sağlayıcı hakemlikten geçir (xverify runtime)
+
 ### Yürütme sözleşmesi
 
 | Etki | Varsayılan yürütme | Yetki | Çıktı | Platformlar | Alias’lar |
 |---|---|---|---|---|---|
-| Yerel yazma | Uygula | Owner | Metin | `darwin`, `linux`, `win32` | Yok |
+| Process kontrolü | Uygula | Owner | Metin | `darwin`, `linux`, `win32` | Yok |
 
 ### Seçenekler
 

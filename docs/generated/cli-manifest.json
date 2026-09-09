@@ -578,6 +578,15 @@
             "tr": "Handler’ın şu anda kabul ettiği render identifier’ını seçer: explainatory (açıklamalı görünüm), standart (standard görünüm), verbose veya json."
           },
           "hidden": false
+        },
+        {
+          "flags": "--debt",
+          "descriptionKey": "cli.runtime.status.opt.debt",
+          "description": {
+            "en": "Show the DB-first tech-debt summary and exit",
+            "tr": "DB-öncelikli teknik-borç özetini gösterip çık"
+          },
+          "hidden": false
         }
       ],
       "arguments": []
@@ -654,18 +663,31 @@
       "aliases": [],
       "hidden": false,
       "catalogDependent": false,
-      "options": [
+      "replacement": "watch",
+      "replacementPath": "watch",
+      "replacementPrefix": [],
+      "replacementDescription": {
+        "en": "Follow a live worker (docker logs / tmux pane / subprocess log) with --follow <taskId>, or open the tmux dashboard split",
+        "tr": "Canlı bir worker'ı --follow <taskId> ile takip edin (docker logs / tmux pane / subprocess log) veya tmux dashboard split'ini açın"
+      },
+      "deprecationNotice": {
+        "en": "Command \"attach\" is deprecated; use \"watch\" instead.",
+        "tr": "\"attach\" komutu kullanımdan kaldırılıyor; bunun yerine \"watch\" kullanın."
+      },
+      "options": [],
+      "arguments": [
         {
-          "flags": "--list",
-          "descriptionKey": "cliContract.attach.opt.list",
+          "name": "args",
+          "token": "[args...]",
+          "required": false,
+          "variadic": true,
+          "descriptionKey": "cliContract.run.arg.alias_args",
           "description": {
-            "en": "List all tmux windows without attaching",
-            "tr": "Hiçbir oturuma bağlanmadan tüm tmux pencerelerini listele"
-          },
-          "hidden": false
+            "en": "Arguments forwarded verbatim to the top-level command this alias delegates to",
+            "tr": "Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar"
+          }
         }
-      ],
-      "arguments": []
+      ]
     },
     {
       "path": "spawn",
@@ -844,6 +866,24 @@
           "description": {
             "en": "Add a success-rate trend projection across the last N sprint entries (default: 5)",
             "tr": "Son N sprint entry’si boyunca başarı oranı trend projeksiyonu ekle (varsayılan: 5)"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--explain",
+          "descriptionKey": "cli.retro.opt.explain",
+          "description": {
+            "en": "Explain the retrospective task evidence",
+            "tr": "Retrospektif görev kanıtını açıklayın"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--task <id>",
+          "descriptionKey": "cli.retro.opt.task",
+          "description": {
+            "en": "Explain one specific task",
+            "tr": "Belirli bir görevi açıklayın"
           },
           "hidden": false
         }
@@ -1291,7 +1331,7 @@
       "effect": "local-write",
       "defaultExecution": "apply",
       "authority": "operator",
-      "output": "text",
+      "output": "text-and-json",
       "platforms": [
         "darwin",
         "linux",
@@ -1307,6 +1347,33 @@
           "description": {
             "en": "Show what would be changed without modifying files",
             "tr": "Hiçbir dosyayı değiştirmeden neyin değişeceğini göster"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--native-provider <provider>",
+          "descriptionKey": "cli.config.migrate.opt.native_provider",
+          "description": {
+            "en": "Explicit native provider target (requires --native-model)",
+            "tr": "Açık native provider hedefi (--native-model gerektirir)"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--native-model <model>",
+          "descriptionKey": "cli.config.migrate.opt.native_model",
+          "description": {
+            "en": "Exact native model ID; no legacy aliases or surrounding whitespace (requires --native-provider)",
+            "tr": "Tam native model ID; legacy alias veya çevreleyen boşluk kullanmayın (--native-provider gerektirir)"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--json",
+          "descriptionKey": "cli.config.migrate.opt.json",
+          "description": {
+            "en": "Print a structured migration result",
+            "tr": "Yapılandırılmış geçiş sonucu yazdır"
           },
           "hidden": false
         }
@@ -2080,27 +2147,33 @@
       "aliases": [],
       "hidden": false,
       "catalogDependent": false,
-      "options": [
-        {
-          "flags": "--count",
-          "descriptionKey": "cli.memcat.archive_debt.opt.count",
-          "description": {
-            "en": "Project only the open/resolved counts, not the individual entries",
-            "tr": "Tek tek entry’leri değil, yalnızca açık/çözülmüş sayılarını projekte et"
-          },
-          "hidden": false
-        },
-        {
-          "flags": "--before <sprint>",
-          "descriptionKey": "cli.memcat.archive_debt.opt.before",
-          "description": {
-            "en": "Also project resolved entries that originate before this sprint ID",
-            "tr": "Bu sprint ID’sinden önce ortaya çıkan çözülmüş entry’leri de projekte et"
-          },
-          "hidden": false
-        }
+      "replacement": "status --debt",
+      "replacementPath": "status",
+      "replacementPrefix": [
+        "--debt"
       ],
-      "arguments": []
+      "replacementDescription": {
+        "en": "Show the current run dashboard",
+        "tr": "Güncel run dashboard'ını göster"
+      },
+      "deprecationNotice": {
+        "en": "Command \"archive-debt\" is deprecated; use \"status --debt\" instead.",
+        "tr": "\"archive-debt\" komutu kullanımdan kaldırılıyor; bunun yerine \"status --debt\" kullanın."
+      },
+      "options": [],
+      "arguments": [
+        {
+          "name": "args",
+          "token": "[args...]",
+          "required": false,
+          "variadic": true,
+          "descriptionKey": "cliContract.run.arg.alias_args",
+          "description": {
+            "en": "Arguments forwarded verbatim to the top-level command this alias delegates to",
+            "tr": "Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar"
+          }
+        }
+      ]
     },
     {
       "path": "archive",
@@ -2506,7 +2579,7 @@
       "effect": "read",
       "defaultExecution": "read",
       "authority": "open",
-      "output": "text-and-json",
+      "output": "text",
       "platforms": [
         "darwin",
         "linux",
@@ -2515,36 +2588,33 @@
       "aliases": [],
       "hidden": false,
       "catalogDependent": false,
-      "options": [
-        {
-          "flags": "--interval <ms>",
-          "descriptionKey": "cliContract.dashboard.opt.interval",
-          "description": {
-            "en": "Refresh interval in milliseconds (used as fallback when fs.watch unavailable)",
-            "tr": "Milisaniye cinsinden yenileme aralığı (fs.watch kullanılamadığında yedek olarak kullanılır)"
-          },
-          "hidden": false
-        },
-        {
-          "flags": "--no-color",
-          "descriptionKey": "cliContract.dashboard.opt.no_color",
-          "description": {
-            "en": "Disable ANSI colors (also respects NO_COLOR env var)",
-            "tr": "ANSI renklerini kapat (NO_COLOR ortam değişkenine de uyar)"
-          },
-          "hidden": false
-        },
-        {
-          "flags": "--json",
-          "descriptionKey": "cliContract.dashboard.opt.json",
-          "description": {
-            "en": "Output dashboard state as raw JSON and exit (shared format with deckent status --raw)",
-            "tr": "Dashboard durumunu ham JSON olarak yazdırıp çık (deckent status --raw ile aynı format)"
-          },
-          "hidden": false
-        }
+      "replacement": "status --watch",
+      "replacementPath": "status",
+      "replacementPrefix": [
+        "--watch"
       ],
-      "arguments": []
+      "replacementDescription": {
+        "en": "Show the current run dashboard",
+        "tr": "Güncel run dashboard'ını göster"
+      },
+      "deprecationNotice": {
+        "en": "Command \"dashboard\" is deprecated; use \"status --watch\" instead.",
+        "tr": "\"dashboard\" komutu kullanımdan kaldırılıyor; bunun yerine \"status --watch\" kullanın."
+      },
+      "options": [],
+      "arguments": [
+        {
+          "name": "args",
+          "token": "[args...]",
+          "required": false,
+          "variadic": true,
+          "descriptionKey": "cliContract.run.arg.alias_args",
+          "description": {
+            "en": "Arguments forwarded verbatim to the top-level command this alias delegates to",
+            "tr": "Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar"
+          }
+        }
+      ]
     },
     {
       "path": "serve",
@@ -2706,6 +2776,233 @@
       "arguments": []
     },
     {
+      "path": "watch output",
+      "summaryKey": "cli.watch.output.desc",
+      "description": {
+        "en": "Read or follow exact worker output without changing worker execution",
+        "tr": "Worker execution’ını değiştirmeden tam worker çıktısını oku veya izle"
+      },
+      "effect": "read",
+      "defaultExecution": "read",
+      "authority": "open",
+      "output": "text-and-json",
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "aliases": [],
+      "hidden": false,
+      "catalogDependent": false,
+      "options": [
+        {
+          "flags": "--tail <n>",
+          "descriptionKey": "outputView.opt.tail",
+          "description": {
+            "en": "Show at most the last N complete lines",
+            "tr": "En fazla son N tamamlanmış satırı göster"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--follow",
+          "descriptionKey": "outputView.opt.follow",
+          "description": {
+            "en": "Continue observing new output; stopping the view does not stop the worker",
+            "tr": "Yeni çıktıyı izlemeyi sürdür; görünümü kapatmak worker’ı durdurmaz"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--sprint-id <id>",
+          "descriptionKey": "outputView.opt.sprint_id",
+          "description": {
+            "en": "Require an exact sprint identifier",
+            "tr": "Tam sprint kimliği eşleşmesini zorunlu tut"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--attempt-id <id>",
+          "descriptionKey": "outputView.opt.attempt_id",
+          "description": {
+            "en": "Select an exact attempt identifier",
+            "tr": "Tam attempt kimliğini seç"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--dispatch-request-id <id>",
+          "descriptionKey": "outputView.opt.dispatch_request_id",
+          "description": {
+            "en": "Select an exact dispatch request identifier",
+            "tr": "Tam dispatch request kimliğini seç"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--json",
+          "descriptionKey": "outputView.opt.json",
+          "description": {
+            "en": "Emit machine-readable NDJSON events",
+            "tr": "Makinece okunabilir NDJSON event’leri üret"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--lang <lang>",
+          "descriptionKey": "outputView.opt.lang",
+          "description": {
+            "en": "Output language (en or tr)",
+            "tr": "Çıktı dili (en veya tr)"
+          },
+          "hidden": false
+        }
+      ],
+      "arguments": [
+        {
+          "name": "taskId",
+          "token": "<taskId>",
+          "required": true,
+          "variadic": false,
+          "descriptionKey": "outputView.arg.task_id",
+          "description": {
+            "en": "Exact worker task identifier",
+            "tr": "Tam worker görev kimliği"
+          }
+        }
+      ]
+    },
+    {
+      "path": "intelligence",
+      "summaryKey": "cli.intelligence.desc",
+      "description": {
+        "en": "Inspect and run competitor intelligence",
+        "tr": "Rakip istihbaratını inceleyin ve çalıştırın"
+      },
+      "effect": "group",
+      "defaultExecution": "read",
+      "authority": "open",
+      "output": "text",
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "aliases": [],
+      "hidden": false,
+      "catalogDependent": false,
+      "options": [],
+      "arguments": []
+    },
+    {
+      "path": "intelligence watch",
+      "summaryKey": "cli.intelligence.watch.desc",
+      "description": {
+        "en": "Manage competitor-watch execution",
+        "tr": "Rakip izleme çalıştırmasını yönetin"
+      },
+      "effect": "group",
+      "defaultExecution": "read",
+      "authority": "open",
+      "output": "text",
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "aliases": [],
+      "hidden": false,
+      "catalogDependent": false,
+      "options": [],
+      "arguments": []
+    },
+    {
+      "path": "intelligence watch run",
+      "summaryKey": "cli.intelligence.watch.run.desc",
+      "description": {
+        "en": "Run the canonical competitor-watch capability",
+        "tr": "Kanonik rakip izleme yeteneğini çalıştırın"
+      },
+      "effect": "local-write",
+      "defaultExecution": "apply",
+      "authority": "operator",
+      "output": "text",
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "aliases": [],
+      "hidden": false,
+      "catalogDependent": false,
+      "options": [
+        {
+          "flags": "--dry-run",
+          "descriptionKey": "cli.intelligence.watch.run.opt.dry_run",
+          "description": {
+            "en": "Preview without persisting events, cursors, or notifications",
+            "tr": "Olayları, imleçleri veya bildirimleri kaydetmeden önizleyin"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--input <fixture>",
+          "descriptionKey": "cli.intelligence.watch.run.opt.input",
+          "description": {
+            "en": "Read source definitions from a JSON fixture",
+            "tr": "Kaynak tanımlarını bir JSON fikstüründen okuyun"
+          },
+          "hidden": false
+        }
+      ],
+      "arguments": []
+    },
+    {
+      "path": "intelligence schedule",
+      "summaryKey": "cli.intelligence.schedule.desc",
+      "description": {
+        "en": "Ensure and report the canonical daily watch flow",
+        "tr": "Kanonik günlük izleme akışını sağlayın ve raporlayın"
+      },
+      "effect": "local-write",
+      "defaultExecution": "apply",
+      "authority": "operator",
+      "output": "text",
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "aliases": [],
+      "hidden": false,
+      "catalogDependent": false,
+      "options": [],
+      "arguments": []
+    },
+    {
+      "path": "intelligence status",
+      "summaryKey": "cli.intelligence.status.desc",
+      "description": {
+        "en": "Show watch event history and last-run state",
+        "tr": "İzleme olay geçmişini ve son çalıştırma durumunu gösterin"
+      },
+      "effect": "read",
+      "defaultExecution": "read",
+      "authority": "open",
+      "output": "text",
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "aliases": [],
+      "hidden": false,
+      "catalogDependent": false,
+      "options": [],
+      "arguments": []
+    },
+    {
       "path": "run",
       "summaryKey": "cli.run.desc",
       "description": {
@@ -2758,6 +3055,24 @@
           "description": {
             "en": "Worker scope directory (default: ./)",
             "tr": "Worker kapsam dizini (varsayılan: ./)"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--files-write <paths...>",
+          "descriptionKey": "cliContract.run.opt.files_write",
+          "description": {
+            "en": "Exact repo-relative files this task may WRITE (repeat paths after the option). A directory scope alone carries no file authority, so a run that needs a landing checkpoint requires this.",
+            "tr": "Bu görevin YAZABİLECEĞİ tam repo-relative dosyalar (yolları seçenekten sonra sıralayın). Tek başına dizin kapsamı dosya yetkisi taşımaz; landing checkpoint gerektiren koşumlar bunu ister."
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--files-read <paths...>",
+          "descriptionKey": "cliContract.run.opt.files_read",
+          "description": {
+            "en": "Exact repo-relative files this task may READ as context (repeat paths after the option).",
+            "tr": "Bu görevin bağlam olarak OKUYABİLECEĞİ tam repo-relative dosyalar (yolları seçenekten sonra sıralayın)."
           },
           "hidden": false
         },
@@ -3921,6 +4236,47 @@
       "arguments": []
     },
     {
+      "path": "skill attribution",
+      "summaryKey": "cli.skill.attribution.desc",
+      "description": {
+        "en": "Inspect or apply the causal skill-attribution cutover",
+        "tr": "Nedensel skill-atıf geçişini inceleyin veya uygulayın"
+      },
+      "effect": "local-write",
+      "defaultExecution": "dry-run",
+      "authority": "operator",
+      "output": "text-and-json",
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "aliases": [],
+      "hidden": false,
+      "catalogDependent": false,
+      "options": [
+        {
+          "flags": "--apply",
+          "descriptionKey": "cli.skill.attribution.opt.apply",
+          "description": {
+            "en": "Apply the lossless cutover and write its immutable receipt",
+            "tr": "Kayıpsız geçişi uygulayın ve immutable receipt yazın"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--json",
+          "descriptionKey": "cli.memcat.shared.opt.json",
+          "description": {
+            "en": "Emit the read-model projection as JSON instead of a rendered table",
+            "tr": "Render edilmiş tablo yerine read-model projeksiyonunu JSON olarak yazdır"
+          },
+          "hidden": false
+        }
+      ],
+      "arguments": []
+    },
+    {
       "path": "skill list",
       "summaryKey": "cli.skill.list.desc",
       "description": {
@@ -4471,7 +4827,7 @@
       "effect": "read",
       "defaultExecution": "read",
       "authority": "open",
-      "output": "text-and-json",
+      "output": "text",
       "platforms": [
         "darwin",
         "linux",
@@ -4480,45 +4836,33 @@
       "aliases": [],
       "hidden": false,
       "catalogDependent": false,
-      "options": [
-        {
-          "flags": "--sprint <id>",
-          "descriptionKey": "cli.memcat.explain.opt.sprint",
-          "description": {
-            "en": "Project a single stored sprint entry by its sprint ID",
-            "tr": "Sprint ID’si ile tek bir kayıtlı sprint entry’sini projekte et"
-          },
-          "hidden": false
-        },
-        {
-          "flags": "--task <taskId>",
-          "descriptionKey": "cli.memcat.explain.opt.task",
-          "description": {
-            "en": "Project the stored routing-decision log for one task ID",
-            "tr": "Tek bir task ID için kayıtlı routing-decision günlüğünü projekte et"
-          },
-          "hidden": false
-        },
-        {
-          "flags": "--json",
-          "descriptionKey": "cli.memcat.shared.opt.json",
-          "description": {
-            "en": "Emit the read-model projection as JSON instead of a rendered table",
-            "tr": "Render edilmiş tablo yerine read-model projeksiyonunu JSON olarak yazdır"
-          },
-          "hidden": false
-        },
-        {
-          "flags": "--verbose",
-          "descriptionKey": "cli.memcat.explain.opt.verbose",
-          "description": {
-            "en": "Project every stored learning and the full task detail (default caps learnings at 3)",
-            "tr": "Kayıtlı tüm öğrenimleri ve tam task detayını projekte et (varsayılan öğrenimleri 3 ile sınırlar)"
-          },
-          "hidden": false
-        }
+      "replacement": "retro --explain",
+      "replacementPath": "retro",
+      "replacementPrefix": [
+        "--explain"
       ],
-      "arguments": []
+      "replacementDescription": {
+        "en": "Show the latest sprint retrospective",
+        "tr": "En son sprint retrospektifini gösterin"
+      },
+      "deprecationNotice": {
+        "en": "Command \"explain\" is deprecated; use \"retro --explain\" instead.",
+        "tr": "\"explain\" komutu kullanımdan kaldırılıyor; bunun yerine \"retro --explain\" kullanın."
+      },
+      "options": [],
+      "arguments": [
+        {
+          "name": "args",
+          "token": "[args...]",
+          "required": false,
+          "variadic": true,
+          "descriptionKey": "cliContract.run.arg.alias_args",
+          "description": {
+            "en": "Arguments forwarded verbatim to the top-level command this alias delegates to",
+            "tr": "Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar"
+          }
+        }
+      ]
     },
     {
       "path": "set-directives",
@@ -4621,27 +4965,28 @@
       "aliases": [],
       "hidden": false,
       "catalogDependent": false,
-      "options": [
-        {
-          "flags": "--write",
-          "descriptionKey": "cliContract.plan_nl.opt.write",
-          "description": {
-            "en": "Write the scaffold to DIRECTIVES.md (any existing file is backed up first)",
-            "tr": "İskeleti DIRECTIVES.md dosyasına yaz (mevcut dosya önce yedeklenir)"
-          },
-          "hidden": false
-        }
-      ],
+      "replacement": "do",
+      "replacementPath": "do",
+      "replacementPrefix": [],
+      "replacementDescription": {
+        "en": "Golden-flow: turn a goal into a sprint plan (dry-run preview by default; --run to actually start it)",
+        "tr": "Golden-flow: bir hedefi sprint planına dönüştürün (varsayılan dry-run önizleme; gerçekten başlatmak için --run)"
+      },
+      "deprecationNotice": {
+        "en": "Command \"plan-nl\" is deprecated; use \"do\" instead.",
+        "tr": "\"plan-nl\" komutu kullanımdan kaldırılıyor; bunun yerine \"do\" kullanın."
+      },
+      "options": [],
       "arguments": [
         {
-          "name": "goal",
-          "token": "<goal>",
-          "required": true,
-          "variadic": false,
-          "descriptionKey": "cliContract.plan_nl.arg.goal",
+          "name": "args",
+          "token": "[args...]",
+          "required": false,
+          "variadic": true,
+          "descriptionKey": "cliContract.run.arg.alias_args",
           "description": {
-            "en": "Free-form description of what the sprint should accomplish",
-            "tr": "Sprint’in ne başarması gerektiğinin serbest biçimli açıklaması"
+            "en": "Arguments forwarded verbatim to the top-level command this alias delegates to",
+            "tr": "Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar"
           }
         }
       ]
@@ -4869,9 +5214,9 @@
         "en": "Manage human checkpoints — list, approve, or reject pending checkpoints",
         "tr": "İnsan checkpoint'lerini yönetin — bekleyenleri listeleyin, onaylayın veya reddedin"
       },
-      "effect": "group",
+      "effect": "mixed",
       "defaultExecution": "read",
-      "authority": "open",
+      "authority": "operator",
       "output": "text",
       "platforms": [
         "darwin",
@@ -4881,8 +5226,31 @@
       "aliases": [],
       "hidden": false,
       "catalogDependent": false,
+      "replacement": "approvals",
+      "replacementPath": "approvals",
+      "replacementPrefix": [],
+      "replacementDescription": {
+        "en": "Runtime-wide approval inbox — list pending requests and decide them over the live-authenticated local-terminal channel",
+        "tr": "Runtime-genelinde onay kutusu — bekleyen istekleri listele ve canlı-doğrulamalı local-terminal kanalından karara bağla"
+      },
+      "deprecationNotice": {
+        "en": "Command \"checkpoint\" is deprecated; use \"approvals\" instead.",
+        "tr": "\"checkpoint\" komutu kullanımdan kaldırılıyor; bunun yerine \"approvals\" kullanın."
+      },
       "options": [],
-      "arguments": []
+      "arguments": [
+        {
+          "name": "args",
+          "token": "[args...]",
+          "required": false,
+          "variadic": true,
+          "descriptionKey": "cliContract.run.arg.alias_args",
+          "description": {
+            "en": "Arguments forwarded verbatim to the top-level command this alias delegates to",
+            "tr": "Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar"
+          }
+        }
+      ]
     },
     {
       "path": "checkpoint list",
@@ -5468,40 +5836,78 @@
       "aliases": [],
       "hidden": false,
       "catalogDependent": false,
+      "replacement": "watch output",
+      "replacementPath": "watch output",
+      "replacementPrefix": [],
+      "replacementDescription": {
+        "en": "Read or follow exact worker output without changing worker execution",
+        "tr": "Worker execution’ını değiştirmeden tam worker çıktısını oku veya izle"
+      },
+      "deprecationNotice": {
+        "en": "Command \"output\" is deprecated; use \"watch output\" instead.",
+        "tr": "\"output\" komutu kullanımdan kaldırılıyor; bunun yerine \"watch output\" kullanın."
+      },
       "options": [
         {
           "flags": "--tail <n>",
-          "descriptionKey": "cliContract.output.opt.tail",
+          "descriptionKey": "outputView.opt.tail",
           "description": {
-            "en": "Show the last N lines of the persisted worker output (default: 50)",
-            "tr": "Kalıcı worker çıktısının son N satırını göster (varsayılan: 50)"
+            "en": "Show at most the last N complete lines",
+            "tr": "En fazla son N tamamlanmış satırı göster"
           },
           "hidden": false
         },
         {
           "flags": "--follow",
-          "descriptionKey": "cliContract.output.opt.follow",
+          "descriptionKey": "outputView.opt.follow",
           "description": {
-            "en": "Re-read the persisted output file every 2 seconds (polling, not a live process attach)",
-            "tr": "Kalıcı çıktı dosyasını her 2 saniyede yeniden oku (yoklama; canlı sürece bağlanma değil)"
+            "en": "Continue observing new output; stopping the view does not stop the worker",
+            "tr": "Yeni çıktıyı izlemeyi sürdür; görünümü kapatmak worker’ı durdurmaz"
           },
           "hidden": false
         },
         {
-          "flags": "--sprint-id <sprintId>",
-          "descriptionKey": "cliContract.output.opt.sprint_id",
+          "flags": "--sprint-id <id>",
+          "descriptionKey": "outputView.opt.sprint_id",
           "description": {
-            "en": "Sprint to read the persisted evidence from (defaults to the current sprint)",
-            "tr": "Kalıcı kanıtın okunacağı sprint (varsayılan: geçerli sprint)"
+            "en": "Require an exact sprint identifier",
+            "tr": "Tam sprint kimliği eşleşmesini zorunlu tut"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--attempt-id <id>",
+          "descriptionKey": "outputView.opt.attempt_id",
+          "description": {
+            "en": "Select an exact attempt identifier",
+            "tr": "Tam attempt kimliğini seç"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--dispatch-request-id <id>",
+          "descriptionKey": "outputView.opt.dispatch_request_id",
+          "description": {
+            "en": "Select an exact dispatch request identifier",
+            "tr": "Tam dispatch request kimliğini seç"
           },
           "hidden": false
         },
         {
           "flags": "--json",
-          "descriptionKey": "cliContract.output.opt.json",
+          "descriptionKey": "outputView.opt.json",
           "description": {
-            "en": "Output raw JSON",
-            "tr": "Ham JSON çıktısı ver"
+            "en": "Emit machine-readable NDJSON events",
+            "tr": "Makinece okunabilir NDJSON event’leri üret"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--lang <lang>",
+          "descriptionKey": "outputView.opt.lang",
+          "description": {
+            "en": "Output language (en or tr)",
+            "tr": "Çıktı dili (en veya tr)"
           },
           "hidden": false
         }
@@ -5512,10 +5918,10 @@
           "token": "<taskId>",
           "required": true,
           "variadic": false,
-          "descriptionKey": "cliContract.output.arg.taskId",
+          "descriptionKey": "outputView.arg.task_id",
           "description": {
-            "en": "Worker task whose persisted output evidence should be read",
-            "tr": "Kalıcı çıktı kanıtı okunacak worker görevi"
+            "en": "Exact worker task identifier",
+            "tr": "Tam worker görev kimliği"
           }
         }
       ]
@@ -5593,8 +5999,35 @@
           "flags": "--reason-code <code>",
           "descriptionKey": "task.settle.opt_reason_code",
           "description": {
-            "en": "Typed pre-dispatch reason for a declared eventless receipt (no_provider|budget_capability_unsupported|provider_authority_rejected|execution_admission_rejected|command_build_failed|fallback_unreachable|fallback_limit_hold|fallback_exhausted)",
-            "tr": "Bildirilen eventless receipt için tipli pre-dispatch nedeni (no_provider|budget_capability_unsupported|provider_authority_rejected|execution_admission_rejected|command_build_failed|fallback_unreachable|fallback_limit_hold|fallback_exhausted)"
+            "en": "Typed pre-dispatch reason for a declared eventless receipt (no_provider|budget_capability_unsupported|provider_authority_rejected|routing_authority_rejected|execution_admission_rejected|command_build_failed|fallback_unreachable|fallback_limit_hold|fallback_exhausted)",
+            "tr": "Bildirilen eventless receipt için tipli pre-dispatch nedeni (no_provider|budget_capability_unsupported|provider_authority_rejected|routing_authority_rejected|execution_admission_rejected|command_build_failed|fallback_unreachable|fallback_limit_hold|fallback_exhausted)"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--abandon-dispatch",
+          "descriptionKey": "task.settle.opt_abandon_dispatch",
+          "description": {
+            "en": "Terminalize a dispatch that started and then died without a result. The disposition is derived from the absence probe, never chosen: it settles as manual_review_required and refuses while any liveness evidence remains.",
+            "tr": "Başlayıp sonuç üretmeden ölen bir dispatch'i terminal yapar. Disposition seçilmez, yokluk-probe'undan türetilir: manual_review_required olarak kapanır ve herhangi bir canlılık kanıtı varken reddeder."
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--from-result",
+          "descriptionKey": "task.settle.opt_from_result",
+          "description": {
+            "en": "Terminalize a dispatch whose worker DID finish and persist a result while the caller stopped waiting. The disposition is read from the worker's own selfAssessment, never chosen.",
+            "tr": "Worker'ı BİTİRİP sonucunu yazdığı hâlde çağıran beklemeyi bıraktığı için takılı kalan dispatch'i terminal yapar. Disposition seçilmez, worker'ın kendi selfAssessment'ından okunur."
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--reproject-status",
+          "descriptionKey": "task.settle.opt_reproject_status",
+          "description": {
+            "en": "Make the task file's status agree with its own TERMINAL receipt. Writes nothing new — the receipt is the authority; this only resolves a task surface left behind by a caller that stopped waiting.",
+            "tr": "Görev dosyasının status alanını kendi TERMİNAL receipt'iyle uyumlu hâle getirir. Yeni bir şey yazmaz — authority receipt'tir; bu yalnız beklemeyi bırakmış bir çağıranın geride bıraktığı görev yüzeyini uzlaştırır."
           },
           "hidden": false
         },
@@ -5795,6 +6228,118 @@
       "effect": "read",
       "defaultExecution": "read",
       "authority": "open",
+      "output": "text",
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "aliases": [],
+      "hidden": false,
+      "catalogDependent": false,
+      "replacement": "memory recall",
+      "replacementPath": "memory recall",
+      "replacementPrefix": [],
+      "replacementDescription": {
+        "en": "Search project memory — ADRs, sprint learnings, patterns, debt",
+        "tr": "Proje belleğinde arayın — ADR'ler, sprint öğrenimleri, pattern'ler, borç"
+      },
+      "deprecationNotice": {
+        "en": "Command \"recall\" is deprecated; use \"memory recall\" instead.",
+        "tr": "\"recall\" komutu kullanımdan kaldırılıyor; bunun yerine \"memory recall\" kullanın."
+      },
+      "options": [],
+      "arguments": [
+        {
+          "name": "args",
+          "token": "[args...]",
+          "required": false,
+          "variadic": true,
+          "descriptionKey": "cliContract.run.arg.alias_args",
+          "description": {
+            "en": "Arguments forwarded verbatim to the top-level command this alias delegates to",
+            "tr": "Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar"
+          }
+        }
+      ]
+    },
+    {
+      "path": "remember",
+      "summaryKey": "cli.remember.desc",
+      "description": {
+        "en": "Store a note in project memory",
+        "tr": "Proje belleğine bir not kaydedin"
+      },
+      "effect": "local-write",
+      "defaultExecution": "apply",
+      "authority": "operator",
+      "output": "text",
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "aliases": [],
+      "hidden": false,
+      "catalogDependent": false,
+      "replacement": "memory remember",
+      "replacementPath": "memory remember",
+      "replacementPrefix": [],
+      "replacementDescription": {
+        "en": "Store a note in project memory",
+        "tr": "Proje belleğine bir not kaydedin"
+      },
+      "deprecationNotice": {
+        "en": "Command \"remember\" is deprecated; use \"memory remember\" instead.",
+        "tr": "\"remember\" komutu kullanımdan kaldırılıyor; bunun yerine \"memory remember\" kullanın."
+      },
+      "options": [],
+      "arguments": [
+        {
+          "name": "args",
+          "token": "[args...]",
+          "required": false,
+          "variadic": true,
+          "descriptionKey": "cliContract.run.arg.alias_args",
+          "description": {
+            "en": "Arguments forwarded verbatim to the top-level command this alias delegates to",
+            "tr": "Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar"
+          }
+        }
+      ]
+    },
+    {
+      "path": "memory",
+      "summaryKey": "cli.memory.desc",
+      "description": {
+        "en": "Memory V2 management",
+        "tr": "Memory V2 yönetimi"
+      },
+      "effect": "group",
+      "defaultExecution": "read",
+      "authority": "open",
+      "output": "text",
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "aliases": [],
+      "hidden": false,
+      "catalogDependent": false,
+      "options": [],
+      "arguments": []
+    },
+    {
+      "path": "memory recall",
+      "summaryKey": "cli.recall.desc",
+      "description": {
+        "en": "Search project memory — ADRs, sprint learnings, patterns, debt",
+        "tr": "Proje belleğinde arayın — ADR'ler, sprint öğrenimleri, pattern'ler, borç"
+      },
+      "effect": "read",
+      "defaultExecution": "read",
+      "authority": "open",
       "output": "text-and-json",
       "platforms": [
         "darwin",
@@ -5849,13 +6394,31 @@
             "tr": "Render edilmiş tablo yerine read-model projeksiyonunu JSON olarak yazdır"
           },
           "hidden": false
+        },
+        {
+          "flags": "--cursor <cursor>",
+          "descriptionKey": "memory_read.cursor_help",
+          "description": {
+            "en": "Continue the same scoped memory query using its next-page reference",
+            "tr": "Sonraki sayfa referansıyla aynı kapsamdaki bellek sorgusunu sürdür"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--detail <detailRef>",
+          "descriptionKey": "memory_read.detail_help",
+          "description": {
+            "en": "Read the complete source record using its exact detail reference",
+            "tr": "Kesin ayrıntı referansıyla eksiksiz kaynak kaydını oku"
+          },
+          "hidden": false
         }
       ],
       "arguments": [
         {
           "name": "query",
-          "token": "<query>",
-          "required": true,
+          "token": "[query]",
+          "required": false,
           "variadic": false,
           "descriptionKey": "cli.memcat.recall.arg.query",
           "description": {
@@ -5866,7 +6429,7 @@
       ]
     },
     {
-      "path": "remember",
+      "path": "memory remember",
       "summaryKey": "cli.remember.desc",
       "description": {
         "en": "Store a note in project memory",
@@ -5926,28 +6489,6 @@
           }
         }
       ]
-    },
-    {
-      "path": "memory",
-      "summaryKey": "cli.memory.desc",
-      "description": {
-        "en": "Memory V2 management",
-        "tr": "Memory V2 yönetimi"
-      },
-      "effect": "group",
-      "defaultExecution": "read",
-      "authority": "open",
-      "output": "text",
-      "platforms": [
-        "darwin",
-        "linux",
-        "win32"
-      ],
-      "aliases": [],
-      "hidden": false,
-      "catalogDependent": false,
-      "options": [],
-      "arguments": []
     },
     {
       "path": "memory rebuild",
@@ -7467,7 +8008,7 @@
       ]
     },
     {
-      "path": "audit-verify",
+      "path": "audit verify",
       "summaryKey": "cli.audit_verify.desc",
       "description": {
         "en": "Verify the audit log HMAC chain for tamper evidence",
@@ -7497,6 +8038,51 @@
         }
       ],
       "arguments": []
+    },
+    {
+      "path": "audit-verify",
+      "summaryKey": "cli.audit_verify.desc",
+      "description": {
+        "en": "Verify the audit log HMAC chain for tamper evidence",
+        "tr": "Kurcalama kanıtı için audit log HMAC zincirini doğrulayın"
+      },
+      "effect": "read",
+      "defaultExecution": "read",
+      "authority": "open",
+      "output": "text",
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "aliases": [],
+      "hidden": false,
+      "catalogDependent": false,
+      "replacement": "audit verify",
+      "replacementPath": "audit verify",
+      "replacementPrefix": [],
+      "replacementDescription": {
+        "en": "Verify the audit log HMAC chain for tamper evidence",
+        "tr": "Kurcalama kanıtı için audit log HMAC zincirini doğrulayın"
+      },
+      "deprecationNotice": {
+        "en": "Command \"audit-verify\" is deprecated; use \"audit verify\" instead.",
+        "tr": "\"audit-verify\" komutu kullanımdan kaldırılıyor; bunun yerine \"audit verify\" kullanın."
+      },
+      "options": [],
+      "arguments": [
+        {
+          "name": "args",
+          "token": "[args...]",
+          "required": false,
+          "variadic": true,
+          "descriptionKey": "cliContract.run.arg.alias_args",
+          "description": {
+            "en": "Arguments forwarded verbatim to the top-level command this alias delegates to",
+            "tr": "Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar"
+          }
+        }
+      ]
     },
     {
       "path": "recover",
@@ -7551,6 +8137,24 @@
           "description": {
             "en": "Restore task files from the pre-archive snapshot instead of recovering forward",
             "tr": "İleri kurtarma yerine görev dosyalarını pre-archive snapshot’tan geri yükle"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--retain-started-failed <dispatch-request-id>",
+          "descriptionKey": "recover.retain_started_failed_option",
+          "description": {
+            "en": "Retain one stopped, started-failed dispatch attempt as historical evidence; no archive or resume.",
+            "tr": "Durmuş started-failed dispatch attempt kanıtını tarihsel olarak koru; archive veya resume yapmaz."
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--retain-committed-unsettled <dispatch-request-id>",
+          "descriptionKey": "recover.retain_committed_unsettled_option",
+          "description": {
+            "en": "Retain one committed-journal, release-pending dispatch attempt with unresolved settlement; no archive or resume.",
+            "tr": "COMMITTED_JOURNAL_RELEASE_PENDING ve settlement UNRESOLVED olan tek dispatch attempt kaydını koru; archive veya resume yapma."
           },
           "hidden": false
         },
@@ -7637,7 +8241,7 @@
       "effect": "read",
       "defaultExecution": "read",
       "authority": "owner",
-      "output": "text",
+      "output": "text-and-json",
       "platforms": [
         "darwin",
         "linux",
@@ -7651,8 +8255,8 @@
           "flags": "--provider <name>",
           "descriptionKey": "cli.memcat.models.opt.provider_filter",
           "description": {
-            "en": "Restrict the catalog projection to one provider (claude, codex, gemini, ollama, cursor)",
-            "tr": "Katalog projeksiyonunu tek bir provider ile sınırla (claude, codex, gemini, ollama, cursor)"
+            "en": "Restrict the catalog projection to one provider (claude, codex, cursor, gemini, ollama)",
+            "tr": "Katalog projeksiyonunu tek bir provider ile sınırla (claude, codex, cursor, gemini, ollama)"
           },
           "hidden": false
         },
@@ -7662,6 +8266,15 @@
           "description": {
             "en": "Read the cached or bundled catalog only; never reach the network",
             "tr": "Yalnızca önbellekteki veya paketlenmiş katalogu oku; ağa hiç çıkma"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--json",
+          "descriptionKey": "cli.memcat.shared.opt.json",
+          "description": {
+            "en": "Emit the read-model projection as JSON instead of a rendered table",
+            "tr": "Render edilmiş tablo yerine read-model projeksiyonunu JSON olarak yazdır"
           },
           "hidden": false
         }
@@ -7696,13 +8309,22 @@
             "tr": "Bu modeli sunan provider"
           },
           "hidden": false
+        },
+        {
+          "flags": "--offline",
+          "descriptionKey": "cli.memcat.models.opt.offline",
+          "description": {
+            "en": "Read the cached or bundled catalog only; never reach the network",
+            "tr": "Yalnızca önbellekteki veya paketlenmiş katalogu oku; ağa hiç çıkma"
+          },
+          "hidden": false
         }
       ],
       "arguments": [
         {
           "name": "model",
-          "token": "<model>",
-          "required": true,
+          "token": "[model]",
+          "required": false,
           "variadic": false,
           "descriptionKey": "cli.memcat.models.arg.model",
           "description": {
@@ -7740,13 +8362,22 @@
             "tr": "Bu modeli sunan provider"
           },
           "hidden": false
+        },
+        {
+          "flags": "--offline",
+          "descriptionKey": "cli.memcat.models.opt.offline",
+          "description": {
+            "en": "Read the cached or bundled catalog only; never reach the network",
+            "tr": "Yalnızca önbellekteki veya paketlenmiş katalogu oku; ağa hiç çıkma"
+          },
+          "hidden": false
         }
       ],
       "arguments": [
         {
           "name": "model",
-          "token": "<model>",
-          "required": true,
+          "token": "[model]",
+          "required": false,
           "variadic": false,
           "descriptionKey": "cli.memcat.models.arg.model",
           "description": {
@@ -7833,7 +8464,7 @@
       "effect": "read",
       "defaultExecution": "read",
       "authority": "open",
-      "output": "text",
+      "output": "text-and-json",
       "platforms": [
         "darwin",
         "linux",
@@ -7842,7 +8473,26 @@
       "aliases": [],
       "hidden": false,
       "catalogDependent": true,
-      "options": [],
+      "options": [
+        {
+          "flags": "--offline",
+          "descriptionKey": "cli.memcat.models.opt.offline",
+          "description": {
+            "en": "Read the cached or bundled catalog only; never reach the network",
+            "tr": "Yalnızca önbellekteki veya paketlenmiş katalogu oku; ağa hiç çıkma"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--json",
+          "descriptionKey": "cli.memcat.shared.opt.json",
+          "description": {
+            "en": "Emit the read-model projection as JSON instead of a rendered table",
+            "tr": "Render edilmiş tablo yerine read-model projeksiyonunu JSON olarak yazdır"
+          },
+          "hidden": false
+        }
+      ],
       "arguments": []
     },
     {
@@ -8365,6 +9015,229 @@
       "hidden": false,
       "catalogDependent": false,
       "options": [],
+      "arguments": []
+    },
+    {
+      "path": "autonomous mission",
+      "summaryKey": "cli.autonomous_mission.desc",
+      "description": {
+        "en": "Manage autonomous missions created from work lists or goals",
+        "tr": "İş listelerinden veya hedeflerden oluşturulan autonomous mission'ları yönetin"
+      },
+      "effect": "group",
+      "defaultExecution": "read",
+      "authority": "open",
+      "output": "text",
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "aliases": [],
+      "hidden": false,
+      "catalogDependent": false,
+      "options": [],
+      "arguments": []
+    },
+    {
+      "path": "autonomous mission create-list",
+      "summaryKey": "cli.autonomous_mission.create_list.desc",
+      "description": {
+        "en": "Create an autonomous mission from one or more work items",
+        "tr": "Bir veya daha fazla iş kaleminden autonomous mission oluşturun"
+      },
+      "effect": "autonomous",
+      "defaultExecution": "apply",
+      "authority": "owner",
+      "output": "text",
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "aliases": [],
+      "hidden": false,
+      "catalogDependent": false,
+      "options": [
+        {
+          "flags": "--item <kind:spec>",
+          "descriptionKey": "cli.governance.mission.opt.item",
+          "description": {
+            "en": "Work item to add, as kind or kind:json-spec. Repeat the flag once per item.",
+            "tr": "Eklenecek iş maddesi; kind veya kind:json-spec biçiminde. Her madde için bayrağı tekrarlayın."
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--items-file <path>",
+          "descriptionKey": "cli.governance.mission.opt.items_file",
+          "description": {
+            "en": "JSON file holding the array of mission items to create the list from.",
+            "tr": "Listenin oluşturulacağı görev maddeleri dizisini tutan JSON dosyası."
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--id <id>",
+          "descriptionKey": "cli.governance.mission.opt.id",
+          "description": {
+            "en": "Mission identifier; one is generated when the flag is omitted.",
+            "tr": "Görev kimliği; bayrak verilmediğinde bir tane üretilir."
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--tenant <tenant>",
+          "descriptionKey": "cli.governance.opt.tenant",
+          "description": {
+            "en": "Record the entry under this tenant identifier instead of the default tenant.",
+            "tr": "Kaydı varsayılan kiracı yerine bu kiracı kimliği altında oluşturur."
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--deliver-to <channel>",
+          "descriptionKey": "cli.governance.mission.opt.deliver_to",
+          "description": {
+            "en": "Channel the settled-mission notification is delivered to.",
+            "tr": "Sonuçlanan görev bildiriminin iletileceği kanal."
+          },
+          "hidden": false
+        }
+      ],
+      "arguments": [
+        {
+          "name": "title",
+          "token": "<title>",
+          "required": true,
+          "variadic": false,
+          "descriptionKey": "cli.governance.mission.arg.title",
+          "description": {
+            "en": "Human-readable title of the mission list to create.",
+            "tr": "Oluşturulacak mission list’in insan-okur başlığı."
+          }
+        }
+      ]
+    },
+    {
+      "path": "autonomous mission create-goal",
+      "summaryKey": "cli.autonomous_mission.create_goal.desc",
+      "description": {
+        "en": "Create an autonomous mission that runs until its goal is reached",
+        "tr": "Hedefine ulaşılana kadar çalışan autonomous mission oluşturun"
+      },
+      "effect": "autonomous",
+      "defaultExecution": "apply",
+      "authority": "owner",
+      "output": "text",
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "aliases": [],
+      "hidden": false,
+      "catalogDependent": false,
+      "options": [
+        {
+          "flags": "--accept <criteria>",
+          "descriptionKey": "cli.governance.mission.opt.accept",
+          "description": {
+            "en": "Acceptance criteria the mission is settled against.",
+            "tr": "Görevin karşısında sonuçlandırıldığı kabul ölçütleri."
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--title <title>",
+          "descriptionKey": "cli.governance.mission.opt.title",
+          "description": {
+            "en": "Mission title; defaults to the goal text when omitted.",
+            "tr": "Görev başlığı; verilmediğinde hedef metnine düşer."
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--id <id>",
+          "descriptionKey": "cli.governance.mission.opt.id",
+          "description": {
+            "en": "Mission identifier; one is generated when the flag is omitted.",
+            "tr": "Görev kimliği; bayrak verilmediğinde bir tane üretilir."
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--tenant <tenant>",
+          "descriptionKey": "cli.governance.opt.tenant",
+          "description": {
+            "en": "Record the entry under this tenant identifier instead of the default tenant.",
+            "tr": "Kaydı varsayılan kiracı yerine bu kiracı kimliği altında oluşturur."
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--deliver-to <channel>",
+          "descriptionKey": "cli.governance.mission.opt.deliver_to",
+          "description": {
+            "en": "Channel the settled-mission notification is delivered to.",
+            "tr": "Sonuçlanan görev bildiriminin iletileceği kanal."
+          },
+          "hidden": false
+        }
+      ],
+      "arguments": [
+        {
+          "name": "goal",
+          "token": "<goal>",
+          "required": true,
+          "variadic": false,
+          "descriptionKey": "cli.governance.mission.arg.goal",
+          "description": {
+            "en": "Goal statement the mission planner should decompose.",
+            "tr": "Mission planner’ın ayrıştıracağı goal ifadesi."
+          }
+        }
+      ]
+    },
+    {
+      "path": "autonomous mission list",
+      "summaryKey": "cli.autonomous_mission.list.desc",
+      "description": {
+        "en": "List all missions (summary table)",
+        "tr": "Tüm mission'ları listeleyin (özet tablo)"
+      },
+      "effect": "read",
+      "defaultExecution": "read",
+      "authority": "owner",
+      "output": "text-and-json",
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "aliases": [],
+      "hidden": false,
+      "catalogDependent": false,
+      "options": [
+        {
+          "flags": "--json",
+          "descriptionKey": "cli.governance.opt.json",
+          "description": {
+            "en": "Emit the result as one machine-readable JSON document instead of formatted text.",
+            "tr": "Sonucu biçimli metin yerine tek bir makine tarafından okunabilir JSON belgesi olarak yazar."
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--tenant <tenant>",
+          "descriptionKey": "cli.governance.opt.tenant_filter",
+          "description": {
+            "en": "Restrict the listing to entries owned by this tenant identifier.",
+            "tr": "Listelemeyi bu kiracı kimliğine ait kayıtlarla sınırlar."
+          },
+          "hidden": false
+        }
+      ],
       "arguments": []
     },
     {
@@ -9116,9 +9989,9 @@
         "en": "Manage autonomous missions created from work lists or goals",
         "tr": "İş listelerinden veya hedeflerden oluşturulan autonomous mission'ları yönetin"
       },
-      "effect": "group",
+      "effect": "mixed",
       "defaultExecution": "read",
-      "authority": "open",
+      "authority": "operator",
       "output": "text",
       "platforms": [
         "darwin",
@@ -9128,8 +10001,31 @@
       "aliases": [],
       "hidden": false,
       "catalogDependent": false,
+      "replacement": "autonomous mission",
+      "replacementPath": "autonomous mission",
+      "replacementPrefix": [],
+      "replacementDescription": {
+        "en": "Manage autonomous missions created from work lists or goals",
+        "tr": "İş listelerinden veya hedeflerden oluşturulan autonomous mission'ları yönetin"
+      },
+      "deprecationNotice": {
+        "en": "Command \"autonomous-mission\" is deprecated; use \"autonomous mission\" instead.",
+        "tr": "\"autonomous-mission\" komutu kullanımdan kaldırılıyor; bunun yerine \"autonomous mission\" kullanın."
+      },
       "options": [],
-      "arguments": []
+      "arguments": [
+        {
+          "name": "args",
+          "token": "[args...]",
+          "required": false,
+          "variadic": true,
+          "descriptionKey": "cliContract.run.arg.alias_args",
+          "description": {
+            "en": "Arguments forwarded verbatim to the top-level command this alias delegates to",
+            "tr": "Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar"
+          }
+        }
+      ]
     },
     {
       "path": "autonomous-mission create-list",
@@ -9150,6 +10046,17 @@
       "aliases": [],
       "hidden": false,
       "catalogDependent": false,
+      "replacement": "autonomous mission",
+      "replacementPath": "autonomous mission create-list",
+      "replacementPrefix": [],
+      "replacementDescription": {
+        "en": "Create an autonomous mission from one or more work items",
+        "tr": "Bir veya daha fazla iş kaleminden autonomous mission oluşturun"
+      },
+      "deprecationNotice": {
+        "en": "Command \"autonomous-mission\" is deprecated; use \"autonomous mission\" instead.",
+        "tr": "\"autonomous-mission\" komutu kullanımdan kaldırılıyor; bunun yerine \"autonomous mission\" kullanın."
+      },
       "options": [
         {
           "flags": "--item <kind:spec>",
@@ -9230,6 +10137,17 @@
       "aliases": [],
       "hidden": false,
       "catalogDependent": false,
+      "replacement": "autonomous mission",
+      "replacementPath": "autonomous mission create-goal",
+      "replacementPrefix": [],
+      "replacementDescription": {
+        "en": "Create an autonomous mission that runs until its goal is reached",
+        "tr": "Hedefine ulaşılana kadar çalışan autonomous mission oluşturun"
+      },
+      "deprecationNotice": {
+        "en": "Command \"autonomous-mission\" is deprecated; use \"autonomous mission\" instead.",
+        "tr": "\"autonomous-mission\" komutu kullanımdan kaldırılıyor; bunun yerine \"autonomous mission\" kullanın."
+      },
       "options": [
         {
           "flags": "--accept <criteria>",
@@ -9310,6 +10228,17 @@
       "aliases": [],
       "hidden": false,
       "catalogDependent": false,
+      "replacement": "autonomous mission",
+      "replacementPath": "autonomous mission list",
+      "replacementPrefix": [],
+      "replacementDescription": {
+        "en": "List all missions (summary table)",
+        "tr": "Tüm mission'ları listeleyin (özet tablo)"
+      },
+      "deprecationNotice": {
+        "en": "Command \"autonomous-mission\" is deprecated; use \"autonomous mission\" instead.",
+        "tr": "\"autonomous-mission\" komutu kullanımdan kaldırılıyor; bunun yerine \"autonomous mission\" kullanın."
+      },
       "options": [
         {
           "flags": "--json",
@@ -10464,6 +11393,33 @@
             "tr": "Sonucu biçimli metin yerine tek bir makine tarafından okunabilir JSON belgesi olarak yazar."
           },
           "hidden": false
+        },
+        {
+          "flags": "--claude",
+          "descriptionKey": "limits.opt_claude",
+          "description": {
+            "en": "Show Claude provider limits",
+            "tr": "Claude sağlayıcı limitlerini göster"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--codex",
+          "descriptionKey": "limits.opt_codex",
+          "description": {
+            "en": "Show Codex provider limits",
+            "tr": "Codex sağlayıcı limitlerini göster"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--cursor",
+          "descriptionKey": "limits.opt_cursor",
+          "description": {
+            "en": "Show Cursor provider limits",
+            "tr": "Cursor sağlayıcı limitlerini göster"
+          },
+          "hidden": false
         }
       ],
       "arguments": []
@@ -10657,7 +11613,17 @@
       "aliases": [],
       "hidden": false,
       "catalogDependent": false,
-      "options": [],
+      "options": [
+        {
+          "flags": "--class <name>",
+          "descriptionKey": "approvals.opt_class",
+          "description": {
+            "en": "Filter the federated inbox by class",
+            "tr": "Federe gelen kutusunu sınıfa göre filtrele"
+          },
+          "hidden": false
+        }
+      ],
       "arguments": []
     },
     {
@@ -10730,6 +11696,56 @@
           }
         }
       ]
+    },
+    {
+      "path": "approvals run",
+      "summaryKey": "confirmations.run_desc",
+      "description": {
+        "en": "Run pending LLM-adapter confirmations through cross-provider adjudication (xverify runtime)",
+        "tr": "Bekleyen LLM-adapter confirmation isteklerini çapraz-sağlayıcı hakemlikten geçir (xverify runtime)"
+      },
+      "effect": "process",
+      "defaultExecution": "apply",
+      "authority": "owner",
+      "output": "text",
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "aliases": [],
+      "hidden": false,
+      "catalogDependent": false,
+      "options": [
+        {
+          "flags": "--id <id>",
+          "descriptionKey": "confirmations.opt_run_id",
+          "description": {
+            "en": "run a single pending llm confirmation",
+            "tr": "tek bir bekleyen llm confirmation isteğini işle"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--author <provider>",
+          "descriptionKey": "confirmations.opt_run_author",
+          "description": {
+            "en": "author provider when the request carries none",
+            "tr": "istek yazar-sağlayıcı taşımıyorsa kullanılacak sağlayıcı"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--timeout <ms>",
+          "descriptionKey": "confirmations.opt_run_timeout",
+          "description": {
+            "en": "verifier timeout in milliseconds",
+            "tr": "hakem zaman aşımı (milisaniye)"
+          },
+          "hidden": false
+        }
+      ],
+      "arguments": []
     },
     {
       "path": "approvals rules",
@@ -10906,9 +11922,9 @@
         "en": "Custom-confirmation inbox — pending acceptance-matrix routes (llm/human/code adapters)",
         "tr": "Custom-confirmation kutusu — bekleyen kabul-matrisi yönlendirmeleri (llm/insan/kod adapterları)"
       },
-      "effect": "group",
+      "effect": "mixed",
       "defaultExecution": "read",
-      "authority": "open",
+      "authority": "operator",
       "output": "text",
       "platforms": [
         "darwin",
@@ -10918,15 +11934,38 @@
       "aliases": [],
       "hidden": false,
       "catalogDependent": false,
+      "replacement": "approvals",
+      "replacementPath": "approvals",
+      "replacementPrefix": [],
+      "replacementDescription": {
+        "en": "Runtime-wide approval inbox — list pending requests and decide them over the live-authenticated local-terminal channel",
+        "tr": "Runtime-genelinde onay kutusu — bekleyen istekleri listele ve canlı-doğrulamalı local-terminal kanalından karara bağla"
+      },
+      "deprecationNotice": {
+        "en": "Command \"confirmations\" is deprecated; use \"approvals\" instead.",
+        "tr": "\"confirmations\" komutu kullanımdan kaldırılıyor; bunun yerine \"approvals\" kullanın."
+      },
       "options": [],
-      "arguments": []
+      "arguments": [
+        {
+          "name": "args",
+          "token": "[args...]",
+          "required": false,
+          "variadic": true,
+          "descriptionKey": "cliContract.run.arg.alias_args",
+          "description": {
+            "en": "Arguments forwarded verbatim to the top-level command this alias delegates to",
+            "tr": "Bu takma adın devrettiği üst-düzey komuta birebir iletilen argümanlar"
+          }
+        }
+      ]
     },
     {
       "path": "confirmations list",
-      "summaryKey": "confirmations.list_desc",
+      "summaryKey": "approvals.list_desc",
       "description": {
-        "en": "List pending confirmation requests",
-        "tr": "Bekleyen confirmation isteklerini listele"
+        "en": "List pending approval requests",
+        "tr": "Bekleyen onay isteklerini listele"
       },
       "effect": "read",
       "defaultExecution": "read",
@@ -10940,15 +11979,36 @@
       "aliases": [],
       "hidden": false,
       "catalogDependent": false,
-      "options": [],
+      "replacement": "approvals",
+      "replacementPath": "approvals list",
+      "replacementPrefix": [],
+      "replacementDescription": {
+        "en": "List pending approval requests",
+        "tr": "Bekleyen onay isteklerini listele"
+      },
+      "deprecationNotice": {
+        "en": "Command \"confirmations\" is deprecated; use \"approvals\" instead.",
+        "tr": "\"confirmations\" komutu kullanımdan kaldırılıyor; bunun yerine \"approvals\" kullanın."
+      },
+      "options": [
+        {
+          "flags": "--class <name>",
+          "descriptionKey": "approvals.opt_class",
+          "description": {
+            "en": "Filter the federated inbox by class",
+            "tr": "Federe gelen kutusunu sınıfa göre filtrele"
+          },
+          "hidden": false
+        }
+      ],
       "arguments": []
     },
     {
       "path": "confirmations decide",
-      "summaryKey": "confirmations.decide_desc",
+      "summaryKey": "approvals.decide_desc",
       "description": {
-        "en": "Decide one HUMAN-adapter confirmation (interactive terminal, single-shot)",
-        "tr": "Bir INSAN-adapter confirmation kararı ver (interaktif terminal, tek atış)"
+        "en": "Decide one pending approval request; requires an interactive TTY re-authentication",
+        "tr": "Bekleyen bir onay isteğini karara bağla; interaktif TTY yeniden-doğrulaması gerektirir"
       },
       "effect": "local-write",
       "defaultExecution": "apply",
@@ -10962,45 +12022,65 @@
       "aliases": [],
       "hidden": false,
       "catalogDependent": false,
+      "replacement": "approvals",
+      "replacementPath": "approvals decide",
+      "replacementPrefix": [],
+      "replacementDescription": {
+        "en": "Decide one pending approval request; requires an interactive TTY re-authentication",
+        "tr": "Bekleyen bir onay isteğini karara bağla; interaktif TTY yeniden-doğrulaması gerektirir"
+      },
+      "deprecationNotice": {
+        "en": "Command \"confirmations\" is deprecated; use \"approvals\" instead.",
+        "tr": "\"confirmations\" komutu kullanımdan kaldırılıyor; bunun yerine \"approvals\" kullanın."
+      },
       "options": [
         {
-          "flags": "--confirm",
-          "descriptionKey": "confirmations.opt_confirm",
+          "flags": "--allow",
+          "descriptionKey": "approvals.opt_allow",
           "description": {
-            "en": "record a CONFIRMED verdict",
-            "tr": "CONFIRMED verdict kaydet"
+            "en": "Approve the request",
+            "tr": "İsteği onayla"
           },
           "hidden": false
         },
         {
-          "flags": "--reject",
-          "descriptionKey": "confirmations.opt_reject",
+          "flags": "--deny",
+          "descriptionKey": "approvals.opt_deny",
           "description": {
-            "en": "record a FAILED verdict",
-            "tr": "FAILED verdict kaydet"
+            "en": "Deny the request",
+            "tr": "İsteği reddet"
           },
           "hidden": false
         },
         {
           "flags": "--reason <text>",
-          "descriptionKey": "confirmations.opt_reason",
+          "descriptionKey": "approvals.opt_reason",
           "description": {
-            "en": "why (recorded verbatim on the settlement)",
-            "tr": "gerekçe (settlement üzerine aynen kaydedilir)"
+            "en": "Optional decision reason recorded with the outcome",
+            "tr": "Sonuçla birlikte kaydedilecek isteğe bağlı karar gerekçesi"
+          },
+          "hidden": false
+        },
+        {
+          "flags": "--always",
+          "descriptionKey": "approvals.opt_always",
+          "description": {
+            "en": "after deciding, promote this decision into a persistent routine-tier rule (approval-rules.json)",
+            "tr": "karardan sonra bu kararı kalıcı routine-seviye kurala terfi ettir (approval-rules.json)"
           },
           "hidden": false
         }
       ],
       "arguments": [
         {
-          "name": "id",
-          "token": "<id>",
+          "name": "requestId",
+          "token": "<requestId>",
           "required": true,
           "variadic": false,
-          "descriptionKey": "cli.governance.confirmations.arg.id",
+          "descriptionKey": "cli.governance.approvals.arg.request_id",
           "description": {
-            "en": "Pending confirmation identifier; decisions are routed to the authenticated approval surface.",
-            "tr": "Pending confirmation kimliği; kararlar authenticated approval yüzeyine yönlendirilir."
+            "en": "Pending approval request identifier to decide.",
+            "tr": "Karara bağlanacak pending approval request kimliği."
           }
         }
       ]
@@ -11012,7 +12092,7 @@
         "en": "Run pending LLM-adapter confirmations through cross-provider adjudication (xverify runtime)",
         "tr": "Bekleyen LLM-adapter confirmation isteklerini çapraz-sağlayıcı hakemlikten geçir (xverify runtime)"
       },
-      "effect": "local-write",
+      "effect": "process",
       "defaultExecution": "apply",
       "authority": "owner",
       "output": "text",
@@ -11024,6 +12104,17 @@
       "aliases": [],
       "hidden": false,
       "catalogDependent": false,
+      "replacement": "approvals",
+      "replacementPath": "approvals run",
+      "replacementPrefix": [],
+      "replacementDescription": {
+        "en": "Run pending LLM-adapter confirmations through cross-provider adjudication (xverify runtime)",
+        "tr": "Bekleyen LLM-adapter confirmation isteklerini çapraz-sağlayıcı hakemlikten geçir (xverify runtime)"
+      },
+      "deprecationNotice": {
+        "en": "Command \"confirmations\" is deprecated; use \"approvals\" instead.",
+        "tr": "\"confirmations\" komutu kullanımdan kaldırılıyor; bunun yerine \"approvals\" kullanın."
+      },
       "options": [
         {
           "flags": "--id <id>",
@@ -11863,6 +12954,40 @@
       "catalogDependent": false,
       "options": [],
       "arguments": []
+    },
+    {
+      "path": "help",
+      "summaryKey": "cli.root_help.help_command_desc",
+      "description": {
+        "en": "Display curated help topics",
+        "tr": "Seçilmiş yardım konularını göster"
+      },
+      "effect": "read",
+      "defaultExecution": "read",
+      "authority": "open",
+      "output": "text",
+      "platforms": [
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "aliases": [],
+      "hidden": true,
+      "catalogDependent": false,
+      "options": [],
+      "arguments": [
+        {
+          "name": "topic",
+          "token": "[topic]",
+          "required": false,
+          "variadic": false,
+          "descriptionKey": "cli.root_help.help_command_topic_desc",
+          "description": {
+            "en": "Help topic to display (advanced)",
+            "tr": "Gösterilecek yardım konusu (advanced)"
+          }
+        }
+      ]
     },
     {
       "path": "help-info",

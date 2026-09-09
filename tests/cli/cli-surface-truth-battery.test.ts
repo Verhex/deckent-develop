@@ -15,7 +15,7 @@
  *   - catalog:  getMessage() from src/cli/helpers/messages.js
  */
 import { describe, it, expect, beforeAll } from 'vitest';
-import type { Command } from 'commander';
+import { Command } from 'commander';
 
 import {
   CLI_COMMAND_CONTRACTS,
@@ -42,7 +42,16 @@ import {
   walkCommanderTree,
   type ContractViolation,
 } from '../../src/cli/helpers/command-contract.js';
+import {
+  parseReplacementSurface,
+  resolveReplacementHelpCommand,
+} from '../../src/cli/helpers/compatibility-command-help.js';
 import { getMessage, getMessageLanguages } from '../../src/cli/helpers/messages.js';
+import {
+  buildCliCommandRows,
+  collectCliDocGenerations,
+  generateCliDocs,
+} from '../../scripts/generate-cli-docs.js';
 
 let buildProgram: () => Command;
 let program: Command;
@@ -75,22 +84,32 @@ describe('CLI contract ⇄ live Commander tree — full-tree verification', () =
 
   it('verification is not vacuous — coverage counters match the real tree', () => {
     const coverage = contractCoverage(program);
-    // Every walked path is a real command path (root excluded, generated
-    // `help` subcommands excluded by the walker).
+    // Every walked path is a real command path (root excluded). Reachable
+    // virtual compatibility children are counted separately from real nodes.
     expect(coverage.treePaths).toBeGreaterThan(100);
     expect(coverage.contractRows).toBe(CLI_COMMAND_CONTRACTS.length);
     expect(coverage.cliContractRows).toBe(cliContracts().length);
-    // Nothing declared `cli` may be missing from the tree.
-    expect(coverage.verifiedPaths).toBe(coverage.cliContractRows);
-    // And the tree carries no path the contract does not cover.
-    expect(coverage.cliContractRows).toBe(coverage.treePaths);
+    expect(coverage.verifiedPaths).toBe(coverage.treePaths);
+    expect(coverage.verifiedPaths + coverage.mappedHelpPaths).toBe(coverage.cliContractRows);
+    const actualPaths = new Set(walkCommanderTree(program).map((node) => node.path));
+    const mappedPaths = cliContracts()
+      .map((contract) => contractPathKey(contract.path))
+      .filter((path) => !actualPaths.has(path));
+    expect(mappedPaths).toEqual([
+      'autonomous-mission create-list',
+      'autonomous-mission create-goal',
+      'autonomous-mission list',
+      'confirmations list',
+      'confirmations decide',
+      'confirmations run',
+    ]);
   });
 
   it('walks nested sub-paths, not just top-level commands', () => {
     const paths = walkCommanderTree(program).map((node) => node.path);
     expect(paths.some((p) => p.split(' ').length >= 2)).toBe(true);
     expect(paths).not.toContain('deckent');
-    expect(paths.filter((p) => p.split(' ').pop() === 'help')).toEqual([]);
+    expect(paths.filter((p) => p.split(' ').pop() === 'help')).toEqual(['help']);
   });
 });
 
@@ -170,6 +189,45 @@ describe('CLI contract ⇄ live Commander tree — per-axis drift is actually ca
     const mutated = { ...row, path: ['no-such-command'] };
     const kinds = verifyCommandContract(program, { contracts: [mutated] }).map((v) => v.kind);
     expect(kinds).toContain('contract-path-missing-from-tree');
+  });
+
+  it('does not whitelist an unknown compatibility child as mapped help', () => {
+    const row = rowFor('confirmations list');
+    const mutated = { ...row, path: ['confirmations', 'not-a-real-child'] };
+    expect(verifyCommandContract(program, { contracts: [mutated] }).map((v) => v.kind))
+      .toContain('contract-path-missing-from-tree');
+    const extraAfterLeaf = { ...row, path: ['confirmations', 'decide', 'extra'] };
+    expect(verifyCommandContract(program, { contracts: [extraAfterLeaf] }).map((v) => v.kind))
+      .toContain('contract-path-missing-from-tree');
+  });
+
+  it('checks mapped help option and argument shape against the real replacement child', () => {
+    const list = rowFor('confirmations list');
+    const wrongOptions = { ...list, options: [] };
+    expect(verifyCommandContract(program, { contracts: [wrongOptions] }).map((v) => v.kind))
+      .toContain('option-drift');
+
+    const create = rowFor('autonomous-mission create-goal');
+    const wrongArguments = { ...create, arguments: [] };
+    expect(verifyCommandContract(program, { contracts: [wrongArguments] }).map((v) => v.kind))
+      .toContain('argument-drift');
+  });
+
+  it('parses exact replacement prefixes and rejects unresolved child help', () => {
+    expect(parseReplacementSurface('status --debt')).toEqual({
+      prefixFlags: ['--debt'],
+      targetPath: ['status'],
+    });
+    expect(parseReplacementSurface('autonomous mission')).toEqual({
+      prefixFlags: [],
+      targetPath: ['autonomous', 'mission'],
+    });
+    expect(resolveReplacementHelpCommand(program, ['approvals'], ['not-a-real-child']))
+      .toBeUndefined();
+
+    const fixture = new Command('deckent');
+    fixture.command('leaf <value>');
+    expect(resolveReplacementHelpCommand(fixture, ['leaf'], ['positional'])?.name()).toBe('leaf');
   });
 
   it('detects a live command with no contract row at all', () => {
@@ -430,7 +488,85 @@ describe('CLI contract — summary and help bindings are complete', () => {
   });
 });
 
+describe('CLI reference — deprecated forwarding stays explicit and canonical', () => {
+  it('keeps alias narrative separate from exact replacement metadata in both languages', () => {
+    const en = buildCliCommandRows('en', { includeHidden: true });
+    const tr = buildCliCommandRows('tr', { includeHidden: true });
+    const enArchive = en.find((row) => row.path === 'archive-debt')!;
+    const trArchive = tr.find((row) => row.path === 'archive-debt')!;
+    expect(enArchive.description).toBe(getMessage('cli.archive_debt.desc', 'en'));
+    expect(enArchive).toMatchObject({
+      replacement: 'status --debt',
+      replacementPath: 'status',
+      replacementPrefix: ['--debt'],
+      replacementDescription: getMessage('status.desc', 'en'),
+      deprecationNotice: getMessage('cli.batch.deprecated.archive_debt', 'en'),
+    });
+    expect(trArchive).toMatchObject({
+      replacementDescription: getMessage('status.desc', 'tr'),
+      deprecationNotice: getMessage('cli.batch.deprecated.archive_debt', 'tr'),
+    });
+  });
+
+  it('documents reachable virtual children without relabeling real legacy children', () => {
+    const rows = buildCliCommandRows('en', { includeHidden: true });
+    expect(rows.find((row) => row.path === 'confirmations decide'))
+      .toMatchObject({ replacementPath: 'approvals decide', replacementPrefix: [] });
+    expect(rows.find((row) => row.path === 'autonomous-mission create-goal'))
+      .toMatchObject({ replacementPath: 'autonomous mission create-goal', replacementPrefix: [] });
+    expect(rows.find((row) => row.path === 'checkpoint approve')?.replacement)
+      .toBeUndefined();
+  });
+
+  it('renders each language from its own strings and emits bilingual manifest fields', () => {
+    const enRows = buildCliCommandRows('en');
+    const trRows = buildCliCommandRows('tr');
+    expect(generateCliDocs(enRows, 'en')).toContain(getMessage('cli.batch.deprecated.recall', 'en'));
+    expect(generateCliDocs(trRows, 'tr')).toContain(getMessage('cli.batch.deprecated.recall', 'tr'));
+
+    const manifestGeneration = collectCliDocGenerations()
+      .find((generation) => generation.target === 'docs/generated/cli-manifest.json')!;
+    const manifest = JSON.parse(manifestGeneration.content) as {
+      commands: Array<{ path: string;
+        replacement?: string;
+        replacementPath?: string;
+        replacementPrefix?: string[];
+        replacementDescription?: { en: string; tr: string };
+        deprecationNotice?: { en: string; tr: string };
+      }>;
+    };
+    const recall = manifest.commands.find((command) => command.path === 'recall')!;
+    expect(recall).toMatchObject({
+      replacement: 'memory recall',
+      replacementPath: 'memory recall',
+      replacementPrefix: [],
+      replacementDescription: {
+        en: getMessage('cli.recall.desc', 'en'),
+        tr: getMessage('cli.recall.desc', 'tr'),
+      },
+      deprecationNotice: {
+        en: getMessage('cli.batch.deprecated.recall', 'en'),
+        tr: getMessage('cli.batch.deprecated.recall', 'tr'),
+      },
+    });
+  });
+});
+
 describe('CLI contract — live shape helpers read only public Commander API', () => {
+  it('checks real output/watch and checkpoint decision paths as ordinary nodes', () => {
+    const nodes = new Map(walkCommanderTree(program).map((node) => [node.path, node]));
+    for (const path of ['output', 'watch output', 'checkpoint approve', 'checkpoint reject']) {
+      const node = nodes.get(path);
+      const contract = getContract(path);
+      expect(node, `${path} must be actually registered`).toBeDefined();
+      expect(node?.mappedHelp).not.toBe(true);
+      expect(contract?.options.map(({ flags }) => flags))
+        .toEqual(describeCommanderOptions(node!.command));
+      expect(contract?.arguments.map(({ name, required, variadic }) => ({ name, required, variadic })))
+        .toEqual(describeCommanderArguments(node!.command));
+    }
+  });
+
   it('option flags are read verbatim from the live command', () => {
     const node = walkCommanderTree(program).find((n) => n.path === 'agent');
     expect(node).toBeDefined();

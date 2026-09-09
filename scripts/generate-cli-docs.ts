@@ -24,10 +24,15 @@ import {
 } from '../src/core/cli-command-contract.js';
 import { buildProgram } from '../src/cli/index.js';
 import {
+  parseReplacementSurface,
+  resolveReplacementHelpCommand,
+} from '../src/cli/helpers/compatibility-command-help.js';
+import {
   verifyCommandContract,
   walkCommanderTree,
 } from '../src/cli/helpers/command-contract.js';
 import { getMessage } from '../src/cli/helpers/messages.js';
+import { DEPRECATED_FORWARDING } from '../src/cli/surface-contract.js';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const DEFAULT_ROOT = resolve(dirname(SCRIPT_PATH), '..');
@@ -65,7 +70,19 @@ export interface CliDocCommand {
   readonly catalogDependent: boolean;
   readonly options: readonly CliDocOption[];
   readonly arguments: readonly CliDocArgument[];
+  readonly replacement?: string;
+  readonly replacementPath?: string;
+  readonly replacementPrefix?: readonly string[];
+  readonly replacementDescription?: string;
+  readonly deprecationNotice?: string;
 }
+
+type CliDocDeprecation = Pick<CliDocCommand,
+  | 'replacement'
+  | 'replacementPath'
+  | 'replacementPrefix'
+  | 'replacementDescription'
+  | 'deprecationNotice'>;
 
 function withLanguage<T>(lang: CliReferenceLanguage, run: () => T): T {
   const previous = process.env['DECKENT_LANGUAGE'];
@@ -87,6 +104,7 @@ function commandRow(
   contract: CliCommandContract,
   command: Command,
   lang: CliReferenceLanguage,
+  deprecation?: CliDocDeprecation,
 ): CliDocCommand {
   return {
     path: contractPathKey(contract.path),
@@ -117,6 +135,49 @@ function commandRow(
       descriptionKey: argument.descriptionKey,
       description: command.registeredArguments[index]!.description,
     })),
+    ...(deprecation ?? {}),
+  };
+}
+
+function resolveDocumentedCommand(
+  program: Command,
+  nodes: ReadonlyMap<string, Command>,
+  path: string,
+): Command | undefined {
+  const actual = nodes.get(path);
+  if (actual) return actual;
+  const segments = path.split(' ');
+  const surface = DEPRECATED_FORWARDING.find((candidate) => candidate.command === segments[0]);
+  if (!surface || segments.length < 2) return undefined;
+  const { targetPath } = parseReplacementSurface(surface.replacement);
+  const suffix = segments.slice(1);
+  const command = resolveReplacementHelpCommand(program, targetPath, suffix);
+  return command?.name() === suffix.at(-1) ? command : undefined;
+}
+
+function resolveDeprecationMetadata(
+  program: Command,
+  nodes: ReadonlyMap<string, Command>,
+  path: string,
+  lang: CliReferenceLanguage,
+): CliDocDeprecation | undefined {
+  const segments = path.split(' ');
+  const surface = DEPRECATED_FORWARDING.find((candidate) => candidate.command === segments[0]);
+  if (!surface) return undefined;
+  const isTopLevel = segments.length === 1;
+  // Real children such as checkpoint approve/reject have their own behavior;
+  // only absent children reached through the generic argv bridge are mapped.
+  if (!isTopLevel && nodes.has(path)) return undefined;
+  const { targetPath, prefixFlags } = parseReplacementSurface(surface.replacement);
+  const suffix = segments.slice(1);
+  const replacement = resolveReplacementHelpCommand(program, targetPath, suffix);
+  if (!replacement || (!isTopLevel && replacement.name() !== suffix.at(-1))) return undefined;
+  return {
+    replacement: surface.replacement,
+    replacementPath: [...targetPath, ...suffix].join(' '),
+    replacementPrefix: prefixFlags,
+    replacementDescription: replacement.description(),
+    deprecationNotice: getMessage(surface.warningKey, lang),
   };
 }
 
@@ -139,9 +200,14 @@ export function buildCliCommandRows(
       .filter((contract) => options.includeHidden === true || !contract.hidden)
       .map((contract) => {
         const path = contractPathKey(contract.path);
-        const command = nodes.get(path);
+        const command = resolveDocumentedCommand(program, nodes, path);
         if (!command) throw new Error(`E_CLI_DOC_PATH_MISSING:${path}`);
-        return commandRow(contract, command, lang);
+        return commandRow(
+          contract,
+          command,
+          lang,
+          resolveDeprecationMetadata(program, nodes, path, lang),
+        );
       });
   });
 }
@@ -199,6 +265,15 @@ function renderCommand(row: CliDocCommand, lang: CliReferenceLanguage): string[]
   ];
   if (row.longDescription && row.longDescription !== row.description) {
     lines.push('', `### ${message('cli.reference.long_description', lang)}`, '', row.longDescription);
+  }
+  if (row.deprecationNotice && row.replacementPath && row.replacementDescription) {
+    const replacement = [row.replacementPath, ...(row.replacementPrefix ?? [])]
+      .join(' ');
+    lines.push(
+      '',
+      `> ${row.deprecationNotice}`,
+      `> ${code(`deckent ${replacement}`)} — ${row.replacementDescription}`,
+    );
   }
   lines.push(
     '',
@@ -279,6 +354,19 @@ function buildInternalManifest(): string {
       aliases: row.aliases,
       hidden: row.hidden,
       catalogDependent: row.catalogDependent,
+      ...(row.replacement === undefined ? {} : {
+        replacement: row.replacement,
+        replacementPath: row.replacementPath,
+        replacementPrefix: row.replacementPrefix,
+        replacementDescription: {
+          en: row.replacementDescription,
+          tr: translated.replacementDescription,
+        },
+        deprecationNotice: {
+          en: row.deprecationNotice,
+          tr: translated.deprecationNotice,
+        },
+      }),
       options: row.options.map((option, index) => ({
         flags: option.flags,
         descriptionKey: option.descriptionKey,

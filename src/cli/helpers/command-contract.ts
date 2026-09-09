@@ -9,7 +9,8 @@
 // and on every declared axis:
 //
 //   • path        — every registered command path has a contract row, and
-//                   every `cli`-surfaced contract row exists in the tree
+//                   every `cli` row is either an actual node or an exact
+//                   live-help child reachable through DEPRECATED_FORWARDING
 //   • options     — exact ordered flag-string equality
 //   • arguments   — name / required / variadic, in order
 //   • aliases     — exact ordered equality
@@ -39,6 +40,11 @@ import {
   type CliCommandContract,
 } from '../../core/cli-command-contract.js';
 import { getMessage } from './messages.js';
+import {
+  parseReplacementSurface,
+  resolveReplacementHelpCommand,
+} from './compatibility-command-help.js';
+import { DEPRECATED_FORWARDING } from '../surface-contract.js';
 
 export type ContractViolationKind =
   | 'command-missing-from-contract'
@@ -52,7 +58,9 @@ export type ContractViolationKind =
   | 'output-drift'
   | 'summary-binding-drift'
   | 'option-description-binding-drift'
-  | 'argument-description-binding-drift';
+  | 'argument-description-binding-drift'
+  | 'deprecated-forwarding-target-missing'
+  | 'deprecated-forwarding-prefix-missing';
 
 export interface ContractViolation {
   /** Space-separated command path without the `deckent` root. */
@@ -69,6 +77,8 @@ export interface CommanderNode {
   readonly command: Command;
   /** False when the parent's help does not list this command. */
   readonly visible: boolean;
+  /** True only for a reachable compatibility child projected from target help. */
+  readonly mappedHelp?: boolean;
 }
 
 export interface CommanderArgumentShape {
@@ -86,9 +96,8 @@ export interface VerifyContractOptions {
 
 /**
  * Every command path in the tree, EXCLUDING the root program itself (the root
- * is the `deckent` binary, not a command) and excluding Commander's
- * auto-generated `help` subcommands (generated chrome, not a contracted
- * surface).
+ * is the `deckent` binary, not a command). Explicit hidden help commands are
+ * included: hidden is a contract axis, never a reason to erase a real path.
  */
 export function walkCommanderTree(program: Command): readonly CommanderNode[] {
   const visit = (command: Command, prefix: readonly string[], parent?: Command): CommanderNode[] => {
@@ -139,6 +148,28 @@ export function isActionlessCommandGroup(command: Command): boolean {
   return command.commands.length > 0 && typeof inspectable._actionHandler !== 'function';
 }
 
+function resolveDeprecatedMappedHelpNode(
+  program: Command,
+  contractPath: string,
+): CommanderNode | undefined {
+  const segments = contractPath.split(' ');
+  const surface = DEPRECATED_FORWARDING.find((candidate) => candidate.command === segments[0]);
+  if (!surface || segments.length < 2) return undefined;
+
+  const legacy = program.commands.find((candidate) => candidate.name() === surface.command);
+  const catchAll = legacy?.registeredArguments[0];
+  if (!legacy || legacy.registeredArguments.length !== 1
+    || catchAll?.name() !== 'args' || catchAll.required || !catchAll.variadic) {
+    return undefined;
+  }
+
+  const { targetPath } = parseReplacementSurface(surface.replacement);
+  const suffix = segments.slice(1);
+  const command = resolveReplacementHelpCommand(program, targetPath, suffix);
+  if (!command || command.name() !== suffix.at(-1)) return undefined;
+  return { path: contractPath, command, visible: true, mappedHelp: true };
+}
+
 function sameList(a: readonly unknown[], b: readonly unknown[]): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
@@ -183,11 +214,40 @@ export function verifyCommandContract(
     }
   }
 
+  // The deprecation map is executable routing metadata, not prose. Verify
+  // each in-scope bridge has a real target and every injected prefix flag is
+  // declared by that exact target command.
+  for (const surface of DEPRECATED_FORWARDING) {
+    if (!contractByPath.has(surface.command)) continue;
+    const { targetPath, prefixFlags } = parseReplacementSurface(surface.replacement);
+    const target = resolveReplacementHelpCommand(program, targetPath);
+    if (!target) {
+      violations.push({
+        path: surface.command,
+        kind: 'deprecated-forwarding-target-missing',
+        expected: `registered target ${targetPath.join(' ')}`,
+        actual: 'none',
+      });
+      continue;
+    }
+    const targetFlags = describeCommanderOptions(target);
+    for (const prefix of prefixFlags) {
+      if (!targetFlags.some((flags) => flags.split(/[ ,|]+/u).includes(prefix))) {
+        violations.push({
+          path: surface.command,
+          kind: 'deprecated-forwarding-prefix-missing',
+          expected: `${targetPath.join(' ')} exposes ${prefix}`,
+          actual: targetFlags.join(' | '),
+        });
+      }
+    }
+  }
+
   // ── direction 2: contract ⊆ tree, plus every per-row axis ───────────────
   for (const contract of contracts) {
     if (!contract.surfaces.includes('cli')) continue;
     const path = contractPathKey(contract.path);
-    const node = byPath.get(path);
+    const node = byPath.get(path) ?? resolveDeprecatedMappedHelpNode(program, path);
     if (!node) {
       violations.push({
         path,
@@ -337,6 +397,7 @@ export interface ContractCoverage {
   readonly contractRows: number;
   readonly cliContractRows: number;
   readonly verifiedPaths: number;
+  readonly mappedHelpPaths: number;
 }
 
 /** Coverage counters — lets a test prove the verification was not vacuous. */
@@ -347,10 +408,15 @@ export function contractCoverage(
   const nodes = walkCommanderTree(program);
   const paths = new Set(nodes.map((node) => node.path));
   const cliRows = contracts.filter((contract) => contract.surfaces.includes('cli'));
+  const mappedHelpPaths = cliRows.filter((contract) => {
+    const path = contractPathKey(contract.path);
+    return !paths.has(path) && resolveDeprecatedMappedHelpNode(program, path) !== undefined;
+  }).length;
   return {
     treePaths: paths.size,
     contractRows: contracts.length,
     cliContractRows: cliRows.length,
     verifiedPaths: cliRows.filter((contract) => paths.has(contractPathKey(contract.path))).length,
+    mappedHelpPaths,
   };
 }

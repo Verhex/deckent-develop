@@ -106,6 +106,7 @@ import {
 } from '../core/task-settlement-authority.js';
 import { getLanguage, getMessage } from './helpers/messages.js';
 import { SURFACE_REGISTRY, listByGroup } from './surface-registry.js';
+import { DEPRECATED_FORWARDING } from './surface-contract.js';
 import {
   applyLocalizedHelp,
   attachRootHelpFooter,
@@ -375,8 +376,19 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
   registerLocalLlm(program);
   registerHelp(program);
 
+  // Compatibility bridges deliberately accept opaque argv, but their help is
+  // still ordinary Commander metadata and must remain bilingual/discoverable.
+  for (const surface of DEPRECATED_FORWARDING) {
+    const command = program.commands.find((candidate) => candidate.name() === surface.command);
+    const forwarded = command?.registeredArguments.find((argument) => argument.name() === 'args');
+    if (forwarded) {
+      forwarded.description = getMessage('cliContract.run.arg.alias_args', getLanguage(undefined));
+    }
+  }
+
   program
-    .command('help [topic]', { hidden: true })
+    .command('help', { hidden: true })
+    .argument('[topic]', getMessage('cli.root_help.help_command_topic_desc', getLanguage(undefined)))
     .description(getMessage('cli.root_help.help_command_desc', getLanguage(undefined)))
     .action((topic?: string) => {
       const lang = getLanguage(undefined);
