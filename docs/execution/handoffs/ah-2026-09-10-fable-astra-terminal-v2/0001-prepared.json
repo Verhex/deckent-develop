@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "outcomeId": "terminal-fluency-program-7107",
+  "role": "supervisor",
+  "baseSha": "02d1e13e6f3c05f194707b4b5651a922e73b01a2",
+  "headSha": "02d1e13e6f3c05f194707b4b5651a922e73b01a2",
+  "branch": "main",
+  "policyDigest": "sha256:c4c96a971833ee892174b7d361e08c7f0eb53c629873381235deaa573594d863",
+  "scopeDigest": "sha256:8aeead5addcd203719bf313a9c1484c1accdbb42eef8fb4a54ab5f37067e82cd",
+  "filesChanged": [],
+  "verification": [],
+  "findings": [],
+  "openActions": [
+    "Read docs/execution/handoffs/ah-2026-09-10-fable-astra-terminal/HANDOFF.md sections 2-4 before any action",
+    "Owner verdict 0/100 on sessions chat-2026-09-09T21-39-06-106Z-2ar0mq and chat-2026-09-09T21-40-57-374Z-4ktml3 is binding: product not DONE",
+    "RC-A interim deliverable reset by narration (interim-deliverable.ts:104-106) and RC-B false token-pressure at 10 percent window (execution-budget-policy.ts:110-111, loop.ts:824) are the P0 root causes; propose 7114-b and 7109-d rows for owner admission",
+    "Cursor 7109-c edits are UNCOMMITTED in the main tree (native-transport.ts, run.tsx, measurement-root test); do not discard, review then owner gate",
+    "Cursor 7107-c READY in /home/alperen/deckent-cursor-7107 with FAIL 4/4 evidence battery-2026-09-09T220252090Z",
+    "7113 C READY in /tmp/deckent-7113-c-astra-20260910 needs different-provider review before landing",
+    "Predecessor candidate ah-2026-09-10-fable-astra-terminal ABORTED (wrong epoch/host/session fields)",
+    "Commit/push, kill/cleanup, MASTER admission, build during sprint remain owner gates"
+  ],
+  "recommendedNextAction": "Verify this receipt against disk (HEAD 02d1e13e6 or the later docs commit carrying this receipt), then VERIFIED on communication.md; transferor commits if still available, otherwise RECOVERY_COMMITTED under the owner live directive; first authorized task after commit: review Cursor 7109-c uncommitted diff and Cursor 7107-c worktree, then propose 7114-b/7109-d capsules to the owner",
+  "authorityHandoff": {
+    "protocolVersion": 1,
+    "handoffId": "ah-2026-09-10-fable-astra-terminal-v2",
+    "sequence": 1,
+    "transition": "PREPARED",
+    "transitionActor": "transferor",
+    "currentAuthorityEpoch": 5,
+    "proposedAuthorityEpoch": 6,
+    "previousReceiptDigest": null,
+    "from": {
+      "hostId": "claude-code-cli",
+      "providerId": "claude",
+      "modelApiId": "claude-fable-5-1",
+      "role": "supervisor",
+      "principalDigest": "sha256:1d1549ebd7282b91e0c19f892a1d68c3092d2c2f7fc05d3096b405c151d47bca",
+      "sessionDigest": "sha256:2081ed61a57cb3c698818a619f3ffbe50ef6c105b07fa323dbbd0c8ae4188ae0"
+    },
+    "to": {
+      "hostId": "codex-cli",
+      "providerId": "codex",
+      "modelApiId": "gpt-6-astra",
+      "role": "supervisor",
+      "principalDigest": "sha256:1d1549ebd7282b91e0c19f892a1d68c3092d2c2f7fc05d3096b405c151d47bca",
+      "sessionDigest": "sha256:a9da68331c114097dd2c61b8c63de94df76f4787c88bc3318865e1aef1b907f1"
+    },
+    "trigger": {
+      "reasonCode": "owner-live-2026-09-10: haftalik limit doluyor, Fable epoch-5 custody Astra'ya devrediliyor; Astra elindeki 7113 C isini bitirir ve D/E ile terminal programini surdurur",
+      "authorityRef": "owner-live-instruction"
+    },
+    "authorityScope": {
+      "goalId": "n/a",
+      "missionId": "n/a",
+      "flowId": "n/a",
+      "runId": "n/a",
+      "roles": [
+        "supervisor"
+      ],
+      "includes": [
+        "Epoch-6 sole executor for TERMINAL-FLUENCY-PROGRAM-001 (MASTER 7107 umbrella: 7108/7109/7111/7112/7113/7114) per docs/execution/handoffs/ah-2026-09-10-fable-astra-terminal/HANDOFF.md; review/landing custody for Cursor 7107-c and 7109-c and own 7113 C (different-provider review required); both channels communication.md and iletisim.md"
+      ],
+      "excludes": [
+        "owner-only and unadmitted work"
+      ]
+    },
+    "evidenceSnapshot": {
+      "observedAt": "2026-09-09T22:21:09.696Z",
+      "repoStateRef": "git:02d1e13e6f3c05f194707b4b5651a922e73b01a2:dirty=60",
+      "runtimeStateRef": "see follow-up-works/current-flow.md",
+      "approvalStateRef": "deckent approvals list @ observedAt",
+      "verificationStateRef": "see MASTER + .analysis/xverify",
+      "buildStateRef": "build:all@02d1e13e6f3c05f194707b4b5651a922e73b01a2",
+      "ssotStateRef": "docs/MASTER-PLAN.md + follow-up-works/current-flow.md"
+    }
+  },
+  "receiptDigest": "sha256:f4473ae8568f7852dd6d21f5f10a815b78e8ae0bd9881b95ea5549d1764239e1"
+}
