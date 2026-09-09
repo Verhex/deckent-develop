@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "8238b998448db21524cbced7976f0397508e9cef6ae3a563cbfb7311e596a326"
+    "value": "20cea35cdc5caf0686299ad3106858406265dcd40062e1d00bd3b5054eb30b8b"
   },
   "summary": {
-    "total": 598,
-    "active": 509,
+    "total": 599,
+    "active": 510,
     "terminal": 89,
     "receipts": 232,
     "byState": {
-      "OPEN": 387,
+      "OPEN": 388,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
@@ -21,7 +21,7 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 373,
+      "P0": 374,
       "P1": 175,
       "P2": 50
     },
@@ -57,7 +57,7 @@
       "SCALE": 1,
       "SECURITY": 11,
       "SURFACE": 1,
-      "TERMINAL": 34,
+      "TERMINAL": 35,
       "TOOL": 1,
       "TRUTH": 108,
       "XPLAT": 7
@@ -5694,6 +5694,17 @@
       "updated": "2026-09-09",
       "definitionDigest": "aaf443c722f064cf4eb9d713bcc40dc1d178101ebd84110eeca43797b7c69580",
       "progressDigest": "30856410b42251c7ba04bb2ba9ec12c6d5f1f4b115eb0c6c40d67ffe2207adf5",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7114,
+      "id": "TERMINAL-INTERACTION-FLOW-001",
+      "program": "TERMINAL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-09-09",
+      "definitionDigest": "62fd9eb5604e77dda99bea89e67fe160e9ad7cfdaefaff2ec70deb0b823bb962",
+      "progressDigest": "f72c25d3cbb88003e99b88de42bffbc46ec7a0c10de9cf544d25a834676466ce",
       "terminalClosureDigest": null
     },
     {
@@ -25073,6 +25084,7 @@
         "TERMINAL-READONLY-APPROVAL-001",
         "TERMINAL-CHECKPOINT-CONTINUITY-001",
         "TERMINAL-LARGE-REFERENCE-DIGEST-001",
+        "TERMINAL-INTERACTION-FLOW-001",
         "SKILLMD-V3-RECONCILIATION-001",
         "AGENT-RUNTIME-ADAPTER-001",
         "RUN-POLICY-DELIVERY-001",
@@ -25148,6 +25160,7 @@
         "TERMINAL-READONLY-APPROVAL-001",
         "TERMINAL-CHECKPOINT-CONTINUITY-001",
         "TERMINAL-LARGE-REFERENCE-DIGEST-001",
+        "TERMINAL-INTERACTION-FLOW-001",
         "SKILLMD-V3-RECONCILIATION-001",
         "AGENT-RUNTIME-ADAPTER-001",
         "ERROR-REGISTRY-THROW-CONVERSION-001",
@@ -26929,6 +26942,7 @@
         "TERMINAL-CONTEXT-CONTINUITY-001"
       ],
       "dependents": [
+        "TERMINAL-INTERACTION-FLOW-001",
         "TERMINAL-LARGE-REFERENCE-DIGEST-001"
       ],
       "children": [],
@@ -26997,7 +27011,9 @@
       "dependsOn": [
         "TERMINAL-CONTEXT-CONTINUITY-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "TERMINAL-INTERACTION-FLOW-001"
+      ],
       "children": [],
       "gates": [
         "G1",
@@ -27034,6 +27050,7 @@
         "TERMINAL-CONTEXT-CONTINUITY-001"
       ],
       "dependents": [
+        "TERMINAL-INTERACTION-FLOW-001",
         "TERMINAL-LARGE-REFERENCE-DIGEST-001"
       ],
       "children": [],
@@ -27099,6 +27116,46 @@
       "evidenceReceipts": [],
       "acceptance": "1.25 MB MASTER-PLAN @ref ile tek turda yapılandırılmış analiz ≤N dk, checkpoint 0, digest scratch'te kalıcı ve /context görünür; 32k pencerede aynı.",
       "evidence": "Vaka: \"[1 referans ölçülen bütçeye sığmadı; araçlı parçalı okumaya geçildi.]\" sonrası 19 tool çağrısı, cevap yok.",
+      "updated": "2026-09-09"
+    },
+    {
+      "order": 7114,
+      "id": "TERMINAL-INTERACTION-FLOW-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TERMINAL",
+      "outcome": "**Owner-admitted 2026-09-09 (Alperen canlı talimat 15:5xZ: \"insanların 10 dakika hiçbir şey alamadan bekleyeceğini düşünüyorsan… claude code arayüzünde modellerle olan etkileşim ve insan akışı nasılsa deckentte onu vermek zorunda\"):** Native terminal etkileşim sözleşmesi = Claude Code akışı. Ölçülen vaka (15:40Z, local Qwen 131k): MASTER-PLAN analizi 665 s / ~40 araç / 9 checkpoint / 0 görünür metin; \"Ne durumdasın?\" → 24 s'de tam durum raporu. Kök neden bileşenleri: (a) araçlar arası anlatım yok/gösterilmiyor, (b) süre/çağrı bütçesinde zorunlu ara teslim yok, (c) ölçüm capability'si /v1/tokenize 404 → her ölçüm conservative (7109-b, Cursor), (d) büyük doküman stratejisi (7113). İş: anlatım sözleşmesi (persona, EN/TR, preamble bütçesine ölçülü), host-zorunlu ara teslim (interimAnswerAfterToolCalls 12 / interimAnswerAfterMs 90 s, config-resolved, /context görünür), kesmede kısmi çıktının korunması, araç satırında hedef+süre, Opus ekosistem araştırması (Claude Code / Codex CLI / Cursor / Gemini CLI / Aider / OpenCode / Goose) → PROGRAM önerileri.",
+      "priority": "P0",
+      "dependsOn": [
+        "TERMINAL-TOOL-BUDGET-UNITS-001",
+        "TERMINAL-READONLY-APPROVAL-001",
+        "TERMINAL-CHECKPOINT-CONTINUITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TERMINAL-TOOL-BUDGET-UNITS-001",
+        "TERMINAL-READONLY-APPROVAL-001",
+        "TERMINAL-CHECKPOINT-CONTINUITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Gerçek Qwen 131k + 32k, standart + full-auto: MASTER-PLAN senaryosunda ilk görünür anlatım ≤10 s, ilk ara teslim ≤90 s veya ≤12 çağrı, kullanıcı kesince kısmi çıktı ekranda ve transcript'te, /context sayaçları; ölçüm \"exact\" (7109-b) ile sahte checkpoint 0; Claude/Codex provider ile aynı akış.",
+      "evidence": "Vaka transcript owner 15:5xZ; session chat-2026-09-09T15-40-24; curl /v1/tokenize 404.",
       "updated": "2026-09-09"
     },
     {
@@ -30342,6 +30399,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "d9b2e341b22420d79f104bad54fa78868be8955850ef922414c073ec3c8cd712"
+    "value": "446a7f52f91dabfdd3b3322e495823ab89c74a16867f20b5fedda57ccaa13580"
   }
 }

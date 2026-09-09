@@ -230,6 +230,21 @@ duration performans kanıtı sayılmadı. WholeCLI/7099 veya platform closure de
    Doküman docs/execution/active/TERMINAL-FLUENCY-PROGRAM-001.md. Lane'ler: 7108 (ajan), 7109 (Cursor
    ENTRY 64), 7111 (ajan), 7112 (ajan, worktree deckent-lane-7110), 7106 revize (Astra READY, review
    ajanı). Landing #2 e7b32aaf8 (A4+L5+7105-b) main'de; run-6 terminal programından SONRA.
+0a9. 15:09Z: LANDED f65502eb3 (7106) → 0eda3ee0f (7108) → d07c3b4db (7109); build:all OK, bot 1035283 yeni
+   dist (7106+7108+7109). sprint-731 kalıntısı recover ile arşivlendi. Owner canlı test bekleniyor (131k+32k,
+   standart+full-auto, MASTER-PLAN senaryosu). Açık: 7108-b (Astra post-landing REVISE: /props deadline/abort,
+   retry re-admission, cause-zinciri abort önceliği, kalıcı TLS/DNS retry) ajanda; 7111 READY→d07c3b4db rebase
+   (bridge çakışması) ajanda; 7112 revizyon READY→d07c3b4db rebase (4 çakışma) ajanda; 7113 tasarım GO
+   (flag-gated, default OFF → kabul sonrası ON), Astra dilim A uygulamaya başlıyor; Cursor beklemede (dilim D).
+   Claude limitleri: alt ajanlar 14:50Z reset sonrası sürdürüldü; review'lar ana oturumda yapılıyor.
+0a10. 15:3xZ LANDED (owner toplu onayı): 0fd94b77e 7108-b (probe deadline/abort, retry re-admission, abort-first
+   transport, signal forwarding) → b6f8f4549 7112 rev4 (host tool-trail, content-ref reader UTF-8 sınır-güvenli,
+   host-stamped checkpoint, replay guard, pencere-paylı açılış) → f3d3e2ceb 7111 rev2 (salt-okunur shell
+   sınıflandırıcı argv-metni/realpath/case, read_file outline-aralık-arama, gruplu onay). Üçlü ağaç: tsc0,
+   2083/2092 (bilinen 9), 64k core-16 9386/9830. Build:all + bot restart koşuyor → owner canlı test (tam 7107
+   bataryası). Astra A5c/A6b/A7b post-landing; 7113 dilim A (Astra) base f3d3e2ceb; Cursor 7113-D bekliyor.
+   Bilinen 9 pre-existing kırık: qwen-incident 2, snapshot-compact 1, shell-risk 2, picker 1, string-free 2,
+   app-picker-mutex 1 (owner admission bekleyen ayrı temizlik işi).
 0a4. MASTER 7106 TERMINAL-PREAMBLE-BUDGET-001 (owner-admitted 10:31Z, P0): "Selam" turu ~48k/131k preamble;
    Astra İŞ D (ölçüm → progressive tool şeması, contentRef referans metin, config-resolved pay, /context).
 0a2. Canary run-3 (sprint-729, 09:03Z) worker gönderimi kabul edilmedi: kök neden = exact Docker
