@@ -58,12 +58,13 @@ yanlış attribution'du; gerçek tetik RC2.
 
 | Paket | Yürütücü | Worktree | Durum |
 |---|---|---|---|
-| 7108 reasoning + transport | Fable ajanı | /home/alperen/deckent-lane-7108 | uygulama |
-| 7109 tool-bütçe birimleri | Cursor | /home/alperen/deckent-cursor-7109 | ASSIGN (ENTRY 64) |
-| 7111 salt-okunur onay + read_file | Fable ajanı | /home/alperen/deckent-lane-7111 | uygulama |
-| 7112 checkpoint sürekliliği | Fable ajanı | /home/alperen/deckent-lane-7110 (proof/7110) | uygulama |
+| 7108 reasoning + transport | Fable ajanı | /home/alperen/deckent-lane-7108 | LANDED d07c3b4db + 0fd94b77e (7108-b) |
+| 7109 tool-bütçe birimleri | Cursor + main session | /home/alperen/deckent-cursor-7109b | LANDED d4046bdcb (7109-b, 2026-09-09) — gerçek Qwen kabul owner |
+| 7111 salt-okunur onay + read_file | Fable ajanı | /home/alperen/deckent-lane-7111 | LANDED f3d3e2ceb + b4de8a1df (7111-b, Astra A7d CONFIRMED) |
+| 7112 checkpoint sürekliliği | Fable ajanı | /home/alperen/deckent-lane-7110 (proof/7110) | LANDED b6f8f4549 |
 | 7106 preamble (revize) | Astra | /tmp/deckent-7106-preamble-revised-20260909 | bağımsız review |
-| 7113 büyük referans digest | tasarım Astra (7106 sonrası) | — | OPEN |
+| 7113 büyük referans digest | Astra | /tmp/deckent-7113-a-astra-20260909 | dilim A LANDED 06e33bb66; B Astra uygulamada; C/D/E OPEN |
+| 7114 etkileşim akışı | Fable ajanı + Opus araştırma | /home/alperen/deckent-lane-7114 | LANDED f2dbb0db3; araştırma follow-up-works/research-terminal-ecosystem-7114.md; gerçek Qwen kabul owner |
 
 Landing sırası: 7106 → 7109 → 7108 → 7111 → 7112 (aynı dosyalara dokunanlar sıralı fan-in,
 her biri main HEAD üstünde kuru-prova + baseline ayrımı, ders 34) → build → owner canlı test →

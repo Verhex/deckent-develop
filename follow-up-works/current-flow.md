@@ -450,3 +450,10 @@ Linux kanıtları Windows-native/macOS/SSH/tmux eksiklerini kapatmaz.
 7099 sonrası7103→7101→7104→7102(önce ADR amendment)→4034.
 9002 DONE korunur;9001 graph/vector ve birleşik yüzey audit'i bu programa eklenmez.
 Yeni kanıt olmadan tekrar audit/test/build yok; sınırlı kapasite fan-in/realproof'a ayrılır.
+
+## Durum deltası 0a11 (2026-09-09, ~20:30Z)
+- Landed: d4046bdcb (7109-b exact measurement, wire-parity; canlı 364==364) · f2dbb0db3 (7114 anlatım sözleşmesi + ara teslim + kesme-koruma + araç satırı). Fan-in b4de8a1df üzerinde 39 dosya 455/455, tsc 0, lint-i18n/zero-hardcode 0.
+- Astra A7d post-landing CONFIRMED (7111-b, 285/285); 7111-c gerekmedi. Astra 7113 B uygulamada, gerçek ölçüm proof'u bu build sonrası.
+- Cursor ENTRY 75: 7109-b düzeltme notu + sıradaki iş = 7107 kabul bataryası koşucusu (scripts/terminal-acceptance-battery.mjs). Cevap bekleniyor.
+- Build: build:all f2dbb0db3 üzerinde yeşil; bot yeniden başlatıldı. Eski MCP server süreçleri (dist cache) host adapter restart'ına kadar eski kodu koşturur.
+- Sıradaki: owner gerçek Qwen kabul testi (7107 §3): ilk anlatım ≤10 s, ilk ara teslim ≤90 s/≤12 çağrı, sahte checkpoint 0, /context "ölçüm: kesin". "terminal-bağlam-hatırla" kararı: araştırma §4 = pencereyi büyütme (65536 + rope-scale 2.0 önerisi), owner kararı bekliyor.
