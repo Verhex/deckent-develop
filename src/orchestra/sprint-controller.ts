@@ -51,7 +51,9 @@ import {
 import type { ExactAcceptedResultTerminalAuthorityV2 } from './exact-accepted-result-terminal-authority.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
-import { debugLog, readJsonSafe, updateLastSprintId } from '../core/utils.js';
+import { debugLog, parseSprintOrdinal, readJsonSafe, updateLastSprintId } from '../core/utils.js';
+import { listRunInspectorRuns } from '../core/run-inspector-read-model.js';
+import { readRunFlowTerminalClosureForSprint } from '../core/run-jobs-read.js';
 
 // ─── Core — adaptive timeout defaults (Sprint 192 Task 192-011) ────
 import {
@@ -1476,11 +1478,241 @@ function exactRecoveryDiagnosticToken(reason: unknown): string {
     : 'reason-unavailable';
 }
 
+/**
+ * Derive the sprint that owns a task id, using the canonical
+ * `<sprintNumber>-<ordinal>` task naming already relied on by
+ * `spawn-backend-docker.ts:17344` (`taskId.startsWith(sprintId.slice(7) + '-')`).
+ *
+ * Returns `null` whenever the owning sprint cannot be proven — a non-numeric
+ * prefix, no ordinal suffix, or an ordinal `parseSprintOrdinal` refuses (the
+ * legacy epoch-millisecond range). An unattributable task id is NEVER retired
+ * as foreign history: retirement removes the only thing that makes a broken
+ * start fail loudly, so an unprovable origin must keep the fail-closed path.
+ *
+ * @internal Exported for cold-restart fan-in behavior tests.
+ */
+export function restoreCandidateSprintIdForTaskId(taskId: string): string | null {
+  const separator = taskId.indexOf('-');
+  if (separator <= 0 || separator === taskId.length - 1) return null;
+  const prefix = taskId.slice(0, separator);
+  if (!/^\d+$/u.test(prefix)) return null;
+  const sprintId = `sprint-${prefix}`;
+  return parseSprintOrdinal(sprintId) === null ? null : sprintId;
+}
+
+/**
+ * Codes that are NEVER decided, checked before the allowlist. A missing port, an
+ * unavailable authority, a registry mismatch or a failed terminal re-read are
+ * environmental or transient: the same attempt can settle on a later start.
+ */
+const TRANSIENT_EXACT_SETTLEMENT_HOLD_SUFFIXES = Object.freeze([
+  '-unavailable',
+  '-registry-mismatch',
+  '-reread-failed',
+  '-cancelled',
+  '-timeout',
+]);
+
+/**
+ * Suffixes of DECIDED, permanent replay/verification failures produced by
+ * `evaluation-audit-trail.ts` and `production-wiring-host-proof-runner.ts`.
+ * Each names a durable artifact that does not match what the current derivation
+ * re-derives — a fact that cannot change by retrying on a later start.
+ */
+const DECIDED_EXACT_SETTLEMENT_HOLD_SUFFIXES = Object.freeze([
+  '-replay-mismatch',
+  '-chain-artifact-mismatch',
+  '-chain-without-artifact',
+  '-revalidation-mismatch',
+  '-receipt-binding-mismatch',
+  '-receipt-invalid',
+  '-authority-invalid',
+  '-result-projection-invalid',
+  '-terminal-input',
+]);
+
+/**
+ * Classify a settlement hold reason as DECIDED (permanently unsettleable) or not.
+ *
+ * Conservative by construction: an unknown code is NEVER decided. Only a code
+ * that survives the transient deny list and then matches the decided allowlist —
+ * or the `production-wiring-*` verifier-asset family, whose asset no longer
+ * snapshots and never will — may retire an attempt as foreign history.
+ *
+ * @internal Exported for cold-restart fan-in behavior tests.
+ */
+export function isDecidedExactSettlementHold(reasonCode: string): boolean {
+  if (!/^[a-z0-9][a-z0-9-]*$/u.test(reasonCode)) return false;
+  if (TRANSIENT_EXACT_SETTLEMENT_HOLD_SUFFIXES.some(s => reasonCode.endsWith(s))) return false;
+  if (reasonCode === 'custody-hold') return false;
+  if (reasonCode.startsWith('production-wiring-')) {
+    return reasonCode.endsWith('-invalid') || reasonCode.endsWith('-changed');
+  }
+  return DECIDED_EXACT_SETTLEMENT_HOLD_SUFFIXES.some(s => reasonCode.endsWith(s));
+}
+
+/**
+ * Durable disposition of the run that owns a recovered attempt.
+ *
+ * `unknown` is deliberately distinct from `not-terminal`: a read failure or an
+ * unlisted run is never evidence that a run finished, and both keep the
+ * fail-closed path.
+ */
+export type OwningRunTerminalDisposition = 'terminal' | 'not-terminal' | 'unknown';
+
+/** Run-record states that explicitly deny terminality on an archive row. */
+const NON_TERMINAL_ARCHIVE_RECORD_STATES = Object.freeze([
+  'ACTIVE', 'RUNNING', 'FIXING', 'PAUSED', 'EXECUTING', 'PLANNING', 'IDLE',
+]);
+
+/**
+ * Read whether the sprint that owns a recovered attempt is durably terminal.
+ *
+ * `readCanonicalRunStatus` alone cannot answer this: it projects the CURRENT run
+ * only (sprint id resolved from active-marker / sprint-state / pause-state /
+ * hint), so an old run such as `sprint-728` reads back as a non-terminal `IDLE`
+ * projection. `listRunInspectorRuns` adds durable archive rows, but archive
+ * MEMBERSHIP is observability, not proof: `run-inspector-read-model.ts:240-270`
+ * builds a row from a `.brain/sprints/*.md` even when its `Status:` is ACTIVE,
+ * and :293-310 lists an EMPTY `.deckent/archive/sprints/<id>` directory.
+ *
+ * Terminality therefore requires the run to be listed AND exactly one of:
+ *   (A) the `source: 'authority'` row for it is COMPLETE/ABORTED;
+ *   (B) `readRunFlowTerminalClosureForSprint` (`core/run-jobs-read.ts:146`)
+ *       returns a closure — it binds the sprint's `.pid`/`.snapshot.json`
+ *       pid+startToken to a run-flow handle of the same generation and then to a
+ *       real terminal job record or RUN_COMPLETED/RUN_FAILED event. Used as-is,
+ *       never reimplemented.
+ *
+ * Everything else is `unknown` — fail-closed.
+ *
+ * Three tempting shortcuts are deliberately absent. A bare
+ * `.deckent/pids/<id>.snapshot.json` proves nothing: `writeStateSnapshot`
+ * (`sprint-pid-manager.ts:434`) rewrites it every 30s while the coordinator is
+ * ALIVE, and `clearPid`'s contract (:200-212) calls a retained snapshot
+ * correlation evidence for a *subsequently published* terminal event — the
+ * event, not the file, is the truth. A `.deckent/runtime/jobs/<id>.json`
+ * matched by FILENAME is unbound: its own `sprintId` may name another run. And
+ * a `recover-resume-outcome-*.json` is a child→recover IPC projection that
+ * `recover.ts:119-120` deletes in `finally`, whose validator checks no
+ * lifecycle/exit consistency — not an authority. (B) subsumes all three: it
+ * binds pid + startToken to the flow handle before accepting any closure.
+ *
+ * @internal Exported for cold-restart fan-in behavior tests.
+ */
+export function readOwningRunTerminalDisposition(
+  projectRoot: string,
+  sprintId: string,
+): OwningRunTerminalDisposition {
+  try {
+    const listed = listRunInspectorRuns(projectRoot).runs
+      .find(run => run.runId === sprintId);
+    if (!listed) return 'unknown';
+    if (listed.source === 'authority') {
+      return listed.lifecycle === 'COMPLETE' || listed.lifecycle === 'ABORTED'
+        ? 'terminal'
+        : 'not-terminal';
+    }
+    // Deny-only guard: an archive row that still advertises a live record state
+    // can never be terminal, whatever else is on disk.
+    const recordState = typeof listed.recordState === 'string'
+      ? listed.recordState.trim().toUpperCase()
+      : null;
+    if (recordState !== null && NON_TERMINAL_ARCHIVE_RECORD_STATES.includes(recordState)) {
+      return 'unknown';
+    }
+    const closure = readRunFlowTerminalClosureForSprint(projectRoot, sprintId);
+    return closure !== null
+      && (closure.state === 'COMPLETED' || closure.state === 'FAILED')
+      ? 'terminal'
+      : 'unknown';
+  } catch (error) {
+    debugLog('sprint-controller:owning-run-disposition-unreadable', error);
+    return 'unknown';
+  }
+}
+
+/**
+ * Require the recovered accepted authority to be bound to the task under
+ * reconciliation. A retirement decision is only ever applied to an attempt whose
+ * exact custody identity names this task; an absent or foreign identity keeps
+ * the fail-closed path.
+ *
+ * @internal Exported for cold-restart fan-in behavior tests.
+ */
+export function isBoundRecoveredAttemptIdentity(
+  taskId: string,
+  identity: unknown,
+): boolean {
+  if (typeof identity !== 'object' || identity === null) return false;
+  const candidate = identity as Record<string, unknown>;
+  return candidate.taskId === taskId
+    && typeof candidate.attemptId === 'string' && candidate.attemptId.length > 0
+    && typeof candidate.projectId === 'string' && candidate.projectId.length > 0
+    && Number.isSafeInteger(candidate.generation) && (candidate.generation as number) > 0;
+}
+
 /** @internal Exported for cold-restart fan-in behavior tests. */
 export async function settleRecoveredExactTerminalAuthorities(
   registry: ExactNormalDockerExecutionRegistryV2,
+  options: Readonly<{
+    readonly projectRoot: string;
+    readonly restoreCandidateSprintId: string | null;
+    /** Injected for hermetic tests; production binds the durable read-model. */
+    readonly readOwningRunLifecycle?: (
+      sprintId: string,
+    ) => OwningRunTerminalDisposition | null;
+  }>,
 ): Promise<void> {
   const recoveredTaskIds = [...registry.snapshotExactTerminalAuthorities().keys()];
+  // One typed start-of-run report line for everything this pass retired. It is
+  // built from what this call actually dropped rather than from the registry's
+  // cumulative snapshot, so a second pass in the same process cannot re-report
+  // an earlier run's history.
+  const retiredHistory: string[] = [];
+  // Compare sprint ORDINALS, never raw ids: `getNextSprintId` mints zero-padded
+  // ids (`sprint-007`) while a task id carries the unpadded prefix (`7-001`), so
+  // a string comparison would classify a CURRENT-run task as foreign. A
+  // restore candidate that cannot be parsed at all disables retirement
+  // entirely — an unprovable same-run boundary must fail closed.
+  const candidateOrdinal = options.restoreCandidateSprintId === null
+    ? null
+    : parseSprintOrdinal(options.restoreCandidateSprintId);
+  const candidateUnprovable = options.restoreCandidateSprintId !== null
+    && candidateOrdinal === null;
+  // The durable read model sweeps `.brain/sprints` and `.deckent/archive/sprints`
+  // on every call, so it is memoized per sprint and only ever reached as the LAST
+  // predicate — a settling attempt must not pay for a disk scan it cannot use.
+  const owningRunCache = new Map<string, OwningRunTerminalDisposition>();
+  const readOwningRun = (sprintId: string): OwningRunTerminalDisposition => {
+    const cached = owningRunCache.get(sprintId);
+    if (cached !== undefined) return cached;
+    let disposition: OwningRunTerminalDisposition;
+    if (!options.readOwningRunLifecycle) {
+      disposition = readOwningRunTerminalDisposition(options.projectRoot, sprintId);
+    } else {
+      try {
+        disposition = options.readOwningRunLifecycle(sprintId) ?? 'unknown';
+      } catch (error) {
+        debugLog('sprint-controller:owning-run-disposition-unreadable', error);
+        disposition = 'unknown';
+      }
+    }
+    owningRunCache.set(sprintId, disposition);
+    return disposition;
+  };
+  const retireAsHistory = (
+    taskId: string,
+    owningSprintId: string,
+    reason: string,
+  ): void => {
+    registry.retireHistoricalUnsettleableAttempt(taskId, reason);
+    retiredHistory.push(`${taskId}=${reason}`);
+    debugLog(
+      'sprint-controller:historical-unsettleable-attempt-retired',
+      `taskId=${taskId};sprintId=${owningSprintId};reason=${reason}`,
+    );
+  };
   for (const taskId of recoveredTaskIds) {
     const resultAuthority = await registry.awaitTaskResultAuthority(taskId);
     if (resultAuthority.state === 'not-dispatched') continue;
@@ -1488,10 +1720,44 @@ export async function settleRecoveredExactTerminalAuthorities(
       const settled = await registry.settleExactAcceptedResult({
         acceptedAuthority: resultAuthority.exactAcceptedAuthority,
       });
+      const owningSprintId = restoreCandidateSprintIdForTaskId(taskId);
+      const owningOrdinal = owningSprintId === null
+        ? null
+        : parseSprintOrdinal(owningSprintId);
+      // Retirement is admitted ONLY from this cold accepted-result branch, and
+      // only on a DECIDED backend settlement hold: a released attempt with an
+      // observed provider exit and an intact durable custody chain whose
+      // accepted result can never settle. `not-dispatched`, `route-required`
+      // (and every other actionable union member), a `terminal-reread`-origin
+      // hold, an undecided reason code, the post-settle revalidation branch and
+      // every other authority state keep their behaviour byte-identical; a task
+      // id whose owning sprint cannot be derived is never retired on "looks
+      // foreign" alone. A parseable foreign task id is likewise NOT proof that
+      // its sprint is over — a concurrent/future run, or one whose state file
+      // was lost, also looks foreign — so the owning run must be durably
+      // terminal AND the accepted authority identity-bound to this task;
+      // `unknown`, ACTIVE/PAUSED and an unbound identity all fail closed.
       if (settled.state !== 'settled') {
         const reason = exactRecoveryDiagnosticToken(
           'reasonCode' in settled ? settled.reasonCode : undefined,
         );
+        // Cheap predicates first, the disk-backed owning-run read last.
+        const retirable = settled.state === 'hold'
+          && settled.origin !== 'terminal-reread'
+          && isDecidedExactSettlementHold(settled.reasonCode)
+          && !candidateUnprovable
+          && owningSprintId !== null
+          && owningOrdinal !== null
+          && owningOrdinal !== candidateOrdinal
+          && isBoundRecoveredAttemptIdentity(
+            taskId,
+            resultAuthority.exactAcceptedAuthority.identity,
+          )
+          && readOwningRun(owningSprintId) === 'terminal';
+        if (retirable && owningSprintId !== null) {
+          retireAsHistory(taskId, owningSprintId, reason);
+          continue;
+        }
         throw new DeckentError(
           'DECKENT_E077',
           `EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD:${taskId}:${settled.state}:${reason}`,
@@ -1499,6 +1765,10 @@ export async function settleRecoveredExactTerminalAuthorities(
       }
       const current = registry.readExactTerminalAuthority(taskId);
       if (current.state !== 'current') {
+        // Settlement SUCCEEDED here; only the terminal re-read did not return
+        // `current`, which includes transient store-read failures
+        // (`terminal-store-reread-failed`). That is not a decided, permanently
+        // unsettleable attempt, so it stays fail-closed and is never retired.
         throw new DeckentError(
           'DECKENT_E077',
           `EXACT_RECOVERY_TERMINAL_REVALIDATION_HOLD:${taskId}:${current.reasonCode}`,
@@ -1512,6 +1782,12 @@ export async function settleRecoveredExactTerminalAuthorities(
     throw new DeckentError(
       'DECKENT_E077',
       `EXACT_RECOVERY_ATTEMPT_HOLD:${taskId}:${resultAuthority.state}${diagnostic}`,
+    );
+  }
+  if (retiredHistory.length > 0) {
+    debugLog(
+      'sprint-controller:historical-unsettleable-attempts',
+      retiredHistory.join(';'),
     );
   }
 }
@@ -2419,7 +2695,10 @@ export async function runSprint(
   }
   if (recoveryReport) {
     exactDockerRegistry.rehydrateRecovery(recoveryReport, recoveryBackend);
-    await settleRecoveredExactTerminalAuthorities(exactDockerRegistry);
+    await settleRecoveredExactTerminalAuthorities(exactDockerRegistry, {
+      projectRoot,
+      restoreCandidateSprintId: readSprintState(projectRoot)?.sprintId ?? null,
+    });
   }
 
   // ═══ State Recovery on Brain Restart (Sprint 162 — Task T-004) ════

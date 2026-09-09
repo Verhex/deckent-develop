@@ -74,8 +74,13 @@ vi.mock('../../src/orchestra/sprint-spawner.js', async (importOriginal) => {
 });
 
 import type { ExactNormalDockerExecutionRegistryV2 } from '../../src/orchestra/scheduler-effects.js';
+import { savePlannedSprint, saveRunHandle } from '../../src/core/run-flow-store.js';
 import {
+  isBoundRecoveredAttemptIdentity,
+  readOwningRunTerminalDisposition,
+  isDecidedExactSettlementHold,
   resolveCircuitBreakerTaskEvidence,
+  restoreCandidateSprintIdForTaskId,
   runSprint,
   settleRecoveredExactTerminalAuthorities,
   terminalizeRecoveredCompleteCheckpoint,
@@ -788,7 +793,7 @@ describe('exact controller terminal fan-in behavior', () => {
       readExactTerminalAuthority,
     } as unknown as ExactNormalDockerExecutionRegistryV2;
 
-    await settleRecoveredExactTerminalAuthorities(registry);
+    await settleRecoveredExactTerminalAuthorities(registry, { projectRoot: '/test/project', restoreCandidateSprintId: null, readOwningRunLifecycle: () => 'terminal' });
 
     expect(settleExactAcceptedResult).toHaveBeenCalledWith({ acceptedAuthority: accepted });
     expect(readExactTerminalAuthority).toHaveBeenCalledWith(taskId);
@@ -813,7 +818,7 @@ describe('exact controller terminal fan-in behavior', () => {
       readExactTerminalAuthority,
     } as unknown as ExactNormalDockerExecutionRegistryV2;
 
-    await settleRecoveredExactTerminalAuthorities(registry);
+    await settleRecoveredExactTerminalAuthorities(registry, { projectRoot: '/test/project', restoreCandidateSprintId: null, readOwningRunLifecycle: () => 'terminal' });
 
     expect(settleExactAcceptedResult).not.toHaveBeenCalled();
     expect(readExactTerminalAuthority).not.toHaveBeenCalled();
@@ -834,7 +839,7 @@ describe('exact controller terminal fan-in behavior', () => {
       })),
     } as unknown as ExactNormalDockerExecutionRegistryV2;
 
-    await expect(settleRecoveredExactTerminalAuthorities(registry)).rejects.toThrow(
+    await expect(settleRecoveredExactTerminalAuthorities(registry, { projectRoot: '/test/project', restoreCandidateSprintId: null, readOwningRunLifecycle: () => 'terminal' })).rejects.toThrow(
       `EXACT_RECOVERY_ATTEMPT_HOLD:${taskId}:authority-hold:LIVE_MONITOR_UNAVAILABLE`,
     );
   });
@@ -854,7 +859,7 @@ describe('exact controller terminal fan-in behavior', () => {
       })),
     } as unknown as ExactNormalDockerExecutionRegistryV2;
 
-    await expect(settleRecoveredExactTerminalAuthorities(registry)).rejects.toThrow(
+    await expect(settleRecoveredExactTerminalAuthorities(registry, { projectRoot: '/test/project', restoreCandidateSprintId: null, readOwningRunLifecycle: () => 'terminal' })).rejects.toThrow(
       `EXACT_RECOVERY_ATTEMPT_HOLD:${taskId}:authority-hold:reason-unavailable`,
     );
   });
@@ -878,7 +883,7 @@ describe('exact controller terminal fan-in behavior', () => {
       })),
     } as unknown as ExactNormalDockerExecutionRegistryV2;
 
-    await expect(settleRecoveredExactTerminalAuthorities(registry)).rejects.toThrow(
+    await expect(settleRecoveredExactTerminalAuthorities(registry, { projectRoot: '/test/project', restoreCandidateSprintId: null, readOwningRunLifecycle: () => 'terminal' })).rejects.toThrow(
       `EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD:${taskId}:hold:LIVE_MONITOR_UNAVAILABLE`,
     );
   });
@@ -905,8 +910,454 @@ describe('exact controller terminal fan-in behavior', () => {
       })),
     } as unknown as ExactNormalDockerExecutionRegistryV2;
 
-    await expect(settleRecoveredExactTerminalAuthorities(registry))
+    await expect(settleRecoveredExactTerminalAuthorities(registry, { projectRoot: '/test/project', restoreCandidateSprintId: null, readOwningRunLifecycle: () => 'terminal' }))
       .rejects.toMatchObject({ code: 'DECKENT_E077' });
+  });
+
+  // sprint-728 was canonically ABORTED on 2026-09-06 with only
+  // 01-effect-landing + 02-accepted-result in its chain, so its accepted result
+  // can never settle (`production-wiring-verifier-asset-invalid`). Before this
+  // guard the foreign attempt threw E077 out of EVERY fresh start on the
+  // machine, exactly like the archived 724-001 attempt did.
+  function unsettleableForeignRegistry(
+    taskId: string,
+    reasonCode: string,
+    settleOutcome?: Record<string, unknown>,
+    identityOverride?: Record<string, unknown>,
+  ) {
+    const accepted = {
+      identity: identityOverride ?? {
+        schemaVersion: 2,
+        backend: 'docker',
+        projectRootSha256: 'a'.repeat(64),
+        projectId: 'recovery-control-project',
+        taskId,
+        attemptId: `exact-attempt:${taskId}`,
+        generation: 1,
+      },
+    };
+    const terminal = new Map<string, unknown>([[taskId, {
+      state: 'hold', reasonCode: 'exact-terminal-awaiting-settlement',
+    }]]);
+    const retired = new Map<string, { reasonCode: string; retiredAt: string }>();
+    const registry = {
+      snapshotExactTerminalAuthorities: () => terminal,
+      awaitTaskResultAuthority: vi.fn(async () => ({
+        state: 'exact-accepted',
+        result: { taskId },
+        settlementRef: null,
+        rawResultPath: `.tasks/task-${taskId}.result`,
+        exactAcceptedAuthority: accepted,
+      })),
+      settleExactAcceptedResult: vi.fn(async () => (
+        settleOutcome ?? { state: 'hold', reasonCode }
+      )),
+      readExactTerminalAuthority: vi.fn(() => ({
+        state: 'hold', reasonCode: 'exact-registry-entry-unavailable',
+      })),
+      readTaskResultAuthority: vi.fn(() => (terminal.has(taskId)
+        ? { state: 'authority-hold', holdReason: reasonCode }
+        : { state: 'pending-settlement', result: null })),
+      retireHistoricalUnsettleableAttempt: vi.fn((id: string, reason: string) => {
+        terminal.delete(id);
+        retired.set(id, { reasonCode: reason, retiredAt: '2026-09-09T00:00:00.000Z' });
+      }),
+      snapshotHistoricalUnsettleableAttempts: () => retired,
+    } as unknown as ExactNormalDockerExecutionRegistryV2;
+    return { registry, terminal, retired };
+  }
+
+  it('retires a foreign unsettleable recovered attempt on a fresh start', async () => {
+    const taskId = '728-001';
+    const reasonCode = 'production-wiring-verifier-asset-invalid';
+    const { registry, terminal, retired } = unsettleableForeignRegistry(taskId, reasonCode);
+
+    await expect(settleRecoveredExactTerminalAuthorities(
+      registry,
+      { projectRoot: '/test/project', restoreCandidateSprintId: null, readOwningRunLifecycle: () => 'terminal' },
+    )).resolves.toBeUndefined();
+
+    // Primary claim: the task leaves the registry entirely, so the
+    // `authority.state !== 'current'` branch in sprint-lifecycle.ts:200-206 and
+    // sprint-spawner.ts:1994-2003 can never be reached for it.
+    expect([...terminal.keys()]).not.toContain(taskId);
+    expect(registry.snapshotExactTerminalAuthorities().has(taskId)).toBe(false);
+    const authority = registry.readTaskResultAuthority(taskId);
+    expect(authority.state).toBe('pending-settlement');
+    expect(authority.state).not.toBe('authority-hold');
+    expect(retired.get(taskId)?.reasonCode).toBe(reasonCode);
+  });
+
+  it('still fails closed when the unsettleable attempt is the restore candidate', async () => {
+    const taskId = '728-001';
+    const reasonCode = 'production-wiring-verifier-asset-invalid';
+    const { registry, terminal } = unsettleableForeignRegistry(taskId, reasonCode);
+
+    await expect(settleRecoveredExactTerminalAuthorities(
+      registry,
+      { projectRoot: '/test/project', restoreCandidateSprintId: 'sprint-728', readOwningRunLifecycle: () => 'terminal' },
+    )).rejects.toThrow(
+      `EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD:${taskId}:hold:${reasonCode}`,
+    );
+    expect(registry.retireHistoricalUnsettleableAttempt).not.toHaveBeenCalled();
+    expect([...terminal.keys()]).toContain(taskId);
+  });
+
+  // A parseable foreign task id is not proof that its sprint is over: a
+  // concurrent/future run, or one whose state file was lost, also looks foreign.
+  it('never retires while the owning run is still ACTIVE', async () => {
+    const reasonCode = 'production-wiring-verifier-asset-invalid';
+    const { registry, terminal } = unsettleableForeignRegistry('728-001', reasonCode);
+
+    await expect(settleRecoveredExactTerminalAuthorities(registry, {
+      projectRoot: '/test/project',
+      restoreCandidateSprintId: null,
+      readOwningRunLifecycle: () => 'not-terminal',
+    })).rejects.toThrow(
+      `EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD:728-001:hold:${reasonCode}`,
+    );
+    expect(registry.retireHistoricalUnsettleableAttempt).not.toHaveBeenCalled();
+    expect([...terminal.keys()]).toContain('728-001');
+  });
+
+  it.each([
+    ['returns unknown', () => 'unknown' as const],
+    ['returns null', () => null],
+    ['throws', () => { throw new Error('read-model unavailable'); }],
+  ])('never retires when the owning-run lifecycle read %s', async (_label, reader) => {
+    const reasonCode = 'production-wiring-verifier-asset-invalid';
+    const { registry } = unsettleableForeignRegistry('728-001', reasonCode);
+
+    await expect(settleRecoveredExactTerminalAuthorities(registry, {
+      projectRoot: '/test/project',
+      restoreCandidateSprintId: null,
+      readOwningRunLifecycle: reader as () => 'terminal' | null,
+    })).rejects.toThrow(
+      `EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD:728-001:hold:${reasonCode}`,
+    );
+    expect(registry.retireHistoricalUnsettleableAttempt).not.toHaveBeenCalled();
+  });
+
+  it('never retires when the accepted authority is not identity-bound to the task', async () => {
+    const reasonCode = 'production-wiring-verifier-asset-invalid';
+    const { registry } = unsettleableForeignRegistry(
+      '728-001',
+      reasonCode,
+      undefined,
+      { taskId: '728-002', attemptId: 'exact-attempt:728-002', projectId: 'p', generation: 1 },
+    );
+
+    await expect(settleRecoveredExactTerminalAuthorities(registry, {
+      projectRoot: '/test/project',
+      restoreCandidateSprintId: null,
+      readOwningRunLifecycle: () => 'terminal',
+    })).rejects.toThrow(
+      `EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD:728-001:hold:${reasonCode}`,
+    );
+    expect(registry.retireHistoricalUnsettleableAttempt).not.toHaveBeenCalled();
+  });
+
+  // The production default path — the only code that decides whether the fix
+  // fires for a real historical run. Every other case injects the reader, so
+  // this exercises the real conjunction over a real project tree.
+  //
+  // Archive MEMBERSHIP is observability, not terminal proof: the inspector
+  // builds an archive row from a `.brain/sprints/*.md` whose `Status:` is
+  // ACTIVE, and lists an EMPTY `.deckent/archive/sprints/<id>` directory.
+  function owningRunFixture(): string {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-owning-run-'));
+    roots.push(root);
+    mkdirSync(join(root, '.deckent', 'archive', 'sprints', 'sprint-728', 'tasks'), {
+      recursive: true,
+    });
+    mkdirSync(join(root, '.deckent', 'pids'), { recursive: true });
+    mkdirSync(join(root, '.deckent', 'runtime', 'jobs'), { recursive: true });
+    mkdirSync(join(root, '.brain', 'sprints'), { recursive: true });
+    return root;
+  }
+
+  /**
+   * The (B) witness shape: a retained generation snapshot whose pid+startToken
+   * bind to a run-flow handle for this sprint, plus a real terminal job closure
+   * keyed by that flow id. `readRunFlowTerminalClosureForSprint` is used as-is.
+   */
+  function identityProvenFlow(
+    root: string,
+    sprintId: string,
+    overrides: {
+      handlePid?: number;
+      handleStartToken?: string;
+      snapshotStartToken?: string | null;
+    } = {},
+  ): void {
+    const flowId = `flow-${sprintId}`;
+    const pid = 2_996_159;
+    const startToken = 's90985410';
+    writeFileSync(
+      join(root, '.deckent', 'pids', `${sprintId}.snapshot.json`),
+      JSON.stringify({
+        sprintId,
+        pid,
+        ...(overrides.snapshotStartToken === null
+          ? {}
+          : { startToken: overrides.snapshotStartToken ?? startToken }),
+      }),
+      'utf-8',
+    );
+    savePlannedSprint(root, flowId, { revision: 1, sprint: { id: sprintId } } as never);
+    saveRunHandle(root, {
+      flowId,
+      revision: 1,
+      planDigest: 'legacy-opaque-digest',
+      handle: { flowId, jobId: `job-${sprintId}`, logRef: `log-${sprintId}` },
+      startedAt: '2026-09-06T06:59:40.307Z',
+      pid: overrides.handlePid ?? pid,
+      startToken: overrides.handleStartToken ?? startToken,
+    } as never);
+    writeFileSync(
+      join(root, '.deckent', 'runtime', 'jobs', `job-${sprintId}.json`),
+      JSON.stringify({
+        status: 'FAILED',
+        completionRecord: { flowId },
+        error: 'run crashed before completion',
+      }),
+      'utf-8',
+    );
+  }
+
+  it('never calls a bare archive directory terminal', () => {
+    const root = owningRunFixture();
+    expect(readOwningRunTerminalDisposition(root, 'sprint-728')).toBe('unknown');
+    expect(readOwningRunTerminalDisposition(root, 'sprint-999')).toBe('unknown');
+  });
+
+  it('never calls an ACTIVE settlement record terminal', () => {
+    const root = owningRunFixture();
+    writeFileSync(
+      join(root, '.brain', 'sprints', 'sprint-728.md'),
+      '# sprint-728\n\n- Sprint ID: sprint-728\n- Status: ACTIVE\n',
+      'utf-8',
+    );
+    identityProvenFlow(root, 'sprint-728');
+    expect(readOwningRunTerminalDisposition(root, 'sprint-728')).toBe('unknown');
+  });
+
+  // A bare `.snapshot.json` is NOT terminal evidence: `writeStateSnapshot`
+  // (sprint-pid-manager.ts:434) rewrites it every 30s while the coordinator is
+  // alive, and `.pid` absence can be a crash/cleanup trace.
+  it('never calls a bare pid snapshot terminal', () => {
+    const root = owningRunFixture();
+    writeFileSync(
+      join(root, '.deckent', 'pids', 'sprint-728.snapshot.json'),
+      JSON.stringify({ sprintId: 'sprint-728', pid: 2996159, startToken: 's90985410' }),
+      'utf-8',
+    );
+    expect(readOwningRunTerminalDisposition(root, 'sprint-728')).toBe('unknown');
+  });
+
+  // A jobs/<id>.json matched by filename is unbound — its own sprintId may name
+  // another run — so it can never decide terminality on its own.
+  it('never calls an unbound job record terminal', () => {
+    const root = owningRunFixture();
+    writeFileSync(
+      join(root, '.deckent', 'runtime', 'jobs', 'sprint-728.json'),
+      JSON.stringify({ status: 'COMPLETE', sprintId: 'sprint-999' }),
+      'utf-8',
+    );
+    expect(readOwningRunTerminalDisposition(root, 'sprint-728')).toBe('unknown');
+  });
+
+  // The REAL sprint-728 shape, verified on the live tree: flow
+  // ece2c94c-aa6c-4a51-85f5-fca676eb9c93's handle carries pid 2996159 /
+  // startToken s90985410, matching the retained snapshot, and the flow's last
+  // terminal event is RUN_FAILED.
+  it('reads an identity-proven terminal flow closure as durably terminal', () => {
+    const root = owningRunFixture();
+    identityProvenFlow(root, 'sprint-728');
+    expect(readOwningRunTerminalDisposition(root, 'sprint-728')).toBe('terminal');
+  });
+
+  it('never calls an identity-unproven flow terminal', () => {
+    const mismatchedPid = owningRunFixture();
+    identityProvenFlow(mismatchedPid, 'sprint-728', { handlePid: 999_001 });
+    expect(readOwningRunTerminalDisposition(mismatchedPid, 'sprint-728')).toBe('unknown');
+
+    const missingToken = owningRunFixture();
+    identityProvenFlow(missingToken, 'sprint-728', { snapshotStartToken: null });
+    expect(readOwningRunTerminalDisposition(missingToken, 'sprint-728')).toBe('unknown');
+
+    const mismatchedToken = owningRunFixture();
+    identityProvenFlow(mismatchedToken, 'sprint-728', { handleStartToken: 'other-generation' });
+    expect(readOwningRunTerminalDisposition(mismatchedToken, 'sprint-728')).toBe('unknown');
+  });
+
+  it('never calls an ACTIVE authority row terminal', () => {
+    const root = owningRunFixture();
+    writeFileSync(
+      join(root, '.deckent', 'sprint-active.json'),
+      JSON.stringify({ sprintId: 'sprint-728' }),
+      'utf-8',
+    );
+    writeFileSync(
+      join(root, '.deckent', 'sprint-state.json'),
+      JSON.stringify({ sprintId: 'sprint-728', phase: 'EXECUTE', status: 'ACTIVE' }),
+      'utf-8',
+    );
+    writeFileSync(
+      join(root, '.deckent', 'pids', 'sprint-728.pid'),
+      JSON.stringify({ pid: process.pid, startToken: 's90985410' }),
+      'utf-8',
+    );
+    expect(readOwningRunTerminalDisposition(root, 'sprint-728')).toBe('not-terminal');
+  });
+
+  it('binds a recovered attempt identity only when every custody field is present', () => {
+    const bound = {
+      taskId: '728-001', attemptId: 'exact-attempt:728-001', projectId: 'p', generation: 1,
+    };
+    expect(isBoundRecoveredAttemptIdentity('728-001', bound)).toBe(true);
+    expect(isBoundRecoveredAttemptIdentity('728-002', bound)).toBe(false);
+    expect(isBoundRecoveredAttemptIdentity('728-001', { ...bound, attemptId: '' })).toBe(false);
+    expect(isBoundRecoveredAttemptIdentity('728-001', { ...bound, projectId: 1 })).toBe(false);
+    expect(isBoundRecoveredAttemptIdentity('728-001', { ...bound, generation: 0 })).toBe(false);
+    expect(isBoundRecoveredAttemptIdentity('728-001', { taskId: '728-001' })).toBe(false);
+    expect(isBoundRecoveredAttemptIdentity('728-001', null)).toBe(false);
+  });
+
+  it('retires a foreign attempt whose evaluation replay can never match again', async () => {
+    const { registry, terminal, retired } = unsettleableForeignRegistry(
+      '724-001',
+      'evaluation-replay-mismatch',
+    );
+
+    await expect(settleRecoveredExactTerminalAuthorities(
+      registry,
+      { projectRoot: '/test/project', restoreCandidateSprintId: null, readOwningRunLifecycle: () => 'terminal' },
+    )).resolves.toBeUndefined();
+
+    expect([...terminal.keys()]).not.toContain('724-001');
+    expect(retired.get('724-001')?.reasonCode).toBe('evaluation-replay-mismatch');
+  });
+
+  // scheduler-effects.ts:735-746 also returns `{state:'hold'}` when the BACKEND
+  // settlement succeeded and only the post-settle terminal re-read was not
+  // `current`. That is transient, so it must never retire a settled attempt.
+  it('never retires a hold whose origin is the post-settle terminal re-read', async () => {
+    const { registry, terminal } = unsettleableForeignRegistry(
+      '728-001',
+      'terminal-store-reread-failed',
+      { state: 'hold', reasonCode: 'terminal-store-reread-failed', origin: 'terminal-reread' },
+    );
+
+    await expect(settleRecoveredExactTerminalAuthorities(
+      registry,
+      { projectRoot: '/test/project', restoreCandidateSprintId: null, readOwningRunLifecycle: () => 'terminal' },
+    )).rejects.toThrow(
+      'EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD:728-001:hold:terminal-store-reread-failed',
+    );
+    expect(registry.retireHistoricalUnsettleableAttempt).not.toHaveBeenCalled();
+    expect([...terminal.keys()]).toContain('728-001');
+  });
+
+  it('never retires a transient registry-mismatch settlement hold', async () => {
+    const { registry } = unsettleableForeignRegistry('728-001', 'accepted-registry-mismatch');
+
+    await expect(settleRecoveredExactTerminalAuthorities(
+      registry,
+      { projectRoot: '/test/project', restoreCandidateSprintId: null, readOwningRunLifecycle: () => 'terminal' },
+    )).rejects.toThrow(
+      'EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD:728-001:hold:accepted-registry-mismatch',
+    );
+    expect(registry.retireHistoricalUnsettleableAttempt).not.toHaveBeenCalled();
+  });
+
+  it('never retires an actionable non-hold settlement outcome', async () => {
+    const { registry } = unsettleableForeignRegistry(
+      '728-001',
+      'acceptance-confirmation-required',
+      { state: 'route-required', reasonCode: 'acceptance-confirmation-required' },
+    );
+
+    await expect(settleRecoveredExactTerminalAuthorities(
+      registry,
+      { projectRoot: '/test/project', restoreCandidateSprintId: null, readOwningRunLifecycle: () => 'terminal' },
+    )).rejects.toThrow(
+      'EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD:728-001:route-required:acceptance-confirmation-required',
+    );
+    expect(registry.retireHistoricalUnsettleableAttempt).not.toHaveBeenCalled();
+  });
+
+  it('classifies only decided, permanent settlement holds as retirable', () => {
+    for (const decided of [
+      'evaluation-replay-mismatch',
+      'archive-chain-replay-mismatch',
+      'settlement-chain-artifact-mismatch',
+      'finalizer-chain-without-artifact',
+      'terminal-acceptance-revalidation-mismatch',
+      'terminal-receipt-binding-mismatch',
+      'terminal-receipt-invalid',
+      'terminal-authority-invalid',
+      'terminal-result-projection-invalid',
+      'invalid-terminal-input',
+      'production-wiring-verifier-asset-invalid',
+      'production-wiring-verifier-asset-changed',
+    ]) expect(isDecidedExactSettlementHold(decided)).toBe(true);
+
+    for (const undecided of [
+      'terminal-store-reread-failed',
+      'accepted-registry-mismatch',
+      'terminal-registry-mismatch',
+      'exact-settlement-port-unavailable',
+      'accepted-result-authority-unavailable',
+      'exact-registry-entry-unavailable',
+      'custody-hold',
+      'host-proof-timeout',
+      'host-proof-cancelled',
+      'production-wiring-verifier-asset-unbound',
+      'acceptance-confirmation-required',
+      'terminal-chain-mismatch',
+      'reason-unavailable',
+      'SOME_UPPERCASE_CODE',
+      'a code with spaces',
+      '',
+    ]) expect(isDecidedExactSettlementHold(undecided)).toBe(false);
+  });
+
+  // getNextSprintId mints zero-padded ids (`sprint-007`) while the task id
+  // carries the unpadded prefix (`7-001`). A raw string comparison would call a
+  // CURRENT-run task foreign and retire live work.
+  it('treats a zero-padded restore candidate as the same sprint', async () => {
+    const reasonCode = 'production-wiring-verifier-asset-invalid';
+    const { registry, terminal } = unsettleableForeignRegistry('7-001', reasonCode);
+
+    await expect(settleRecoveredExactTerminalAuthorities(
+      registry,
+      { projectRoot: '/test/project', restoreCandidateSprintId: 'sprint-007', readOwningRunLifecycle: () => 'terminal' },
+    )).rejects.toThrow(`EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD:7-001:hold:${reasonCode}`);
+    expect(registry.retireHistoricalUnsettleableAttempt).not.toHaveBeenCalled();
+    expect([...terminal.keys()]).toContain('7-001');
+  });
+
+  it('never retires when the restore candidate sprint id cannot be parsed', async () => {
+    const reasonCode = 'production-wiring-verifier-asset-invalid';
+    const { registry } = unsettleableForeignRegistry('728-001', reasonCode);
+
+    await expect(settleRecoveredExactTerminalAuthorities(
+      registry,
+      { projectRoot: '/test/project', restoreCandidateSprintId: 'not-a-sprint-id', readOwningRunLifecycle: () => 'terminal' },
+    )).rejects.toThrow(`EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD:728-001:hold:${reasonCode}`);
+    expect(registry.retireHistoricalUnsettleableAttempt).not.toHaveBeenCalled();
+  });
+
+  it('never retires a task id whose owning sprint cannot be derived', () => {
+    expect(restoreCandidateSprintIdForTaskId('728-001')).toBe('sprint-728');
+    expect(restoreCandidateSprintIdForTaskId('0728-1')).toBe('sprint-0728');
+    expect(restoreCandidateSprintIdForTaskId('cold-settlement-hold-001')).toBeNull();
+    expect(restoreCandidateSprintIdForTaskId('728')).toBeNull();
+    expect(restoreCandidateSprintIdForTaskId('')).toBeNull();
+    // Legacy epoch-millisecond ordinals are refused by parseSprintOrdinal, so
+    // they stay unattributable and therefore fail closed.
+    expect(restoreCandidateSprintIdForTaskId('1700000000000-001')).toBeNull();
   });
 
   it('ignores a forged public cascade/pre-dispatch result for an exact task', () => {

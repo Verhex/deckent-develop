@@ -29,6 +29,15 @@ export type SettleExactAcceptedResultOutcome =
   | {
       readonly state: 'hold';
       readonly reasonCode: string;
+      /**
+       * Where the hold was decided. `settlement` (the default when the field is
+       * absent) means the backend settlement itself refused. `terminal-reread`
+       * means settlement SUCCEEDED and only the post-settle terminal re-read did
+       * not return `current` — a transient class that must never be mistaken for
+       * a decided, permanently unsettleable attempt. Optional so every existing
+       * producer stays byte-compatible.
+       */
+      readonly origin?: 'settlement' | 'terminal-reread';
     };
 
 export type SettleExactAcceptedResult = (input: {

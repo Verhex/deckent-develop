@@ -97,6 +97,7 @@ import { markPending, markActive, clearPending } from '../core/active-workers.js
 import { authHealthCheck } from '../agents/worker.js';
 import {
   TASK_ATTEMPT_CUSTODY_ARTIFACT_CLASSES,
+  TASK_ATTEMPT_CUSTODY_CHAIN_STAGES,
   TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
   TaskAttemptCustodyHold,
   TaskAttemptCustodyStore,
@@ -111,6 +112,8 @@ import {
   type TaskAttemptCustodyArtifactReceiptV2,
   type TaskAttemptCustodyAttemptAccess,
   type TaskAttemptCustodyBackendMountTransferReceipt,
+  type TaskAttemptCustodyChainReceiptV2,
+  type TaskAttemptCustodyChainStage,
   type TaskAttemptCustodyDispatchAdmissionRefV2,
   type TaskAttemptCustodyEffectCommittedReleasePendingDispatchV2,
   type TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2,
@@ -17938,6 +17941,58 @@ export class DockerSpawnBackend implements SpawnBackend {
     return retained;
   }
 
+  /**
+   * Recognise an attempt whose custody chain is complete through `archive`.
+   *
+   * Such an attempt is terminal history: effect landing, accepted result,
+   * evaluation, finalizer, settlement and archive are all durably published and
+   * digest-linked. Replaying its cold accepted result through today's derivation
+   * is not an integrity check — a later, legitimate derivation change turns the
+   * comparison into `evaluation-replay-mismatch` and holds EVERY subsequent run
+   * on the machine (measured 2026-09-09: sprint-724's archived `724-001` killed
+   * each new sprint before planning). Recovery exists for genuinely unsettled
+   * attempts, so a complete archive chain is skipped rather than recovered.
+   *
+   * Every link is verified explicitly, and any Store hold is treated as "not
+   * archived" so the ordinary reconciliation path keeps its existing behaviour.
+   */
+  private readExactArchivedAttemptDisposition(
+    scope: PreparedExactDockerCustodyScope,
+  ): boolean {
+    try {
+      const chain = new Map<
+        TaskAttemptCustodyChainStage,
+        TaskAttemptCustodyChainReceiptV2
+      >();
+      for (const stage of TASK_ATTEMPT_CUSTODY_CHAIN_STAGES) {
+        const receipt = scope.store.readChain(scope.identity, scope.policy, stage);
+        if (!receipt
+          || receipt.stage !== stage
+          || receipt.identity.taskId !== scope.identity.taskId
+          || receipt.identity.attemptId !== scope.identity.attemptId
+          || receipt.identity.generation !== scope.identity.generation
+          || receipt.identity.projectId !== scope.identity.projectId) return false;
+        chain.set(stage, receipt);
+      }
+      for (let index = 1; index < TASK_ATTEMPT_CUSTODY_CHAIN_STAGES.length; index += 1) {
+        const stage = TASK_ATTEMPT_CUSTODY_CHAIN_STAGES[index];
+        const previousStage = TASK_ATTEMPT_CUSTODY_CHAIN_STAGES[index - 1];
+        if (stage === undefined || previousStage === undefined) return false;
+        const receipt = chain.get(stage);
+        const previous = chain.get(previousStage);
+        if (!receipt || !previous
+          || receipt.predecessorDigest !== previous.receiptDigest) return false;
+      }
+      return true;
+    } catch (error) {
+      // A Store hold must not become a new crash site on a path that never had
+      // one, but it must not be silent either: it is indistinguishable from
+      // "not archived" and would otherwise hide a permanently stuck attempt.
+      debugLog('docker-backend:archived-attempt-chain-read-hold', error);
+      return false;
+    }
+  }
+
   private async inspectExactCommittedHostPostimages(
     scope: PreparedExactDockerCustodyScope,
     ready: Extract<ExecutionEffectDockerLifecycleAuthorityV1, {
@@ -19096,6 +19151,19 @@ export class DockerSpawnBackend implements SpawnBackend {
             'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
             true,
           );
+        }
+        if (this.readExactArchivedAttemptDisposition(scope)) {
+          const archived = report.historicalArchived
+            ?? (report.historicalArchived = []);
+          if (!archived.includes(scope.identity.taskId)) {
+            archived.push(scope.identity.taskId);
+          }
+          debugLog(
+            'docker-backend:historical-archived-attempt-skipped',
+            `taskId=${scope.identity.taskId};attemptId=${scope.identity.attemptId}`
+            + ';reason=complete-archive-chain',
+          );
+          continue;
         }
       const startObservation = opened.store.readDispatchObservationByClass({
         admissionRef: scope.admissionRef,

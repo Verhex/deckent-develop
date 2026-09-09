@@ -86,6 +86,11 @@ export interface SpawnBackendRecoveryReport {
    * absent. These attempts stay failed and unresolved; retention only prevents
    * the old provider attempt from being replayed during startup. */
   retainedCommittedUnsettled?: string[];
+  /** Attempts whose custody chain is complete through `archive`. They are already
+   * terminally settled history: recovery skips them instead of replaying a cold
+   * accepted result against today's derivation, which would hold every later run
+   * on the machine (same failure class as the MASTER-PLAN 664 lesson). */
+  historicalArchived?: string[];
   closedAbsentAfterExit: string[];
   retiredLanded: string[];
   resumedContinuations: string[];

@@ -395,6 +395,27 @@ export interface ExactNormalDockerExecutionRegistryV2 {
   readonly revalidateExactAcceptedResultTerminalAuthority:
     RevalidateExactAcceptedResultTerminalAuthority;
   readExactTerminalAuthority(taskId: string): ExactAcceptedTaskTerminalAuthorityRead;
+  /**
+   * Drop a recovered attempt that belongs to an earlier, already-terminal run
+   * and can never settle under the current derivation.
+   *
+   * Deletion — not a hold — is required. A `hold` entry reads back as
+   * `authority-hold` from `readTaskResultAuthority`, and both
+   * `sprint-lifecycle.ts:200-206` and `sprint-spawner.ts:1994-2003` throw
+   * `DECKENT_E077` for ANY held registry entry *before* filtering by the new
+   * sprint's task ids. A foreign historical attempt must therefore leave the
+   * registry entirely, or every later start on the machine stays bricked.
+   *
+   * Retirement is in-memory only: the custody store is untouched, so the
+   * attempt is re-examined (and re-retired) at the next start until an operator
+   * retention surface exists for an accepted-but-unsettleable attempt.
+   */
+  retireHistoricalUnsettleableAttempt(taskId: string, reasonCode: string): void;
+  /** Typed report of everything `retireHistoricalUnsettleableAttempt` dropped. */
+  snapshotHistoricalUnsettleableAttempts(): ReadonlyMap<string, Readonly<{
+    readonly reasonCode: string;
+    readonly retiredAt: string;
+  }>>;
   snapshotExactTerminalAuthorities(): ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead>;
   rehydrateRecovery(report: SpawnBackendRecoveryReport, backend: SpawnBackend): void;
   reconcileExactLifecycle(
@@ -424,6 +445,10 @@ export function createExactNormalDockerExecutionRegistry(
   projectRoot: string,
 ): ExactNormalDockerExecutionRegistryV2 {
   const entries = new Map<string, ExactNormalDockerRegistryEntry>();
+  const historicalUnsettleable = new Map<string, Readonly<{
+    readonly reasonCode: string;
+    readonly retiredAt: string;
+  }>>();
   const terminalWaits = new Map<string, Promise<void>>();
   /** One project-wide adoption scan per backend kind, regardless of task-local instances. */
   const recoveryOwners = new Map<string, SpawnBackend>();
@@ -716,9 +741,17 @@ export function createExactNormalDockerExecutionRegistry(
       expectedTerminalAuthority: settled.authority,
     });
     entries.set(acceptedAuthority.identity.taskId, Object.freeze({ ...entry, terminal: current }));
+    // The backend settlement SUCCEEDED here; only the post-settle terminal
+    // re-read was not `current` (this includes transient store-read failures).
+    // Tag the origin so a caller cannot mistake it for a decided, permanently
+    // unsettleable attempt. Backend settlement holds pass through untouched.
     return current.state === 'current'
       ? settled
-      : Object.freeze({ state: 'hold' as const, reasonCode: current.reasonCode });
+      : Object.freeze({
+          state: 'hold' as const,
+          reasonCode: current.reasonCode,
+          origin: 'terminal-reread' as const,
+        });
   };
   const revalidateExactAcceptedResultTerminalAuthority:
     RevalidateExactAcceptedResultTerminalAuthority = async ({
@@ -1010,6 +1043,19 @@ export function createExactNormalDockerExecutionRegistry(
     settleExactAcceptedResult,
     revalidateExactAcceptedResultTerminalAuthority,
     readExactTerminalAuthority,
+    retireHistoricalUnsettleableAttempt(taskId: string, reasonCode: string): void {
+      entries.delete(taskId);
+      historicalUnsettleable.set(taskId, Object.freeze({
+        reasonCode,
+        retiredAt: new Date().toISOString(),
+      }));
+    },
+    snapshotHistoricalUnsettleableAttempts(): ReadonlyMap<string, Readonly<{
+      readonly reasonCode: string;
+      readonly retiredAt: string;
+    }>> {
+      return new Map(historicalUnsettleable);
+    },
     snapshotExactTerminalAuthorities(): ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead> {
       const snapshot = new Map<string, ExactAcceptedTaskTerminalAuthorityRead>();
       for (const [taskId, entry] of entries) {
