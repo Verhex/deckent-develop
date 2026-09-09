@@ -38,16 +38,24 @@
 //
 // Path containment: lexical (resolve + relative against the supplied root)
 // when the root is not on disk (pure unit mode); when the project root EXISTS
-// on disk every explicit path argument (or a glob's literal prefix directory)
-// must exist and realpath-resolve — every parent followed — inside the
-// realpath of the root, and a missing/unresolvable path fails closed
-// (PATH_UNRESOLVED). Git positionals are refs/pathspecs and stay lexical.
+// on disk every explicit path argument must exist and be canonicalised
+// component by component — EVERY intermediate symlink target and the final
+// realpath are each checked for root containment AND protected-tree membership
+// (7111-b: an in-root `notes.txt → .env` alias is PATH_PROTECTED). A glob
+// argument is expanded here against the real filesystem with sh rules (dotfiles
+// only for a leading `.`, `**` ≡ `*`, braces are rejected by the scanner) and
+// EVERY match goes through the same canonical check; zero matches (the shell
+// would pass the literal) or more than `maxGlobMatches` → GLOB_EXPANSION, not
+// read-only. Missing/unresolvable → PATH_UNRESOLVED. Git positionals are
+// refs/pathspecs and stay lexical. Traversal roots (`grep -r dir`, `find dir`)
+// are checked as directories; descent into symlinked subdirectories is a
+// documented follow-up.
 // Case rule: containment and protected-tree matching are case-insensitive on
 // win32/darwin (their default filesystems are) and case-sensitive on linux,
 // unless `caseSensitivePaths` says otherwise.
 
 import { posix, win32 } from 'node:path';
-import { realpathSync, statSync } from 'node:fs';
+import { lstatSync, readdirSync, readlinkSync, realpathSync, statSync } from 'node:fs';
 
 export type ShellDialect = 'posix' | 'powershell';
 export type ReadOnlyShellRisk = 'none' | 'low';
@@ -84,6 +92,8 @@ export type ReadOnlyShellReasonCode =
   | 'PATH_OUTSIDE_ROOT'
   | 'PATH_PROTECTED'
   | 'PATH_UNRESOLVED'
+  | 'GLOB_EXPANSION'
+  | 'GLOB_UNSUPPORTED'
   | 'SCRIPT_BLOCK'
   | 'SUBEXPRESSION'
   | 'CALL_OPERATOR'
@@ -108,7 +118,13 @@ export interface ReadOnlyShellOptions {
   /** Realpath-resolve existing path arguments against the realpath of the root
    *  (symlink escape guard). Default `true`; only effective with a projectRoot. */
   readonly resolveSymlinks?: boolean;
+  /** Upper bound on filesystem glob expansion per argument (7111-b). Over the
+   *  bound → not read-only. Default DEFAULT_MAX_GLOB_MATCHES. */
+  readonly maxGlobMatches?: number;
 }
+
+/** Default per-argument glob expansion bound (config-resolvable by callers). */
+export const DEFAULT_MAX_GLOB_MATCHES = 10_000;
 
 /** Documented default case rule (exported so callers/tests share one truth). */
 export function defaultCaseSensitivePaths(dialect: ShellDialect, platform: NodeJS.Platform = process.platform): boolean {
@@ -607,6 +623,77 @@ interface PathContext {
   readonly resolveSymlinks: boolean;
   /** realpath of the root when it exists on disk; null → lexical-only mode. */
   readonly realRoot: string | null;
+  readonly maxGlobMatches: number;
+}
+
+const MAX_SYMLINK_HOPS = 64;
+
+/**
+ * Canonicalise `abs` component by component, following every symlink (bounded)
+ * and returning every intermediate link target plus the final real path, so
+ * each identity can be containment- and protected-checked. `null` when any
+ * component is missing, unreadable or cycles.
+ */
+function canonicalWalk(api: typeof posix | typeof win32, abs: string): { real: string; visited: string[] } | null {
+  const visited: string[] = [];
+  let hops = 0;
+  let pending = abs;
+  // Every symlink hop restarts the walk from the filesystem root over the
+  // RESOLVED target plus the remaining components, so parents introduced by a
+  // target (`notes.txt → dirlink/file.txt`, `dirlink → outside`) are followed
+  // and checked themselves, not silently traversed by a later lstat.
+  for (;;) {
+    const parsed = api.parse(pending);
+    const segments = pending.slice(parsed.root.length).split(/[\\/]/u).filter((segment) => segment.length > 0);
+    let current = parsed.root;
+    let restarted = false;
+    for (let index = 0; index < segments.length; index++) {
+      current = api.join(current, segments[index] as string);
+      let link: string;
+      try {
+        if (!lstatSync(current).isSymbolicLink()) continue;
+        link = readlinkSync(current);
+      } catch {
+        return null;
+      }
+      if (++hops > MAX_SYMLINK_HOPS) return null;
+      const target = api.resolve(api.dirname(current), link);
+      visited.push(target);
+      pending = api.join(target, ...segments.slice(index + 1));
+      restarted = true;
+      break;
+    }
+    if (restarted) continue;
+    // The walk converged; the kernel's realpath must agree, else fail closed.
+    let real: string;
+    try { statSync(current); real = realpathSync(abs); } catch { return null; }
+    if (real !== current) return null;
+    return { real, visited };
+  }
+}
+
+/** sh-style expansion of one glob argument against the real filesystem. */
+function expandGlob(api: typeof posix | typeof win32, base: string, pattern: string, bound: number): string[] | null | 'unsupported' {
+  const segments = pattern.split(/[\\/]/u).filter((segment) => segment.length > 0);
+  let frontier = [pattern.startsWith('/') || isWindowsStylePath(pattern) ? api.parse(api.resolve(base, pattern)).root : base];
+  for (const segment of segments) {
+    const next: string[] = [];
+    if (!GLOB_CHARS.test(segment)) {
+      for (const dir of frontier) next.push(api.join(dir, segment));
+    } else {
+      const re = globSegmentRegExp(segment.replace(/\*{2,}/gu, '*'));
+      if (re === null) return 'unsupported';
+      for (const dir of frontier) {
+        let names: string[];
+        try { names = readdirSync(dir); } catch { continue; }
+        for (const name of names.sort()) if (re.test(name)) next.push(api.join(dir, name));
+        if (next.length > bound) return null;
+      }
+    }
+    frontier = next;
+    if (frontier.length === 0) return [];
+  }
+  return frontier.length > bound ? null : frontier;
 }
 
 /** realpath (every parent followed) of an EXISTING path; null when missing/unresolvable. */
@@ -661,17 +748,66 @@ function isProtected(rel: string, patterns: readonly string[]): string | null {
   return null;
 }
 
-/** Shell-glob segment → RegExp (`*`/`?` never match a leading dot, as in sh). */
-function globSegmentRegExp(segment: string): RegExp {
+const POSIX_CLASSES: Readonly<Record<string, string>> = {
+  alpha: 'A-Za-z', digit: '0-9', alnum: 'A-Za-z0-9', upper: 'A-Z', lower: 'a-z', space: ' \\t\\n\\r\\f\\v',
+  blank: ' \\t', punct: '!-\\/:-@\\[-`{-~', xdigit: '0-9A-Fa-f', cntrl: '\\x00-\\x1f\\x7f', print: '\\x20-\\x7e', graph: '\\x21-\\x7e',
+};
+const escapeRegExpChar = (c: string): string => c.replace(/[.*+?^${}()|[\]\\\/-]/gu, '\\$&');
+
+/**
+ * POSIX bracket expression at `segment[open]` → JS class source, or `null` when
+ * the form is not supported EXACTLY (collating `[.x.]` / equivalence `[=x=]`),
+ * which the caller classifies as GLOB_UNSUPPORTED. An unterminated `[` is a
+ * literal bracket, as in sh. Returns the index just past the closing `]`.
+ */
+function compileBracket(segment: string, open: number): { source: string; end: number } | 'literal' | null {
+  let i = open + 1;
+  let negate = false;
+  if (segment[i] === '!' || segment[i] === '^') { negate = true; i++; }
+  let body = '';
+  let first = true;
+  while (i < segment.length) {
+    const c = segment[i] as string;
+    if (c === ']' && !first) return { source: `[${negate ? '^/' : ''}${body}]`, end: i + 1 };
+    first = false;
+    if (c === '[' && (segment[i + 1] === '.' || segment[i + 1] === '=')) return null;
+    if (c === '[' && segment[i + 1] === ':') {
+      const close = segment.indexOf(':]', i + 2);
+      if (close < 0) return null;
+      const cls = POSIX_CLASSES[segment.slice(i + 2, close)];
+      if (cls === undefined) return null;
+      body += cls;
+      i = close + 2;
+      continue;
+    }
+    if (segment[i + 1] === '-' && i + 2 < segment.length && segment[i + 2] !== ']') {
+      const hi = segment[i + 2] as string;
+      if (hi === '[') return null;
+      if (c.charCodeAt(0) > hi.charCodeAt(0)) return null;
+      body += `${escapeRegExpChar(c)}-${escapeRegExpChar(hi)}`;
+      i += 3;
+      continue;
+    }
+    body += escapeRegExpChar(c);
+    i++;
+  }
+  return 'literal';
+}
+
+/** Shell-glob segment → RegExp (`*`/`?` never match a leading dot, as in sh);
+ *  `null` for a bracket form that is not supported exactly (fail closed). */
+function globSegmentRegExp(segment: string): RegExp | null {
   let out = '';
   for (let i = 0; i < segment.length; i++) {
     const c = segment[i] as string;
     if (c === '*') out += '[^/]*';
     else if (c === '?') out += '[^/]';
     else if (c === '[') {
-      const close = segment.indexOf(']', i + 1);
-      if (close > i) { out += `[${segment.slice(i + 1, close).replace(/\\/gu, '\\\\')}]`; i = close; }
-      else out += '\\[';
+      const bracket = compileBracket(segment, i);
+      if (bracket === null) return null;
+      if (bracket === 'literal') { out += '\\['; continue; }
+      out += bracket.source;
+      i = bracket.end - 1;
     } else out += c.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
   }
   const leadingDotAllowed = segment.startsWith('.');
@@ -694,7 +830,7 @@ function globReachesProtected(relDir: string, globSegments: readonly string[], p
       const depth = Math.min(remaining.length, globSegments.length);
       let matched = depth > 0;
       for (let i = 0; i < depth && matched; i++) {
-        matched = globSegmentRegExp(globSegments[i] as string).test(remaining[i] as string);
+        matched = globSegmentRegExp(globSegments[i] as string)?.test(remaining[i] as string) ?? true;
       }
       if (matched) return pattern;
       continue;
@@ -705,7 +841,7 @@ function globReachesProtected(relDir: string, globSegments: readonly string[], p
       if (last === '.*' && pattern.startsWith('.')) return pattern;
       continue;
     }
-    if (globSegmentRegExp(last).test(pattern)) return pattern;
+    if (globSegmentRegExp(last)?.test(pattern) ?? true) return pattern;
   }
   return null;
 }
@@ -720,7 +856,8 @@ function checkPath(word: Word, ctx: PathContext, readsContent: boolean, lexicalO
     ? win32
     : posix;
   const root = ctx.root ?? SYNTHETIC_ROOT;
-  const globIndex = raw.search(GLOB_CHARS);
+  // Only UNQUOTED glob metacharacters expand; a quoted `'*.txt'` is a literal name.
+  const globIndex = word.glob ? raw.search(GLOB_CHARS) : -1;
   const hasGlob = globIndex >= 0;
   let candidate = hasGlob ? raw.slice(0, globIndex) : raw;
   if (hasGlob) {
@@ -729,26 +866,52 @@ function checkPath(word: Word, ctx: PathContext, readsContent: boolean, lexicalO
   }
   const abs = api.resolve(root, candidate.length > 0 ? candidate : '.');
   if (outsideRoot(api, root, abs, ctx.caseSensitive)) return { ok: false, reasonCode: 'PATH_OUTSIDE_ROOT', detail: raw };
-  if (ctx.realRoot !== null && !lexicalOnly) {
-    // Root exists on disk: the argument (or a glob's literal prefix directory)
-    // must exist and realpath-resolve — every parent followed — inside the
-    // realpath of the root. A link inside the project pointing outside, or a
-    // missing/unresolvable path, is never silently read.
-    const realAbs = strictRealPath(abs);
-    if (realAbs === null) return { ok: false, reasonCode: 'PATH_UNRESOLVED', detail: raw };
-    if (outsideRoot(api, ctx.realRoot, realAbs, ctx.caseSensitive)) return { ok: false, reasonCode: 'PATH_OUTSIDE_ROOT', detail: raw };
-  }
+  const fold = (value: string): string => (ctx.caseSensitive ? value : value.toLowerCase());
+  const foldedPatterns = ctx.caseSensitive ? ctx.protectedPatterns : ctx.protectedPatterns.map((pattern) => pattern.toLowerCase());
+  const toRelPosix = (base: string, target: string): string => api.relative(base, target).split(api.sep).join('/');
+  const protectedAt = (base: string, target: string): boolean => isProtected(fold(toRelPosix(base, target)), foldedPatterns) !== null;
+  const realRoot = ctx.realRoot;
+  /** Canonical identity check (disk mode): every symlink hop and the final
+   *  real path must be inside the real root and outside the protected trees. */
+  const canonicalCheck = (target: string): PathVerdict => {
+    if (realRoot === null) return { ok: true };
+    const walk = canonicalWalk(api, target);
+    if (walk === null) return { ok: false, reasonCode: 'PATH_UNRESOLVED', detail: raw };
+    for (const identity of [...walk.visited, walk.real]) {
+      if (outsideRoot(api, realRoot, identity, ctx.caseSensitive)) return { ok: false, reasonCode: 'PATH_OUTSIDE_ROOT', detail: raw };
+      if (protectedAt(realRoot, identity)) return { ok: false, reasonCode: 'PATH_PROTECTED', detail: raw };
+    }
+    return { ok: true };
+  };
   const rel = api.relative(root, abs);
   const relPosix = rel.split(api.sep).join('/');
   ctx.paths.push(relPosix.length === 0 ? '.' : relPosix);
-  const fold = (value: string): string => (ctx.caseSensitive ? value : value.toLowerCase());
-  const foldedPatterns = ctx.caseSensitive ? ctx.protectedPatterns : ctx.protectedPatterns.map((pattern) => pattern.toLowerCase());
-  const hit = isProtected(fold(relPosix), foldedPatterns);
-  if (hit !== null) return { ok: false, reasonCode: 'PATH_PROTECTED', detail: raw };
-  if (hasGlob && readsContent) {
-    const globPart = raw.slice(candidate.length).split(/[\\/]/u).filter((segment) => segment.length > 0).map(fold);
-    const reached = globReachesProtected(fold(relPosix), globPart, foldedPatterns);
-    if (reached !== null) return { ok: false, reasonCode: 'PATH_PROTECTED', detail: raw };
+  if (isProtected(fold(relPosix), foldedPatterns) !== null) return { ok: false, reasonCode: 'PATH_PROTECTED', detail: raw };
+  if (realRoot === null || lexicalOnly) {
+    // Lexical mode (root not on disk): a glob can only be judged by what it
+    // COULD reach, so a content read whose pattern can land on a protected
+    // entry fails closed here. In disk mode the real expansion below decides.
+    if (hasGlob && readsContent) {
+      const globPart = raw.slice(candidate.length).split(/[\\/]/u).filter((segment) => segment.length > 0).map(fold);
+      if (globPart.some((segment) => globSegmentRegExp(segment) === null)) return { ok: false, reasonCode: 'GLOB_UNSUPPORTED', detail: raw };
+      const reached = globReachesProtected(fold(relPosix), globPart, foldedPatterns);
+      if (reached !== null) return { ok: false, reasonCode: 'PATH_PROTECTED', detail: raw };
+    }
+    return { ok: true };
+  }
+  if (!hasGlob) return canonicalCheck(abs);
+  // Glob (disk mode): the prefix directory must be sound, then EVERY match is
+  // canonically checked. Zero matches means the shell would hand the program
+  // the literal pattern; over-bound expansion is refused — both fail closed.
+  const prefixVerdict = canonicalCheck(abs);
+  if (!prefixVerdict.ok) return prefixVerdict;
+  const matches = expandGlob(api, abs, raw.slice(candidate.length), ctx.maxGlobMatches);
+  if (matches === 'unsupported') return { ok: false, reasonCode: 'GLOB_UNSUPPORTED', detail: raw };
+  if (matches === null || matches.length === 0) return { ok: false, reasonCode: 'GLOB_EXPANSION', detail: raw };
+  for (const match of matches) {
+    if (protectedAt(root, match)) return { ok: false, reasonCode: 'PATH_PROTECTED', detail: raw };
+    const verdict = canonicalCheck(match);
+    if (!verdict.ok) return verdict;
   }
   return { ok: true };
 }
@@ -1632,6 +1795,9 @@ export function classifyReadOnlyShellCommand(command: string, options: ReadOnlyS
     caseSensitive: options.caseSensitivePaths ?? defaultCaseSensitivePaths(dialect, options.platform),
     resolveSymlinks: options.resolveSymlinks ?? true,
     realRoot: rootOnDisk(options.projectRoot ?? null, options.resolveSymlinks ?? true),
+    maxGlobMatches: Number.isSafeInteger(options.maxGlobMatches) && (options.maxGlobMatches as number) >= 1
+      ? (options.maxGlobMatches as number)
+      : DEFAULT_MAX_GLOB_MATCHES,
   };
   const programs: string[] = [];
   let risk: ReadOnlyShellRisk = 'none';

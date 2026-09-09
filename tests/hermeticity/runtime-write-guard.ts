@@ -297,8 +297,25 @@ function canonicalizeTarget(value: string): string {
     cursor = parent;
   }
 
-  const physicalBase = existsSync(cursor) ? realpathSync.native(cursor) : cursor;
+  const physicalBase = existsSync(cursor) ? physicalPath(cursor) : cursor;
   return path.resolve(physicalBase, ...missingSegments);
+}
+
+/**
+ * realpath that survives a target vanishing between the existence probe and
+ * the resolution (rimraf deletes in parallel: a symlink whose target was just
+ * removed is dangling by the time it is canonicalised). The containment answer
+ * stays physical — the parent's realpath plus the leaf name — instead of an
+ * unhandled ENOENT that leaves the deleting test hanging (7111-b rev2).
+ */
+function physicalPath(cursor: string): string {
+  try {
+    return realpathSync.native(cursor);
+  } catch {
+    const parent = path.dirname(cursor);
+    if (parent === cursor) return cursor;
+    return path.resolve(physicalPath(parent), path.basename(cursor));
+  }
 }
 
 interface ProtectedRoot {
