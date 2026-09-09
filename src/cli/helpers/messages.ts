@@ -3770,6 +3770,16 @@ const BASE_MESSAGES: MessageMap = {
     tr: 'ön metin: {tokens}/{limit} bütçe (pencerenin %{percent} kadarı) · {tools} araç şeması',
   },
   'native-context.slash.trigger': { en: 'last compaction trigger: {trigger}', tr: 'son sıkıştırma tetikleyicisi: {trigger}' },
+  'native-context.slash.tool_result_pressure': {
+    en: 'retained tool results: {retained} / {cap} tokens (window {window}, {quality})',
+    tr: 'tutulan araç sonuçları: {retained} / {cap} token (pencere {window}, {quality})',
+  },
+  'native-context.slash.request_pressure': {
+    en: 'measured request: {retained} / {cap} tokens (window {window}, {quality})',
+    tr: 'ölçülen istek: {retained} / {cap} token (pencere {window}, {quality})',
+  },
+  'native-context.measurement.quality_exact': { en: 'exact', tr: 'kesin' },
+  'native-context.measurement.quality_upper_bound': { en: 'conservative upper bound', tr: 'muhafazakâr üst sınır' },
   'native-context.trigger.token_pressure': { en: 'measured context pressure', tr: 'ölçülmüş bağlam baskısı' },
   'native-context.trigger.overflow': { en: 'input overflow recovery', tr: 'girdi taşması kurtarması' },
   'native-context.trigger.manual': { en: 'explicit compaction', tr: 'doğrudan sıkıştırma' },

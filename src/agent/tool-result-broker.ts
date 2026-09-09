@@ -25,6 +25,7 @@
 // `[deckent] truncated (…)` returns. User-facing text stays in messages.ts.
 
 import { createHash } from 'node:crypto';
+import { previewUtf8BytesForTokenBudget, TOOL_RESULT_PREVIEW_HARD_MAX_BYTES } from './context-budget.js';
 import { createSessionToolContentStore, type ToolCaptureReceipt } from './session-tool-content.js';
 
 // ─── Budget constants ───────────────────────────────────────────────────────
@@ -32,13 +33,25 @@ import { createSessionToolContentStore, type ToolCaptureReceipt } from './sessio
 /** Default preview budget handed to the model when a result overflows. */
 export const DEFAULT_MAX_PREVIEW_BYTES = 16_384;
 /** Ceiling on any caller-supplied preview budget. */
-export const HARD_MAX_PREVIEW_BYTES = 65_536;
+export const HARD_MAX_PREVIEW_BYTES = TOOL_RESULT_PREVIEW_HARD_MAX_BYTES;
 /** Ceiling on the RENDERED string — what actually reaches the loop. */
-export const RENDER_HARD_CAP_BYTES = 65_536;
+export const RENDER_HARD_CAP_BYTES = TOOL_RESULT_PREVIEW_HARD_MAX_BYTES;
 /** stderr rides its own bounded field; it never eats the stdout preview. */
 export const STDERR_PREVIEW_BYTES = 4_096;
 /** Coarse bytes→tokens heuristic (~4 bytes/token), enough for budget triage. */
 const BYTES_PER_TOKEN = 4;
+
+/**
+ * Derive a preview-byte cap from a token share and a measured wire ratio.
+ * Used by the agent loop; callers without a measured ratio keep DEFAULT_MAX_PREVIEW_BYTES.
+ */
+export function previewBytesFromTokenShare(
+  tokenShare: number,
+  tokensPerUtf8Byte: number,
+  hardMaxBytes = HARD_MAX_PREVIEW_BYTES,
+): number {
+  return previewUtf8BytesForTokenBudget(tokenShare, tokensPerUtf8Byte, hardMaxBytes);
+}
 /** Summary is the first non-empty line, hard-capped. */
 const SUMMARY_MAX_CHARS = 200;
 

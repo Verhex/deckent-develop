@@ -86,6 +86,21 @@ describe('resolveContextSlash — read-only snapshot lines', () => {
     expect(engine.sends).toEqual([]); // zero provider turns
   });
 
+  it('renders retained tool-result pressure when the snapshot carries it', async () => {
+    const engine = fakeEngine({ contextSnapshot: async () => ({
+      ...snapshot,
+      lastCheckpointPressure: {
+        retainedTokens: 4500, capTokens: 19_660, windowTokens: 131_072,
+        quality: 'exact', scope: 'tool-results',
+      },
+    }) });
+    const text = await resolveContextSlash('/context', engine, labels);
+    expect(text).toContain('4500');
+    expect(text).toContain('19660');
+    expect(text).toContain('131072');
+    expect(text).toContain('retained tool results');
+  });
+
   it('says "unknown" (catalog) when no actual request exists instead of guessing', async () => {
     const engine = fakeEngine({ contextSnapshot: async () => ({
       ...snapshot, window: undefined, measuredInputTokens: undefined,

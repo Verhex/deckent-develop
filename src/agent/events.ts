@@ -4,7 +4,7 @@
 
 import type { NativeToolApprovalClassification, ToolPermissionTier } from './tools/types.js';
 import type { ApprovalMode } from './permission-types.js';
-import type { ProviderAdmissionDecision } from './provider-tooluse/types.js';
+import type { ProviderAdmissionDecision, RequestMeasurementQuality } from './provider-tooluse/types.js';
 import type { NativePermissionInvocation } from './native-permission-binding.js';
 
 export interface TextDeltaEvent { type: 'text-delta'; text: string; }
@@ -86,11 +86,23 @@ export interface NoticeEvent { type: 'notice'; code: string; message: string; va
 /** NATIVE-AGENT-HORIZON-001: the loop asks the session layer to take a scratch
  *  checkpoint (cadence or no-progress). Data-only — the session/view decides
  *  how to fulfil and render it. */
+/** Typed justification when token-pressure is measured from context share. */
+export interface BudgetCheckpointPressure {
+  readonly retainedTokens: number;
+  readonly capTokens: number;
+  readonly windowTokens: number;
+  readonly quality: RequestMeasurementQuality;
+  /** `tool-results` = retained tool bodies; `full-request` = admission overflow. */
+  readonly scope: 'tool-results' | 'full-request';
+}
+
 export interface BudgetCheckpointRequestEvent {
   type: 'budget-checkpoint-request';
   reason: 'cadence-rounds' | 'cadence-toolcalls' | 'no-progress' | 'token-pressure';
   rounds: number;
   toolCalls: number;
+  /** Present for measured token-pressure checkpoints from the loop's share math. */
+  pressure?: BudgetCheckpointPressure;
 }
 
 export type AgentEvent =

@@ -12,7 +12,7 @@
 // issued record; unknown ids are never cached as future authority.
 
 import { createHash, randomUUID } from 'node:crypto';
-import type { AgentEvent, PermissionRequestEvent, RequestMeasurementEvent } from './events.js';
+import type { AgentEvent, BudgetCheckpointPressure, PermissionRequestEvent, RequestMeasurementEvent } from './events.js';
 import {
   runAgentTurn,
   type LoopDeps,
@@ -331,6 +331,7 @@ export interface ContextSnapshot {
   refreshPlanned: boolean;
   highWaterRatio: number;
   lastContextTrigger?: 'token-pressure' | 'overflow' | 'manual' | 'planned' | 'cadence';
+  lastCheckpointPressure?: BudgetCheckpointPressure;
 }
 
 export function createAgentSession(deps: AgentSessionDeps): AgentSession {
@@ -344,6 +345,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     ...(deps.contentStore ? {contentStore: deps.contentStore} : {}),
   }) : undefined;
   let lastContextTrigger: ContextSnapshot['lastContextTrigger'];
+  let lastCheckpointPressure: BudgetCheckpointPressure | undefined;
   let mode: ApprovalMode = deps.policy.defaultMode;
   /** TERMINAL-TOOLS-008 — abort seam of the turn in flight (fresh per send()). */
   let turnAbort: AbortController | undefined;
@@ -1027,6 +1029,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     if (!scratch || !scratchDeps) return;
     if (planned) {
       lastContextTrigger = 'planned';
+      lastCheckpointPressure = undefined;
       yield* takeContextEpoch(turnId, attributionGeneration);
       return;
     }
@@ -1034,6 +1037,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     if (!measured) return;
     if (measured.inputTokens >= Math.floor(measured.window * contextBudget.contextHighWaterRatio)) {
       lastContextTrigger = 'token-pressure';
+      lastCheckpointPressure = undefined;
       yield* takeContextEpoch(turnId, attributionGeneration);
     }
   }
@@ -1088,6 +1092,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
           // fresh epoch, the original turn retried exactly once. No loop.
           if (!epochAdvancedThisTurn) {
             lastContextTrigger = 'overflow';
+            lastCheckpointPressure = undefined;
             yield* takeContextEpoch(turnId, attributionGeneration);
           }
           if (epochAdvancedThisTurn && await epochFits(retryInput)) {
@@ -1098,7 +1103,9 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
         yield event;
         if (event.type !== 'budget-checkpoint-request') continue;
         lastContextTrigger = event.reason === 'token-pressure' ? 'token-pressure' : 'cadence';
+        if (event.reason !== 'token-pressure') lastCheckpointPressure = undefined;
         yield* takeContextEpoch(turnId, attributionGeneration);
+        if (event.reason === 'token-pressure' && event.pressure) lastCheckpointPressure = event.pressure;
       }
       if (!retry) return;
       yield {
@@ -1269,6 +1276,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
         refreshPlanned: contextRefreshPlanned,
         highWaterRatio: contextBudget.contextHighWaterRatio,
         ...(lastContextTrigger ? { lastContextTrigger } : {}),
+        ...(lastCheckpointPressure ? { lastCheckpointPressure } : {}),
       };
     },
     clearLastRequestMeasurement(): void {
@@ -1294,6 +1302,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       // A fresh abort seam for the explicit compaction (cancel() aborts it).
       turnAbort = new AbortController();
       lastContextTrigger = 'manual';
+      lastCheckpointPressure = undefined;
       return takeContextEpoch(`compact-${compactSequence}`, attributionGeneration);
     },
     close(options = {}): void {

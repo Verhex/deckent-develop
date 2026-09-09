@@ -23,7 +23,9 @@ import { grantPatternFor, type ApprovalMode } from './permission-types.js';
 import { ToolRegistry, type NativeToolSchema } from './tools/registry.js';
 import type { ToolResult } from './tools/types.js';
 import { Transcript } from './transcript.js';
-import type { ProviderAdapter, ProviderMessage, ProviderRequest, ProviderToolCall } from './provider-tooluse/types.js';
+import type {
+  ProviderAdapter, ProviderMessage, ProviderRequest, ProviderToolCall, RequestMeasurement,
+} from './provider-tooluse/types.js';
 import {
   recursionExceeded,
   createNativeBudgetState,
@@ -42,7 +44,14 @@ import {
   measureProviderRequest,
   digestProviderRequest,
   estimateMessageTokens,
+  deriveMeasuredTokensPerUtf8Byte,
+  measureRetainedToolResultTokens,
+  providerRequestWireUtf8Bytes,
+  sumToolResultUtf8Bytes,
+  toolResultBytesToTokens,
 } from './context-budget.js';
+import type { BudgetCheckpointPressure } from './events.js';
+import { previewBytesFromTokenShare } from './tool-result-broker.js';
 import { matchRule } from './permission-types.js';
 import type {
   NativePermissionBinding,
@@ -301,21 +310,60 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     // a single round of oversized tool results still overflows, and the 25%
     // floor above deliberately keeps a window even when overheads swallow the
     // context. Measure the ACTUAL request the way the wire will carry it.
-    const measureMessages = async (source: readonly ProviderMessage[]): Promise<number> => {
-      if (rawBudget === undefined || rawBudget <= 0) return 0;
-      const measurement = await measureProviderRequest({
-        request: {
-          system, messages: [...source], tools: toolSchemas, model,
-          ...(outputCeilingTokens > 0 ? { outputCeilingTokens } : {}),
-        },
-        identity: {
-          provider: adapter.name, model, contextWindowTokens: rawBudget,
-          contextProvenance: 'configured-narrowing',
-        },
-        ...(adapter.requestMeasurement ? { capability: adapter.requestMeasurement } : {}),
-      });
-      return measurement.inputTokens + outputCeilingTokens + contextSafetyReserveTokens;
+    let lastTokensPerUtf8Byte = 1;
+    const measureInflight = new Map<string, Promise<RequestMeasurement>>();
+    const measureRequest = async (source: readonly ProviderMessage[]): Promise<RequestMeasurement> => {
+      if (rawBudget === undefined || rawBudget <= 0) {
+        return {
+          inputTokens: 0,
+          quality: 'exact',
+          provenance: 'no-context-window',
+          requestDigest: '',
+          identity: {
+            provider: adapter.name, model, contextWindowTokens: 0,
+            contextProvenance: 'configured-narrowing',
+          },
+        };
+      }
+      const request = {
+        system, messages: [...source], tools: toolSchemas, model,
+        ...(outputCeilingTokens > 0 ? { outputCeilingTokens } : {}),
+      };
+      const requestDigest = digestProviderRequest(request);
+      const inflightKey = `${adapter.name}\0${model}\0${rawBudget}\0${requestDigest}`;
+      let inflight = measureInflight.get(inflightKey);
+      if (!inflight) {
+        inflight = measureProviderRequest({
+          request,
+          identity: {
+            provider: adapter.name, model, contextWindowTokens: rawBudget,
+            contextProvenance: 'configured-narrowing',
+          },
+          ...(adapter.requestMeasurement ? { capability: adapter.requestMeasurement } : {}),
+        }).finally(() => { measureInflight.delete(inflightKey); });
+        measureInflight.set(inflightKey, inflight);
+      }
+      const measurement = await inflight;
+      lastTokensPerUtf8Byte = deriveMeasuredTokensPerUtf8Byte(
+        measurement.inputTokens,
+        providerRequestWireUtf8Bytes(request),
+      );
+      return measurement;
     };
+    const measureMessages = async (source: readonly ProviderMessage[]): Promise<number> =>
+      (await measureRequest(source)).inputTokens + outputCeilingTokens + contextSafetyReserveTokens;
+    const tokenPressureJustification = (
+      retainedTokens: number,
+      capTokens: number,
+      quality: BudgetCheckpointPressure['quality'],
+      scope: BudgetCheckpointPressure['scope'],
+    ): BudgetCheckpointPressure => ({
+      retainedTokens,
+      capTokens,
+      windowTokens: rawBudget!,
+      quality,
+      scope,
+    });
     const fitRequest = async (source: readonly ProviderMessage[]): Promise<{
       messages: ProviderMessage[];
       droppedCount: number;
@@ -360,9 +408,16 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       const pressureTranscript = digestProviderRequest({ system, messages: transcript.toProviderMessages(), tools: toolSchemas, model });
       if (pressureTranscript !== lastPressureTranscript) {
         lastPressureTranscript = pressureTranscript;
+        const admissionMeasure = await measureRequest(transcript.toProviderMessages());
         yield {
           type: 'budget-checkpoint-request', reason: 'token-pressure',
           rounds: budgetState?.rounds ?? iterations, toolCalls: budgetState?.toolCalls ?? 0,
+          pressure: tokenPressureJustification(
+            fitted.requiredTokens,
+            Math.floor(rawBudget! * (deps.nativeBudget?.contextHighWaterRatio ?? DEFAULT_NATIVE_AGENT_BUDGET.contextHighWaterRatio)),
+            admissionMeasure.quality,
+            'full-request',
+          ),
         };
       }
       // Re-fit silently: a consumer that ignored the checkpoint would otherwise
@@ -618,14 +673,24 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     // Reserve room for the incoming batch before publishing its tool-call
     // owner. A checkpoint here cannot orphan pending call/result pairs.
     if (calls.length > 0 && deps.nativeBudget && rawBudget !== undefined && rawBudget > 0) {
-      const retained = transcript.toProviderMessages().reduce(
-        (bytes, message) => bytes + (message.role === 'tool' ? Buffer.byteLength(message.content, 'utf8') : 0), 0);
-      const total = rawBudget * deps.nativeBudget.maxTurnToolResultShareOfContext;
-      const desired = Math.min(rawBudget * deps.nativeBudget.maxToolResultShareOfContext * calls.length,
-        total * deps.nativeBudget.contextHighWaterRatio);
-      if (retained > 0 && total - retained < desired) {
-        yield { type: 'budget-checkpoint-request', reason: 'token-pressure',
-          rounds: budgetState?.rounds ?? iterations, toolCalls: budgetState?.toolCalls ?? 0 };
+      const turnCapTokens = Math.floor(rawBudget * deps.nativeBudget.maxTurnToolResultShareOfContext);
+      const singleCapTokens = Math.floor(rawBudget * deps.nativeBudget.maxToolResultShareOfContext);
+      const desiredTokens = Math.min(
+        singleCapTokens * calls.length,
+        Math.floor(turnCapTokens * deps.nativeBudget.contextHighWaterRatio),
+      );
+      const retainedMeasure = await measureRetainedToolResultTokens(
+        transcript.toProviderMessages(),
+        measureRequest,
+      );
+      if (retainedMeasure.retainedTokens > 0 && turnCapTokens - retainedMeasure.retainedTokens < desiredTokens) {
+        yield {
+          type: 'budget-checkpoint-request', reason: 'token-pressure',
+          rounds: budgetState?.rounds ?? iterations, toolCalls: budgetState?.toolCalls ?? 0,
+          pressure: tokenPressureJustification(
+            retainedMeasure.retainedTokens, turnCapTokens, retainedMeasure.quality, 'tool-results',
+          ),
+        };
       }
     }
     if (assistantText !== '' || calls.length > 0) {
@@ -840,18 +905,25 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       finally { leaveToolExecution?.(); }
       deps.preambleBudgeter?.observeToolResult(call.name, call.args, result);
       if (deps.nativeBudget && rawBudget !== undefined && rawBudget > 0) {
-        const retainedBytes = transcript.toProviderMessages().reduce(
-          (total, message) => total + (message.role === 'tool' ? Buffer.byteLength(message.content, 'utf8') : 0), 0,
-        );
         const singleShare = deps.nativeBudget.maxToolResultShareOfContext ?? DEFAULT_NATIVE_AGENT_BUDGET.maxToolResultShareOfContext;
         const turnShare = deps.nativeBudget.maxTurnToolResultShareOfContext ?? DEFAULT_NATIVE_AGENT_BUDGET.maxTurnToolResultShareOfContext;
-        // One UTF-8 byte is the conservative token upper bound. Never multiply
-        // a context allocation by the optimistic chars/4 display estimate.
-        const cap = Math.min(Math.floor(rawBudget * singleShare), Math.floor((Math.floor(rawBudget * turnShare) - retainedBytes) / (calls.length - callIndex)));
+        const turnCapTokens = Math.floor(rawBudget * turnShare);
+        const singleCapTokens = Math.floor(rawBudget * singleShare);
+        // In-flight batch: size against brokered UTF-8 bodies with the same measured
+        // wire ratio — not the conservative full−nonTool probe (that upper-bounds each
+        // body byte as a token and starves large parallel batches mid-turn).
+        const retainedBytes = sumToolResultUtf8Bytes(transcript.toProviderMessages());
+        const retainedTokens = toolResultBytesToTokens(retainedBytes, lastTokensPerUtf8Byte);
+        const remainingTurnTokens = Math.max(0, turnCapTokens - retainedTokens);
+        const perCallTokenCap = Math.min(
+          singleCapTokens,
+          Math.floor(remainingTurnTokens / (calls.length - callIndex)),
+        );
+        const previewBytes = previewBytesFromTokenShare(perCallTokenCap, lastTokensPerUtf8Byte);
         try {
           result = { ...result, output: brokerToolResult(result, {
             store: deps.contentStore ?? { write: () => { throw new Error('Session content store unavailable'); } },
-            maxPreviewBytes: Math.max(1, cap), maxRenderedBytes: cap,
+            maxPreviewBytes: previewBytes, maxRenderedBytes: previewBytes,
           }) };
         } catch (error) {
           if (!(error instanceof ToolResultContextBudgetError)) throw error;
@@ -878,18 +950,22 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     }
     if (deps.nativeBudget && rawBudget !== undefined && rawBudget > 0) {
       const highWater = deps.nativeBudget.contextHighWaterRatio ?? DEFAULT_NATIVE_AGENT_BUDGET.contextHighWaterRatio;
-      const retainedBytes = transcript.toProviderMessages().reduce(
-        (total, message) => total + (message.role === 'tool' ? Buffer.byteLength(message.content, 'utf8') : 0), 0,
-      );
-      const retainedCap = rawBudget * (deps.nativeBudget.maxTurnToolResultShareOfContext ?? DEFAULT_NATIVE_AGENT_BUDGET.maxTurnToolResultShareOfContext);
-      if (await measureMessages(transcript.toProviderMessages()) >= rawBudget * highWater
-        || retainedBytes >= retainedCap * highWater) {
-        const pressureTranscript = digestProviderRequest({ system, messages: transcript.toProviderMessages(), tools: toolSchemas, model });
+      const turnCapTokens = Math.floor(rawBudget * (deps.nativeBudget.maxTurnToolResultShareOfContext ?? DEFAULT_NATIVE_AGENT_BUDGET.maxTurnToolResultShareOfContext));
+      const highWaterWindow = Math.floor(rawBudget * highWater);
+      const highWaterRetained = Math.floor(turnCapTokens * highWater);
+      const messages = transcript.toProviderMessages();
+      const totalMeasured = await measureMessages(messages);
+      const retainedMeasure = await measureRetainedToolResultTokens(messages, measureRequest);
+      if (totalMeasured >= highWaterWindow || retainedMeasure.retainedTokens >= highWaterRetained) {
+        const pressureTranscript = digestProviderRequest({ system, messages, tools: toolSchemas, model });
         if (pressureTranscript !== lastPressureTranscript) {
           lastPressureTranscript = pressureTranscript;
           yield {
             type: 'budget-checkpoint-request', reason: 'token-pressure',
             rounds: budgetState?.rounds ?? iterations, toolCalls: budgetState?.toolCalls ?? 0,
+            pressure: tokenPressureJustification(
+              retainedMeasure.retainedTokens, highWaterRetained, retainedMeasure.quality, 'tool-results',
+            ),
           };
         }
       }

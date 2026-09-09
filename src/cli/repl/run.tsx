@@ -819,6 +819,10 @@ export interface ContextSlashLabels extends NativeRequestMetricLabels {
   preambleFloorAdmitted?: string;
   contextTrigger?: string;
   contextTriggers?: Record<NonNullable<ContextSnapshot['lastContextTrigger']>, string>;
+  toolResultPressure?: string;
+  requestPressure?: string;
+  measurementQualityExact?: string;
+  measurementQualityUpperBound?: string;
   highWater: string;      // "auto-compaction at {percent}% of the window"
   refreshPlanned: string; // "a compaction is planned for the next turn"
   unknown: string;        // "unknown"
@@ -840,6 +844,10 @@ export function buildContextSlashLabels(t: (key: string) => string): ContextSlas
     preambleBudget: t('native-context.slash.preamble_budget'),
     preambleFloorAdmitted: t('native-context.slash.preamble_floor_admitted'),
     contextTrigger: t('native-context.slash.trigger'),
+    toolResultPressure: t('native-context.slash.tool_result_pressure'),
+    requestPressure: t('native-context.slash.request_pressure'),
+    measurementQualityExact: t('native-context.measurement.quality_exact'),
+    measurementQualityUpperBound: t('native-context.measurement.quality_upper_bound'),
     contextTriggers: {
       'token-pressure': t('native-context.trigger.token_pressure'),
       overflow: t('native-context.trigger.overflow'),
@@ -899,6 +907,22 @@ export function formatContextSnapshot(snapshot: ContextSnapshot, labels: Context
   }
   if (snapshot.lastContextTrigger && labels.contextTrigger && labels.contextTriggers) {
     lines.push(`  ${labels.contextTrigger.replace('{trigger}', labels.contextTriggers[snapshot.lastContextTrigger])}`);
+  }
+  if (snapshot.lastCheckpointPressure) {
+    const pressure = snapshot.lastCheckpointPressure;
+    const qualityLabel = pressure.quality === 'exact'
+      ? (labels.measurementQualityExact ?? pressure.quality)
+      : (labels.measurementQualityUpperBound ?? pressure.quality);
+    const template = pressure.scope === 'full-request'
+      ? labels.requestPressure
+      : labels.toolResultPressure;
+    if (template) {
+      lines.push(`  ${template
+        .replace('{retained}', String(pressure.retainedTokens))
+        .replace('{cap}', String(pressure.capTokens))
+        .replace('{window}', String(pressure.windowTokens))
+        .replace('{quality}', qualityLabel)}`);
+    }
   }
   if (snapshot.refreshPlanned) lines.push(`  ${labels.refreshPlanned}`);
   return lines.join('\n');

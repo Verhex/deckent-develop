@@ -17,6 +17,7 @@ import type {
   ProviderRequest,
   ProviderRequestMeasurementCapability,
   RequestMeasurement,
+  RequestMeasurementQuality,
 } from './provider-tooluse/types.js';
 
 const DEFAULT_MEASUREMENT_TIMEOUT_MS = 2_000;
@@ -42,6 +43,90 @@ function stableJson(value: unknown): string {
 export function digestProviderRequest(req: ProviderRequest): string {
   const { signal: _signal, ...wireRequest } = req;
   return createHash('sha256').update(stableJson(wireRequest)).digest('hex');
+}
+
+/** UTF-8 byte length of the provider wire payload (AbortSignal excluded). */
+export function providerRequestWireUtf8Bytes(req: ProviderRequest): number {
+  const { signal: _signal, ...wireRequest } = req;
+  return Buffer.byteLength(stableJson(wireRequest), 'utf8');
+}
+
+/** Sum of UTF-8 byte lengths of all tool-result bodies in `messages`. */
+export function sumToolResultUtf8Bytes(messages: readonly ProviderMessage[]): number {
+  return messages.reduce(
+    (total, message) => total + (message.role === 'tool' ? Buffer.byteLength(message.content, 'utf8') : 0),
+    0,
+  );
+}
+
+/**
+ * Tokens-per-UTF8-byte ratio from a measured request. When measurement quality
+ * is an upper bound this stays conservative for bytes→tokens conversion.
+ */
+export function deriveMeasuredTokensPerUtf8Byte(inputTokens: number, wireUtf8Bytes: number): number {
+  if (!(wireUtf8Bytes > 0) || !(inputTokens >= 0)) return 1;
+  return inputTokens / wireUtf8Bytes;
+}
+
+/** Convert retained tool-result bytes using a measured tokens-per-byte ratio. */
+export function toolResultBytesToTokens(bytes: number, tokensPerUtf8Byte: number): number {
+  if (bytes <= 0) return 0;
+  const ratio = Number.isFinite(tokensPerUtf8Byte) && tokensPerUtf8Byte > 0 ? tokensPerUtf8Byte : 1;
+  return Math.ceil(bytes * ratio);
+}
+
+/** Lower bound on tokens/byte for preview sizing (~4 UTF-8 bytes per token). */
+export const TOOL_RESULT_TOKENS_PER_UTF8_BYTE_FLOOR = 0.25;
+
+/** Shared hard ceiling for tool-result preview and rendered strings. */
+export const TOOL_RESULT_PREVIEW_HARD_MAX_BYTES = 65_536;
+
+/** Preview-byte cap for a token share using the same measured ratio as the loop. */
+export function previewUtf8BytesForTokenBudget(
+  tokenBudget: number,
+  tokensPerUtf8Byte: number,
+  hardMaxBytes = TOOL_RESULT_PREVIEW_HARD_MAX_BYTES,
+): number {
+  if (!(tokenBudget > 0)) return 1;
+  const measured = Number.isFinite(tokensPerUtf8Byte) && tokensPerUtf8Byte > 0 ? tokensPerUtf8Byte : 1;
+  const ratio = Math.max(measured, TOOL_RESULT_TOKENS_PER_UTF8_BYTE_FLOOR);
+  return Math.max(1, Math.min(hardMaxBytes, Math.floor(tokenBudget / ratio)));
+}
+
+export interface RetainedToolResultMeasurement {
+  readonly retainedTokens: number;
+  readonly quality: RequestMeasurementQuality;
+}
+
+/** Conservative retained-tool upper bound: one token per UTF-8 body byte. */
+export function conservativeRetainedToolResultTokens(messages: readonly ProviderMessage[]): number {
+  return sumToolResultUtf8Bytes(messages);
+}
+
+/**
+ * Measure retained tool-result tokens. Uses an exact full−nonTool delta only when
+ * BOTH halves are exact; otherwise falls back to the UTF-8 byte upper bound so a
+ * synthetic non-tool wire (tool_use without tool_result) cannot fail-open to zero.
+ */
+export async function measureRetainedToolResultTokens(
+  allMessages: readonly ProviderMessage[],
+  measure: (messages: readonly ProviderMessage[]) => Promise<RequestMeasurement>,
+): Promise<RetainedToolResultMeasurement> {
+  const toolBytes = sumToolResultUtf8Bytes(allMessages);
+  if (toolBytes === 0) return { retainedTokens: 0, quality: 'exact' };
+  const nonToolMessages = allMessages.filter((message) => message.role !== 'tool');
+  const full = await measure(allMessages);
+  const withoutTools = await measure(nonToolMessages);
+  if (full.quality === 'exact' && withoutTools.quality === 'exact') {
+    return {
+      retainedTokens: Math.max(0, full.inputTokens - withoutTools.inputTokens),
+      quality: 'exact',
+    };
+  }
+  return {
+    retainedTokens: conservativeRetainedToolResultTokens(allMessages),
+    quality: 'conservative-upper-bound',
+  };
 }
 
 /** A tokenizer-independent upper bound. Byte-token tokenizers cannot emit

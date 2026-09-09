@@ -8,7 +8,8 @@ import { createSessionContentStore } from '../../src/agent/tool-result-broker.js
 import { ToolRegistry } from '../../src/agent/tools/registry.js';
 import { SAFE_DEFAULT_POLICY } from '../../src/agent/permission-policy.js';
 import { resolveNativeAgentBudget } from '../../src/core/execution-budget-policy.js';
-import type { ProviderAdapter, ProviderEvent, ProviderRequest } from '../../src/agent/provider-tooluse/types.js';
+import type { ProviderAdapter, ProviderEvent, ProviderMessage, ProviderRequest, RequestMeasurement } from '../../src/agent/provider-tooluse/types.js';
+import { providerRequestWireUtf8Bytes } from '../../src/agent/context-budget.js';
 
 const roots: string[] = [];
 const checkpoint = JSON.stringify({ schemaVersion: 1, objective: 'continue', findings: [], evidenceRefs: [],
@@ -17,6 +18,19 @@ const checkpoint = JSON.stringify({ schemaVersion: 1, objective: 'continue', fin
 const drain = async (input: AsyncIterable<AgentSessionEvent>) => { const out: AgentSessionEvent[] = []; for await (const e of input) out.push(e); return out; };
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 function cwd() { const root = mkdtempSync(join(tmpdir(), 'context-continuity-')); roots.push(root); return root; }
+function wireScaledMeasurement(adapter: ProviderAdapter): ProviderAdapter {
+  return {
+    ...adapter,
+    requestMeasurement: {
+      measure: async (request) => ({
+        inputTokens: Math.ceil(providerRequestWireUtf8Bytes(request) / 4),
+        quality: 'exact',
+        provenance: 'fixture-wire-scaled',
+      }),
+    },
+  };
+}
+
 function base(adapter: ProviderAdapter) {
   return { adapter, cwd: cwd(), model: 'fixture-context', registry: new ToolRegistry(), policy: SAFE_DEFAULT_POLICY,
     ruleStore: { grant() {}, revoke() {}, activeRules: () => [], activeDenies: () => [] },
@@ -350,9 +364,8 @@ describe('large completed batch survives an automatic context epoch', () => {
     const completedCheckpoint = JSON.stringify({ ...JSON.parse(checkpoint),
       findings: ['All 24 inspections completed'], nextActions: ['Report the findings without rerunning inspections'],
     });
-    const adapter: ProviderAdapter = {
+    const adapter: ProviderAdapter = wireScaledMeasurement({
       name: 'large-completed-batch-lineage',
-      requestMeasurement: { async measure() { return { inputTokens: 100, provenance: 'fixture-exact' }; } },
       async *send(request) {
         if (request.system === 'checkpoint-fixture') {
           checkpointCalls++;
@@ -369,7 +382,7 @@ describe('large completed batch survives an automatic context epoch', () => {
         } else yield { type: 'text-delta', text: 'All inspections are complete; reporting findings.' };
         yield { type: 'done', stopReason: 'stop' };
       },
-    };
+    });
     const deps = base(adapter);
     deps.registry.register({ name: 'inspect', description: 'Read the next evidence item', inputSchema: { type: 'object' },
       category: 'coding', tier: 'silent', source: 'builtin',
@@ -377,7 +390,14 @@ describe('large completed batch survives an automatic context epoch', () => {
       handler: async args => { handlerCalls++; return { ok: true, output: outputs.get(String(args.id))! }; },
     });
     const store = createSessionContentStore({ dir: join(deps.cwd, 'large-batch-content') });
-    const session = createAgentSession({ ...deps, nativeBudget: resolveNativeAgentBudget({}), contentStore: store });
+    const session = createAgentSession({
+      ...deps,
+      nativeBudget: resolveNativeAgentBudget({}),
+      contentStore: store,
+      // Wire-scaled window: 24 brokered ~512 B refs exceed the ~1843-token retained
+      // high-water (12288 × 0.20 × 0.75) yet the resumed request still admits (<12288).
+      getContextBudgetTokens: () => 12_288,
+    });
     try {
       const events = await drain(session.send('Inspect the 24 items once, then report findings'));
       expect(events.some(event => event.type === 'error')).toBe(false);
