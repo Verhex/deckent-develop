@@ -27,7 +27,8 @@ import {
 } from '../../core/model-registry.js';
 import { OPENAI_COMPAT_PRESET_META } from '../../providers/openai-compatible.js';
 import type { ModelDefinition, ReasoningControlDescriptor, RegistryProviderName } from '../../core/model-registry-types.js';
-import type { ReasoningControlConfig } from '../../core/config-types.js';
+import type { ExecutionBudgetPolicyConfig, ReasoningControlConfig } from '../../core/config-types.js';
+import { resolveNativeAgentBudget } from '../../core/execution-budget-policy.js';
 import {
   createReasoningControlResolver,
   probeOpenAICompatReasoningControl,
@@ -225,6 +226,8 @@ export type NativeTransportConfig = TransportConfig & {
   };
   /** Resolved direct llama.cpp lifecycle authority shared with the CLI command. */
   local_llm?: { endpoint?: string; contextSize?: number; reasoningControl?: ReasoningControlConfig };
+  /** 7108-b: `native_agent.reasoningProbeTimeoutMs` bounds the live descriptor probe. */
+  execution_budget?: ExecutionBudgetPolicyConfig;
 };
 
 /** What a /model — /provider switch (or the settings pin) asks for. */
@@ -722,15 +725,21 @@ export function resolveNativeSelection(
         contextProvenance: server ? 'server-reported' : configured ? 'configured-narrowing' : 'model-registry',
       };
     };
+    // 7108-b: the probe is bounded by the config-resolved deadline AND the
+    // turn's abort signal — a cold or wedged server can never hang the first
+    // descriptor await; the outcome is a typed `unknown` (never cached).
+    const reasoningProbeTimeoutMs = resolveNativeAgentBudget({ policy: config.execution_budget }).reasoningProbeTimeoutMs;
     const reasoningControl = createReasoningControlResolver({
       ...(configuredReasoningControl ? { configured: configuredReasoningControl } : {}),
-      probe: (wireModel) => probeOpenAICompatReasoningControl({ endpoint, model: wireModel, fetchFn }),
+      probe: (wireModel, signal) => probeOpenAICompatReasoningControl({
+        endpoint, model: wireModel, fetchFn, timeoutMs: reasoningProbeTimeoutMs, ...(signal ? { signal } : {}),
+      }),
     });
     return {
       ...measuredResolved({
         adapter: createOpenAIAdapter({
           baseUrl: endpoint, name: 'local-llm',
-          reasoningControl: (wireModel) => reasoningControl.resolve(wireModel),
+          reasoningControl: (wireModel, signal) => reasoningControl.resolve(wireModel, signal),
         }),
         model: selectedModel,
         providerName: 'local-llm',

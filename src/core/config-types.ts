@@ -975,6 +975,10 @@ export interface NativeAgentBudgetConfig {
   /** 7108: base backoff between transport retries (multiplied by the attempt
    *  index). Positive integer milliseconds. */
   transportRetryBackoffMs?: number;
+  /** 7108-b: overall deadline for the live reasoning-control probe (`/props`)
+   *  a native turn may wait on before planning with `unknown`. Positive
+   *  integer milliseconds; default 2000. */
+  reasoningProbeTimeoutMs?: number;
 }
 
 /**

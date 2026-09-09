@@ -50,7 +50,10 @@ export type ReasoningToggleDescriptor =
   /** No evidence either way — the honest default; nothing is put on the wire. */
   | { readonly kind: 'unknown' };
 
-export type ReasoningControlProvenance = 'configured' | 'server-reported' | 'catalog' | 'unknown';
+/** `probe-timeout` / `probe-aborted` (7108-b): the live probe did not finish —
+ *  the descriptor is `unknown` in every other respect and is never cached. */
+export type ReasoningControlProvenance =
+  | 'configured' | 'server-reported' | 'catalog' | 'unknown' | 'probe-timeout' | 'probe-aborted';
 
 export interface ReasoningControlDescriptor {
   readonly toggle: ReasoningToggleDescriptor;

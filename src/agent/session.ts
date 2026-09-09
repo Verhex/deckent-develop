@@ -860,7 +860,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   async function turnOutputCeilingTokens(adapter: ProviderAdapter, model: string): Promise<number> {
     if (!deps.nativeBudget) return 0;
     return planReasoning({
-      policy: contextBudget.reasoning, descriptor: await resolveAdapterReasoningControl(adapter, model),
+      policy: contextBudget.reasoning, descriptor: await resolveAdapterReasoningControl(adapter, model, turnAbort?.signal),
       structured: false, visibleReserveTokens: contextBudget.outputReserveTokens,
     }).outputCeilingTokens;
   }

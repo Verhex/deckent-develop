@@ -3816,14 +3816,26 @@ const BASE_MESSAGES: MessageMap = {
     en: 'retrying the same request once with a raised output ceiling',
     tr: 'aynı istek yükseltilmiş çıktı tavanıyla bir kez yeniden deneniyor',
   },
+  'native.reasoning_exhausted.retry-unadmissible': {
+    en: 'The model spent its output ceiling ({ceiling} tokens) on ~{reasoningTokens} tokens of hidden reasoning with no visible text, and the raised ceiling ({raised} tokens) cannot fit the context window while preserving the preamble and transcript reserves — the turn was ended without a retry. Set reasoning.mode to "off", lower reasoning.exhaustedRetryBudgetTokens, or start a fresh context epoch (/renew).',
+    tr: 'Model çıktı tavanını ({ceiling} token) ~{reasoningTokens} token gizli akıl yürütmeye harcadı, görünür metin üretmedi ve yükseltilmiş tavan ({raised} token) preamble ile transcript rezervleri korunarak bağlam penceresine sığmıyor — tur yeniden deneme yapılmadan sonlandırıldı. reasoning.mode değerini "off" yapın, reasoning.exhaustedRetryBudgetTokens değerini düşürün veya yeni bir bağlam dönemi başlatın (/renew).',
+  },
   'native.reasoning_exhausted': {
     en: 'The retry also ended at the output ceiling ({ceiling} tokens) with ~{reasoningTokens} tokens of hidden reasoning and no visible text — the turn was ended. Lower execution_budget.native_agent.reasoning, set reasoning.mode to "off", or ask a narrower question.',
     tr: 'Yeniden deneme de ~{reasoningTokens} token gizli akıl yürütmeyle çıktı tavanında ({ceiling} token) bitti ve görünür metin üretmedi — tur sonlandırıldı. execution_budget.native_agent.reasoning değerini düşürün, reasoning.mode değerini "off" yapın veya daha dar bir soru sorun.',
   },
   // 7108 §3 — typed transport failure with the REAL socket cause (undici cause chain).
   'native.transport-failure': {
-    en: 'Connection to the provider dropped ({code}) — retried {retries} time(s) and failed again; the turn ended without a reply. Check that the endpoint is up and try again.',
-    tr: 'Sağlayıcıyla bağlantı koptu ({code}) — {retries} kez yeniden denendi ve yine başarısız oldu; tur yanıtsız sonlandı. Endpoint\'in ayakta olduğunu doğrulayıp tekrar deneyin.',
+    en: 'Connection to the provider dropped ({code}) — retried {retries} time(s) (transportRetry = {configured}) and failed again; the turn ended without a reply. Check that the endpoint is up and try again.',
+    tr: 'Sağlayıcıyla bağlantı koptu ({code}) — {retries} kez yeniden denendi (transportRetry = {configured}) ve yine başarısız oldu; tur yanıtsız sonlandı. Endpoint\'in ayakta olduğunu doğrulayıp tekrar deneyin.',
+  },
+  'native.transport-failure.permanent': {
+    en: 'Connection to the provider failed ({code}) — this failure is not transient (certificate, DNS or an unknown cause), so it was not retried; the turn ended without a reply. Fix the endpoint/TLS configuration and try again.',
+    tr: 'Sağlayıcıyla bağlantı başarısız oldu ({code}) — bu hata geçici değil (sertifika, DNS veya bilinmeyen bir neden), bu yüzden yeniden denenmedi; tur yanıtsız sonlandı. Endpoint/TLS yapılandırmasını düzeltip tekrar deneyin.',
+  },
+  'native.transport-failure.not-authorized': {
+    en: 'Connection to the provider dropped ({code}) and was not retried because execution_budget.native_agent.transportRetry is {configured}; the turn ended without a reply. Raise transportRetry (max 3) to allow bounded retries.',
+    tr: 'Sağlayıcıyla bağlantı koptu ({code}) ve execution_budget.native_agent.transportRetry değeri {configured} olduğu için yeniden denenmedi; tur yanıtsız sonlandı. Sınırlı yeniden denemeye izin vermek için transportRetry değerini yükseltin (en fazla 3).',
   },
   'native.transport-failure.no-retry': {
     en: 'Connection to the provider failed ({code}) during the {phase} phase and was not retried (a retry after the response started could duplicate output); the turn ended without a reply.',

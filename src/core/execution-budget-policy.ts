@@ -52,6 +52,8 @@ export interface ResolvedNativeAgentBudget {
   readonly transportRetry: number;
   /** 7108: base backoff between transport retries, milliseconds. */
   readonly transportRetryBackoffMs: number;
+  /** 7108-b: overall deadline of the live reasoning-control probe, milliseconds. */
+  readonly reasoningProbeTimeoutMs: number;
 }
 
 export type NativeReasoningMode = 'auto' | 'off' | 'on';
@@ -65,8 +67,10 @@ export interface ResolvedNativeReasoningPolicy {
   readonly exhaustedRetryBudgetTokens: number;
 }
 
-/** Hard upper bound for `transportRetry` — a transport hiccup is retried a
- *  bounded number of times, never looped. */
+/** Hard upper bound for `transportRetry` — the CONFIGURED number of retries for
+ *  a transient transport failure (0 = never retry, N = up to N retries before
+ *  the typed error); never a loop, and every user-facing line reports the
+ *  configured/performed count rather than assuming "once". */
 export const MAX_NATIVE_TRANSPORT_RETRY = 3;
 
 /** Bounded deep/extended defaults. Rationale (owner RCA 2026-08-17): a healthy
@@ -101,6 +105,9 @@ export const DEFAULT_NATIVE_AGENT_BUDGET: ResolvedNativeAgentBudget = Object.fre
   reasoning: Object.freeze({ mode: 'auto' as const, budgetTokens: 8_192, exhaustedRetryBudgetTokens: 16_384 }),
   transportRetry: 1,
   transportRetryBackoffMs: 250,
+  // 7108-b: the first descriptor await must never hang a turn — same bound as
+  // the request-measurement capability (agent/context-budget.ts).
+  reasoningProbeTimeoutMs: 2_000,
 });
 
 const NATIVE_AGENT_BUDGET_FIELDS = Object.keys(DEFAULT_NATIVE_AGENT_BUDGET) as

@@ -118,7 +118,48 @@ export interface ReasoningControlProbeInput {
   endpoint: string;
   model: string;
   fetchFn?: typeof globalThis.fetch;
+  /** The caller's (turn) abort signal — a cancelled turn cancels the probe. */
   signal?: AbortSignal;
+  /** Overall probe deadline (both `/props` requests together). Config-resolved
+   *  (`execution_budget.native_agent.reasoningProbeTimeoutMs`); absent → the
+   *  same bounded default the request-measurement capability uses. */
+  timeoutMs?: number;
+}
+
+/** Default overall deadline for the live probe (mirrors the measurement
+ *  capability's 2 s bound in agent/context-budget.ts). */
+export const DEFAULT_REASONING_PROBE_TIMEOUT_MS = 2_000;
+
+/** Typed no-evidence outcomes of a probe that did not finish (7108-b): never
+ *  cached, never anything but `unknown` for planning purposes. */
+export const PROBE_TIMEOUT_REASONING_CONTROL: ReasoningControlDescriptor = Object.freeze({
+  toggle: Object.freeze({ kind: 'unknown' as const }),
+  sharesCompletionBudget: 'unknown' as const,
+  provenance: 'probe-timeout' as const,
+});
+export const PROBE_ABORTED_REASONING_CONTROL: ReasoningControlDescriptor = Object.freeze({
+  toggle: Object.freeze({ kind: 'unknown' as const }),
+  sharesCompletionBudget: 'unknown' as const,
+  provenance: 'probe-aborted' as const,
+});
+
+/** Compose the caller's signal with an overall deadline. Every fetch the probe
+ *  makes carries the composed signal, so an omitted caller signal still yields
+ *  a bounded request (never an unbounded hang on the first descriptor await). */
+function withProbeDeadline(signal: AbortSignal | undefined, timeoutMs: number): {
+  signal: AbortSignal; timedOut: () => boolean; release: () => void;
+} {
+  const controller = new AbortController();
+  let timedOut = false;
+  const onAbort = (): void => controller.abort();
+  if (signal?.aborted) controller.abort();
+  else signal?.addEventListener('abort', onAbort, { once: true });
+  const timer = setTimeout(() => { timedOut = true; controller.abort(); }, Math.max(0, timeoutMs));
+  return {
+    signal: controller.signal,
+    timedOut: () => timedOut,
+    release: () => { clearTimeout(timer); signal?.removeEventListener('abort', onAbort); },
+  };
 }
 
 /** The template token whose presence proves the server-side switch exists. */
@@ -142,8 +183,15 @@ export async function probeOpenAICompatReasoningControl(
   const fetchFn = input.fetchFn ?? globalThis.fetch;
   const rootEndpoint = input.endpoint.replace(/\/v1\/?$/u, '');
   const base = rootEndpoint.endsWith('/') ? rootEndpoint : `${rootEndpoint}/`;
+  const deadline = withProbeDeadline(input.signal, input.timeoutMs ?? DEFAULT_REASONING_PROBE_TIMEOUT_MS);
+  /** Typed outcome when the composed signal fired: the caller's abort wins over the deadline. */
+  const interrupted = (): ReasoningControlDescriptor | null => {
+    if (input.signal?.aborted) return PROBE_ABORTED_REASONING_CONTROL;
+    if (deadline.timedOut()) return PROBE_TIMEOUT_REASONING_CONTROL;
+    return null;
+  };
   const read = async (url: string): Promise<{ chatTemplate: string | null; llamaCpp: boolean } | null> => {
-    const response = await fetchFn(url, input.signal ? { signal: input.signal } : undefined);
+    const response = await fetchFn(url, { signal: deadline.signal });
     if (!response.ok) return null;
     const body = await response.json() as { chat_template?: unknown; default_generation_settings?: unknown };
     if (!isPlainObject(body)) return null;
@@ -154,9 +202,11 @@ export async function probeOpenAICompatReasoningControl(
   };
   try {
     let evidence = await read(new URL(`props?model=${encodeURIComponent(input.model)}`, base).toString()).catch(() => null);
+    if (deadline.signal.aborted) return interrupted();
     if (evidence === null || (evidence.chatTemplate === null && !evidence.llamaCpp)) {
       evidence = await read(new URL('props', base).toString()).catch(() => null);
     }
+    if (deadline.signal.aborted) return interrupted();
     if (evidence === null) return null;
     if (evidence.chatTemplate === null && !evidence.llamaCpp) return null;
     const toggle: ReasoningToggleDescriptor = evidence.chatTemplate === null
@@ -170,7 +220,9 @@ export async function probeOpenAICompatReasoningControl(
       provenance: 'server-reported' as const,
     });
   } catch {
-    return null;
+    return interrupted();
+  } finally {
+    deadline.release();
   }
 }
 
@@ -185,8 +237,9 @@ export function resolveModelReasoningControl(
 }
 
 export interface ReasoningControlResolver {
-  /** Descriptor for `model` — configured > registry (known) > live probe > unknown. */
-  resolve(model: string): Promise<ReasoningControlDescriptor>;
+  /** Descriptor for `model` — configured > registry (known) > live probe > unknown.
+   *  `signal` (the turn's abort) cancels an in-flight probe. */
+  resolve(model: string, signal?: AbortSignal): Promise<ReasoningControlDescriptor>;
 }
 
 /**
@@ -197,13 +250,13 @@ export interface ReasoningControlResolver {
 export function createReasoningControlResolver(input: {
   configured?: ReasoningControlDescriptor | undefined;
   registry?: ModelRegistry;
-  probe?: (model: string) => Promise<ReasoningControlDescriptor | null>;
+  probe?: (model: string, signal?: AbortSignal) => Promise<ReasoningControlDescriptor | null>;
 }): ReasoningControlResolver {
   const registry = input.registry ?? modelRegistry;
   const probed = new Map<string, ReasoningControlDescriptor>();
   const inFlight = new Map<string, Promise<ReasoningControlDescriptor | null>>();
   return {
-    async resolve(model) {
+    async resolve(model, signal) {
       if (input.configured) return input.configured;
       const fromRegistry = resolveModelReasoningControl(model, registry);
       if (isKnownReasoningControl(fromRegistry)) return fromRegistry;
@@ -212,16 +265,18 @@ export function createReasoningControlResolver(input: {
       if (!input.probe) return UNKNOWN_REASONING_CONTROL;
       let pending = inFlight.get(model);
       if (!pending) {
-        pending = input.probe(model).catch(() => null);
+        pending = input.probe(model, signal).catch(() => null);
         inFlight.set(model, pending);
       }
       try {
         const result = await pending;
+        // Only REAL evidence is memoized: a timed-out / aborted / failed probe
+        // returns its typed no-evidence descriptor and is probed again next time.
         if (result && isKnownReasoningControl(result)) {
           probed.set(model, result);
           return result;
         }
-        return UNKNOWN_REASONING_CONTROL;
+        return result ?? UNKNOWN_REASONING_CONTROL;
       } finally {
         inFlight.delete(model);
       }

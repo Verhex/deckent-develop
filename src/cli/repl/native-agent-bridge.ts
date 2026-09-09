@@ -542,8 +542,11 @@ const NATIVE_AGENT_SIGNAL_KEYS = new Set([
   // 7108 — reasoning exhaustion + typed transport failure (vars-interpolated).
   'native.reasoning_exhausted_output_ceiling',
   'native.reasoning_exhausted',
+  'native.reasoning_exhausted.retry-unadmissible',
   'native.transport-failure',
   'native.transport-failure.no-retry',
+  'native.transport-failure.permanent',
+  'native.transport-failure.not-authorized',
   INPUT_CONTEXT_OVERFLOW_KEY,
   CONTINUATION_EXHAUSTED_KEY,
 ]);

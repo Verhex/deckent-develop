@@ -93,13 +93,28 @@ export function planReasoningExhaustionRecovery(
 export async function resolveAdapterReasoningControl(
   adapter: ProviderAdapter,
   model: string,
+  signal?: AbortSignal,
 ): Promise<ReasoningControlDescriptor | undefined> {
   if (!adapter.reasoningControl) return undefined;
   try {
-    return (await adapter.reasoningControl(model)) ?? undefined;
+    return (await adapter.reasoningControl(model, signal)) ?? undefined;
   } catch {
     return undefined;
   }
+}
+
+/**
+ * 7108-b — when a raised-ceiling retry cannot be admitted (the raised ceiling
+ * would break the preamble/transcript reserves), the only other lever is
+ * switching thinking off — allowed solely under `auto` with a toggleable
+ * descriptor and thinking actually requested; forced `on` and a backend that
+ * already ignored `off` leave nothing but the typed hold.
+ */
+export function planReasoningRaiseFallback(
+  plan: ReasoningPlan,
+  policy: ResolvedNativeReasoningPolicy | undefined,
+): 'retry-reasoning-off' | 'none' {
+  return policy?.mode === 'auto' && plan.thinkingRequested && plan.toggleable ? 'retry-reasoning-off' : 'none';
 }
 
 /** Conservative chars→tokens projection for the live indicator (display only). */

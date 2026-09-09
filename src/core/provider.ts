@@ -15,6 +15,7 @@ import {
   type ModelRegistry,
 } from './model-registry.js';
 import { probeOpenAICompatReasoningControl, validateReasoningControlConfig } from './reasoning-control.js';
+import { resolveNativeAgentBudget } from './execution-budget-policy.js';
 import { resolveActiveModelPolicy, emptyModelActivationPolicy } from './model-activation-store.js';
 import type { TokenUsage } from './token-usage.js';
 import { DeckBroker } from './deck-broker.js';
@@ -1472,6 +1473,8 @@ export interface BootstrapResult {
  */
 export async function bootstrapProviders(
   config: Pick<ResolvedConfig, 'brain_provider' | 'worker_provider' | 'fallback_provider' | 'projectRoot' | 'providers'> & {
+    /** 7108-b: `native_agent.reasoningProbeTimeoutMs` bounds the boot-time descriptor probe. */
+    execution_budget?: ResolvedConfig['execution_budget'];
     auth_mode?: 'subscription' | 'api' | 'hybrid';
     /**
      * DECKBROKER-WIRE (354-006, flag-gated DEFAULT-OFF, ADR-G-005/G-017 row
@@ -1662,6 +1665,7 @@ export async function bootstrapProviders(
               credentialEnvKeys,
             });
         if (candidate.executionCostClass === 'local') {
+          const probeTimeoutMs = resolveNativeAgentBudget({ policy: config.execution_budget }).reasoningProbeTimeoutMs;
           const checkedAtMs = Date.now();
           const [healthy, modelIds] = await Promise.all([
             adapter.probeHealth(),
@@ -1673,7 +1677,7 @@ export async function bootstrapProviders(
             // honest `unknown` (attached by ensureLocalLlmModelRegistered).
             const reasoningControl = candidate.reasoningControl
               ?? (healthy
-                ? await probeOpenAICompatReasoningControl({ endpoint: candidate.baseURL!, model: modelId })
+                ? await probeOpenAICompatReasoningControl({ endpoint: candidate.baseURL!, model: modelId, timeoutMs: probeTimeoutMs })
                 : null);
             ensureLocalLlmModelRegistered(
               modelId,

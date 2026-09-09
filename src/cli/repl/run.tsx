@@ -1628,6 +1628,8 @@ export async function runInkRepl(
     ollama_host?: string;
     providers?: NativeTransportConfig['providers'];
     local_llm?: NativeTransportConfig['local_llm'];
+    /** 7108-b: `native_agent.reasoningProbeTimeoutMs` bounds the live descriptor probe. */
+    execution_budget?: ResolvedConfig['execution_budget'];
   } = {};
   let configLoadFailed = false;
   if (onBootSelection?.projectConfig) {
@@ -1672,6 +1674,7 @@ export async function runInkRepl(
       native_context_tokens: projectCfg.native_context_tokens,
       providers: projectCfg.providers,
       local_llm: projectCfg.local_llm,
+      execution_budget: projectCfg.execution_budget,
     };
     deckSecrets = loadDeckSecrets(process.cwd());
     nativeBoot = resolveNativeProvider(

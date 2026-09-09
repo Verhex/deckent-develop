@@ -64,8 +64,9 @@ describe('classifyTransportFailure', () => {
     expect(isAbortError(Object.assign(new Error('a'), { code: 'UND_ERR_ABORTED' }))).toBe(true);
   });
   it('ProviderTransportError message carries the real code and the retry count', () => {
-    const err = new ProviderTransportError('openai-compatible', 'connect', classifyTransportFailure(undiciError('ECONNRESET', { syscall: 'read' }), 'connect'), 2);
-    expect(err.message).toBe('openai-compatible connect failed — fetch failed (class=reset code=ECONNRESET syscall=read) — retried 1×');
+    const err = new ProviderTransportError('openai-compatible', 'connect', classifyTransportFailure(undiciError('ECONNRESET', { syscall: 'read' }), 'connect'), 2, 1);
+    expect(err.message).toBe('openai-compatible connect failed — fetch failed (class=reset code=ECONNRESET syscall=read) — retried 1× of 1 configured');
+    expect(err.noRetryReason).toBe('exhausted');
     expect(err.retries).toBe(1);
     expect(err.code).toBe('PROVIDER_TRANSPORT_FAILURE');
   });
@@ -96,7 +97,8 @@ describe('createOpenAIAdapter — bounded transport retry', () => {
       err instanceof ProviderTransportError
       && err.attempts === 2 && err.retries === 1 && err.phase === 'connect'
       && err.failure.code === 'ECONNRESET' && err.failure.class === 'reset' && err.failure.errno === -104
-      && /openai-compatible connect failed — fetch failed \(class=reset code=ECONNRESET syscall=read\) — retried 1×/.test(err.message));
+      && err.retryBudget === 1 && err.noRetryReason === 'exhausted'
+      && /openai-compatible connect failed — fetch failed \(class=reset code=ECONNRESET syscall=read\) — retried 1× of 1 configured/.test(err.message));
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
@@ -178,7 +180,10 @@ describe('runAgentTurn — typed transport error reaches the view with vars', ()
     const error = events.find((e) => e.type === 'error');
     expect(error).toMatchObject({
       type: 'error', code: 'native.transport-failure',
-      vars: { code: 'ECONNRESET', class: 'reset', retries: String(DEFAULT_NATIVE_AGENT_BUDGET.transportRetry), phase: 'connect' },
+      vars: {
+        code: 'ECONNRESET', class: 'reset', retries: String(DEFAULT_NATIVE_AGENT_BUDGET.transportRetry),
+        configured: String(DEFAULT_NATIVE_AGENT_BUDGET.transportRetry), phase: 'connect',
+      },
     });
     expect(events[events.length - 1]).toEqual({ type: 'turn-end' });
   });

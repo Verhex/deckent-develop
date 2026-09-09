@@ -163,7 +163,11 @@ describe('exhaustion recovery — ONE bounded retry of the SAME request', () => 
       { ...deps(adapter, B), getContextBudgetTokens: () => window }, new Transcript(), 'go',
     ));
     expect(requests).toHaveLength(1);
-    expect(events.find((e) => e.type === 'error')).toMatchObject({ code: 'native-context.admission-denied' });
+    // 7108-b: an unadmissible raise is its own typed hold (never a stale-preamble request).
+    expect(events.find((e) => e.type === 'error')).toMatchObject({
+      code: 'native.reasoning_exhausted.retry-unadmissible',
+      vars: { ceiling: String(B.outputReserveTokens + B.reasoning.budgetTokens), raised: String(B.outputReserveTokens + B.reasoning.exhaustedRetryBudgetTokens) },
+    });
   });
 
   it('legacy caller (no native budget) keeps the classic continuation path', async () => {

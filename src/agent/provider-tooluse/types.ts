@@ -140,7 +140,7 @@ export type ProviderEvent = ProviderTextDelta | ProviderToolCall | ProviderUsage
  *  the transport reads it to map {@link ReasoningDirective} onto the wire.
  *  Absent, or resolving to an `unknown` descriptor, means "no evidence". */
 export type ProviderReasoningControlCapability =
-  (model: string) => ReasoningControlDescriptor | undefined | Promise<ReasoningControlDescriptor | undefined>;
+  (model: string, signal?: AbortSignal) => ReasoningControlDescriptor | undefined | Promise<ReasoningControlDescriptor | undefined>;
 
 /** Every LLM backend (Anthropic/OpenAI-compat/Ollama) implements this. */
 export interface ProviderAdapter {

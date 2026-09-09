@@ -229,13 +229,18 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
       // this adapter was handed. No descriptor / unknown toggle → no field.
       if (req.reasoning && opts.reasoningControl) {
         let descriptor: ReasoningControlDescriptor | undefined;
-        try { descriptor = (await opts.reasoningControl(req.model)) ?? undefined; } catch { descriptor = undefined; }
+        // 7108-b — the turn's abort signal reaches the in-send descriptor lookup
+        // (and its probe) exactly like the loop's first lookup: cancellation is
+        // never delayed by a second /props round-trip.
+        try { descriptor = (await opts.reasoningControl(req.model, req.signal)) ?? undefined; } catch { descriptor = undefined; }
         Object.assign(body, mapReasoningDirectiveToWire(req.reasoning, descriptor, body));
       }
 
-      // 7108 §3 — bounded retry for TRANSIENT failures that happen before any
-      // response byte arrived (connect refused/reset/timeout). The retry budget
-      // is the caller's (config-resolved); absent → exactly one attempt.
+      // 7108 §3 — bounded retry (up to the caller's CONFIGURED count, 0..N) for
+      // allowlisted TRANSIENT failures that happen before any response byte
+      // arrived (reset/refused/timeout). Absent budget → exactly one attempt;
+      // an abort anywhere in the cause chain or a permanent (TLS/DNS) code is
+      // never retried (7108-b).
       const retryBudget = req.transportRetry?.attempts ?? 0;
       const backoffMs = req.transportRetry?.backoffMs ?? 0;
       let attempts = 0;
@@ -262,7 +267,7 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
             await sleepWithSignal(backoffMs * attempts, req.signal);
             continue;
           }
-          throw new ProviderTransportError(TRANSPORT_LABEL, 'connect', failure, attempts);
+          throw new ProviderTransportError(TRANSPORT_LABEL, 'connect', failure, attempts, retryBudget);
         }
       }
       if (!resp.ok || !resp.body) {
@@ -310,7 +315,7 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
         // already have generated part of the answer); it is surfaced typed, with
         // the real socket cause, instead of an undici wrapper string.
         if (isAbortError(cause)) throw cause;
-        throw new ProviderTransportError(TRANSPORT_LABEL, 'stream', classifyTransportFailure(cause, 'stream'), attempts);
+        throw new ProviderTransportError(TRANSPORT_LABEL, 'stream', classifyTransportFailure(cause, 'stream'), attempts, retryBudget);
       }
       // Stream ended (via [DONE] or close) without a `finish_reason:'tool_calls'`
       // chunk — flush any tool calls still accumulated so they are never dropped.

@@ -13,6 +13,7 @@ import {
   approximateReasoningTokens,
   planReasoning,
   planReasoningExhaustionRecovery,
+  planReasoningRaiseFallback,
   resolveAdapterReasoningControl,
 } from './reasoning-control.js';
 import { composeSystemPrompt } from './identity.js';
@@ -62,6 +63,14 @@ import type { NativeToolApprovalClassification } from './tools/types.js';
 import { ALL_APPROVAL_RISKS, ALL_APPROVAL_SCOPES } from '../core/approval-contract.js';
 
 const MAX_OUTPUT_CONTINUATIONS = 2;
+
+/** 7108-b — carries an UNRELATED fault thrown by the preamble authority while
+ *  the exhaustion retry is being re-prepared inside the provider try/catch, so
+ *  it can be rethrown as-is instead of being relabeled a provider failure
+ *  (7106 contract: preparation faults never masquerade as anything else). */
+class UnrelatedPreparationFault extends Error {
+  constructor(readonly fault: unknown) { super('unrelated preparation fault'); this.name = 'UnrelatedPreparationFault'; }
+}
 const CONTINUATION_INSTRUCTION = 'Continue the same answer exactly where it stopped. Do not repeat prior visible text.';
 
 function isValidApprovalClassification(value: NativeToolApprovalClassification): boolean {
@@ -257,7 +266,12 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     // same number feeds prompt fitting, admission and the wire, so a thinking
     // model can no longer spend the whole visible reserve on reasoning.
     const reasoningPolicy = deps.nativeBudget?.reasoning;
-    const reasoningDescriptor = reasoningPolicy ? await resolveAdapterReasoningControl(adapter, model) : undefined;
+    // 7108-b: the descriptor await rides the turn's abort signal (and the
+    // config-resolved probe deadline inside the transport) — never an
+    // unbounded hang before the first request.
+    const reasoningDescriptor = reasoningPolicy
+      ? await resolveAdapterReasoningControl(adapter, model, deps.getTurnSignal?.())
+      : undefined;
     const reasoningPlan = planReasoning({
       policy: reasoningPolicy, descriptor: reasoningDescriptor, structured: false,
       visibleReserveTokens: deps.nativeBudget?.outputReserveTokens ?? 0,
@@ -453,7 +467,7 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     let continuationMessages = messages;
     // 7108 — the ONE bounded reasoning-exhaustion retry: fields it overrides on
     // the otherwise identical request (reasoning off, or a raised ceiling).
-    let reasoningRetryOverride: Pick<ProviderRequest, 'reasoning' | 'outputCeilingTokens'> = {};
+    let reasoningRetryOverride: Partial<Pick<ProviderRequest, 'reasoning' | 'outputCeilingTokens' | 'system' | 'tools'>> = {};
     let reasoningRetryUsed = false;
     try {
       while (true) {
@@ -565,14 +579,61 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
             return;
           }
           reasoningRetryUsed = true;
+          let action: 'retry-reasoning-off' | 'retry-raised-ceiling' = recovery.kind;
           if (recovery.kind === 'retry-raised-ceiling') {
+            // 7108-b: a raised ceiling shrinks the preamble hard limit and the
+            // transcript room — the retry must be re-prepared through the SAME
+            // preamble-budget authority (reduced preamble or typed hold) and
+            // re-admitted against the raised ceiling. Never a request that
+            // breaks the transcript/preamble reserves, never a stale preamble.
+            const exhaustedCeiling = outputCeilingTokens;
             outputCeilingTokens = recovery.outputCeilingTokens;
-            reasoningRetryOverride = { outputCeilingTokens };
-            // The raised ceiling must still be admissible: never ship a doomed call.
-            if (overContext(await measureMessages(continuationMessages))) {
-              yield { type: 'error', code: 'native-context.admission-denied', message: 'native-context.admission-denied' };
-              yield { type: 'turn-end' };
-              return;
+            let admitted = true;
+            let raisedSystem = system;
+            let raisedTools = toolSchemas;
+            if (deps.preambleBudgeter && rawBudget !== undefined && rawBudget > 0) {
+              try {
+                const prepared = await deps.preambleBudgeter.prepare({
+                  compose: {cwd: deps.cwd, lang: deps.lang,
+                    ...(deps.scratchDir ? {scratchDir: deps.scratchDir} : {})},
+                  tools: deps.getProviderToolSchemas?.() ?? deps.registry.toNativeSchemas(),
+                  adapter, model, window: rawBudget,
+                  outputCeilingTokens, safetyReserveTokens: contextSafetyReserveTokens,
+                });
+                raisedSystem = prepared.system; raisedTools = prepared.tools;
+              } catch (error) {
+                if (!(error instanceof PreambleBudgetError)) throw new UnrelatedPreparationFault(error);
+                admitted = false;
+              }
+            }
+            if (admitted) {
+              // Admission reads the current bindings: measure the retry exactly as it would ship.
+              const previousSystem = system; const previousTools = toolSchemas;
+              system = raisedSystem; toolSchemas = raisedTools;
+              admitted = !overContext(await measureMessages(continuationMessages));
+              if (!admitted) { system = previousSystem; toolSchemas = previousTools; }
+            }
+            if (admitted) {
+              reasoningRetryOverride = { outputCeilingTokens, system, tools: toolSchemas };
+            } else {
+              outputCeilingTokens = exhaustedCeiling;
+              const fallback = planReasoningRaiseFallback(reasoningPlan, reasoningPolicy);
+              if (fallback === 'none') {
+                yield {
+                  type: 'generation-recovery', classification,
+                  continuationIndex, maxContinuations: MAX_OUTPUT_CONTINUATIONS,
+                  hiddenReasoningObserved, action: 'hold',
+                };
+                yield {
+                  type: 'error', code: 'native.reasoning_exhausted.retry-unadmissible',
+                  message: 'native.reasoning_exhausted.retry-unadmissible',
+                  vars: { reasoningTokens, ceiling: String(exhaustedCeiling), raised: String(recovery.outputCeilingTokens) },
+                };
+                yield { type: 'turn-end' };
+                return;
+              }
+              action = fallback;
+              reasoningRetryOverride = { reasoning: { mode: 'off' } };
             }
           } else {
             reasoningRetryOverride = { reasoning: { mode: 'off' } };
@@ -580,12 +641,12 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
           yield {
             type: 'generation-recovery', classification,
             continuationIndex, maxContinuations: MAX_OUTPUT_CONTINUATIONS,
-            hiddenReasoningObserved, action: recovery.kind,
+            hiddenReasoningObserved, action,
           };
           yield {
             type: 'notice', code: 'native.reasoning_exhausted_output_ceiling',
             message: 'native.reasoning_exhausted_output_ceiling',
-            vars: { action: recovery.kind, reasoningTokens, ceiling: String(outputCeilingTokens) },
+            vars: { action, reasoningTokens, ceiling: String(outputCeilingTokens) },
           };
           continue;
         }
@@ -612,6 +673,8 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         ];
       }
     } catch (e) {
+      // 7108-b — an unrelated preamble-preparation fault surfaces as itself.
+      if (e instanceof UnrelatedPreparationFault) throw e.fault;
       // TERMINAL-TOOLS-008 — an aborted stream is the user's own cancel, not a
       // provider failure: end the turn honestly, never as an 'error' event.
       if (deps.isCancelled?.() || (e instanceof Error && e.name === 'AbortError')) {
@@ -622,11 +685,23 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       // whether the bounded retry already ran, so the view can say
       // "connection dropped (ECONNRESET) — retried once" instead of "fetch failed".
       if (e instanceof ProviderTransportError) {
+        // 7108-b: the code names the honest reason — retried N× (configured
+        // count), not retried because the response had started, because the
+        // failure is permanent (TLS/DNS/unknown), or because transportRetry=0.
+        const codeByReason = {
+          exhausted: 'native.transport-failure',
+          'stream-phase': 'native.transport-failure.no-retry',
+          permanent: 'native.transport-failure.permanent',
+          'not-authorized': 'native.transport-failure.not-authorized',
+        } as const;
         yield {
           type: 'error',
-          code: e.retries > 0 ? 'native.transport-failure' : 'native.transport-failure.no-retry',
+          code: codeByReason[e.noRetryReason],
           message: e.message,
-          vars: { code: e.failure.code ?? e.failure.class, class: e.failure.class, retries: String(e.retries), phase: e.phase },
+          vars: {
+            code: e.failure.code ?? e.failure.class, class: e.failure.class,
+            retries: String(e.retries), configured: String(e.retryBudget), phase: e.phase,
+          },
         };
         yield { type: 'turn-end' };
         return;

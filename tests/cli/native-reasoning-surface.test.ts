@@ -32,6 +32,9 @@ const NEW_KEYS = [
   'native.reasoning_exhausted',
   'native.transport-failure',
   'native.transport-failure.no-retry',
+  'native.transport-failure.permanent',
+  'native.transport-failure.not-authorized',
+  'native.reasoning_exhausted.retry-unadmissible',
   'tui.native_reasoning_active',
   'native.switch.invalid-reasoning-control',
   'native.boot.invalid-reasoning-control',
@@ -70,7 +73,8 @@ describe('catalog', () => {
     expect(applySignalVars(t, 'plain', undefined)).toBe('plain');
   });
 
-  it.each(['native.reasoning_exhausted_output_ceiling', 'native.reasoning_exhausted', 'native.transport-failure', 'native.transport-failure.no-retry'])(
+  it.each(['native.reasoning_exhausted_output_ceiling', 'native.reasoning_exhausted', 'native.reasoning_exhausted.retry-unadmissible',
+    'native.transport-failure', 'native.transport-failure.no-retry', 'native.transport-failure.permanent', 'native.transport-failure.not-authorized'])(
     '%s is a recognized native-agent signal in both languages', (code) => {
       for (const lang of ['en', 'tr'] as const) {
         expect(localizeNativeAgentSignal((k) => getMessage(k, lang), code, 'raw')).not.toBe('raw');
@@ -153,7 +157,7 @@ describe('bridge — localized exhaustion notice and transport failure', () => {
   it.each(['en', 'tr'] as const)('%s: a typed transport failure names the real code and the retry count', async (lang) => {
     const adapter: ProviderAdapter = { name: 'drop', async *send() {
       throw new ProviderTransportError('openai-compatible', 'connect',
-        classifyTransportFailure(new TypeError('fetch failed', { cause: Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }) }), 'connect'), 2);
+        classifyTransportFailure(new TypeError('fetch failed', { cause: Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' }) }), 'connect'), 2, 1);
     } };
     const out: string[] = [];
     const engine = createNativeEngine({
@@ -162,7 +166,8 @@ describe('bridge — localized exhaustion notice and transport failure', () => {
     });
     await engine('go', { output: (t) => out.push(t), onTurnEnd: () => {} });
     const text = out.join('');
-    expect(text).toContain(getMessage('native.transport-failure', lang, { code: 'ECONNRESET', retries: '1' }));
+    expect(text).toContain(getMessage('native.transport-failure', lang, { code: 'ECONNRESET', retries: '1', configured: '1' }));
+    expect(text).not.toContain('{configured}');
     expect(text).not.toContain('{code}');
     expect(text).not.toContain('fetch failed');
   });
