@@ -1,4 +1,5 @@
 import { classifyApprovalCommand } from '../core/approval-command-classification.js';
+import { resolveShellDialectForPlatform } from '../core/shell-readonly-classifier.js';
 import type {
   NativeToolApprovalClassification,
   NativeToolApprovalClassifier,
@@ -18,12 +19,32 @@ function classified(
   return { scope, risk, scopeId, resource };
 }
 
-export function nativeBuiltinApprovalClassifier(tool: string): NativeToolApprovalClassifier | undefined {
+/**
+ * Execution context for the shell classifier (7111). `cwd` is resolved per
+ * call so the REPL's live `/cd` is followed; `platform` selects the dialect
+ * deckent_bash really executes (`bash -c` vs `powershell.exe -Command`).
+ * Omitted → no read-only recognition (every shell call stays shell-exec).
+ */
+export interface NativeBuiltinApprovalOptions {
+  readonly cwd?: () => string;
+  readonly platform?: NodeJS.Platform;
+}
+
+export function nativeBuiltinApprovalClassifier(
+  tool: string,
+  options: NativeBuiltinApprovalOptions = {},
+): NativeToolApprovalClassifier | undefined {
   if (tool === 'deckent_bash') {
     return (args, resource) => {
       const command = text(args, 'cmd');
       if (!command) return null;
-      const result = classifyApprovalCommand(command, 'agentic');
+      const result = options.cwd === undefined
+        ? classifyApprovalCommand(command, 'agentic')
+        : classifyApprovalCommand(command, 'agentic', {
+            dialect: resolveShellDialectForPlatform(options.platform),
+            projectRoot: options.cwd(),
+            ...(options.platform !== undefined ? { platform: options.platform } : {}),
+          });
       return classified(result.scope, result.risk, tool, resource);
     };
   }

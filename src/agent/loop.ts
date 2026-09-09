@@ -39,6 +39,7 @@ import { brokerToolResult, ToolResultContextBudgetError, type ContentWriter } fr
 import { checkSelfModifying } from './guards/self-modifying.js';
 import { accrue, costExceeded, type CostGuardState } from './guards/cost.js';
 import { classifyShellCommand } from './guards/shell-risk.js';
+import { resolveShellDialectForPlatform } from '../core/shell-readonly-classifier.js';
 import {
   fitMessagesToBudget,
   derivePromptBudget,
@@ -819,7 +820,9 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         const isShellTool = call.name === 'bash' || call.name.endsWith('_bash');
         const rawShellCommand = call.args['command'] ?? call.args['cmd'] ?? resource;
         const shellCommand = typeof rawShellCommand === 'string' ? rawShellCommand : '';
-        const shellRisk = isShellTool ? classifyShellCommand(shellCommand) : undefined;
+        const shellRisk = isShellTool
+          ? classifyShellCommand(shellCommand, { projectRoot: deps.cwd, dialect: resolveShellDialectForPlatform() })
+          : undefined;
         let approval: NativeToolApprovalClassification | { readonly reasonCode: 'NATIVE_PERMISSION_CLASSIFICATION_UNAVAILABLE' };
         try {
           approval = classifyNativeToolApproval(def.approval, call.args, resource);

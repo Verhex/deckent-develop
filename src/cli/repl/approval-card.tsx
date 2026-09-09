@@ -31,7 +31,12 @@ import type {
 import type {
   ApprovalTerminalEvent,
 } from './approval-terminal-channel.js';
-import type { NativePermissionIntent, NativePermissionIntentController } from './native-permission-approval.js';
+import {
+  roundCoverableItems,
+  type NativePermissionIntent,
+  type NativePermissionIntentController,
+  type NativePermissionRoundItem,
+} from './native-permission-approval.js';
 
 export interface NativePermissionIntentLabels {
   readonly title: string;
@@ -44,6 +49,48 @@ export interface NativePermissionIntentLabels {
   readonly sessionConsequence: string;
   readonly alwaysConsequence: string;
   readonly cancel: string;
+  /** 7111 — round-scoped grouped intent (one card per model round). */
+  readonly roundTitle: string;
+  readonly roundItem: string;
+  readonly roundItemCurrent: string;
+  readonly roundItemAuto: string;
+  readonly roundItemFloor: string;
+  readonly roundItemDenied: string;
+  readonly roundItemCovered: string;
+  readonly roundMore: string;
+  readonly round: string;
+  readonly roundConsequence: string;
+  readonly cancelRound: string;
+  readonly scope: Readonly<Record<string, string>>;
+  readonly risk: Readonly<Record<string, string>>;
+}
+
+/** Bound on rendered round rows — the rest collapses into one `roundMore` line. */
+export const NATIVE_PERMISSION_ROUND_MAX_ROWS = 12;
+
+/** Pure row builder for the round list (unit-testable without Ink). */
+export function buildNativePermissionRoundRows(
+  intent: NativePermissionIntent,
+  labels: NativePermissionIntentLabels,
+): string[] {
+  if (!intent.round) return [];
+  const coverable = new Set(roundCoverableItems(intent).map((item) => item.callId));
+  const status = (item: NativePermissionRoundItem): string => {
+    if (item.callId === intent.invocation.callId) return labels.roundItemCurrent;
+    if (coverable.has(item.callId)) return labels.roundItemCovered;
+    if (item.projection === 'auto') return labels.roundItemAuto;
+    if (item.projection === 'denied') return labels.roundItemDenied;
+    return labels.roundItemFloor;
+  };
+  const rows = intent.round.items.slice(0, NATIVE_PERMISSION_ROUND_MAX_ROWS).map((item, index) => `${labels.roundItem
+    .replace('{index}', String(index + 1))
+    .replace('{tool}', item.tool)
+    .replace('{scope}', labels.scope[item.scope] ?? item.scope)
+    .replace('{risk}', labels.risk[item.risk] ?? item.risk)
+    .replace('{resource}', item.resource)} ${status(item)}`);
+  const hidden = intent.round.items.length - rows.length;
+  if (hidden > 0) rows.push(labels.roundMore.replace('{n}', String(hidden)));
+  return [labels.roundTitle.replace('{count}', String(intent.round.items.length)), ...rows];
 }
 
 export function NativePermissionIntentCard(props: {
@@ -54,25 +101,30 @@ export function NativePermissionIntentCard(props: {
 }): ReactElement | null {
   const { intent, controller, labels, isActive } = props;
   const glyphs = useTerminalGlyphs();
+  const roundAvailable = intent !== null && intent.lifetimes.includes('once') && roundCoverableItems(intent).length > 0;
   useInput((input, key) => {
     if (!intent || !isActive) return;
     if (key.escape || input === 'n') { controller.cancel(); return; }
     if (input === '1' && intent.lifetimes.includes('once')) controller.choose('once');
     else if (input === '2' && intent.lifetimes.includes('session')) controller.choose('session');
     else if (input === '3' && intent.lifetimes.includes('always')) controller.choose('always');
+    else if (input === '4' && roundAvailable) controller.chooseRound();
   });
   if (!intent) return null;
   const rows = [
     intent.lifetimes.includes('once') ? `1  ${labels.once} ${glyphs.dash} ${labels.onceConsequence}` : null,
     intent.lifetimes.includes('session') ? `2  ${labels.session} ${glyphs.dash} ${labels.sessionConsequence}` : null,
     intent.lifetimes.includes('always') ? `3  ${labels.always} ${glyphs.dash} ${labels.alwaysConsequence}` : null,
+    roundAvailable ? `4  ${labels.round} ${glyphs.dash} ${labels.roundConsequence}` : null,
   ].filter((row): row is string => row !== null);
+  const roundRows = buildNativePermissionRoundRows(intent, labels);
   return <Box borderStyle={glyphs.borderStyle} flexDirection="column" paddingX={1}>
     <Text bold>{labels.title.replace('{tool}', intent.tool)}</Text>
     <Text>{labels.actor.replace('{actor}', intent.actorId)}</Text>
     <Text>{labels.resource.replace('{resource}', intent.resource)}</Text>
+    {roundRows.map((row, index) => <Text key={`round-${index}`} dimColor={index > 0}>{row}</Text>)}
     {rows.map((row) => <Text key={row}>{row}</Text>)}
-    <Text dimColor>{labels.cancel}</Text>
+    <Text dimColor>{roundAvailable ? labels.cancelRound : labels.cancel}</Text>
   </Box>;
 }
 

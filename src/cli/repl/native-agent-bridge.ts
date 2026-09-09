@@ -36,6 +36,12 @@ import { createToolExposure } from '../../agent/tools/exposure.js';
 import { primaryResource, writeTargets, type PermissionResponse } from '../../agent/loop.js';
 import { decide, resolveTier } from '../../agent/permission.js';
 import { checkSelfModifying } from '../../agent/guards/self-modifying.js';
+import { classifyShellCommand } from '../../agent/guards/shell-risk.js';
+import { resolveShellDialectForPlatform } from '../../core/shell-readonly-classifier.js';
+import { redactSensitive } from '../../core/redact-sensitive.js';
+import type { PermissionPolicy } from '../../agent/permission-policy.js';
+import type { RuleStore } from '../../agent/permission-store.js';
+import type { NativePermissionRound, NativePermissionRoundItem } from './native-permission-approval.js';
 import {
   BRIDGE_RISK_BY_TIER,
   PARITY_POLICY_DENIAL_PREFIX,
@@ -247,6 +253,8 @@ export interface NativeEngineDeps {
     maskedArgs: Readonly<Record<string, unknown>>,
     signal: AbortSignal,
     validateRequest: (request: PermissionRequestEvent) => boolean,
+    /** 7111 — projection of every call the model proposed in this round. */
+    round?: NativePermissionRound,
   ) => Promise<PermissionResponse>;
   /** The existing tool/change-block sink (run.tsx toolSink). */
   toolSink: (info: ToolInfo) => void;
@@ -749,6 +757,124 @@ export function createParityExecImpl(ctx: ParityExecContext) {
   };
 }
 
+// ─── 7111 — read-only transcript marker ─────────────────────────────────────
+//
+// The loop emits, per call, `permission-auto-decision` → `tool-executing` →
+// `tool-result`. A shell call the engine auto-allowed on the silent tier for a
+// PROVEN read-only command (resourceClass 'safe-read') gets a compact marker on
+// its transcript tool line, so the audit trail stays visible ("● deckent_bash —
+// tool ran · read-only · auto") without a prompt. Pure and framework-free.
+export interface ReadOnlyToolMarker {
+  observeAutoDecision(ev: { tool: string; resourceClass: string; decision: 'allow' | 'deny' }): void;
+  observeExecuting(ev: { id: string; tool: string }): void;
+  /** Consumes the marker for this call id; true exactly once per read-only call. */
+  consumeResult(ev: { id: string; tool: string }): boolean;
+}
+
+export function createReadOnlyToolMarker(): ReadOnlyToolMarker {
+  let pendingTool: string | undefined;
+  const readOnlyIds = new Set<string>();
+  const isShellTool = (tool: string): boolean => tool === 'bash' || tool.endsWith('_bash');
+  return {
+    observeAutoDecision(ev) {
+      pendingTool = ev.decision === 'allow' && ev.resourceClass === 'safe-read' && isShellTool(ev.tool) ? ev.tool : undefined;
+    },
+    observeExecuting(ev) {
+      if (pendingTool !== undefined && pendingTool === ev.tool) readOnlyIds.add(ev.id);
+      pendingTool = undefined;
+    },
+    consumeResult(ev) {
+      return readOnlyIds.delete(ev.id);
+    },
+  };
+}
+
+// ─── 7111 — round-scoped permission projection ───────────────────────────────
+//
+// loop.ts yields `tool-proposed` for EVERY call of a model round before the
+// first permission request of that round, so the bridge can hand the intent
+// card a projection of the whole round: what will run silently, what will ask,
+// what sits on the always floor. The projection re-applies the loop's own
+// helpers in the loop's own order (same policy / rule-store / mode instances —
+// the born-607 parity discipline) and is presentation-only: the loop remains
+// the authority for every decision.
+export interface NativePermissionRoundProjector {
+  readonly registry: Pick<ToolRegistry, 'get'>;
+  readonly policy: PermissionPolicy;
+  readonly ruleStore: Pick<RuleStore, 'activeRules' | 'activeDenies'>;
+  readonly getMode: () => ApprovalMode;
+  readonly cwd: string;
+  readonly platform?: NodeJS.Platform;
+}
+
+export function projectNativePermissionRoundItem(
+  deps: NativePermissionRoundProjector,
+  call: { readonly id: string; readonly tool: string; readonly args: Record<string, unknown> },
+): NativePermissionRoundItem | null {
+  const def = deps.registry.get(call.tool);
+  if (!def) return null;
+  const resource = primaryResource(call.args);
+  const elevated = checkSelfModifying(deps.cwd, writeTargets(call.args)).elevated;
+  let tier = resolveTier(def, deps.policy);
+  const isShellTool = call.tool === 'bash' || call.tool.endsWith('_bash');
+  if (isShellTool) {
+    const rawShellCommand = call.args['command'] ?? call.args['cmd'] ?? resource;
+    const shellRisk = classifyShellCommand(typeof rawShellCommand === 'string' ? rawShellCommand : '', {
+      projectRoot: deps.cwd,
+      dialect: resolveShellDialectForPlatform(deps.platform),
+      ...(deps.platform !== undefined ? { platform: deps.platform } : {}),
+    });
+    if (shellRisk.risk === 'destructive') tier = 'always';
+    else if (shellRisk.risk === 'safe-read') tier = 'silent';
+  }
+  if (elevated) tier = 'always';
+  const decision = decide(call.tool, resource, tier, {
+    rules: deps.ruleStore.activeRules(),
+    denies: deps.ruleStore.activeDenies(),
+    policy: deps.policy,
+    mode: deps.getMode(),
+  });
+  const approval = classifyNativeToolApproval(def.approval, call.args, resource);
+  const classified = !('reasonCode' in approval);
+  return {
+    callId: call.id,
+    tool: call.tool,
+    resource: redactSensitive(resource),
+    scope: classified ? approval.scope : 'unclassified',
+    risk: classified ? approval.risk : 'unclassified',
+    projection: decision === 'deny' ? 'denied'
+      : decision === 'allow' ? 'auto'
+        : tier === 'always' ? 'floor'
+          : 'confirm',
+  };
+}
+
+export interface NativePermissionRoundTracker {
+  observeProposed(call: { readonly id: string; readonly tool: string; readonly args: Record<string, unknown> }): void;
+  /** Closes the open burst; the next `tool-proposed` starts a new round. */
+  observeExecution(): void;
+  /** The round that contains `callId`, keyed by the session/turn identity of the request. */
+  roundFor(sessionInstanceId: string, turnGeneration: number, callId: string): NativePermissionRound | undefined;
+}
+
+export function createNativePermissionRoundTracker(deps: NativePermissionRoundProjector): NativePermissionRoundTracker {
+  let items: NativePermissionRoundItem[] = [];
+  let open = false;
+  let roundIndex = 0;
+  return {
+    observeProposed(call) {
+      if (!open) { items = []; roundIndex++; open = true; }
+      const item = projectNativePermissionRoundItem(deps, call);
+      if (item) items.push(item);
+    },
+    observeExecution() { open = false; },
+    roundFor(sessionInstanceId, turnGeneration, callId) {
+      if (!items.some((item) => item.callId === callId)) return undefined;
+      return { key: `${sessionInstanceId}:${turnGeneration}:${roundIndex}`, items: [...items] };
+    },
+  };
+}
+
 export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   const t = deps.t ?? ((k: string): string => k);
   // The loop owns cost accrual + the hard-ceiling abort (SP1-A1) — the session
@@ -918,6 +1044,15 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
       cbs.onReasoningActivity?.({ kind: 'clear' });
       reasoningIndicatorShown = false;
     };
+    // 7111 — per-turn read-only marker + round projection (see helpers above).
+    const readOnlyMarker = createReadOnlyToolMarker();
+    const roundTracker = createNativePermissionRoundTracker({
+      registry: deps.registry,
+      policy,
+      ruleStore,
+      getMode: () => session.getApprovalMode(),
+      cwd: deps.cwd,
+    });
     try {
       for await (const ev of session.send(lineage) as AsyncIterable<AgentSessionEvent>) {
         switch (ev.type) {
@@ -938,7 +1073,12 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           });
           break;
         }
+        case 'tool-proposed':
+          roundTracker.observeProposed({ id: ev.id, tool: ev.tool, args: ev.args });
+          break;
         case 'permission-request': {
+          roundTracker.observeExecution();
+          const round = roundTracker.roundFor(ev.invocation.sessionInstanceId, ev.invocation.turnGeneration, ev.invocation.callId);
           const response = deps.decidePermission
             ? await deps.decidePermission(
                 ev,
@@ -947,19 +1087,29 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
                 ev.maskedArgs,
                 permissionWaitAbort.signal,
                 session.validatePermissionRequest,
+                round,
               )
             : ({ decision: 'hold', reasonCode: 'NATIVE_PERMISSION_AUTHORITY_UNAVAILABLE' } as const);
           session.respondPermission(ev, response);
           break;
         }
-        case 'tool-result':
+        case 'tool-result': {
           if (activeToolId === ev.id) clearActiveTool();
           if (!ev.ok && ev.code) {
             cbs.output(`\n${localizeNativeAgentSignal(t, ev.code, ev.code)}\n`);
           }
-          deps.toolSink({ verb: `${ev.tool} — ${t('native.tool_ran')}`, target: '', ...(ev.ok ? {} : { failed: true }) });
+          const readOnly = readOnlyMarker.consumeResult(ev);
+          deps.toolSink({
+            verb: `${ev.tool} — ${t('native.tool_ran')}`,
+            target: '',
+            ...(readOnly ? { note: t('native.tool_read_only_marker') } : {}),
+            ...(ev.ok ? {} : { failed: true }),
+          });
           break;
+        }
         case 'tool-executing':
+          roundTracker.observeExecution();
+          readOnlyMarker.observeExecuting(ev);
           clearActiveTool();
           clearReasoningIndicator();
           activeToolId = ev.id;
@@ -973,6 +1123,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           });
           break;
         case 'permission-auto-decision':
+          readOnlyMarker.observeAutoDecision(ev);
           // NT-12 (553-002) — the trace snapshot is NOT the audit record: every
           // auto-decision (silent tierMap allow/deny, no confirm-queue round trip)
           // is persisted durably here via the same hash-chained audit-writer every
@@ -1101,7 +1252,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
             });
           }
           break;
-        // 'tool-proposed' is not execution; 'turn-end' falls through.
+        // 'turn-end' falls through.
         }
       }
     } finally { clearActiveTool(); clearReasoningIndicator(); }

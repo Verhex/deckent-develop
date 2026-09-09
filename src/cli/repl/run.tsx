@@ -672,6 +672,8 @@ export function buildApprovalLabels(t: (key: string) => string): ApprovalCardLab
 }
 
 export function buildNativePermissionIntentLabels(t: (key: string) => string): NativePermissionIntentLabels {
+  const scopes = ['file-read', 'file-write', 'shell-exec', 'git-mutation', 'network', 'credential', 'lifecycle', 'unclassified'] as const;
+  const risks = ['none', 'low', 'medium', 'high', 'critical'] as const;
   return {
     title: t('native_permission.intent_title'),
     actor: t('native_permission.intent_actor'),
@@ -683,6 +685,20 @@ export function buildNativePermissionIntentLabels(t: (key: string) => string): N
     sessionConsequence: t('native_permission.intent_session_consequence'),
     alwaysConsequence: t('native_permission.intent_always_consequence'),
     cancel: t('native_permission.intent_cancel'),
+    // 7111 — round-scoped grouped intent.
+    roundTitle: t('native_permission.round_title'),
+    roundItem: t('native_permission.round_item'),
+    roundItemCurrent: t('native_permission.round_item_current'),
+    roundItemAuto: t('native_permission.round_item_auto'),
+    roundItemFloor: t('native_permission.round_item_floor'),
+    roundItemDenied: t('native_permission.round_item_denied'),
+    roundItemCovered: t('native_permission.round_item_covered'),
+    roundMore: t('native_permission.round_more'),
+    round: t('native_permission.intent_round'),
+    roundConsequence: t('native_permission.intent_round_consequence'),
+    cancelRound: t('native_permission.intent_cancel_round'),
+    scope: Object.fromEntries(scopes.map((scope) => [scope, t(`native_permission.scope.${scope}`)])),
+    risk: Object.fromEntries(risks.map((risk) => [risk, t(`native_permission.risk.${risk}`)])),
   };
 }
 
@@ -2262,8 +2278,8 @@ export async function runInkRepl(
         lang: lang as 'en' | 'tr',
         confirm: (summary, toolName) => (confirmTrigger ? confirmTrigger(summary, toolName) : Promise.resolve('n')),
         decidePermission: nativePermissionDecision
-          ? (request, approval, lifetimes, maskedArgs, signal, validateRequest) =>
-              nativePermissionDecision(request, approval, lifetimes, maskedArgs, signal, validateRequest)
+          ? (request, approval, lifetimes, maskedArgs, signal, validateRequest, round) =>
+              nativePermissionDecision(request, approval, lifetimes, maskedArgs, signal, validateRequest, round)
           : async () => ({ decision: 'hold', reasonCode: 'NATIVE_PERMISSION_AUTHORITY_UNAVAILABLE' }),
         toolSink: (info) => { if (toolSink) toolSink(info); },
         t: terminalLabel,

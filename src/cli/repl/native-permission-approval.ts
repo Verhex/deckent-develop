@@ -3,6 +3,7 @@ import { bindNativePermissionIntent, permittedNativePermissionLifetimes } from '
 import type { PermissionRequestEvent } from '../../agent/events.js';
 import type { PermissionResponse } from '../../agent/loop.js';
 import type { NativeToolApprovalClassification } from '../../agent/tools/types.js';
+import type { ApprovalRisk, ApprovalScope } from '../../core/approval-contract.js';
 import type { ApprovalBroker } from '../../core/approval-broker.js';
 import type { ApprovalTerminalDecisionAdapter } from './approval-terminal-command.js';
 import { approvalLifecycleProfileDigest, resolveEffectiveApprovalRiskTier } from '../../core/approval-lifecycle-policy.js';
@@ -10,12 +11,47 @@ import type { ResolvedApprovalLifecycleConfig } from '../../core/config-types.js
 import { isApprovalFileAclHold } from '../../core/approval-file-cas.js';
 import { redactSensitive } from '../../core/redact-sensitive.js';
 
+/**
+ * 7111 — engine-parity PROJECTION of what the loop will do with one proposed
+ * call of the current model round (the loop stays the authority):
+ *   auto     → silent tier / matched grant / mode auto-allow — never asks
+ *   confirm  → confirm tier under the current mode — asks (round-coverable)
+ *   floor    → always tier / self-modifying elevation — asks every time
+ *   denied   → explicit deny rule — never runs
+ */
+export type NativePermissionRoundProjection = 'auto' | 'confirm' | 'floor' | 'denied';
+
+export interface NativePermissionRoundItem {
+  readonly callId: string;
+  readonly tool: string;
+  /** Already redacted (redactSensitive) — safe to render. */
+  readonly resource: string;
+  readonly scope: ApprovalScope | 'unclassified';
+  readonly risk: ApprovalRisk | 'unclassified';
+  readonly projection: NativePermissionRoundProjection;
+}
+
+/** All tool calls the model proposed in the round that contains this request. */
+export interface NativePermissionRound {
+  /** `${sessionInstanceId}:${turnGeneration}:${roundIndex}` — a grouped grant never crosses rounds. */
+  readonly key: string;
+  readonly items: readonly NativePermissionRoundItem[];
+}
+
 export interface NativePermissionIntent {
   readonly invocation: NativePermissionInvocation;
   readonly tool: string;
   readonly resource: string;
   readonly actorId: string;
   readonly lifetimes: readonly NativePermissionLifetime[];
+  /** 7111 — present when the bridge could project the whole round. */
+  readonly round?: NativePermissionRound;
+}
+
+/** Items a "once for the whole round" choice would cover besides the current one. */
+export function roundCoverableItems(intent: NativePermissionIntent): readonly NativePermissionRoundItem[] {
+  if (!intent.round) return [];
+  return intent.round.items.filter((item) => item.projection === 'confirm' && item.callId !== intent.invocation.callId);
 }
 
 export interface NativePermissionApprovalServiceOptions {
@@ -39,6 +75,7 @@ export function createNativePermissionApprovalService(options: NativePermissionA
     maskedArgs: Readonly<Record<string, unknown>> | null,
     signal: AbortSignal,
     validateRequest: (request: PermissionRequestEvent) => boolean,
+    round?: NativePermissionRound,
   ): Promise<PermissionResponse> {
     const canonicalLifetimes = permittedNativePermissionLifetimes(request.invocation);
     const classificationMatches = classification.scope === request.approval.scope
@@ -57,6 +94,7 @@ export function createNativePermissionApprovalService(options: NativePermissionA
       resource: redactSensitive(classification.resource),
       actorId: options.actorId,
       lifetimes,
+      ...(round ? { round } : {}),
     });
     const intent = await new Promise<NativePermissionIntentResult>((resolve) => {
       const abort = () => {
@@ -140,18 +178,28 @@ export function createNativePermissionApprovalService(options: NativePermissionA
   };
 }
 export type NativePermissionIntentResult =
-  | { readonly kind: 'selected'; readonly lifetime: NativePermissionLifetime }
+  | { readonly kind: 'selected'; readonly lifetime: NativePermissionLifetime; readonly roundCovered?: true }
   | { readonly kind: 'cancelled'; readonly reasonCode: 'NATIVE_PERMISSION_INTENT_CANCELLED' };
 export interface NativePermissionIntentController {
   request(intent: NativePermissionIntent): Promise<NativePermissionIntentResult>;
   current(): NativePermissionIntent | null;
   choose(lifetime: NativePermissionLifetime): boolean;
+  /**
+   * 7111 — settle the active intent as `once` AND cover every other
+   * confirm-projected call of the SAME round: their later intents resolve
+   * as `once` without a card. Always-tier, elevated and nested invocations
+   * are never covered (their intents still show the card), and the durable
+   * broker decision per item is untouched — this groups the lifetime
+   * selection, not the authority.
+   */
+  chooseRound(): boolean;
   cancel(): boolean;
   subscribe(listener: (intent: NativePermissionIntent | null) => void): () => void;
 }
 
 export function createNativePermissionIntentController(): NativePermissionIntentController {
   let active: { intent: NativePermissionIntent; resolve: (result: NativePermissionIntentResult) => void } | undefined;
+  let roundGrant: { key: string; callIds: Set<string> } | undefined;
   const listeners = new Set<(intent: NativePermissionIntent | null) => void>();
   const publish = (): void => { for (const listener of listeners) listener(active?.intent ?? null); };
   const settle = (result: NativePermissionIntentResult): boolean => {
@@ -162,17 +210,41 @@ export function createNativePermissionIntentController(): NativePermissionIntent
     publish();
     return true;
   };
+  const coveredByRound = (intent: NativePermissionIntent): boolean => {
+    if (!roundGrant || !intent.round) return false;
+    if (roundGrant.key !== intent.round.key) { roundGrant = undefined; return false; }
+    const { invocation } = intent;
+    if (invocation.tier !== 'confirm' || invocation.elevated || invocation.nested) return false;
+    if (!intent.lifetimes.includes('once')) return false;
+    return roundGrant.callIds.delete(invocation.callId);
+  };
   return {
     request(intent) {
       if (active) return Promise.resolve({ kind: 'cancelled', reasonCode: 'NATIVE_PERMISSION_INTENT_CANCELLED' });
+      if (coveredByRound(intent)) return Promise.resolve({ kind: 'selected', lifetime: 'once', roundCovered: true });
       return new Promise((resolve) => {
-        active = { intent: Object.freeze({ ...intent, lifetimes: Object.freeze([...intent.lifetimes]) }), resolve };
+        active = {
+          intent: Object.freeze({
+            ...intent,
+            lifetimes: Object.freeze([...intent.lifetimes]),
+            ...(intent.round ? { round: Object.freeze({ key: intent.round.key, items: Object.freeze(intent.round.items.map((item) => Object.freeze({ ...item }))) }) } : {}),
+          }),
+          resolve,
+        };
         publish();
       });
     },
     current: () => active?.intent ?? null,
     choose: (lifetime) => active?.intent.lifetimes.includes(lifetime) === true
       && settle({ kind: 'selected', lifetime }),
+    chooseRound() {
+      const intent = active?.intent;
+      if (!intent || !intent.round || !intent.lifetimes.includes('once')) return false;
+      const coverable = roundCoverableItems(intent);
+      if (coverable.length === 0) return false;
+      roundGrant = { key: intent.round.key, callIds: new Set(coverable.map((item) => item.callId)) };
+      return settle({ kind: 'selected', lifetime: 'once' });
+    },
     cancel: () => settle({ kind: 'cancelled', reasonCode: 'NATIVE_PERMISSION_INTENT_CANCELLED' }),
     subscribe(listener) {
       listeners.add(listener);

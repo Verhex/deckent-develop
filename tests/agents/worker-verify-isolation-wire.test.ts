@@ -268,6 +268,7 @@ describe('classifyRiskyToolCall', () => {
             scope: 'shell-exec',
             risk: 'medium',
             reason: 'shell command execution',
+            reasonCode: 'SHELL_EXEC_DEFAULT',
         });
     });
     it('classifies git push --force as git-mutation/critical', () => {

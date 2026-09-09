@@ -8,6 +8,7 @@ import { CLI_RUNTIME_HELP_MESSAGES } from './message-catalog/cli-runtime-help.js
 import { CLI_REFERENCE_MESSAGES } from './message-catalog/cli-reference.js';
 import { CLI_TERMINAL_SLASH_MESSAGES } from './message-catalog/cli-terminal-slash.js';
 import { CLI_TERMINAL_PICKER_MESSAGES } from './message-catalog/cli-terminal-picker.js';
+import { CLI_TERMINAL_READONLY_MESSAGES } from './message-catalog/cli-terminal-readonly.js';
 import { MEMORY_EXPORT_MESSAGES } from './message-catalog/memory-export.js';
 import { MEMORY_READ_MESSAGES } from '../../core/memory-read-messages.js';
 import { AUTONOMOUS_PLANNER_MESSAGES } from './message-catalog/autonomous-planner.js';
@@ -10198,6 +10199,7 @@ export const MESSAGE_CATALOG_FAMILIES: Readonly<Record<string, MessageCatalogFam
   'cli-reference': CLI_REFERENCE_MESSAGES,
   'cli-terminal-slash': CLI_TERMINAL_SLASH_MESSAGES,
   'cli-terminal-picker': CLI_TERMINAL_PICKER_MESSAGES,
+  'cli-terminal-readonly': CLI_TERMINAL_READONLY_MESSAGES,
   'memory-export': MEMORY_EXPORT_MESSAGES,
   'memory-read': MEMORY_READ_MESSAGES,
   'autonomous-planner': AUTONOMOUS_PLANNER_MESSAGES,

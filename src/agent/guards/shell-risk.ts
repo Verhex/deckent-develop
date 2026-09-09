@@ -1,8 +1,25 @@
+import {
+  classifyReadOnlyShellCommand,
+  type ShellDialect,
+} from '../../core/shell-readonly-classifier.js';
+
 export type ShellRisk = 'safe-read' | 'modify' | 'destructive';
 
 export interface ShellRiskClassification {
   risk: ShellRisk;
   reason: string;
+}
+
+/**
+ * Execution context for the read-only half of the verdict (7111). Absent →
+ * lexical containment only + POSIX dialect, which is what the pure unit
+ * contract of this module has always been.
+ */
+export interface ShellRiskOptions {
+  readonly dialect?: ShellDialect;
+  readonly projectRoot?: string | null;
+  /** Host platform (case rule for containment). Default `process.platform`. */
+  readonly platform?: NodeJS.Platform;
 }
 
 interface ShellScan {
@@ -274,13 +291,32 @@ function classifySegment(segment: string): ShellRiskClassification {
   return { risk: 'modify', reason: 'shell.modify.unknown-command' };
 }
 
-/** Classify a shell command conservatively; the worst compound segment wins. */
-export function classifyShellCommand(command: string): ShellRiskClassification {
+/**
+ * Classify a shell command conservatively; the worst compound segment wins.
+ *
+ * 7111 — the `safe-read` outcome is owned by ONE authority: the allowlist
+ * read-only parser in core/shell-readonly-classifier.ts (dialect-aware, path
+ * containment, protected trees, per-program flag grammars). The legacy
+ * segment scanner here keeps its job for the DESTRUCTIVE floor and for the
+ * `modify` reasons a rejected command reports; it can no longer promote a
+ * command to `safe-read` on its own, so the approval scope (file-read) and
+ * the permission tier (silent) can never disagree.
+ */
+export function classifyShellCommand(command: string, options: ShellRiskOptions = {}): ShellRiskClassification {
   const scan = scanShell(command);
   let result: ShellRiskClassification = { risk: 'safe-read', reason: 'shell.safe-read.compound' };
   if (scan.segments.length === 0) result = { risk: 'modify', reason: 'shell.modify.empty-command' };
   for (const segment of scan.segments) result = combine(result, classifySegment(segment));
   if (scan.malformed) result = combine(result, { risk: 'modify', reason: 'shell.modify.unparseable' });
   if (scan.outputRedirect) result = combine(result, { risk: 'modify', reason: 'shell.modify.output-redirection' });
-  return result;
+  if (result.risk === 'destructive') return result;
+  const readOnly = classifyReadOnlyShellCommand(command, {
+    dialect: options.dialect ?? 'posix',
+    projectRoot: options.projectRoot ?? null,
+    ...(options.platform !== undefined ? { platform: options.platform } : {}),
+  });
+  if (readOnly.readOnly) return { risk: 'safe-read', reason: `shell.safe-read.${readOnly.programs[0] ?? 'compound'}` };
+  return result.risk === 'safe-read'
+    ? { risk: 'modify', reason: `shell.modify.${readOnly.reasonCode.toLowerCase().replace(/_/gu, '-')}` }
+    : result;
 }

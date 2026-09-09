@@ -15,8 +15,14 @@ import { ToolRegistry } from '../../agent/tools/registry.js';
 import { isContentRefReader, type ContentWriter } from '../../agent/tool-result-broker.js';
 import { defineContentRefTool } from '../../agent/tools/content-ref-tool.js';
 import type { ToolDefinition, ToolPermissionTier, ToolResult } from '../../agent/tools/types.js';
-import { nativeBuiltinApprovalClassifier } from '../../agent/native-tool-approval.js';
+import { nativeBuiltinApprovalClassifier, type NativeBuiltinApprovalOptions } from '../../agent/native-tool-approval.js';
 import type { NativeToolApprovalClassifier } from '../../agent/tools/types.js';
+import {
+  renderReadFileView,
+  resolveReadFileBudget,
+  resolveReadFileViewRequest,
+  type ReadFileBudget,
+} from './native-read-file.js';
 import type { ToolExposure, ToolExposureKind } from '../../agent/tools/exposure.js';
 import { createToolExecDispatcher } from '../commands/chat-tool-exec.js';
 import { createCliToolDispatcher } from '../commands/chat-tool-bridge.js';
@@ -97,6 +103,20 @@ export interface NativeToolRegistryOptions {
    * per-process store (byte-identical pre-wire behavior).
    */
   contentStore?: ContentWriter;
+  /**
+   * 7111 — read budget for `deckent_read_file`'s bounded views (outline /
+   * range / search). `maxPreviewBytes` mirrors the tool-result broker cap the
+   * session runs with; `maxBytesPerLine` overrides the per-line share. Absent →
+   * the broker's own default cap (DEFAULT_MAX_PREVIEW_BYTES) and 1/8 of it per
+   * line — the same numbers the model sees in the meta line.
+   */
+  readFile?: { maxPreviewBytes?: number; maxBytesPerLine?: number };
+  /**
+   * 7111 — host platform for the shell-command approval classifier
+   * (POSIX `bash -c` vs native-Windows `powershell.exe -Command`). Defaults to
+   * `process.platform`; a test seam, never a production override.
+   */
+  platform?: NodeJS.Platform;
 }
 
 export interface RunFlowRegistryOptions {
@@ -207,9 +227,23 @@ const SCHEMAS: Record<string, Record<string, unknown>> = {
   deckent_read_file: {
     type: 'object',
     properties: {
-      path: { type: 'string', description: 'Project-relative file path.' },
-      offset: { type: 'integer', minimum: 1, description: '1-based first line to return. Omit to start at line 1.' },
-      limit: { type: 'integer', minimum: 1, description: 'How many lines to return from offset. Omit to read to the end of the file.' },
+      path: { type: 'string', description: 'Project-relative path.' },
+      offset: { type: 'integer', minimum: 1, description: 'Legacy 1-based first line.' },
+      limit: { type: 'integer', minimum: 1, description: 'Legacy line count.' },
+      // 7111 — bounded views. Kept terse ON PURPOSE: this schema rides every
+      // provider request and the preamble budget prices its bytes as tokens
+      // (tests/agent/preamble-budget-registry-matrix.test.ts, 64k core set).
+      mode: { type: 'string', enum: ['content', 'outline', 'search'] },
+      startLine: { type: 'integer', minimum: 1 },
+      endLine: { type: 'integer', minimum: 1, description: 'Inclusive.' },
+      maxBytesPerLine: { type: 'integer', minimum: 96, description: 'Default cap/8.' },
+      lineByteOffset: { type: 'integer', minimum: 0, description: 'Resume an elided line.' },
+      outlineOffset: { type: 'integer', minimum: 1, description: 'First heading index.' },
+      pattern: { type: 'string', description: 'Regex; enables search.' },
+      literal: { type: 'boolean' },
+      ignoreCase: { type: 'boolean' },
+      context: { type: 'integer', minimum: 0, maximum: 10 },
+      maxMatches: { type: 'integer', minimum: 1, maximum: 500, description: 'Default 50.' },
     },
     required: ['path'],
   },
@@ -229,7 +263,7 @@ const SCHEMAS: Record<string, Record<string, unknown>> = {
 };
 
 const DESCRIPTIONS: Record<string, string> = {
-  deckent_read_file: 'Read a file within the project. With no offset/limit it returns the whole content, as before. Pass offset (1-based first line) and/or limit (line count) to get a line-numbered slice preceded by a "[deckent] read_file: totalLines=… range=… hasMore=… nextOffset=…" meta line, so a large file can be read in bounded pieces.',
+  deckent_read_file: 'Read a project file (prefer over bash sed/awk/grep). Views fit the result cap; the leading "[deckent] read_file:" meta line names the continuation. mode outline: headings + line numbers + size/longest-line stats (use first on big files); startLine/endLine: numbered lines, long lines elided behind "[… N bytes elided; re-read {startLine,endLine,lineByteOffset}]"; pattern: grep-style hits. Plain {path}: whole file.',
   deckent_list_dir: 'List a directory within the project (dirs suffixed with /).',
   deckent_grep: 'Search project files with a JS regex; returns path:line:text hits (capped).',
   deckent_glob: 'Find project files matching a glob pattern (** / * / ?), capped.',
@@ -377,8 +411,19 @@ async function dispatchReadFile(
   cwd: NativeToolRegistryOptions['cwd'],
   exec: McpToolDispatcher,
   args: Record<string, unknown>,
+  budget: ReadFileBudget,
 ): Promise<ToolResult> {
   const path = typeof args['path'] === 'string' ? args['path'] : String(args['path'] ?? '');
+  // 7111 — bounded views (outline / range / search). Full bytes come through
+  // the same in-memory capture seam as the ranged read; the renderer is
+  // budget-bounded by construction, so nothing here can reach the loop over
+  // the cap and nothing is silently cut.
+  const view = resolveReadFileViewRequest(args);
+  if (view !== null) {
+    const full = await readFullFileText(cwd, path);
+    if (!full.ok) return toolResultFrom(full.output);
+    return { ok: true, output: renderReadFileView(full.text, view, budget) };
+  }
   const range = resolveReadFileRange(args);
   if (range === null) {
     const rendered = await exec.dispatch('deckent_read_file', args);
@@ -413,8 +458,9 @@ function defineFromDispatcher(
   tier: ToolPermissionTier,
   dispatcher: McpToolDispatcher,
   exposure?: ToolExposureKind,
+  approvalOptions: NativeBuiltinApprovalOptions = {},
 ): ToolDefinition {
-  const approval = nativeBuiltinApprovalClassifier(name);
+  const approval = nativeBuiltinApprovalClassifier(name, approvalOptions);
   return {
     name,
     description,
@@ -828,14 +874,23 @@ export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRe
   const exec = createToolExecDispatcher({
     cwd: opts.cwd,
     ...(opts.contentStore ? { contentStore: opts.contentStore } : {}),
+    ...(opts.readFile?.maxPreviewBytes !== undefined ? { maxPreviewBytes: opts.readFile.maxPreviewBytes } : {}),
   });
+  // 7111 — the shell approval classifier sees the live project root (REPL /cd)
+  // and the host dialect, so a proven read-only `deckent_bash` classifies as
+  // file-read (silent tier) and everything else stays on the confirm floor.
+  const approvalOptions: NativeBuiltinApprovalOptions = {
+    cwd: opts.cwd,
+    ...(opts.platform !== undefined ? { platform: opts.platform } : {}),
+  };
+  const readBudget = resolveReadFileBudget(opts.readFile ?? {});
   for (const name of ['deckent_read_file', 'deckent_list_dir', 'deckent_grep', 'deckent_glob', 'deckent_write_file', 'deckent_edit_file', 'deckent_bash', 'deckent_git_status', 'deckent_git_log', 'deckent_git_diff', 'deckent_git_add', 'deckent_git_commit'] as const) {
-    const def = { ...defineFromDispatcher(name, DESCRIPTIONS[name]!, SCHEMAS[name]!, execToolTier(name), exec, 'core'), replayable: EXEC_REPLAYABLE.has(name) };
+    const def = { ...defineFromDispatcher(name, DESCRIPTIONS[name]!, SCHEMAS[name]!, execToolTier(name), exec, 'core', approvalOptions), replayable: EXEC_REPLAYABLE.has(name) };
     // 562-002: read_file keeps its tier/exposure/definition and only swaps the
     // handler in — the ranged form needs the broker's full bytes, which the plain
     // dispatcher passthrough cannot expose (see dispatchReadFile).
     registry.register(name === 'deckent_read_file'
-      ? { ...def, handler: (args) => dispatchReadFile(opts.cwd, exec, args) }
+      ? { ...def, handler: (args) => dispatchReadFile(opts.cwd, exec, args, readBudget) }
       : def);
   }
 

@@ -45,6 +45,7 @@ describe('classifyRiskyWorkerCommand (src/agents/worker.ts)', () => {
       scope: 'shell-exec',
       risk: 'medium',
       reason: 'shell command execution',
+      reasonCode: 'SHELL_EXEC_DEFAULT',
     });
   });
 
