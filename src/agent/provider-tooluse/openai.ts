@@ -125,6 +125,20 @@ function toOpenAIMessage(m: ProviderMessage): Record<string, unknown> {
 }
 
 /**
+ * 7109-b — the exact chat wire shape this adapter sends. Exported so the
+ * llama.cpp measurement path (`/apply-template` + `/tokenize`) counts the
+ * same bytes the completion request carries: wire parity by construction, not
+ * by a second hand-written shape that drifts.
+ */
+export function toOpenAIChatMessages(req: Pick<ProviderRequest, 'system' | 'messages'>): Record<string, unknown>[] {
+  return [{ role: 'system', content: req.system }, ...req.messages.map(toOpenAIMessage)];
+}
+
+export function toOpenAIChatTools(tools: ProviderRequest['tools']): Record<string, unknown>[] {
+  return tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }));
+}
+
+/**
  * Drain accumulated streamed tool-call fragments into normalized tool-call
  * events, then clear the accumulator. Emitting both on `finish_reason:'tool_calls'`
  * AND once more at stream end means tool calls survive OpenAI-compatible backends
@@ -211,7 +225,7 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
         model: req.model,
         stream: true,
         stream_options: { include_usage: true },
-        messages: [{ role: 'system', content: req.system }, ...req.messages.map(toOpenAIMessage)],
+        messages: toOpenAIChatMessages(req),
       };
       // NT-08 / RCA §2 — the computed safe ceiling, made explicit on the wire.
       // Resolved through the shared ladder (request > configured > unresolved),
@@ -223,7 +237,7 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
       });
       if (ceiling.state === 'resolved') body['max_tokens'] = ceiling.tokens;
       if (req.tools.length > 0) {
-        body['tools'] = req.tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }));
+        body['tools'] = toOpenAIChatTools(req.tools);
       }
       // 7108 — hidden-reasoning directive → wire toggle, per the descriptor
       // this adapter was handed. No descriptor / unknown toggle → no field.

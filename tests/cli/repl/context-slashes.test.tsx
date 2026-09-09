@@ -286,6 +286,19 @@ describe('/context trigger and cached request provenance', () => {
     expect(engine.sends).toEqual([]);
   });
 
+  it.each(['en', 'tr'] as const)('shows boot measurement authority on /context in %s', async (lang) => {
+    const labels = buildContextSlashLabels(tFor(lang));
+    const engine = fakeEngine({
+      contextSnapshot: async () => ({
+        ...snapshot,
+        measurementAuthority: { state: 'exact-available', provenance: 'llama.cpp-apply-template-tokenize' },
+      }),
+    });
+    const text = await resolveContextSlash('/context', engine, labels);
+    expect(text).toContain(labels.measurementStateExact!);
+    expect(engine.sends).toEqual([]);
+  });
+
   it.each(['en', 'tr'] as const)('does not invent a trigger or provenance before any actual request in %s', async (lang) => {
     const labels = buildContextSlashLabels(tFor(lang));
     const engine = fakeEngine({ contextSnapshot: async () => ({

@@ -3844,6 +3844,33 @@ const BASE_MESSAGES: MessageMap = {
   },
   'native-context.measurement.quality_exact': { en: 'exact', tr: 'kesin' },
   'native-context.measurement.quality_upper_bound': { en: 'conservative upper bound', tr: 'muhafazakâr üst sınır' },
+  'native-context.slash.measurement_authority': {
+    en: 'measurement authority: {state}{reason}',
+    tr: 'ölçüm otoritesi: {state}{reason}',
+  },
+  'native-context.measurement.state_exact': { en: 'exact', tr: 'kesin' },
+  'native-context.measurement.state_unavailable': { en: 'conservative (unavailable)', tr: 'temkinli (kullanılamıyor)' },
+  'native-context.measurement.reason_suffix': { en: ' ({reason})', tr: ' ({reason})' },
+  'native.measurement_authority.exact': { en: 'Measurement: exact', tr: 'Ölçüm: kesin' },
+  'native.measurement_authority.unavailable': {
+    en: 'Measurement: conservative ({reason})',
+    tr: 'Ölçüm: temkinli ({reason})',
+  },
+  'native.measurement_authority.reason.http_404': {
+    en: 'root tokenize/apply-template returned 404',
+    tr: 'kök tokenize/apply-template 404 döndü',
+  },
+  'native.measurement_authority.reason.timeout': { en: 'measurement probe timed out', tr: 'ölçüm probu zaman aşımına uğradı' },
+  'native.measurement_authority.reason.schema': { en: 'measurement response invalid', tr: 'ölçüm yanıtı geçersiz' },
+  'native.measurement_authority.reason.unsupported_endpoint': {
+    en: 'hosted endpoint has no local tokenize routes',
+    tr: 'barındırılan uç noktada yerel tokenize yolu yok',
+  },
+  'native.measurement_authority.reason.measurement_failed': {
+    en: 'latest measurement failed; conservative upper bound in use',
+    tr: 'son ölçüm başarısız; temkinli üst sınır kullanılıyor',
+  },
+  'native.measurement_authority.reason.unknown': { en: 'reason unknown', tr: 'neden bilinmiyor' },
   'native-context.trigger.token_pressure': { en: 'measured context pressure', tr: 'ölçülmüş bağlam baskısı' },
   'native-context.trigger.overflow': { en: 'input overflow recovery', tr: 'girdi taşması kurtarması' },
   'native-context.trigger.manual': { en: 'explicit compaction', tr: 'doğrudan sıkıştırma' },

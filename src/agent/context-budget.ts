@@ -24,6 +24,20 @@ const DEFAULT_MEASUREMENT_TIMEOUT_MS = 2_000;
 const DEFAULT_MEASUREMENT_CACHE_SIZE = 256;
 const measurementCache = new Map<string, RequestMeasurement>();
 
+export type RequestMeasurementUnavailableReason =
+  | 'http-404'
+  | 'timeout'
+  | 'schema'
+  | 'unsupported-endpoint'
+  /** The boot probe passed but the latest real measurement returned null. */
+  | 'measurement-failed';
+
+export interface RequestMeasurementAuthorityStatus {
+  readonly state: 'exact-available' | 'unavailable';
+  readonly reason?: RequestMeasurementUnavailableReason;
+  readonly provenance?: string;
+}
+
 /** ~4 chars per token — the cross-model rule of thumb, rounded up. */
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
@@ -140,6 +154,37 @@ export function conservativeRequestTokenUpperBound(req: ProviderRequest): number
   return wireBytes + framingTokens;
 }
 
+/** Config-resolved measurement deadline: base + per-KiB wire payload. */
+export function resolveMeasurementTimeoutMs(
+  wireUtf8Bytes: number,
+  baseMs = DEFAULT_MEASUREMENT_TIMEOUT_MS,
+  perKiBMs = 250,
+): number {
+  const extra = Math.ceil(Math.max(0, wireUtf8Bytes) / 1024) * perKiBMs;
+  return Math.min(30_000, baseMs + extra);
+}
+
+/**
+ * 7109-b — the /context authority line follows the LAST real measurement once
+ * one exists: a boot probe that timed out while the router was still loading
+ * the model must not label a session "conservative" forever, and a probe that
+ * succeeded must not hide a later failing counter. Before any request the boot
+ * probe is the only evidence.
+ */
+export function deriveMeasurementAuthority(
+  boot: RequestMeasurementAuthorityStatus | undefined,
+  last: RequestMeasurement | undefined,
+): RequestMeasurementAuthorityStatus | undefined {
+  if (!last) return boot;
+  if (last.quality === 'exact') {
+    return { state: 'exact-available', ...(last.provenance ? { provenance: last.provenance } : {}) };
+  }
+  return {
+    state: 'unavailable',
+    reason: boot?.state === 'unavailable' && boot.reason ? boot.reason : 'measurement-failed',
+  };
+}
+
 export async function measureProviderRequest(input: {
   request: ProviderRequest;
   identity: ProviderContextIdentity;
@@ -155,7 +200,9 @@ export async function measureProviderRequest(input: {
   let result: RequestMeasurement | null = null;
   if (input.capability) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), input.timeoutMs ?? DEFAULT_MEASUREMENT_TIMEOUT_MS);
+    const wireBytes = providerRequestWireUtf8Bytes(input.request);
+    const timeoutMs = input.timeoutMs ?? resolveMeasurementTimeoutMs(wireBytes);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const exact = await input.capability.measure(input.request, controller.signal);
       if (exact && Number.isSafeInteger(exact.inputTokens) && exact.inputTokens >= 0) {

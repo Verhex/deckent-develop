@@ -13,6 +13,8 @@ import {
   resolveNativeProvider,
   resolveNativeSelection,
   resolveContextBudgetTokens,
+  resolveNativeMeasurementEndpoint,
+  probeRequestMeasurementAuthority,
   inferNativeProviderForModel,
   listNativeModelCandidates,
   registryProviderFor,
@@ -21,6 +23,7 @@ import {
   type ProviderError,
   type ResolvedProvider,
 } from './native-transport.js';
+import type { RequestMeasurementAuthorityStatus } from '../../agent/context-budget.js';
 // TERMINAL-PICKER-002 — the interactive value picker's data + label seams.
 import { buildPickerLabels, PICKER_VIA_KEYS } from './picker-labels.js';
 import { AUTH_PROBE_PROVIDERS, nativeProviderVia } from '../../core/native-provider-names.js';
@@ -842,6 +845,15 @@ export interface ContextSlashLabels extends NativeRequestMetricLabels {
   requestPressure?: string;
   measurementQualityExact?: string;
   measurementQualityUpperBound?: string;
+  measurementAuthority?: string;
+  measurementStateExact?: string;
+  measurementStateUnavailable?: string;
+  measurementReasonSuffix?: string;
+  measurementReasonHttp404?: string;
+  measurementReasonTimeout?: string;
+  measurementReasonSchema?: string;
+  measurementReasonUnsupported?: string;
+  measurementReasonFailed?: string;
   highWater: string;      // "auto-compaction at {percent}% of the window"
   refreshPlanned: string; // "a compaction is planned for the next turn"
   unknown: string;        // "unknown"
@@ -867,6 +879,15 @@ export function buildContextSlashLabels(t: (key: string) => string): ContextSlas
     requestPressure: t('native-context.slash.request_pressure'),
     measurementQualityExact: t('native-context.measurement.quality_exact'),
     measurementQualityUpperBound: t('native-context.measurement.quality_upper_bound'),
+    measurementAuthority: t('native-context.slash.measurement_authority'),
+    measurementStateExact: t('native-context.measurement.state_exact'),
+    measurementStateUnavailable: t('native-context.measurement.state_unavailable'),
+    measurementReasonSuffix: t('native-context.measurement.reason_suffix'),
+    measurementReasonHttp404: t('native.measurement_authority.reason.http_404'),
+    measurementReasonTimeout: t('native.measurement_authority.reason.timeout'),
+    measurementReasonSchema: t('native.measurement_authority.reason.schema'),
+    measurementReasonUnsupported: t('native.measurement_authority.reason.unsupported_endpoint'),
+    measurementReasonFailed: t('native.measurement_authority.reason.measurement_failed'),
     contextTriggers: {
       'token-pressure': t('native-context.trigger.token_pressure'),
       overflow: t('native-context.trigger.overflow'),
@@ -942,6 +963,22 @@ export function formatContextSnapshot(snapshot: ContextSnapshot, labels: Context
         .replace('{window}', String(pressure.windowTokens))
         .replace('{quality}', qualityLabel)}`);
     }
+  }
+  if (snapshot.measurementAuthority && labels.measurementAuthority) {
+    const authority = snapshot.measurementAuthority;
+    const stateLabel = authority.state === 'exact-available'
+      ? (labels.measurementStateExact ?? authority.state)
+      : (labels.measurementStateUnavailable ?? authority.state);
+    const reasonText = authority.reason === 'http-404' ? labels.measurementReasonHttp404
+      : authority.reason === 'timeout' ? labels.measurementReasonTimeout
+        : authority.reason === 'schema' ? labels.measurementReasonSchema
+          : authority.reason === 'unsupported-endpoint' ? labels.measurementReasonUnsupported
+            : authority.reason === 'measurement-failed' ? labels.measurementReasonFailed
+              : undefined;
+    const reasonSuffix = authority.state === 'unavailable' && reasonText && labels.measurementReasonSuffix
+      ? labels.measurementReasonSuffix.replace('{reason}', reasonText)
+      : '';
+    lines.push(`  ${labels.measurementAuthority.replace('{state}', stateLabel).replace('{reason}', reasonSuffix)}`);
   }
   if (snapshot.refreshPlanned) lines.push(`  ${labels.refreshPlanned}`);
   return lines.join('\n');
@@ -1682,6 +1719,7 @@ export async function runInkRepl(
     || projectCfg.native_model !== undefined
     || process.env['DECKENT_NATIVE_MODEL'] !== undefined;
   let nativeBoot: ResolvedProvider | ProviderError | undefined;
+  let measurementAuthority: RequestMeasurementAuthorityStatus | undefined;
   let nativeCfg: NativeTransportConfig | undefined;
   let deckSecrets: Record<string, string> | undefined;
   if (nativeSelected) {
@@ -1708,6 +1746,18 @@ export async function runInkRepl(
         return { exitCode: 1, errorCode: nativeBoot.errorCode ?? 'native-boot-failed' };
       }
       process.stdout.write(`\n${renderTerminalMessage('native.boot.legacy-host-fallback', lang, terminalGlyphs, { provider: providerName })}\n`);
+    } else {
+      const claudeKey = deckSecrets['DECKENT_CLAUDE_API_KEY']
+        || process.env['DECKENT_CLAUDE_API_KEY']
+        || process.env['ANTHROPIC_API_KEY'];
+      measurementAuthority = await probeRequestMeasurementAuthority({
+        providerName: nativeBoot.providerName,
+        model: nativeBoot.model,
+        endpoint: resolveNativeMeasurementEndpoint(nativeBoot.providerName, nativeCfg),
+        ...(nativeBoot.providerName === 'claude' && claudeKey
+          ? { headers: { 'x-api-key': claudeKey, 'anthropic-version': '2023-06-01' } }
+          : {}),
+      });
     }
   }
 
@@ -2290,6 +2340,7 @@ export async function runInkRepl(
         ...(recordTurn ? { recordTurn } : {}),
         scratch: scratchIds,
         contentStore: sessionContentStore,
+        ...(measurementAuthority ? { measurementAuthority } : {}),
       });
     }
   }

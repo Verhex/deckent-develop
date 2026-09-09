@@ -325,6 +325,8 @@ export interface NativeEngineDeps {
    * close (the dispatcher's legacy store reaps itself by prefix).
    */
   contentStore?: ContentWriter;
+  /** Boot-time exact measurement probe (7109-b) — surfaced on /context. */
+  measurementAuthority?: import('../../agent/context-budget.js').RequestMeasurementAuthorityStatus;
 }
 
 /**
@@ -950,6 +952,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
       : {}),
     ...(deps.scratch ? { scratch: { ...deps.scratch, checkpointInstruction: CHECKPOINT_INSTRUCTION } } : {}),
     ...(deps.contentStore ? { contentStore: deps.contentStore } : {}),
+    ...(deps.measurementAuthority ? { measurementAuthority: deps.measurementAuthority } : {}),
     checkpointLabels: buildCheckpointTrailLabels(t),
   });
 

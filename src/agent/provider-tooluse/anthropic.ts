@@ -79,9 +79,13 @@ async function readBodyText(body: AsyncIterable<Uint8Array>): Promise<string> {
   }
 }
 
+/** Anthropic Messages API default base — the one literal, shared with the
+ *  boot-time measurement probe so both surfaces resolve the same host. */
+export const ANTHROPIC_DEFAULT_BASE_URL = 'https://api.anthropic.com/v1';
+
 export function createAnthropicAdapter(opts: AnthropicAdapterOptions): ProviderAdapter {
   const fetchImpl = opts.fetchImpl ?? globalThis.fetch;
-  const baseUrl = opts.baseUrl ?? 'https://api.anthropic.com/v1';
+  const baseUrl = opts.baseUrl ?? ANTHROPIC_DEFAULT_BASE_URL;
   return {
     name: 'anthropic',
     async *send(req: ProviderRequest): AsyncIterable<ProviderEvent> {

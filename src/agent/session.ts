@@ -33,7 +33,13 @@ import type {
 } from './provider-tooluse/types.js';
 import { InputContextOverflowError } from './provider-tooluse/context-errors.js';
 import { providerContextErrorCode } from './provider-tooluse/context-errors.js';
-import { decideProviderAdmission, estimateTokens, measureProviderRequest } from './context-budget.js';
+import {
+  decideProviderAdmission,
+  estimateTokens,
+  measureProviderRequest,
+  deriveMeasurementAuthority,
+  type RequestMeasurementAuthorityStatus,
+} from './context-budget.js';
 import { openScratchStore, type CheckpointReadResult, type ScratchCheckpointPayload, type ScratchStore, SCRATCH_CHECKPOINT_SCHEMA_VERSION } from './scratch-checkpoint.js';
 import {
   boundLastAssistantText,
@@ -245,6 +251,8 @@ export interface AgentSessionDeps {
   getAdapter?: () => ProviderAdapter;
   getModel?: () => string;
   getContextBudgetTokens?: () => number | undefined;
+  /** Typed boot probe for exact token counting (7109-b). */
+  measurementAuthority?: RequestMeasurementAuthorityStatus;
   /** NT-06 progressive tool surface — per-round provider schema view (loop.ts
    *  falls back to the full registry when absent). */
   getProviderToolSchemas?: LoopDeps['getProviderToolSchemas'];
@@ -351,6 +359,8 @@ export interface ContextSnapshot {
   highWaterRatio: number;
   lastContextTrigger?: 'token-pressure' | 'overflow' | 'manual' | 'planned' | 'cadence';
   lastCheckpointPressure?: BudgetCheckpointPressure;
+  /** Boot-time exact-counter probe — honest unavailable is visible on /context. */
+  measurementAuthority?: RequestMeasurementAuthorityStatus;
 }
 
 export function createAgentSession(deps: AgentSessionDeps): AgentSession {
@@ -1415,6 +1425,10 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
         highWaterRatio: contextBudget.contextHighWaterRatio,
         ...(lastContextTrigger ? { lastContextTrigger } : {}),
         ...(lastCheckpointPressure ? { lastCheckpointPressure } : {}),
+        ...((() => {
+          const authority = deriveMeasurementAuthority(deps.measurementAuthority, decision?.measurement);
+          return authority ? { measurementAuthority: authority } : {};
+        })()),
       };
     },
     clearLastRequestMeasurement(): void {

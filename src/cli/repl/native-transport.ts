@@ -10,8 +10,8 @@
 // or mid-stream flush() calls (the "queue/flush" race guard).
 
 import { detectTransport, type TransportConfig } from '../../agent/provider-detect.js';
-import { createAnthropicAdapter } from '../../agent/provider-tooluse/anthropic.js';
-import { createOpenAIAdapter } from '../../agent/provider-tooluse/openai.js';
+import { ANTHROPIC_DEFAULT_BASE_URL, createAnthropicAdapter } from '../../agent/provider-tooluse/anthropic.js';
+import { createOpenAIAdapter, toOpenAIChatMessages, toOpenAIChatTools } from '../../agent/provider-tooluse/openai.js';
 import { createOllamaAdapter } from '../../agent/provider-tooluse/ollama.js';
 import type {
   ProviderAdapter,
@@ -42,8 +42,12 @@ import {
   decideProviderAdmission,
   deriveEffectiveContext,
   measureProviderRequest,
+  resolveMeasurementTimeoutMs,
   type EffectiveContextResult,
+  type RequestMeasurementAuthorityStatus,
+  type RequestMeasurementUnavailableReason,
 } from '../../agent/context-budget.js';
+export type { RequestMeasurementAuthorityStatus, RequestMeasurementUnavailableReason } from '../../agent/context-budget.js';
 import {
   ContextAuthorityUnavailableError,
   InputContextOverflowError,
@@ -55,6 +59,49 @@ export interface NativeEndpointHealth {
   endpoint: string;
   healthy: boolean;
   detail?: string;
+}
+
+/** Strip a trailing OpenAI-compatible `/v1` suffix so llama.cpp root routes resolve. */
+export function resolveLlamaCppServerRoot(endpoint: string): string {
+  return endpoint.replace(/\/v1\/?$/u, '').replace(/\/$/, '');
+}
+
+export function resolveNativeMeasurementEndpoint(
+  providerName: string,
+  config: NativeTransportConfig,
+): string | undefined {
+  if (providerName !== 'local-llm') return undefined;
+  const legacyDefinition = config.providers?.['local-llm'] as { baseUrl?: string; endpoint?: string } | undefined;
+  const registryDefinition = config.providers?.registry?.find((entry) => entry.name === 'local-llm');
+  return config.local_llm?.endpoint
+    ?? registryDefinition?.baseUrl
+    ?? registryDefinition?.endpoint
+    ?? legacyDefinition?.baseUrl
+    ?? legacyDefinition?.endpoint;
+}
+
+function llamaCppRootBase(endpoint: string): string {
+  const root = resolveLlamaCppServerRoot(endpoint);
+  return root.endsWith('/') ? root : `${root}/`;
+}
+
+/**
+ * 7109-b — measurement bodies mirror the completion wire exactly (real-binary
+ * evidence, llama.cpp b10398 router + Qwen chat template): a top-level
+ * `system` field is ignored by the template, native tool schemas fail with
+ * "Missing tool type", an empty `messages` array raises inside the template,
+ * and router mode rejects a `/tokenize` body without `model`.
+ */
+function llamaCppTemplateBody(req: Pick<ProviderRequest, 'model' | 'system' | 'messages' | 'tools'>): Record<string, unknown> {
+  return {
+    model: req.model,
+    messages: toOpenAIChatMessages(req),
+    ...(req.tools.length > 0 ? { tools: toOpenAIChatTools(req.tools) } : {}),
+  };
+}
+
+function llamaCppTokenizeBody(model: string, content: string): Record<string, unknown> {
+  return { model, content, add_special: true };
 }
 
 export interface ResolvedProvider {
@@ -86,6 +133,7 @@ function requestMeasurementCapability(input: {
   fetchFn: typeof globalThis.fetch;
   headers?: Record<string, string>;
 }): ProviderRequestMeasurementCapability {
+  const llamaRoot = input.kind === 'llama.cpp' ? llamaCppRootBase(input.endpoint) : undefined;
   return {
     async measure(req, signal) {
       if (input.kind === 'anthropic') {
@@ -99,16 +147,16 @@ function requestMeasurementCapability(input: {
           ? { inputTokens: body.input_tokens, provenance: 'anthropic-count-tokens' }
           : null;
       }
-      const templated = await input.fetchFn(new URL('apply-template', `${input.endpoint.replace(/\/$/, '')}/`).toString(), {
+      const templated = await input.fetchFn(new URL('apply-template', llamaRoot!).toString(), {
         method: 'POST', signal, headers: { 'content-type': 'application/json', ...input.headers },
-        body: JSON.stringify({ model: req.model, system: req.system, messages: req.messages, tools: req.tools }),
+        body: JSON.stringify(llamaCppTemplateBody(req)),
       });
       if (!templated.ok) return null;
       const templateBody = await templated.json() as { prompt?: unknown };
       if (typeof templateBody.prompt !== 'string') return null;
-      const tokenized = await input.fetchFn(new URL('tokenize', `${input.endpoint.replace(/\/$/, '')}/`).toString(), {
+      const tokenized = await input.fetchFn(new URL('tokenize', llamaRoot!).toString(), {
         method: 'POST', signal, headers: { 'content-type': 'application/json', ...input.headers },
-        body: JSON.stringify({ content: templateBody.prompt, add_special: true }),
+        body: JSON.stringify(llamaCppTokenizeBody(req.model, templateBody.prompt)),
       });
       if (!tokenized.ok) return null;
       const tokenBody = await tokenized.json() as { tokens?: unknown[]; count?: unknown };
@@ -118,6 +166,114 @@ function requestMeasurementCapability(input: {
       return count === null ? null : { inputTokens: count, provenance: 'llama.cpp-apply-template-tokenize' };
     },
   };
+}
+
+const DEFAULT_MEASUREMENT_PROBE_TIMEOUT_MS = 2_000;
+
+export async function probeRequestMeasurementAuthority(input: {
+  providerName: string;
+  endpoint?: string;
+  model: string;
+  fetchFn?: typeof globalThis.fetch;
+  headers?: Record<string, string>;
+  timeoutMs?: number;
+}): Promise<RequestMeasurementAuthorityStatus> {
+  const fetchFn = input.fetchFn ?? globalThis.fetch;
+  if (input.providerName === 'claude') {
+    const endpoint = ANTHROPIC_DEFAULT_BASE_URL;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), input.timeoutMs ?? DEFAULT_MEASUREMENT_PROBE_TIMEOUT_MS);
+    try {
+      const response = await fetchFn(new URL('messages/count_tokens', `${endpoint}/`).toString(), {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'content-type': 'application/json', ...input.headers },
+        body: JSON.stringify({ model: input.model, system: 'probe', messages: [{ role: 'user', content: 'probe' }], tools: [] }),
+      });
+      if (response.status === 404) return { state: 'unavailable', reason: 'http-404' };
+      if (!response.ok) return { state: 'unavailable', reason: 'schema' };
+      const body = await response.json() as { input_tokens?: unknown };
+      return typeof body.input_tokens === 'number'
+        ? { state: 'exact-available', provenance: 'anthropic-count-tokens' }
+        : { state: 'unavailable', reason: 'schema' };
+    } catch (error) {
+      return error instanceof Error && error.name === 'AbortError'
+        ? { state: 'unavailable', reason: 'timeout' }
+        : { state: 'unavailable', reason: 'schema' };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  if (input.providerName === 'local-llm' && input.endpoint) {
+    const root = llamaCppRootBase(input.endpoint);
+    const probeRequest = {
+      model: input.model,
+      system: '',
+      messages: [{ role: 'user' as const, content: 'probe' }],
+      tools: [] as ProviderRequest['tools'],
+    };
+    const wireBytes = Buffer.byteLength(JSON.stringify(llamaCppTemplateBody(probeRequest)), 'utf8');
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      input.timeoutMs ?? resolveMeasurementTimeoutMs(wireBytes),
+    );
+    try {
+      const templated = await fetchFn(new URL('apply-template', root).toString(), {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'content-type': 'application/json', ...input.headers },
+        body: JSON.stringify(llamaCppTemplateBody(probeRequest)),
+      });
+      if (templated.status === 404) return { state: 'unavailable', reason: 'http-404' };
+      if (!templated.ok) return { state: 'unavailable', reason: 'schema' };
+      const templateBody = await templated.json() as { prompt?: unknown };
+      if (typeof templateBody.prompt !== 'string') return { state: 'unavailable', reason: 'schema' };
+      const tokenized = await fetchFn(new URL('tokenize', root).toString(), {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'content-type': 'application/json', ...input.headers },
+        body: JSON.stringify(llamaCppTokenizeBody(input.model, templateBody.prompt)),
+      });
+      if (tokenized.status === 404) return { state: 'unavailable', reason: 'http-404' };
+      if (!tokenized.ok) return { state: 'unavailable', reason: 'schema' };
+      const tokenBody = await tokenized.json() as { tokens?: unknown[]; count?: unknown };
+      const count = typeof tokenBody.count === 'number'
+        ? tokenBody.count
+        : Array.isArray(tokenBody.tokens) ? tokenBody.tokens.length : null;
+      return count === null
+        ? { state: 'unavailable', reason: 'schema' }
+        : { state: 'exact-available', provenance: 'llama.cpp-apply-template-tokenize' };
+    } catch (error) {
+      return error instanceof Error && error.name === 'AbortError'
+        ? { state: 'unavailable', reason: 'timeout' }
+        : { state: 'unavailable', reason: 'schema' };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  return { state: 'unavailable', reason: 'unsupported-endpoint' };
+}
+
+export function formatMeasurementAuthorityLine(
+  authority: RequestMeasurementAuthorityStatus | undefined,
+  lang: string,
+): string | undefined {
+  if (!authority) return undefined;
+  if (authority.state === 'exact-available') {
+    return getMessage('native.measurement_authority.exact', lang);
+  }
+  const reasonKeys: Record<RequestMeasurementUnavailableReason, string> = {
+    'http-404': 'native.measurement_authority.reason.http_404',
+    timeout: 'native.measurement_authority.reason.timeout',
+    schema: 'native.measurement_authority.reason.schema',
+    'unsupported-endpoint': 'native.measurement_authority.reason.unsupported_endpoint',
+    'measurement-failed': 'native.measurement_authority.reason.measurement_failed',
+  };
+  const reason = authority.reason
+    ? getMessage(reasonKeys[authority.reason], lang)
+    : getMessage('native.measurement_authority.reason.unknown', lang);
+  return getMessage('native.measurement_authority.unavailable', lang, { reason });
 }
 
 /** Wrap the real native adapter at its single dispatch seam. Measurement and
@@ -390,6 +546,7 @@ export async function validateNativeModelIdentity(
 export async function formatNativeProviderStatus(
   resolved: ResolvedProvider,
   lang: string,
+  measurementAuthority?: RequestMeasurementAuthorityStatus,
 ): Promise<string> {
   const health = await resolved.endpointHealth?.();
   const statusLine = getMessage('native.provider_status', lang, {
@@ -402,6 +559,8 @@ export async function formatNativeProviderStatus(
   // Model-identity verdict (LOCAL-LLM-MODEL-IDENTITY-001): surfaced at session
   // start so a config/router mismatch is visible BEFORE the first failing turn.
   const lines = [statusLine];
+  const measurementLine = formatMeasurementAuthorityLine(measurementAuthority, lang);
+  if (measurementLine) lines.push(measurementLine);
   const identity = await resolved.modelIdentity?.();
   if (identity && identity.state === 'unknown-model') {
     lines.push(getMessage('native.model_identity.unknown', lang, {
@@ -614,7 +773,7 @@ export function resolveNativeSelection(
         provider: 'claude',
       };
     }
-    const endpoint = 'https://api.anthropic.com/v1';
+    const endpoint = ANTHROPIC_DEFAULT_BASE_URL;
     return measuredResolved({
       adapter: createAnthropicAdapter({ apiKey, baseUrl: endpoint }),
       model: wire.apiId,
@@ -651,10 +810,6 @@ export function resolveNativeSelection(
     if (apiKey) opts.apiKey = apiKey;
     return measuredResolved({
       adapter: createOpenAIAdapter(opts), model, providerName: 'openai',
-      capability: requestMeasurementCapability({
-        kind: 'llama.cpp', endpoint: baseUrl, fetchFn: ctx.fetchFn ?? globalThis.fetch,
-        ...(apiKey ? { headers: { authorization: `Bearer ${apiKey}` } } : {}),
-      }),
     });
   }
 
@@ -791,10 +946,6 @@ export function resolveNativeSelection(
         baseUrl: meta.baseURL, apiKey, name: meta.name,
         reasoningControl: (wireModel) => resolveModelReasoningControl(wireModel),
       }), model, providerName: provider,
-      capability: requestMeasurementCapability({
-        kind: 'llama.cpp', endpoint: meta.baseURL, fetchFn: ctx.fetchFn ?? globalThis.fetch,
-        headers: { authorization: `Bearer ${apiKey}` },
-      }),
     });
   }
 
@@ -813,9 +964,6 @@ export function resolveNativeSelection(
     if (inactive) return inactive;
     return measuredResolved({
       adapter: createOllamaAdapter({ host: config.ollama_host }), model, providerName: 'ollama',
-      capability: requestMeasurementCapability({
-        kind: 'llama.cpp', endpoint: config.ollama_host, fetchFn: ctx.fetchFn ?? globalThis.fetch,
-      }),
     });
   }
 
