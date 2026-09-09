@@ -1,6 +1,7 @@
 import { releaseSprintLock } from '../core/multi-ide.js';
 import { clearActiveSprint } from './sprint-lifecycle.js';
 import { clearPid } from './sprint-pid-manager.js';
+import type { ExactLifecycleReconcileOptionsV1 } from './scheduler-effects.js';
 
 /**
  * Retire the current coordinator's planning lease when startup recovery
@@ -44,9 +45,14 @@ export async function containAndRetireFailedExecutionAuthority(
   projectRoot: string,
   sprintId: string,
   lifecycleAuthority: {
-    reconcileExactLifecycle(mode: 'contain'): Promise<unknown>;
+    reconcileExactLifecycle(
+      mode: 'contain',
+      options?: ExactLifecycleReconcileOptionsV1,
+    ): Promise<unknown>;
   },
+  options?: ExactLifecycleReconcileOptionsV1,
 ): Promise<void> {
-  await lifecycleAuthority.reconcileExactLifecycle('contain');
+  if (options === undefined) await lifecycleAuthority.reconcileExactLifecycle('contain');
+  else await lifecycleAuthority.reconcileExactLifecycle('contain', options);
   retireFailedSpawnAuthority(projectRoot, sprintId);
 }

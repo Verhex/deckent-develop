@@ -46,6 +46,9 @@ vi.mock('../../src/core/file-lock.js', () => ({
 import { spawn, spawnSync } from 'node:child_process';
 import { DockerSpawnBackend } from '../../src/orchestra/spawn-backend-docker.js';
 import {
+  createExactNormalDockerExecutionRegistry,
+} from '../../src/orchestra/scheduler-effects.js';
+import {
   createTaskResultSettlementV2Fixture,
   type TaskResultAcceptedV2Fixture,
 } from '../helpers/task-result-settlement-v2-fixture.js';
@@ -73,7 +76,10 @@ function projectRoot(): string {
  * real custody-store fixture, so the reconciler reads the fixture's genuine
  * chain receipts while every unrelated Store query stays explicit.
  */
-function recoveryHarness(fixture: TaskResultAcceptedV2Fixture) {
+function recoveryHarness(
+  fixture: TaskResultAcceptedV2Fixture,
+  daemon: 'container-absent' | 'unstubbed' = 'unstubbed',
+) {
   const identity = fixture.identity;
   const admissionRef = {
     schemaVersion: 2 as const,
@@ -164,7 +170,24 @@ function recoveryHarness(fixture: TaskResultAcceptedV2Fixture) {
     () => ({ kind: 'cold-accepted-result' }),
   );
   internals.readColdExactDockerAcceptedResult = readColdExactDockerAcceptedResult;
-  return { backend, identity, store, readColdExactDockerAcceptedResult };
+  // Containment probes the daemon through the injected workspace command
+  // runner. `docker inspect` on a removed container answers exit 1 with an
+  // empty stdout and the daemon's "no such object" line — the exact shape
+  // `isExactDockerContainerAbsent` accepts.
+  const workspaceCommands = vi.fn(async () => Object.freeze({
+    status: 1,
+    signal: null,
+    stdout: new Uint8Array(),
+    stderr: Buffer.from(`error: no such object: ${authority.backendExecutionId}`),
+    error: false,
+    overflow: false,
+  }));
+  if (daemon === 'container-absent') {
+    internals.exactWorkspaceCommandRunner = workspaceCommands;
+  }
+  return {
+    backend, identity, store, readColdExactDockerAcceptedResult, workspaceCommands,
+  };
 }
 
 describe('docker restart reconciliation of terminally archived attempts', () => {
@@ -222,6 +245,60 @@ describe('docker restart reconciliation of terminally archived attempts', () => 
     expect(report.historicalArchived).toEqual([harness.identity.taskId]);
     expect(report.adopted).not.toContain(harness.identity.taskId);
     expect(report.held).toEqual([]);
+  });
+
+  // The 2026-09-09 `EXACT_LIFECYCLE_CONTAIN_HOLD` shape: a released,
+  // provider-exited attempt whose custody chain stops at `accepted-result`
+  // (sprint-728's `728-001`) is NOT archived, so containment is attempted, the
+  // effect resources it named are long gone and the entry holds. The hold must
+  // carry the daemon fact so the registry can decide without re-inferring it.
+  it('reports a containment hold with the daemon container proven absent', async () => {
+    const fixture = createTaskResultSettlementV2Fixture({ terminal: 'accepted-only' });
+    const harness = recoveryHarness(fixture, 'container-absent');
+
+    const report = await harness.backend.reconcilePendingAttempts({ mode: 'contain' });
+
+    expect(report.historicalArchived).toBeUndefined();
+    expect(report.adopted).not.toContain(harness.identity.taskId);
+    expect(report.held).toEqual([expect.objectContaining({
+      kind: 'spawn-backend-recovery-hold',
+      backend: 'docker',
+      taskId: harness.identity.taskId,
+      authorityState: 'DISPATCH_TERMINAL',
+      reasonCode: 'TERMINAL_RECONCILIATION_REQUIRED',
+      daemonContainerState: 'absent',
+    })]);
+    expect(harness.workspaceCommands).toHaveBeenCalled();
+  });
+
+  // End-to-end for the fix: the registry given a truthful historical-foreign
+  // predicate consumes exactly that hold and no longer throws. (The predicate's
+  // own fail-closed proof lives in `scheduler-effects.test.ts`.)
+  it('lets the registry retire that hold as foreign, already-contained history', async () => {
+    const fixture = createTaskResultSettlementV2Fixture({ terminal: 'accepted-only' });
+    const harness = recoveryHarness(fixture, 'container-absent');
+    const registry = createExactNormalDockerExecutionRegistry(projectRoot());
+    registry.rehydrateRecovery({
+      adopted: [], closedNotDispatched: [], closedAbsentAfterExit: [],
+      retiredLanded: [], resumedContinuations: [], exactEntries: [], held: [],
+    }, harness.backend);
+    // Seeded so the skip is proven to DELETE the entry: a survivor owned by
+    // this backend would reach the containment inventory sweep and throw
+    // `EXACT_CONTAINMENT_INCOMPLETE` instead.
+    registry.registerHold(harness.identity.taskId, 'seeded-prior-hold', harness.backend);
+    expect(registry.readTaskResultAuthority(harness.identity.taskId).state)
+      .toBe('authority-hold');
+
+    await expect(registry.reconcileExactLifecycle('contain', {
+      isHistoricalForeignTask: (taskId: string) => taskId === harness.identity.taskId,
+    })).resolves.toHaveLength(1);
+
+    expect(registry.readTaskResultAuthority(harness.identity.taskId).state)
+      .not.toBe('authority-hold');
+    expect(registry.snapshotExactTerminalAuthorities().has(harness.identity.taskId))
+      .toBe(false);
+    expect(registry.snapshotHistoricalUnsettleableAttempts()
+      .has(harness.identity.taskId)).toBe(true);
   });
 
   it('still recovers the same attempt when the archive chain is absent', async () => {

@@ -1652,6 +1652,60 @@ export function isBoundRecoveredAttemptIdentity(
     && Number.isSafeInteger(candidate.generation) && (candidate.generation as number) > 0;
 }
 
+/**
+ * Build the origin authority the exact registry needs to skip a containment
+ * hold that belongs to an earlier, already-terminal run.
+ *
+ * Same fail-closed contract as `settleRecoveredExactTerminalAuthorities`:
+ * ORDINALS are compared, never raw ids (`getNextSprintId` mints `sprint-007`
+ * while its task ids carry the unpadded `7-001` prefix), an unprovable origin
+ * or an unparseable current sprint disables the skip entirely, and the durable
+ * owning-run read — the only disk-backed predicate — runs last and is memoized
+ * because it sweeps `.brain/sprints` and `.deckent/archive/sprints`.
+ *
+ * @internal Exported for cold-restart fan-in behavior tests.
+ */
+export function createHistoricalForeignTaskPredicate(
+  projectRoot: string,
+  currentSprintId: string | null,
+  /** Injected for hermetic tests; production binds the durable read-model. */
+  readOwningRunLifecycle?: (sprintId: string) => OwningRunTerminalDisposition | null,
+): (taskId: string) => boolean {
+  const currentOrdinal = currentSprintId === null
+    ? null
+    : parseSprintOrdinal(currentSprintId);
+  const owningRunCache = new Map<string, OwningRunTerminalDisposition>();
+  const readOwningRun = (sprintId: string): OwningRunTerminalDisposition => {
+    const cached = owningRunCache.get(sprintId);
+    if (cached !== undefined) return cached;
+    let disposition: OwningRunTerminalDisposition;
+    if (!readOwningRunLifecycle) {
+      disposition = readOwningRunTerminalDisposition(projectRoot, sprintId);
+    } else {
+      try {
+        disposition = readOwningRunLifecycle(sprintId) ?? 'unknown';
+      } catch (error) {
+        debugLog('sprint-controller:owning-run-disposition-unreadable', error);
+        disposition = 'unknown';
+      }
+    }
+    owningRunCache.set(sprintId, disposition);
+    return disposition;
+  };
+  return (taskId: string): boolean => {
+    if (currentOrdinal === null) return false;
+    const owningSprintId = restoreCandidateSprintIdForTaskId(taskId);
+    if (owningSprintId === null) return false;
+    const owningOrdinal = parseSprintOrdinal(owningSprintId);
+    // EARLIER only. `!==` would admit a FUTURE or concurrent ordinal (current
+    // sprint-730, task `731-001`) whose owning run happens to read `terminal`
+    // — a run that has not started yet, or a sibling coordinator's, is not this
+    // run's history and must never be projected away.
+    if (owningOrdinal === null || owningOrdinal >= currentOrdinal) return false;
+    return readOwningRun(owningSprintId) === 'terminal';
+  };
+}
+
 /** @internal Exported for cold-restart fan-in behavior tests. */
 export async function settleRecoveredExactTerminalAuthorities(
   registry: ExactNormalDockerExecutionRegistryV2,
@@ -1748,7 +1802,12 @@ export async function settleRecoveredExactTerminalAuthorities(
           && !candidateUnprovable
           && owningSprintId !== null
           && owningOrdinal !== null
-          && owningOrdinal !== candidateOrdinal
+          // EARLIER only, exactly as `createHistoricalForeignTaskPredicate`:
+          // the restore candidate IS the current run, so an attempt whose
+          // ordinal is at or beyond it is future/concurrent work, never
+          // history. With no restore candidate there is no current run to be
+          // earlier than, and the pre-existing behaviour is preserved.
+          && (candidateOrdinal === null || owningOrdinal < candidateOrdinal)
           && isBoundRecoveredAttemptIdentity(
             taskId,
             resultAuthority.exactAcceptedAuthority.identity,
@@ -3158,6 +3217,10 @@ export async function runSprint(
           routingFailure,
           'provider-routing-hold',
           exactDockerRegistry,
+          {
+            isHistoricalForeignTask:
+              createHistoricalForeignTaskPredicate(projectRoot, sprint.id),
+          },
         );
         emitSprintEvent('SPRINT_PAUSED', {
           sprintId: sprint.id,
@@ -3425,6 +3488,10 @@ export async function runSprint(
           projectRoot,
           sprint.id,
           exactDockerRegistry,
+          {
+            isHistoricalForeignTask:
+              createHistoricalForeignTaskPredicate(projectRoot, sprint.id),
+          },
         );
         throw err;
       }
@@ -3815,6 +3882,10 @@ export async function runSprint(
       reason,
       'provider-execution-hold',
       exactDockerRegistry,
+      {
+        isHistoricalForeignTask:
+          createHistoricalForeignTaskPredicate(projectRoot, sprint.id),
+      },
     );
     emitSprintEvent('SPRINT_PAUSED', {
       sprintId: sprint.id,
@@ -3986,6 +4057,10 @@ export async function runSprint(
         `${fixSpawnFailure.code}: ${fixSpawnFailure.message}`,
         'fix-spawn-failure',
         exactDockerRegistry,
+        {
+          isHistoricalForeignTask:
+            createHistoricalForeignTaskPredicate(projectRoot, sprint.id),
+        },
       );
 
       emitSprintEvent('SPRINT_PAUSED', {
@@ -4060,7 +4135,9 @@ export async function runSprint(
       `REPAIR_QUIESCENCE_DRAIN_REQUIRED:${repairQuiescence.reason}:${repairQuiescence.pendingQueueCount}`,
     );
   }
-  await prepareExactSprintLifecycle(exactDockerRegistry, 'contain');
+  await prepareExactSprintLifecycle(exactDockerRegistry, 'contain', {
+    isHistoricalForeignTask: createHistoricalForeignTaskPredicate(projectRoot, sprint.id),
+  });
   if (applyCascadeCircuitBreaker(
     projectRoot,
     sprint,

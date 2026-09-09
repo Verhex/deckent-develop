@@ -17,6 +17,8 @@ import {
   DEFAULT_MODE,
   DECKENT_VERSION,
   SUPPORTED_LANGUAGES,
+  DOCKER_POPULATION_RETRY_MAX_DEFAULT,
+  DOCKER_POPULATION_RETRY_MAX_LIMIT,
 } from './constants.js';
 import { readJsonSafeAsync, debugLog } from './utils.js';
 import { needsMigration, migrateConfig, removeDuplicateKeys } from './config-migration.js';
@@ -1076,6 +1078,19 @@ export function validateConfig(config: DeckentConfig): string[] {
   }
 
   // ─── Sprint config validation ──────────────────────────────────────
+  // Bounded re-runs of the exact Docker workspace population helper. The value
+  // counts RETRIES, so 0 disables retrying and the hard ceiling caps how long a
+  // single population may occupy an admitted attempt.
+  if (config.docker_population_retry_max !== undefined
+    && (typeof config.docker_population_retry_max !== 'number'
+      || !Number.isInteger(config.docker_population_retry_max)
+      || config.docker_population_retry_max < 0
+      || config.docker_population_retry_max > DOCKER_POPULATION_RETRY_MAX_LIMIT)) {
+    errors.push(
+      `docker_population_retry_max must be an integer between 0 and ${DOCKER_POPULATION_RETRY_MAX_LIMIT}`,
+    );
+  }
+
   if (config.retry_transient_failures !== undefined && typeof config.retry_transient_failures !== 'boolean') {
     errors.push('retry_transient_failures must be a boolean');
   }
@@ -2070,6 +2085,10 @@ export function createDefaultConfig(): DeckentConfig {
     // reachable, else subprocess with a one-time typed log); a user who writes
     // 'docker' explicitly keeps the honest hard failure.
     spawn_backend: 'auto',
+    // Bounded re-runs of the exact Docker workspace population helper. Authored
+    // as a real default (not a hidden runtime fallback) so the resolved config
+    // carries the ceiling the adapter admits against.
+    docker_population_retry_max: DOCKER_POPULATION_RETRY_MAX_DEFAULT,
     // KN2 (GR-2026-08-08-DOGFOOD-KN2-01): default worker execution-budget POLICY.
     // The budget authority (resolveExecutionBudgetPolicy) is deliberately
     // owner-authored with no runtime default — absence is a typed `hold`, which
@@ -2731,6 +2750,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     auth_mode: config.auth_mode,
     docker_image: config.docker_image,
     docker_timeout: config.docker_timeout,
+    docker_population_retry_max: config.docker_population_retry_max,
     worker_memory_limit_by_kind: config.worker_memory_limit_by_kind,
     worker_memory_limit: config.worker_memory_limit,
     worker_home_tmpfs_size: config.worker_home_tmpfs_size, // WORKER-ENV-TMPFS-001 carry
@@ -3351,6 +3371,12 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
     description: 'Docker container timeout in seconds. Workers killed after this duration.',
     type: 'number',
     default: 1200,
+    category: 'Sprint',
+  },
+  docker_population_retry_max: {
+    description: 'Bounded re-runs of the exact Docker workspace population helper when a concurrent write to the project root aborts it before any destination byte is written. Value = retries; total attempts = value + 1.',
+    type: 'number',
+    default: DOCKER_POPULATION_RETRY_MAX_DEFAULT,
     category: 'Sprint',
   },
   worker_memory_limit_by_kind: {

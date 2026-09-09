@@ -147,6 +147,17 @@ export interface SpawnBackendRecoveryHold {
   readonly authorityState: SpawnBackendRecoveryHoldAuthorityState;
   readonly reasonCode: SpawnBackendRecoveryHoldReasonCode;
   readonly custodyHoldCode?: string;
+  /**
+   * Containment-only daemon observation for the attempt's backend execution,
+   * taken BEFORE containment is attempted so a hold raised by any later step
+   * still carries the proof.
+   *
+   * `absent` is a physical fact, not an inference: the daemon has no such
+   * object, so no live effect of this attempt can still be running and there is
+   * nothing left to contain. `present` and `unknown` prove nothing and must
+   * keep every fail-closed path. The field is absent outside `contain` mode.
+   */
+  readonly daemonContainerState?: 'absent' | 'present' | 'unknown';
 }
 
 export class SpawnBackendRecoveryHoldError extends Error {
@@ -1395,7 +1406,7 @@ export interface SpawnBackendFactoryOptions {
    * Already-resolved prompt config. Production normally uses the project-bound
    * snapshot populated by loadConfig(); this seam keeps factory tests explicit.
    */
-  effectiveConfig?: Pick<ResolvedConfig, 'prompt'>;
+  effectiveConfig?: Pick<ResolvedConfig, 'prompt' | 'docker_population_retry_max'>;
 
   /**
    * Sandbox backend options (memory limit, allowed dirs, network block).
@@ -1435,6 +1446,10 @@ export class SpawnBackendFactory {
         memorySwap: opts.dockerMemorySwap,
         kindMemoryLimits: opts.dockerKindMemoryLimits,
         homeTmpfsSize: opts.dockerHomeTmpfsSize, // WORKER-ENV-TMPFS-001: config-driven HOME tmpfs
+        // Bounded re-run ceiling for the exact workspace population helper.
+        // Config-resolved exactly like the neighbouring prompt flags; absent
+        // config keeps the validated default inside the backend.
+        populationRetryMax: effectiveConfig?.docker_population_retry_max,
         catalogMountMask: effectiveConfig?.prompt?.catalog_mount_mask,
         codexCoreChannel: effectiveConfig?.prompt?.codex_core_channel,
         codexSuppressProjectDoc: effectiveConfig?.prompt?.codex_suppress_project_doc,

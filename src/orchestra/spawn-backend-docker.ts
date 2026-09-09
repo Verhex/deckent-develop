@@ -61,7 +61,10 @@ import {
   verifyWorkerImageDependencySource,
   WORKER_IMAGE_RUNTIME_AUTHORITY_PROBE_SOURCE,
 } from '../core/worker-image-check.js';
-import { LOCKS_DIR, TASKS_DIR } from '../core/constants.js';
+import {
+  LOCKS_DIR, TASKS_DIR,
+  DOCKER_POPULATION_RETRY_MAX_DEFAULT, DOCKER_POPULATION_RETRY_MAX_LIMIT,
+} from '../core/constants.js';
 import { archiveTaskArtifacts } from '../core/sprint-archive.js';
 import {
   crossVerifyEvidenceBrokerDirectory,
@@ -2831,10 +2834,212 @@ try {
 }
 `;
 
-const EXACT_DOCKER_BOUNDED_STDIN_READER = String.raw`
+/**
+ * Typed failure ordinals for the exact Docker workspace population helper.
+ *
+ * The helper runs inside a bounded container and can only communicate through
+ * its exit code and a small stderr budget. Exit 78 stays the single "helper
+ * refused" contract; the ordinal written alongside it names WHICH invariant
+ * refused, so a population abort is attributable instead of collapsing into a
+ * generic ADAPTER_UNAVAILABLE. This table is the ONE definition of that
+ * mapping: the helper source interpolates these numbers, and the host parses
+ * them back. Ordinal 0 is reserved for host-side classification failure.
+ */
+export const EXACT_DOCKER_POPULATION_FAILURE_ORDINALS = Object.freeze({
+  HELPER_RUN_UNCLASSIFIED: 0,
+  STDIN_INVENTORY_BOUNDS: 1,
+  AUTHORITY_INVALID: 2,
+  INVENTORY_PAYLOAD_INVALID: 3,
+  DEADLINE_EXCEEDED: 4,
+  SOURCE_MUTATED_PRE_COPY: 5,
+  SOURCE_MUTATED_MID_COPY: 6,
+  SOURCE_MANIFEST_MISMATCH: 7,
+  DESTINATION_READBACK_INVALID: 8,
+  SOURCE_MUTATED_POST_COPY: 9,
+  INFRASTRUCTURE_MOUNT_POINT_CONFLICT: 10,
+  DECK_MASK_INVALID: 11,
+  WORKSPACE_OWNERSHIP_SEAL: 12,
+  NATIVE_UNAVAILABLE: 13,
+} as const);
+
+export type ExactDockerPopulationFailureReasonV1 =
+  keyof typeof EXACT_DOCKER_POPULATION_FAILURE_ORDINALS;
+
+/**
+ * Re-runnable failure class. A population attempt only becomes re-runnable when
+ * it aborted BEFORE the first destination byte was written, i.e. while the
+ * immutable pre-copy source scan was still running. Every later class leaves
+ * the workspace volume partially or fully written, and the volume generation is
+ * bound into `volumeIdentityDigest` through its daemon `createdAt`, so a clean
+ * re-run would require a NEW volume generation — an authority this adapter does
+ * not hold. Those classes therefore fail closed with their typed reason.
+ */
+export const EXACT_DOCKER_POPULATION_RETRYABLE_REASONS: readonly ExactDockerPopulationFailureReasonV1[]
+  = Object.freeze(['SOURCE_MUTATED_PRE_COPY'] as const);
+
+/** Helper→host failure marker. Mechanism token, never rendered to a user. */
+export const EXACT_DOCKER_POPULATION_FAILURE_SENTINEL = 'exact-docker-population-failure:';
+
+/** Bounded numeric summary ceiling carried beside an ordinal. */
+const EXACT_DOCKER_POPULATION_FAILURE_DETAIL_MAX = 8;
+
+export interface ExactDockerPopulationHelperFailureV1 {
+  readonly reason: ExactDockerPopulationFailureReasonV1;
+  readonly ordinal: number;
+  /** Bounded numeric summary (phase index, manifest mismatch bits, counts). */
+  readonly detail: readonly number[];
+}
+
+const EXACT_DOCKER_POPULATION_REASON_BY_ORDINAL: ReadonlyMap<
+  number, ExactDockerPopulationFailureReasonV1
+> = new Map(
+  (Object.entries(EXACT_DOCKER_POPULATION_FAILURE_ORDINALS) as readonly [
+    ExactDockerPopulationFailureReasonV1, number,
+  ][]).map(([reason, ordinal]) => [ordinal, reason]),
+);
+
+const EXACT_DOCKER_POPULATION_UNCLASSIFIED: ExactDockerPopulationHelperFailureV1 = Object.freeze({
+  reason: 'HELPER_RUN_UNCLASSIFIED' as const,
+  ordinal: EXACT_DOCKER_POPULATION_FAILURE_ORDINALS.HELPER_RUN_UNCLASSIFIED,
+  detail: Object.freeze([]) as readonly number[],
+});
+
+/**
+ * Whole-line grammar for a helper refusal. The sentinel is only a verdict when
+ * it is the ENTIRE line: a docker daemon diagnostic that merely quotes or
+ * embeds the token (`... diagnostic: exact-docker-population-failure:5`) must
+ * never be promoted to a typed reason, because a mutation reason additionally
+ * buys a retry. Built from the sentinel constant so the two cannot drift.
+ */
+const EXACT_DOCKER_POPULATION_FAILURE_LINE = new RegExp(
+  `^${EXACT_DOCKER_POPULATION_FAILURE_SENTINEL.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}`
+  + '([0-9]{1,3})(?::([0-9]+(?:,[0-9]+)*))?$',
+  'u',
+);
+
+/**
+ * Map captured helper stderr bytes onto a typed reason. Only a line that
+ * matches the whole-line grammar above, carries an in-table ordinal the helper
+ * is allowed to claim and a bounded numeric summary becomes a verdict; every
+ * other byte sequence classifies as HELPER_RUN_UNCLASSIFIED, which never
+ * retries. The last fully matching line wins, so a truncated or quoted earlier
+ * line cannot outrank the helper's own final refusal.
+ */
+export function parseExactDockerPopulationHelperFailureV1(
+  stderr: Uint8Array | string,
+): ExactDockerPopulationHelperFailureV1 {
+  const text = typeof stderr === 'string' ? stderr : Buffer.from(stderr).toString('utf8');
+  const lines = text.split('\n');
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    // Tolerate exactly one trailing CR (CRLF capture); no other whitespace is
+    // accepted, so a padded or indented line stays unclassified.
+    const raw = lines[index] as string;
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
+    const match = EXACT_DOCKER_POPULATION_FAILURE_LINE.exec(line);
+    if (!match) continue;
+    const ordinal = Number(match[1]);
+    const reason = EXACT_DOCKER_POPULATION_REASON_BY_ORDINAL.get(ordinal);
+    if (reason === undefined || reason === 'HELPER_RUN_UNCLASSIFIED') continue;
+    const detailText = match[2];
+    if (detailText === undefined) {
+      return Object.freeze({ reason, ordinal, detail: Object.freeze([]) as readonly number[] });
+    }
+    const parts = detailText.split(',');
+    if (parts.length > EXACT_DOCKER_POPULATION_FAILURE_DETAIL_MAX
+      || !parts.every(part => part.length <= 15)) continue;
+    const detail = parts.map(Number);
+    if (!detail.every(Number.isSafeInteger)) continue;
+    return Object.freeze({ reason, ordinal, detail: Object.freeze(detail) as readonly number[] });
+  }
+  return EXACT_DOCKER_POPULATION_UNCLASSIFIED;
+}
+
+export type ExactDockerPopulationRetryDecisionV1 = 'RETRY' | 'FAIL';
+
+/**
+ * Pure admission for a further population attempt. `attemptsMade` counts the
+ * attempts already burned (1 after the first failure); `retryMax` is the
+ * config-resolved retry ceiling, so total attempts never exceed retryMax + 1.
+ */
+export function exactDockerPopulationRetryDecisionV1(
+  input: Readonly<{
+    reason: ExactDockerPopulationFailureReasonV1;
+    attemptsMade: number;
+    retryMax: number;
+  }>,
+): ExactDockerPopulationRetryDecisionV1 {
+  if (!Number.isSafeInteger(input.attemptsMade) || input.attemptsMade < 1) return 'FAIL';
+  if (!Number.isSafeInteger(input.retryMax) || input.retryMax < 0) return 'FAIL';
+  if (!EXACT_DOCKER_POPULATION_RETRYABLE_REASONS.includes(input.reason)) return 'FAIL';
+  return input.attemptsMade <= input.retryMax ? 'RETRY' : 'FAIL';
+}
+
+/**
+ * Config-resolved retry ceiling. Absent config keeps the validated default;
+ * an out-of-contract value fails closed rather than being silently clamped.
+ */
+export function resolveExactDockerPopulationRetryMaxV1(value: number | undefined): number {
+  if (value === undefined) return DOCKER_POPULATION_RETRY_MAX_DEFAULT;
+  if (!Number.isSafeInteger(value) || value < 0 || value > DOCKER_POPULATION_RETRY_MAX_LIMIT) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', true);
+  }
+  return value;
+}
+
+export interface ExactDockerPopulationAttemptV1 {
+  readonly attempt: number;
+  readonly reason: ExactDockerPopulationFailureReasonV1;
+  readonly ordinal: number;
+  readonly detail: readonly number[];
+}
+
+/**
+ * Capture adapter error carrying the typed population reason and the bounded
+ * per-attempt trail. Backward compatible: it still IS an
+ * ExecutionEffectDockerCaptureAdapterErrorV1 with the same stage and name, so
+ * every existing `instanceof`/stage consumer keeps working unchanged while a
+ * lifecycle-side surface can additionally read `reason`/`attempts`.
+ */
+export class ExactDockerPopulationCaptureAdapterErrorV1
+  extends ExecutionEffectDockerCaptureAdapterErrorV1 {
+  readonly reason: ExactDockerPopulationFailureReasonV1;
+  readonly attempts: readonly ExactDockerPopulationAttemptV1[];
+
+  constructor(
+    stage: ExecutionEffectDockerCaptureAdapterStageV1,
+    reason: ExactDockerPopulationFailureReasonV1,
+    attempts: readonly ExactDockerPopulationAttemptV1[],
+  ) {
+    super(stage);
+    this.reason = reason;
+    this.attempts = Object.freeze([...attempts]);
+  }
+}
+
+const EXACT_DOCKER_POPULATION_ORDINALS = EXACT_DOCKER_POPULATION_FAILURE_ORDINALS;
+
+/**
+ * Bounded typed-refusal writer shared by the population helper and the stdin
+ * reader interpolated into it. Every refusal keeps the exit-78 contract and
+ * additionally names its ordinal (plus a bounded numeric summary) on stderr, so
+ * the host can attribute the abort instead of reporting a generic adapter hold.
+ * `writeSync` is used deliberately: `process.stderr.write` may not flush before
+ * `process.exit` when stderr is a pipe, which would erase the attribution.
+ */
+const EXACT_DOCKER_TYPED_FAILURE_WRITER = String.raw`
+const fail = (ordinal, ...detail) => {
+  try {
+    writeSync(2, '\n${EXACT_DOCKER_POPULATION_FAILURE_SENTINEL}' + ordinal
+      + (detail.length === 0 ? '' : ':' + detail.join(',')) + '\n');
+  } catch { /* stderr is best-effort; the exit code stays authoritative. */ }
+  process.exit(78);
+};
+`;
+
+const EXACT_DOCKER_BOUNDED_STDIN_READER = String.raw`${EXACT_DOCKER_TYPED_FAILURE_WRITER}
 if (!Number.isSafeInteger(authority.inventoryByteLength)
   || authority.inventoryByteLength < 0
-  || authority.inventoryByteLength > ${EXACT_DOCKER_WORKSPACE_INVENTORY_BYTES_MAX}) process.exit(78);
+  || authority.inventoryByteLength > ${EXACT_DOCKER_WORKSPACE_INVENTORY_BYTES_MAX}) fail(${EXACT_DOCKER_POPULATION_ORDINALS.STDIN_INVENTORY_BOUNDS}, 1);
 const stdinChunks = [];
 let stdinByteLength = 0;
 for await (const chunk of process.stdin) {
@@ -2842,16 +3047,25 @@ for await (const chunk of process.stdin) {
   if (bytes.byteLength === 0) continue;
   stdinByteLength += bytes.byteLength;
   if (!Number.isSafeInteger(stdinByteLength)
-    || stdinByteLength > authority.inventoryByteLength) process.exit(78);
+    || stdinByteLength > authority.inventoryByteLength) fail(${EXACT_DOCKER_POPULATION_ORDINALS.STDIN_INVENTORY_BOUNDS}, 2);
   stdinChunks.push(bytes);
 }
-if (stdinByteLength !== authority.inventoryByteLength) process.exit(78);
+if (stdinByteLength !== authority.inventoryByteLength) fail(${EXACT_DOCKER_POPULATION_ORDINALS.STDIN_INVENTORY_BOUNDS}, 3);
 const raw = Buffer.concat(stdinChunks, stdinByteLength);
 `;
 
-/** Test/audit projection of the exact bounded asynchronous Docker stdin reader. */
+/**
+ * Test/audit projection of the exact bounded asynchronous Docker stdin reader.
+ * Self-contained: it carries the typed refusal writer it uses, so the projection
+ * stays independently executable and the composed helper declares `fail` once.
+ */
 export function exactDockerBoundedStdinReaderSource(): string {
   return EXACT_DOCKER_BOUNDED_STDIN_READER;
+}
+
+/** Test/audit projection of the shared typed-refusal writer. */
+export function exactDockerTypedFailureWriterSource(): string {
+  return EXACT_DOCKER_TYPED_FAILURE_WRITER;
 }
 
 const EXACT_DOCKER_EFFECT_POPULATE_HELPER = String.raw`
@@ -2865,7 +3079,7 @@ import { loadExecAuthorityNative } from '/app/dist/core/exec-authority-native.js
 const authority = JSON.parse(Buffer.from(process.argv[1], 'base64url').toString('utf8'));
 ${EXACT_DOCKER_BOUNDED_STDIN_READER}
 if (raw.length !== authority.inventoryByteLength
-  || (raw.length > 0 && raw[raw.length - 1] !== 0)) process.exit(78);
+  || (raw.length > 0 && raw[raw.length - 1] !== 0)) fail(${EXACT_DOCKER_POPULATION_ORDINALS.INVENTORY_PAYLOAD_INVALID}, 1);
 const paths = raw.length === 0 ? [] : raw.subarray(0, raw.length - 1).toString('utf8').split('\0');
 // These directories are host-owned mount targets, not worker-authored effects.
 // Materialize them before the immutable baseline capture so Docker never
@@ -2885,8 +3099,17 @@ if (paths.length !== authority.pathCount || paths.length > MAX_ENTRIES
   || !/^sha256:[a-f0-9]{64}$/.test(authority.inventoryDigest)
   || !/^sha256:[a-f0-9]{64}$/.test(authority.inventoryAdmissionReceiptDigest)
   || ![MAX_ENTRIES, MAX_FILE_BYTES, MAX_TOTAL_BYTES, MAX_PATH_BYTES, MAX_NAME_BYTES, MAX_DEPTH]
-    .every(Number.isSafeInteger)) process.exit(78);
-const checkDeadline = () => { if (Date.now() > authority.deadlineUnixMs) process.exit(78); };
+    .every(Number.isSafeInteger)) fail(${EXACT_DOCKER_POPULATION_ORDINALS.AUTHORITY_INVALID});
+// The active phase decides how a source/destination read refusal is attributed.
+// Only the pre-copy scan runs before the first destination byte exists, so only
+// its ordinal is admissible for a same-volume re-run on the host side.
+let phaseOrdinal = ${EXACT_DOCKER_POPULATION_ORDINALS.SOURCE_MUTATED_PRE_COPY};
+let phaseIndex = 0;
+const checkDeadline = () => {
+  if (Date.now() > authority.deadlineUnixMs) {
+    fail(${EXACT_DOCKER_POPULATION_ORDINALS.DEADLINE_EXCEEDED}, phaseOrdinal, phaseIndex);
+  }
+};
 const same = (a,b) => a.dev === b.dev && a.ino === b.ino && a.mode === b.mode
   && a.size === b.size && a.mtimeNs === b.mtimeNs && a.nlink === b.nlink;
 let previous = null;
@@ -2896,14 +3119,14 @@ for (const relative of paths) {
     || relative.split('/').length > MAX_DEPTH
     || relative.split('/').some(part => !part || part === '.' || part === '..'
       || Buffer.byteLength(part, 'utf8') > MAX_NAME_BYTES)
-    || (previous !== null && previous >= relative)) process.exit(78);
+    || (previous !== null && previous >= relative)) fail(${EXACT_DOCKER_POPULATION_ORDINALS.INVENTORY_PAYLOAD_INVALID}, 2);
   previous = relative;
 }
 const inspectParents = (root, relative) => {
   const parts = relative.split('/');
   for (let index = 1; index < parts.length; index += 1) {
     const parent = lstatSync(join(root, ...parts.slice(0, index)), { bigint: true });
-    if (!parent.isDirectory() || parent.isSymbolicLink()) process.exit(78);
+    if (!parent.isDirectory() || parent.isSymbolicLink()) fail(phaseOrdinal, phaseIndex);
   }
 };
 const readEntry = (root, relative) => {
@@ -2911,26 +3134,26 @@ const readEntry = (root, relative) => {
   inspectParents(root, relative);
   const absolute = join(root, ...relative.split('/'));
   const before = lstatSync(absolute, { bigint: true });
-  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1n) process.exit(78);
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1n) fail(phaseOrdinal, phaseIndex);
   if (before.size < 0n || before.size > BigInt(MAX_FILE_BYTES)
-    || before.size > BigInt(Number.MAX_SAFE_INTEGER)) process.exit(78);
+    || before.size > BigInt(Number.MAX_SAFE_INTEGER)) fail(phaseOrdinal, phaseIndex);
   const fd = openSync(absolute, constants.O_RDONLY | constants.O_NOFOLLOW);
   const content = createHash('sha256');
   let byteLength = 0;
   try {
     const opened = fstatSync(fd, { bigint: true });
-    if (!same(before, opened) || opened.nlink !== 1n) process.exit(78);
+    if (!same(before, opened) || opened.nlink !== 1n) fail(phaseOrdinal, phaseIndex);
     const buffer = Buffer.allocUnsafe(1024 * 1024);
     for (;;) {
       checkDeadline();
       const count = readSync(fd, buffer, 0, buffer.length, null);
       if (count === 0) break;
       byteLength += count;
-      if (!Number.isSafeInteger(byteLength) || byteLength > MAX_FILE_BYTES) process.exit(78);
+      if (!Number.isSafeInteger(byteLength) || byteLength > MAX_FILE_BYTES) fail(phaseOrdinal, phaseIndex);
       content.update(buffer.subarray(0, count));
     }
     const after = fstatSync(fd, { bigint: true });
-    if (!same(opened, after) || BigInt(byteLength) !== opened.size) process.exit(78);
+    if (!same(opened, after) || BigInt(byteLength) !== opened.size) fail(phaseOrdinal, phaseIndex);
   } finally { closeSync(fd); }
   return Object.freeze({
     mode: Number(before.mode & 0o777n),
@@ -2950,9 +3173,10 @@ const scan = (root, retainEntries) => {
   let entryCount = 0;
   let totalBytes = 0;
   for (const relative of paths) {
+    phaseIndex = entryCount;
     const entry = readEntry(root, relative);
     totalBytes += entry.byteLength;
-    if (!Number.isSafeInteger(totalBytes) || totalBytes > MAX_TOTAL_BYTES) process.exit(78);
+    if (!Number.isSafeInteger(totalBytes) || totalBytes > MAX_TOTAL_BYTES) fail(phaseOrdinal, phaseIndex);
     entryCount += 1;
     if (entries) entries.set(relative, entry);
     hash.update(JSON.stringify([
@@ -2966,9 +3190,16 @@ const scan = (root, retainEntries) => {
     entries,
   });
 };
+phaseOrdinal = ${EXACT_DOCKER_POPULATION_ORDINALS.SOURCE_MUTATED_PRE_COPY};
 const sourcePre = scan('/source', true);
+// From here on the workspace volume receives bytes, so a refusal can no longer
+// be replayed onto this volume generation.
+phaseOrdinal = ${EXACT_DOCKER_POPULATION_ORDINALS.SOURCE_MUTATED_MID_COPY};
 const ownedDirectories = new Set(['/workspace']);
+let copyIndex = 0;
 for (const relative of paths) {
+  phaseIndex = copyIndex;
+  copyIndex += 1;
   checkDeadline();
   const parts = relative.split('/');
   inspectParents('/source', relative);
@@ -2977,7 +3208,7 @@ for (const relative of paths) {
   const expected = sourcePre.entries.get(relative);
   if (!expected || !before.isFile() || before.isSymbolicLink() || before.nlink !== 1n
     || Number(before.mode & 0o777n) !== expected.mode
-    || before.size !== BigInt(expected.byteLength)) process.exit(78);
+    || before.size !== BigInt(expected.byteLength)) fail(phaseOrdinal, phaseIndex);
   const destination = join('/workspace', ...parts);
   mkdirSync(dirname(destination), { recursive: true, mode: 0o755 });
   for (let index = 1; index < parts.length; index += 1) {
@@ -2991,7 +3222,7 @@ for (const relative of paths) {
   );
   try {
     const opened = fstatSync(sourceFd, { bigint: true });
-    if (!same(before, opened) || opened.nlink !== 1n) process.exit(78);
+    if (!same(before, opened) || opened.nlink !== 1n) fail(phaseOrdinal, phaseIndex);
     const content = createHash('sha256');
     let byteLength = 0;
     const buffer = Buffer.allocUnsafe(1024 * 1024);
@@ -3000,19 +3231,19 @@ for (const relative of paths) {
       const count = readSync(sourceFd, buffer, 0, buffer.length, null);
       if (count === 0) break;
       byteLength += count;
-      if (!Number.isSafeInteger(byteLength) || byteLength > MAX_FILE_BYTES) process.exit(78);
+      if (!Number.isSafeInteger(byteLength) || byteLength > MAX_FILE_BYTES) fail(phaseOrdinal, phaseIndex);
       content.update(buffer.subarray(0, count));
       let offset = 0;
       while (offset < count) {
         checkDeadline();
         const written = writeSync(destinationFd, buffer, offset, count - offset);
-        if (!Number.isSafeInteger(written) || written <= 0) process.exit(78);
+        if (!Number.isSafeInteger(written) || written <= 0) fail(phaseOrdinal, phaseIndex);
         offset += written;
       }
     }
     const after = fstatSync(sourceFd, { bigint: true });
     if (!same(opened, after) || byteLength !== expected.byteLength
-      || 'sha256:' + content.digest('hex') !== expected.contentDigest) process.exit(78);
+      || 'sha256:' + content.digest('hex') !== expected.contentDigest) fail(phaseOrdinal, phaseIndex);
     fchmodSync(destinationFd, Number(before.mode & 0o777n));
     fsyncSync(destinationFd);
   } finally {
@@ -3021,26 +3252,28 @@ for (const relative of paths) {
   }
   chownSync(destination, authority.workspaceOwnerUid, authority.workspaceOwnerGid);
 }
+let mountPointIndex = 0;
 for (const relative of infrastructureMountPoints) {
-  if (paths.some(path => path === relative || path.startsWith(relative + '/'))) process.exit(78);
+  if (paths.some(path => path === relative || path.startsWith(relative + '/'))) fail(${EXACT_DOCKER_POPULATION_ORDINALS.INFRASTRUCTURE_MOUNT_POINT_CONFLICT}, mountPointIndex, 1);
   const absolute = join('/workspace', relative);
   mkdirSync(absolute, { recursive: false, mode: 0o755 });
   const stat = lstatSync(absolute, { bigint: true });
   if (!stat.isDirectory() || stat.isSymbolicLink()
-    || Number(stat.mode & 0o777n) !== 0o755) process.exit(78);
+    || Number(stat.mode & 0o777n) !== 0o755) fail(${EXACT_DOCKER_POPULATION_ORDINALS.INFRASTRUCTURE_MOUNT_POINT_CONFLICT}, mountPointIndex, 2);
   ownedDirectories.add(absolute);
+  mountPointIndex += 1;
 }
 // The provider's read-only /dev/null mask also needs a file mount target. Docker
 // otherwise creates .deck after the baseline, manufacturing a protected-path
 // effect (sprint-719). This is a fresh inert host-owned placeholder, never a copy
 // of canonical .deck and never a relaxation of the protected write policy.
 const deckMaskTarget = join('/workspace', '.deck');
-if (paths.some(path => path === '.deck' || path.startsWith('.deck/'))) process.exit(78);
+if (paths.some(path => path === '.deck' || path.startsWith('.deck/'))) fail(${EXACT_DOCKER_POPULATION_ORDINALS.DECK_MASK_INVALID}, 1);
 const deckMaskFd = openSync(deckMaskTarget,
   constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o644);
 try {
   const stat = fstatSync(deckMaskFd, { bigint: true });
-  if (!stat.isFile() || stat.nlink !== 1n || stat.size !== 0n) process.exit(78);
+  if (!stat.isFile() || stat.nlink !== 1n || stat.size !== 0n) fail(${EXACT_DOCKER_POPULATION_ORDINALS.DECK_MASK_INVALID}, 2);
   fchmodSync(deckMaskFd, 0o644);
   fsyncSync(deckMaskFd);
 } finally { closeSync(deckMaskFd); }
@@ -3049,7 +3282,7 @@ const deckMaskStat = lstatSync(deckMaskTarget, { bigint: true });
 if (!deckMaskStat.isFile() || deckMaskStat.isSymbolicLink() || deckMaskStat.nlink !== 1n
   || deckMaskStat.size !== 0n || Number(deckMaskStat.mode & 0o777n) !== 0o644
   || deckMaskStat.uid !== BigInt(authority.workspaceOwnerUid)
-  || deckMaskStat.gid !== BigInt(authority.workspaceOwnerGid)) process.exit(78);
+  || deckMaskStat.gid !== BigInt(authority.workspaceOwnerGid)) fail(${EXACT_DOCKER_POPULATION_ORDINALS.DECK_MASK_INVALID}, 3);
 // Seal the fresh volume root while this bounded helper still owns it. After the
 // ownership handoff the helper intentionally has no FOWNER capability, so mode
 // mutation must not be possible anymore.
@@ -3057,31 +3290,41 @@ chmodSync('/workspace', 0o700);
 for (const directory of [...ownedDirectories]
   .sort((left, right) => right.split('/').length - left.split('/').length)) {
   const stat = lstatSync(directory, { bigint: true });
-  if (!stat.isDirectory() || stat.isSymbolicLink()) process.exit(78);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) fail(${EXACT_DOCKER_POPULATION_ORDINALS.WORKSPACE_OWNERSHIP_SEAL}, 1);
   chownSync(directory, authority.workspaceOwnerUid, authority.workspaceOwnerGid);
 }
 try {
   process.setgroups([]);
   process.setgid(authority.workspaceOwnerGid);
   process.setuid(authority.workspaceOwnerUid);
-} catch { process.exit(78); }
+} catch { fail(${EXACT_DOCKER_POPULATION_ORDINALS.WORKSPACE_OWNERSHIP_SEAL}, 2); }
 const ownedRoot = lstatSync('/workspace', { bigint: true });
 if (!ownedRoot.isDirectory() || ownedRoot.isSymbolicLink()
   || ownedRoot.uid !== BigInt(authority.workspaceOwnerUid)
   || ownedRoot.gid !== BigInt(authority.workspaceOwnerGid)
   || Number(ownedRoot.mode & 0o777n) !== 0o700
   || process.getuid() !== authority.workspaceOwnerUid
-  || process.getgid() !== authority.workspaceOwnerGid) process.exit(78);
+  || process.getgid() !== authority.workspaceOwnerGid) fail(${EXACT_DOCKER_POPULATION_ORDINALS.WORKSPACE_OWNERSHIP_SEAL}, 3);
 sourcePre.entries.clear();
+phaseOrdinal = ${EXACT_DOCKER_POPULATION_ORDINALS.DESTINATION_READBACK_INVALID};
 const destination = scan('/workspace', false);
+phaseOrdinal = ${EXACT_DOCKER_POPULATION_ORDINALS.SOURCE_MUTATED_POST_COPY};
 const sourcePost = scan('/source', false);
-if (sourcePre.digest !== destination.digest || destination.digest !== sourcePost.digest
-  || sourcePre.entryCount !== destination.entryCount
-  || destination.entryCount !== sourcePost.entryCount
-  || sourcePre.totalBytes !== destination.totalBytes
-  || destination.totalBytes !== sourcePost.totalBytes) process.exit(78);
+// Unchanged three-way immutability proof: pre == destination == post. The bit
+// summary is derived from exactly the same comparisons and only exists so the
+// bounded refusal can carry a numeric explanation; per-path indices are not
+// available because the pre-copy entry map is released above to stay in memory
+// budget for the two remaining full scans.
+const manifestMismatchBits = (sourcePre.digest === destination.digest ? 0 : 1)
+  | (destination.digest === sourcePost.digest ? 0 : 2)
+  | (sourcePre.entryCount === destination.entryCount ? 0 : 4)
+  | (destination.entryCount === sourcePost.entryCount ? 0 : 8)
+  | (sourcePre.totalBytes === destination.totalBytes ? 0 : 16)
+  | (destination.totalBytes === sourcePost.totalBytes ? 0 : 32);
+if (manifestMismatchBits !== 0) fail(${EXACT_DOCKER_POPULATION_ORDINALS.SOURCE_MANIFEST_MISMATCH},
+  manifestMismatchBits, sourcePre.entryCount, destination.entryCount, sourcePost.entryCount);
 const native = loadExecAuthorityNative();
-if (!native.available || !native.effect || native.effect.available === false) process.exit(78);
+if (!native.available || !native.effect || native.effect.available === false) fail(${EXACT_DOCKER_POPULATION_ORDINALS.NATIVE_UNAVAILABLE});
 let root;
 try {
   root = native.effect.openRoot('WORKSPACE', '/workspace');
@@ -3304,6 +3547,13 @@ export interface CreateExactDockerEffectLifecycleAdapterV1Input {
   readonly workspaceOwnerGid: number;
   readonly runner: ExactDockerWorkspaceCommandRunnerV1;
   readonly nowIso: () => string;
+  /**
+   * Config-resolved bounded re-run ceiling for the workspace population helper
+   * (`docker_population_retry_max`). Counts RETRIES, so the total number of
+   * population attempts never exceeds this value + 1. Absent keeps the
+   * validated default; an out-of-contract value fails the factory closed.
+   */
+  readonly populationRetryMax?: number;
 }
 
 function exactDockerEffectTimestamp(nowIso: () => string): string {
@@ -3461,6 +3711,7 @@ export function createExactDockerEffectLifecycleAdapterV1(
     throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', true);
   }
   const run = input.runner;
+  const populationRetryMax = resolveExactDockerPopulationRetryMaxV1(input.populationRetryMax);
   const wallClockNow = input.nowIso;
   let lastTimestampMs: number | null = null;
   const now = (): string => {
@@ -3519,7 +3770,22 @@ export function createExactDockerEffectLifecycleAdapterV1(
       manifestTotalBytes: number;
     }> | null;
   }>> => {
-    const unavailable = (stage: ExecutionEffectDockerCaptureAdapterStageV1): never => {
+    const populationAttempts: ExactDockerPopulationAttemptV1[] = [];
+    const unavailable = (
+      stage: ExecutionEffectDockerCaptureAdapterStageV1,
+      reason: ExactDockerPopulationFailureReasonV1 | null = null,
+    ): never => {
+      // A population refusal keeps the same stage and error identity, but now
+      // additionally carries the typed reason and the bounded per-attempt trail
+      // so a lifecycle surface can attribute it instead of reporting a generic
+      // adapter hold. Non-population stages keep the exact legacy error.
+      if (reason !== null || populationAttempts.length > 0) {
+        throw new ExactDockerPopulationCaptureAdapterErrorV1(
+          stage,
+          reason ?? 'HELPER_RUN_UNCLASSIFIED',
+          populationAttempts,
+        );
+      }
       throw new ExecutionEffectDockerCaptureAdapterErrorV1(stage);
     };
     const expectedVolumeIdentityDigest = ('workspaceSnapshot' in captureInput
@@ -3538,67 +3804,101 @@ export function createExactDockerEffectLifecycleAdapterV1(
       workspaceAuthority,
     );
     if (!beforeGeneration) return unavailable('PRE_GENERATION');
-    const startedAt = exactDockerEffectTimestamp(now);
-    const startedMs = Date.parse(startedAt);
-    const deadlineMs = startedMs + EXACT_DOCKER_EFFECT_CAPTURE_TIMEOUT_MS;
-    const deadlineAt = new Date(deadlineMs).toISOString();
-    const encoded = Buffer.from(canonicalJson({
-      limits: exactDockerEffectCaptureLimitsWithDeadline(captureInput.captureLimits, deadlineMs),
-      deadlineUnixMs: deadlineMs,
-      ...(populate ? {
-        inventoryByteLength: input.inventory.nulDelimitedPaths.byteLength,
-        pathCount: input.inventory.pathCount,
-        inventoryDigest: input.inventory.inventoryDigest,
-        inventoryAdmissionReceiptDigest: captureInput.plan.inventoryAdmissionReceiptDigest,
-        workspaceOwnerUid: input.workspaceOwnerUid,
-        workspaceOwnerGid: input.workspaceOwnerGid,
-      } : {}),
-    }), 'utf8').toString('base64url');
-    const selectedHelper = populate
-      ? EXACT_DOCKER_EFFECT_POPULATE_HELPER : EXACT_DOCKER_EFFECT_CAPTURE_HELPER;
-    let helperSource = selectedHelper;
-    const args = [
-      'run', ...(populate ? ['-i'] : []),
-      '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
-      ...(populate
-        ? [
-          '--cap-add', 'CHOWN',
-          '--cap-add', 'SETUID',
-          '--cap-add', 'SETGID',
-          // The trusted population helper must traverse owner-private (0700)
-          // project directories through its read-only /source bind. It still
-          // receives no write capability over the canonical source and has no
-          // network. After copying, it drops to the workspace owner before the
-          // immutable source/destination/post-copy comparison and capture.
-          '--cap-add', 'DAC_READ_SEARCH',
-        ]
-        : ['--user', `${input.workspaceOwnerUid}:${input.workspaceOwnerGid}`]),
-      '--security-opt', 'no-new-privileges',
-      '--memory', '2g', '--memory-swap', '2g', '--pids-limit', '256',
-      '--tmpfs', '/tmp:size=64m,mode=0700',
-      ...buildExactDockerNativeSnapshotArgs(
-        input.workspaceOwnerUid,
-        input.workspaceOwnerGid,
-      ),
-      ...(populate ? [
-        '--mount', `type=bind,src=${canonicalProjectRoot},dst=/source,readonly,bind-propagation=rprivate`,
-      ] : []),
-      '--mount', `type=volume,src=${captureInput.plan.volumeName},dst=/workspace,volume-nocopy`,
-      input.imageAuthority.imageReference,
-      'node', '--input-type=module', '-e',
-      helperSource,
-      encoded,
-    ];
-    const result = await run(Object.freeze({
-      command: 'docker' as const,
-      args: Object.freeze(args),
-      stdin: populate ? input.inventory.nulDelimitedPaths : Buffer.alloc(0),
-      timeoutMs: EXACT_DOCKER_EFFECT_CAPTURE_TIMEOUT_MS,
-      stdoutCeiling: EXACT_DOCKER_EFFECT_RECEIPT_CEILING,
-      stderrCeiling: 64 * 1024,
-    }));
-    if (!exactDockerWorkspaceCommandSucceeded(result)) {
-      unavailable('HELPER_RUN');
+    // Each attempt re-enters the whole bounded window: a fresh started/deadline
+    // pair and therefore a freshly encoded authority. Reusing the first
+    // attempt's deadline would make every retry abort instantly inside the
+    // helper's own checkDeadline().
+    let startedAt!: string;
+    let startedMs!: number;
+    let deadlineMs!: number;
+    let deadlineAt!: string;
+    let result: ExactDockerWorkspaceCommandResultV1;
+    for (let attempt = 1; ; attempt += 1) {
+      startedAt = exactDockerEffectTimestamp(now);
+      startedMs = Date.parse(startedAt);
+      deadlineMs = startedMs + EXACT_DOCKER_EFFECT_CAPTURE_TIMEOUT_MS;
+      deadlineAt = new Date(deadlineMs).toISOString();
+      const encoded = Buffer.from(canonicalJson({
+        limits: exactDockerEffectCaptureLimitsWithDeadline(captureInput.captureLimits, deadlineMs),
+        deadlineUnixMs: deadlineMs,
+        ...(populate ? {
+          inventoryByteLength: input.inventory.nulDelimitedPaths.byteLength,
+          pathCount: input.inventory.pathCount,
+          inventoryDigest: input.inventory.inventoryDigest,
+          inventoryAdmissionReceiptDigest: captureInput.plan.inventoryAdmissionReceiptDigest,
+          workspaceOwnerUid: input.workspaceOwnerUid,
+          workspaceOwnerGid: input.workspaceOwnerGid,
+        } : {}),
+      }), 'utf8').toString('base64url');
+      const selectedHelper = populate
+        ? EXACT_DOCKER_EFFECT_POPULATE_HELPER : EXACT_DOCKER_EFFECT_CAPTURE_HELPER;
+      let helperSource = selectedHelper;
+      const args = [
+        'run', ...(populate ? ['-i'] : []),
+        '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
+        ...(populate
+          ? [
+            '--cap-add', 'CHOWN',
+            '--cap-add', 'SETUID',
+            '--cap-add', 'SETGID',
+            // The trusted population helper must traverse owner-private (0700)
+            // project directories through its read-only /source bind. It still
+            // receives no write capability over the canonical source and has no
+            // network. After copying, it drops to the workspace owner before the
+            // immutable source/destination/post-copy comparison and capture.
+            '--cap-add', 'DAC_READ_SEARCH',
+          ]
+          : ['--user', `${input.workspaceOwnerUid}:${input.workspaceOwnerGid}`]),
+        '--security-opt', 'no-new-privileges',
+        '--memory', '2g', '--memory-swap', '2g', '--pids-limit', '256',
+        '--tmpfs', '/tmp:size=64m,mode=0700',
+        ...buildExactDockerNativeSnapshotArgs(
+          input.workspaceOwnerUid,
+          input.workspaceOwnerGid,
+        ),
+        ...(populate ? [
+          '--mount', `type=bind,src=${canonicalProjectRoot},dst=/source,readonly,bind-propagation=rprivate`,
+        ] : []),
+        '--mount', `type=volume,src=${captureInput.plan.volumeName},dst=/workspace,volume-nocopy`,
+        input.imageAuthority.imageReference,
+        'node', '--input-type=module', '-e',
+        helperSource,
+        encoded,
+      ];
+      result = await run(Object.freeze({
+        command: 'docker' as const,
+        args: Object.freeze(args),
+        stdin: populate ? input.inventory.nulDelimitedPaths : Buffer.alloc(0),
+        timeoutMs: EXACT_DOCKER_EFFECT_CAPTURE_TIMEOUT_MS,
+        stdoutCeiling: EXACT_DOCKER_EFFECT_RECEIPT_CEILING,
+        stderrCeiling: 64 * 1024,
+      }));
+      if (exactDockerWorkspaceCommandSucceeded(result)) break;
+      if (!populate) unavailable('HELPER_RUN');
+      // Only a clean exit-78 refusal carries a helper verdict. A daemon failure,
+      // a signal, a truncated stream or any other status stays unclassified even
+      // when its stderr happens to contain digits.
+      const failure = result.status === 78 && result.signal === null
+        && !result.error && !result.overflow
+        ? parseExactDockerPopulationHelperFailureV1(result.stderr)
+        : Object.freeze({
+          reason: 'HELPER_RUN_UNCLASSIFIED' as const,
+          ordinal: EXACT_DOCKER_POPULATION_FAILURE_ORDINALS.HELPER_RUN_UNCLASSIFIED,
+          detail: Object.freeze([]) as readonly number[],
+        });
+      populationAttempts.push(Object.freeze({
+        attempt,
+        reason: failure.reason,
+        ordinal: failure.ordinal,
+        detail: failure.detail,
+      }));
+      if (exactDockerPopulationRetryDecisionV1({
+        reason: failure.reason,
+        attemptsMade: attempt,
+        retryMax: populationRetryMax,
+      }) === 'FAIL') {
+        unavailable('HELPER_RUN', failure.reason);
+      }
     }
     const afterGeneration = await inspectExactVolumeGeneration(
       captureInput.plan.volumeName,
@@ -10463,6 +10763,12 @@ export interface DockerSpawnBackendConstructionOptions {
   readonly homeTmpfsSize?: string;
   readonly verifyProviderCliInImage?: boolean;
   /**
+   * Config-resolved (`docker_population_retry_max`) bounded re-run ceiling for
+   * the exact workspace population helper. Counts RETRIES; absent keeps the
+   * validated default.
+   */
+  readonly populationRetryMax?: number;
+  /**
    * 593-001 F2c: mask the repo design catalogs (`.claude/skills`, `.claude/agents`)
    * from the worker's mount view. Config source: `prompt.catalog_mount_mask`
    * (default false). Opt-in, exactly like {@link verifyProviderCliInImage}: the
@@ -10904,6 +11210,8 @@ export class DockerSpawnBackend implements SpawnBackend {
   private readonly kindMemoryLimits: Record<string, string>;
   private readonly homeTmpfsSize: string;
   private readonly verifyProviderCliInImage: boolean;
+  /** Config-resolved bounded population re-run ceiling (`docker_population_retry_max`). */
+  private readonly populationRetryMax: number;
   /** 593-001 F2c: `prompt.catalog_mount_mask` — default false (byte-identical argv). */
   private readonly catalogMountMask: boolean;
   private readonly codexCoreChannel: boolean;
@@ -11040,6 +11348,8 @@ export class DockerSpawnBackend implements SpawnBackend {
     this.gracefulTimeoutSeconds = opts?.gracefulTimeoutSeconds ?? DEFAULT_GRACEFUL_TIMEOUT_SECONDS;
     this.memoryLimit = opts?.memoryLimit ?? DEFAULT_WORKER_MEMORY_LIMIT;
     this.homeTmpfsSize = opts?.homeTmpfsSize ?? DEFAULT_WORKER_HOME_TMPFS_SIZE;
+    // Fails closed on an out-of-contract value rather than silently clamping it.
+    this.populationRetryMax = resolveExactDockerPopulationRetryMaxV1(opts?.populationRetryMax);
     // MASTER-PLAN 666: swap must follow the limit, not a fixed constant. The
     // documented rule (and the 4g/6g default pair) is limit × 1.5; pinning the
     // constant meant raising `worker_memory_limit` to 6g silently produced
@@ -12799,6 +13109,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       workspaceOwnerGid: gid,
       runner: this.exactWorkspaceCommandRunner,
       nowIso: () => this.nextExactDockerTimestamp(),
+      populationRetryMax: this.populationRetryMax,
     });
     try {
       effectPlan = createExecutionEffectDockerWorkspacePlanV1({
@@ -18374,6 +18685,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       workspaceOwnerGid: process.getgid?.() ?? -1,
       runner: this.exactWorkspaceCommandRunner,
       nowIso: () => this.nextExactDockerTimestamp(),
+      populationRetryMax: this.populationRetryMax,
     });
     const clock = createExactDockerEffectClockV1(() => this.nextExactDockerTimestamp());
     const limits: ExecutionEffectNativeAdapterLimitsV1 = Object.freeze({
@@ -18614,6 +18926,40 @@ export class DockerSpawnBackend implements SpawnBackend {
       this.clearExactDockerLiveAttempt(scope.admissionRef.refDigest);
       debugLog('docker-backend:exact-custody-monitor-acceptance', error);
     });
+  }
+
+  /**
+   * Observe whether the daemon still knows this attempt's backend execution.
+   *
+   * Containment must fail closed on every ambiguity, so only an explicit
+   * "no such object" answer is reported as `absent`; a transport failure, a
+   * malformed answer or a live container all read back as `unknown`/`present`.
+   * The probe is read-only (`docker inspect`) and never mutates daemon state.
+   */
+  private async observeExactDockerDaemonContainerState(
+    containerId: unknown,
+  ): Promise<'absent' | 'present' | 'unknown'> {
+    if (typeof containerId !== 'string' || containerId.length === 0) return 'unknown';
+    try {
+      const inspect = await this.exactWorkspaceCommandRunner(Object.freeze({
+        command: 'docker' as const,
+        args: Object.freeze([
+          'inspect', '--format', '{{.State.Running}}|{{.State.ExitCode}}', containerId,
+        ]),
+        stdin: Buffer.alloc(0),
+        timeoutMs: 10_000,
+        stdoutCeiling: 1024,
+        stderrCeiling: 64 * 1024,
+      }));
+      if (isExactDockerContainerAbsent(
+        exactDockerWorkspaceCommandObservation(inspect),
+        containerId,
+      )) return 'absent';
+      return exactDockerWorkspaceCommandSucceeded(inspect) ? 'present' : 'unknown';
+    } catch (error) {
+      debugLog('docker-backend:contain-daemon-container-probe', error);
+      return 'unknown';
+    }
   }
 
   /**
@@ -19013,6 +19359,10 @@ export class DockerSpawnBackend implements SpawnBackend {
     for (const entry of discovered.entries) {
       let holdAuthorityState: SpawnBackendRecoveryHoldAuthorityState = 'RECOVERY_ENTRY_FAILED';
       let holdReasonCode: SpawnBackendRecoveryHoldReasonCode = 'ENTRY_RECONCILIATION_FAILED';
+      // Containment-only: observed once, before containment is attempted, so a
+      // hold raised by ANY later containment step still carries the daemon fact
+      // instead of forcing the caller to infer it from a reason code.
+      let holdDaemonContainerState: 'absent' | 'present' | 'unknown' | null = null;
       try {
         if (entry.state === 'quarantined-historical-admission') {
           if (!report.closedNotDispatched.includes(entry.reservation.identity.taskId)) {
@@ -19192,6 +19542,9 @@ export class DockerSpawnBackend implements SpawnBackend {
       const start = this.rereadExactProviderStartObservation(scope, query);
       const providerExit = this.readExactDockerRecoveryProviderExit(scope);
       if (options.mode === 'contain') {
+        holdDaemonContainerState = await this.observeExactDockerDaemonContainerState(
+          releasedAuthority.backendExecutionId,
+        );
         const containedExit = await this.containExactDockerCustodyAttempt(
           scope,
           releasedAuthority,
@@ -19362,6 +19715,8 @@ export class DockerSpawnBackend implements SpawnBackend {
           admissionRefDigest: entry.state === 'admitted' ? entry.ref.refDigest : null,
           authorityState: holdAuthorityState,
           reasonCode: holdReasonCode,
+          ...(holdDaemonContainerState === null
+            ? {} : { daemonContainerState: holdDaemonContainerState }),
           ...(error instanceof ExactDockerCustodyFailure ? {
             custodyHoldCode: error.safeStage && /^[A-Z0-9_]{1,48}$/u.test(error.safeStage)
               ? error.safeStage : error.reasonCode,

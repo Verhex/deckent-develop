@@ -1003,6 +1003,25 @@ describe('exact controller terminal fan-in behavior', () => {
     expect([...terminal.keys()]).toContain(taskId);
   });
 
+  // `historical` means EARLIER, never future or concurrent: the restore
+  // candidate IS the current run, so an attempt whose ordinal is AHEAD of it is
+  // work this coordinator has not reached yet (or a sibling's), and a
+  // `terminal` origin read does not make it retirable.
+  it('never retires an attempt from a later sprint than the restore candidate', async () => {
+    const taskId = '731-001';
+    const reasonCode = 'production-wiring-verifier-asset-invalid';
+    const { registry, terminal } = unsettleableForeignRegistry(taskId, reasonCode);
+
+    await expect(settleRecoveredExactTerminalAuthorities(
+      registry,
+      { projectRoot: '/test/project', restoreCandidateSprintId: 'sprint-730', readOwningRunLifecycle: () => 'terminal' },
+    )).rejects.toThrow(
+      `EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD:${taskId}:hold:${reasonCode}`,
+    );
+    expect(registry.retireHistoricalUnsettleableAttempt).not.toHaveBeenCalled();
+    expect([...terminal.keys()]).toContain(taskId);
+  });
+
   // A parseable foreign task id is not proof that its sprint is over: a
   // concurrent/future run, or one whose state file was lost, also looks foreign.
   it('never retires while the owning run is still ACTIVE', async () => {

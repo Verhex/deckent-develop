@@ -62,7 +62,10 @@ import { publishCanonicalRunStatusReadModel } from '../core/run-status-read-mode
 
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
-import type { ExactNormalDockerExecutionRegistryV2 } from './scheduler-effects.js';
+import type {
+  ExactLifecycleReconcileOptionsV1,
+  ExactNormalDockerExecutionRegistryV2,
+} from './scheduler-effects.js';
 import type { ExactAcceptedResultTerminalAuthorityV2 } from './exact-accepted-result-terminal-authority.js';
 
 // ─── Spawn backend tmpfile archive ────────────────────────────────
@@ -126,8 +129,13 @@ function readLifecycleFileSnapshot(path: string): string | null {
 export async function prepareExactSprintLifecycle(
   registry: ExactNormalDockerExecutionRegistryV2,
   mode: 'resume' | 'contain',
+  options?: ExactLifecycleReconcileOptionsV1,
 ): Promise<void> {
-  await registry.reconcileExactLifecycle(mode);
+  // Preserve the one-argument call shape when no options are supplied: the
+  // registry contract is `(mode)` for every existing caller and only the
+  // historical-foreign predicate carries a second argument.
+  if (options === undefined) await registry.reconcileExactLifecycle(mode);
+  else await registry.reconcileExactLifecycle(mode, options);
 }
 
 /** Exact Docker pause is an async containment transaction; it never falls into tmux kill. */
@@ -137,8 +145,9 @@ export async function pauseSprintExact(
   reason: string,
   reasonCode: string,
   registry: ExactNormalDockerExecutionRegistryV2,
+  options?: ExactLifecycleReconcileOptionsV1,
 ): Promise<PauseState> {
-  await prepareExactSprintLifecycle(registry, 'contain');
+  await prepareExactSprintLifecycle(registry, 'contain', options);
   for (const task of sprint.tasks) {
     if (!registry.isExactTask(task.id)) continue;
     const resultAuthority = registry.readTaskResultAuthority(task.id);

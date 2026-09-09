@@ -184,3 +184,14 @@ export const BRAIN_TOTAL_LINE_BUDGET = 5000 as const;
 // decay'i yavaşlat ki analiz raporları hemen silinmesin.
 export const MEMORY_DECAY_SPRINTS = 20 as const;
 export const PATTERN_DECAY_SPRINTS = 25 as const;
+
+// ─── Exact Docker workspace population retry admission ───────────────
+// The exact Docker dependency-population helper copies the project inventory
+// into the workspace volume and then proves source immutability across the copy
+// window (pre-scan == destination == post-scan). On a live project root a
+// concurrent write inside that window aborts the helper. Only the failure class
+// that aborts BEFORE any destination byte is written is safely re-runnable on
+// the same volume generation, so this ceiling bounds those re-runs.
+// `docker_population_retry_max` = number of RETRIES (total attempts = value + 1).
+export const DOCKER_POPULATION_RETRY_MAX_DEFAULT = 2 as const;
+export const DOCKER_POPULATION_RETRY_MAX_LIMIT = 5 as const;

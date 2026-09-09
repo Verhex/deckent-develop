@@ -82,6 +82,7 @@ import {
 import type {
   SpawnBackend,
   SpawnBackendExactRecoveryEntryV2,
+  SpawnBackendRecoveryHold,
   SpawnBackendRecoveryReport,
 } from './spawn-backend.js';
 import { SpawnBackendFactory } from './spawn-backend.js';
@@ -345,6 +346,70 @@ function providerAdapterLifecycleOwner(
   });
 }
 
+/**
+ * Caller-supplied origin authority for one `reconcileExactLifecycle` pass.
+ *
+ * The registry knows nothing about sprints, so it can never decide on its own
+ * whether a recovered task belongs to the run being reconciled. The controller
+ * injects that decision; omitting it keeps every legacy call byte-identical.
+ */
+export interface ExactLifecycleReconcileOptionsV1 {
+  /**
+   * `true` only when the task is PROVEN to belong to an earlier run that is
+   * durably terminal. Unprovable origin, the current run, and a concurrent or
+   * future run must all answer `false` (fail-closed).
+   */
+  readonly isHistoricalForeignTask?: (taskId: string) => boolean;
+}
+
+/**
+ * Decide whether one containment hold is foreign, already-contained history.
+ *
+ * Measured 2026-09-09 (sprint-729 flow `4c5c9721`, sprint-730 flow `561882f2`):
+ * the FIX-phase containment barrier (`sprint-controller.ts` →
+ * `prepareExactSprintLifecycle(registry, 'contain')`) re-reads EVERY dispatch
+ * admission the project custody store ever recorded. `728-001` — released,
+ * provider-exited, custody chain stopping at `02-accepted-result`, owning
+ * sprint-728 ABORTED three days earlier, container and both effect volumes long
+ * deleted — cannot be contained, so the docker backend held it and the registry
+ * threw `EXACT_LIFECYCLE_CONTAIN_HOLD`, killing both canary runs. The
+ * fresh-start path already retires such attempts
+ * (`settleRecoveredExactTerminalAuthorities`); this is the same decision on the
+ * mid-run contain path, and it uses the same fail-closed vocabulary.
+ *
+ * Every predicate here is REQUIRED, cheapest first:
+ *   1. containment only — `resume` keeps its behaviour byte-identical;
+ *   2. the hold must come from this backend and name a DURABLY TERMINAL
+ *      dispatch authority, so the owning run's dispatch decision is closed;
+ *   3. the daemon must have PROVEN the backend execution absent before
+ *      containment was attempted — `present`/`unknown`/missing all throw, so a
+ *      possibly-live effect is never projected away;
+ *   4. the backend must not still inventory a live worker for the task;
+ *   5. the caller must prove the task belongs to an earlier, terminal run.
+ * A hold on the CURRENT run's task, an unattributable task, or an attempt whose
+ * container is live or unknown keeps the byte-identical throw.
+ */
+function isRetirableHistoricalContainHold(
+  mode: 'resume' | 'contain',
+  hold: SpawnBackendRecoveryHold,
+  backend: SpawnBackend,
+  options: ExactLifecycleReconcileOptionsV1 | undefined,
+): boolean {
+  if (mode !== 'contain') return false;
+  const isHistoricalForeignTask = options?.isHistoricalForeignTask;
+  if (typeof isHistoricalForeignTask !== 'function') return false;
+  if (hold.backend !== backend.name) return false;
+  if (hold.authorityState !== 'DISPATCH_TERMINAL') return false;
+  if (hold.daemonContainerState !== 'absent') return false;
+  if ((backend.workerInventoryState?.(hold.taskId) ?? 'unknown') === 'active') return false;
+  try {
+    return isHistoricalForeignTask(hold.taskId) === true;
+  } catch (error) {
+    debugLog('scheduler-effects:historical-contain-origin-unreadable', error);
+    return false;
+  }
+}
+
 export interface ExactNormalDockerDependencyContextV2 {
   readonly dependencyIds: readonly string[];
   readonly dependencyResults: ReadonlyMap<string, DependencyResultEntry>;
@@ -420,6 +485,7 @@ export interface ExactNormalDockerExecutionRegistryV2 {
   rehydrateRecovery(report: SpawnBackendRecoveryReport, backend: SpawnBackend): void;
   reconcileExactLifecycle(
     mode: 'resume' | 'contain',
+    options?: ExactLifecycleReconcileOptionsV1,
   ): Promise<readonly SpawnBackendRecoveryReport[]>;
   readTaskResultAuthority(taskId: string): TaskResultAuthorityRead<TaskResult>;
   awaitTaskResultAuthority(taskId: string): Promise<TaskResultAuthorityRead<TaskResult>>;
@@ -1150,6 +1216,7 @@ export function createExactNormalDockerExecutionRegistry(
     },
     async reconcileExactLifecycle(
       mode: 'resume' | 'contain',
+      options?: ExactLifecycleReconcileOptionsV1,
     ): Promise<readonly SpawnBackendRecoveryReport[]> {
       const backends = new Map<string, SpawnBackend>(recoveryOwners);
       for (const entry of entries.values()) {
@@ -1170,10 +1237,30 @@ export function createExactNormalDockerExecutionRegistry(
         const report = await backend.reconcilePendingAttempts({ mode });
         reports.push(report);
         this.rehydrateRecovery(report, backend);
+        let heldForThisRun = 0;
         for (const hold of report.held ?? []) {
+          if (isRetirableHistoricalContainHold(mode, hold, backend, options)) {
+            // Deletion, not a hold: a `hold` entry reads back as
+            // `authority-hold` and re-bricks every later start (see
+            // `retireHistoricalUnsettleableAttempt`). Recorded in the typed
+            // historical-unsettleable snapshot so the skip is never silent.
+            this.retireHistoricalUnsettleableAttempt(
+              hold.taskId,
+              `contain-skipped-historical:${hold.custodyHoldCode ?? hold.reasonCode}`,
+            );
+            debugLog(
+              'scheduler-effects:historical-contain-hold-skipped',
+              `taskId=${hold.taskId};authorityState=${hold.authorityState}`
+              + `;reasonCode=${hold.reasonCode}`
+              + `;custodyHoldCode=${hold.custodyHoldCode ?? ''}`
+              + ';daemonContainerState=absent',
+            );
+            continue;
+          }
+          heldForThisRun += 1;
           this.registerHold(hold.taskId, hold.reasonCode, backend);
         }
-        if ((report.held?.length ?? 0) > 0) {
+        if (heldForThisRun > 0) {
           throw new DeckentError('DECKENT_E091', `EXACT_LIFECYCLE_${mode.toUpperCase()}_HOLD`);
         }
         if (mode === 'contain') {

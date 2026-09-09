@@ -1158,6 +1158,15 @@ export interface DeckentConfig {
   /** Docker container timeout in seconds (default: 1200 = 20 minutes) */
   docker_timeout?: number;
   /**
+   * Bounded re-runs of the exact Docker workspace population helper when it
+   * aborts because the live project root was written during the copy window,
+   * BEFORE any destination byte was produced (source-mutation pre-copy class).
+   * Value = number of RETRIES; total attempts = value + 1. Default 2, hard
+   * upper bound 5 (DOCKER_POPULATION_RETRY_MAX_LIMIT). Mid-copy and manifest
+   * mismatch classes never retry: their volume generation is already dirty.
+   */
+  docker_population_retry_max?: number;
+  /**
    * Opt-in per-kind Docker memory limits. Keys are canonical TaskKind values
    * (work-model.ts SSOT): 'code-development', 'documentation', 'test', etc.
    * When a spawned task's kind matches, that limit overrides the global default 4g.
@@ -2191,6 +2200,15 @@ export interface ResolvedConfig {
   docker_image?: string;
   /** Docker container timeout in seconds (default: 1200 = 20 minutes) */
   docker_timeout?: number;
+  /**
+   * Bounded re-runs of the exact Docker workspace population helper when it
+   * aborts because the live project root was written during the copy window,
+   * BEFORE any destination byte was produced (source-mutation pre-copy class).
+   * Value = number of RETRIES; total attempts = value + 1. Default 2, hard
+   * upper bound 5 (DOCKER_POPULATION_RETRY_MAX_LIMIT). Mid-copy and manifest
+   * mismatch classes never retry: their volume generation is already dirty.
+   */
+  docker_population_retry_max?: number;
   /** Opt-in per-kind Docker memory limits. Keys are canonical TaskKind values. Swap derived at × 1.5. */
   worker_memory_limit_by_kind?: Record<string, string>;
   /** Default per-worker Docker memory limit (docker `--memory`), e.g. "2g". Default '4g'. */

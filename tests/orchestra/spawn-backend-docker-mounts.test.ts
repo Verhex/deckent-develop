@@ -1197,8 +1197,11 @@ describe('exact Docker custody mounts', () => {
     expect(post).toBeGreaterThan(destination);
     expect(source).toContain('execution-effect-population-content-manifest-v1');
     expect(source).toContain('inventoryAdmissionReceiptDigest: authority.inventoryAdmissionReceiptDigest');
-    expect(source).toContain('sourcePre.digest !== destination.digest');
-    expect(source).toContain('destination.digest !== sourcePost.digest');
+    // The three-way proof is unchanged; it is now expressed as a bit summary so
+    // the bounded typed refusal can carry a numeric explanation of the mismatch.
+    expect(source).toContain('sourcePre.digest === destination.digest ? 0 : 1');
+    expect(source).toContain('destination.digest === sourcePost.digest ? 0 : 2');
+    expect(source).toContain('if (manifestMismatchBits !== 0) fail(');
     expect(source).toContain('totalBytes > MAX_TOTAL_BYTES');
     expect(source).toContain('byteLength > MAX_FILE_BYTES');
     expect(source).toContain('Date.now() > authority.deadlineUnixMs');
@@ -1223,7 +1226,7 @@ describe('exact Docker custody mounts', () => {
     expect(source).toContain('sourcePre.entries.clear()');
     expect(source).toContain("const destination = scan('/workspace', false)");
     expect(source).toContain("const sourcePost = scan('/source', false)");
-    expect(source).toContain('if (!Number.isSafeInteger(written) || written <= 0) process.exit(78)');
+    expect(source).toContain('if (!Number.isSafeInteger(written) || written <= 0) fail(');
     expect(source).not.toContain('readFileSync(absolute)');
   });
 
@@ -1601,7 +1604,7 @@ describe('exact Docker custody mounts', () => {
     expect(source).toContain('EXACT_DOCKER_EFFECT_CLOCK_REGRESSION_TOLERANCE_MS');
     expect(source).toContain('return new Date(lastTimestampMs).toISOString()');
     const captureBefore = source.indexOf('const beforeGeneration = await inspectExactVolumeGeneration');
-    const helperRun = source.indexOf('const result = await run', captureBefore);
+    const helperRun = source.indexOf('result = await run', captureBefore);
     const captureAfter = source.indexOf('const afterGeneration = await inspectExactVolumeGeneration', helperRun);
     expect(captureBefore).toBeGreaterThan(0);
     expect(helperRun).toBeGreaterThan(captureBefore);
@@ -3278,6 +3281,7 @@ describe('exact Docker custody mounts', () => {
       rehydrateExactDockerEffectLaunch: ReturnType<typeof vi.fn>;
       monitorExactDockerCustody: ReturnType<typeof vi.fn>;
       commitExactDockerEffectLanding: ReturnType<typeof vi.fn>;
+      exactWorkspaceCommandRunner: ReturnType<typeof vi.fn>;
     };
     internals.openExactDockerRecoveryStore = vi.fn(() => ({
       store,
@@ -3295,10 +3299,27 @@ describe('exact Docker custody mounts', () => {
     internals.rehydrateExactDockerEffectLaunch = vi.fn(async () => undefined);
     internals.monitorExactDockerCustody = vi.fn();
     internals.commitExactDockerEffectLanding = vi.fn();
+    // Containment observes the daemon ONCE before the contain step through the
+    // injected workspace command runner (read-only `docker inspect`); the
+    // module-level `spawn` mock never emits, so the probe must stay hermetic.
+    internals.exactWorkspaceCommandRunner = vi.fn(async () => Object.freeze({
+      status: 1,
+      signal: null,
+      stdout: new Uint8Array(),
+      stderr: Buffer.from(`error: no such object: ${fixture.authority.backendExecutionId}`),
+      error: false,
+      overflow: false,
+    }));
 
     expect(backend.workerInventoryState(fixture.identity.taskId)).toBe('unknown');
     await expect(backend.reconcilePendingAttempts({ mode: 'contain' }))
       .resolves.toMatchObject({ adopted: [fixture.identity.taskId] });
+    expect(internals.exactWorkspaceCommandRunner).toHaveBeenCalledTimes(1);
+    expect(internals.exactWorkspaceCommandRunner.mock.calls[0]?.[0]).toMatchObject({
+      command: 'docker',
+      args: ['inspect', '--format', '{{.State.Running}}|{{.State.ExitCode}}',
+        fixture.authority.backendExecutionId],
+    });
     expect(internals.containExactDockerCustodyAttempt).toHaveBeenCalledWith(
       scope,
       fixture.authority,
