@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "outcomeId": "TERMINAL-OPERATOR-SURFACE-CLOSURE-001",
+  "role": "supervisor",
+  "baseSha": "27af4125a1f3b3f32a60fb477cbd936317f516ed",
+  "headSha": "27af4125a1f3b3f32a60fb477cbd936317f516ed",
+  "branch": "main",
+  "policyDigest": "sha256:c4c96a971833ee892174b7d361e08c7f0eb53c629873381235deaa573594d863",
+  "scopeDigest": "sha256:e963666fe56d60bfd8db27cf72c7c3af02d8fbac7ea608c5e015a2f8fe3df088",
+  "filesChanged": [],
+  "verification": [],
+  "findings": [],
+  "openActions": [
+    "Reconcile pinned snapshot and run exact read-only do/start admission plus sprint728 retained failure inspection; resolve only an admitted concrete blocker",
+    "Complete Goal Docker purpose/termination/accepted-result identity and provider capacity/budget admission bindings only after explicit owner gate for the two schema/authority decisions",
+    "Close MCP checkpoint decision authority parity through the canonical live approval service; no MCP self-approval",
+    "Prove real dependent multiworker execution to main landing then next Goal and durable settlement with exact output/heartbeat and intervention evidence",
+    "Reconcile original 7099 closure contract, Windows-native proof and independent provider receipt before canonical DONE; no new broad audit without new evidence"
+  ],
+  "recommendedNextAction": "Independently verify handoff-snapshot.json and immutable receipt chain; after COMMITTED, perform read-only do/start admission and sprint728 retained failure inspection before any new run or recovery",
+  "authorityHandoff": {
+    "protocolVersion": 1,
+    "handoffId": "ah-2026-09-09-astra-fable-7099",
+    "sequence": 2,
+    "transition": "VERIFIED",
+    "transitionActor": "transferee",
+    "currentAuthorityEpoch": 4,
+    "proposedAuthorityEpoch": 5,
+    "previousReceiptDigest": "sha256:4a55bf87c80ddb231f22e08aa1c75a47ad84c04debfd84a8bcd6d2ccbd050f6b",
+    "from": {
+      "hostId": "codex-cli",
+      "providerId": "codex",
+      "modelApiId": "gpt-6-astra",
+      "role": "supervisor",
+      "principalDigest": "sha256:1d1549ebd7282b91e0c19f892a1d68c3092d2c2f7fc05d3096b405c151d47bca",
+      "sessionDigest": "sha256:a5db7522d16ebcda203b427bf1195a7b37c4f09fbd8b4813cc5d97cf31c006f1"
+    },
+    "to": {
+      "hostId": "claude-code-cli",
+      "providerId": "claude",
+      "modelApiId": "claude-fable-5-1",
+      "role": "supervisor",
+      "principalDigest": "sha256:1d1549ebd7282b91e0c19f892a1d68c3092d2c2f7fc05d3096b405c151d47bca",
+      "sessionDigest": "sha256:607b3e3dc5324bc2fda6f66dfce8dee8dcf9c5a2d49bed4f463895303eab93a2"
+    },
+    "trigger": {
+      "reasonCode": "OWNER_DIRECTIVE",
+      "authorityRef": "owner-live-2026-09-09-native-status-then-fable-handoff-and-standing-astra-sole-executor"
+    },
+    "authorityScope": {
+      "goalId": "n/a",
+      "missionId": "n/a",
+      "flowId": "n/a",
+      "runId": "n/a",
+      "roles": [
+        "supervisor"
+      ],
+      "includes": [
+        "7099 remaining Terminal and Goal closure; only the five openActions; preserve dirty ownership and existing proof; ADR-D-007 bounded manual recovery where already admitted"
+      ],
+      "excludes": [
+        "owner-only commit/push, MASTER admission, Goal schema/authority amendments, kill/cleanup, mode/authority changes; unadmitted outcomes; raw memory.db/secrets; self-verification; blanket dirty landing or pruning lost worktrees"
+      ]
+    },
+    "evidenceSnapshot": {
+      "observedAt": "2026-09-09T07:35:58.500Z",
+      "repoStateRef": "git:27af4125a1f3b3f32a60fb477cbd936317f516ed:dirty=59",
+      "runtimeStateRef": ".deckent/recovery-snapshots/7099-catalog-YLr6iwUC/proof/handoff-snapshot.json#runtime sha256:a5d0f6897ab13bbde99d45c16154f4b8004b60fe028caa1d015d9fd76ecc3bdc; one owned bot153705 s794158; healthy local-llm; no active worker; clean gate HOLD only E_CLEAN_BOT_ACTIVE",
+      "approvalStateRef": ".deckent/recovery-snapshots/7099-catalog-YLr6iwUC/proof/handoff-snapshot.json#approvals: broker pending0 approved7; federated0; gateway pairing NOT_INSPECTED; no decision authority transferred",
+      "verificationStateRef": ".deckent/recovery-snapshots/7099-catalog-YLr6iwUC/proof/handoff-snapshot.json#verification-and-findings sha256:a5d0f6897ab13bbde99d45c16154f4b8004b60fe028caa1d015d9fd76ecc3bdc; 91+141 tests, actual38+8CLI, NativePTY no clear; effective gpt-6-astra registry dirty NOT_COMMITTED; 7099 VERIFY; remote advisory NOT_RUN",
+      "buildStateRef": ".deckent/recovery-snapshots/7099-catalog-YLr6iwUC/verify-cUNzW4pb/main-status-build-v2-result.json: build:all exit0 sourceTree fcda399fefbd32be80439706fcd7a5f8b2f52b91b6b4ae8db6ad55ac1ffada92 matches current source; inherited dirty build inputs; bot restarted; MCP reconnect NOT_VERIFIED",
+      "ssotStateRef": "docs/MASTER-PLAN.md + follow-up-works/current-flow.md"
+    }
+  },
+  "receiptDigest": "sha256:8a3096b8d50bd35e4528c8a1047bafca63d6787b183abe5069ad4101661b4eab"
+}
