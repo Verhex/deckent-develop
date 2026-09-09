@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):d9a947d0e17bf0223853a1037d1193ab4c742ace4691eebbe4a6a28293b36317`
+**Source digest:** `sha256(normalized-lf-utf8):b8b82db4a8517a98cfffb5429ff3df9ab27d90486e46a93f1947f48a7ef95ba4`
 
-**Rows:** 591 total · 502 active · 89 terminal
+**Rows:** 592 total · 503 active · 89 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 380 |
+| OPEN | 381 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
@@ -450,6 +450,7 @@
 | 7103 | `TERMINAL-STARTUP-PERF-001` | OPEN | P1 | TERMINAL | `TERMINAL-OPERATOR-SURFACE-CLOSURE-001` | — | Native terminal ilk boyama maliyeti: modül-kapsamı worktree binary authority hash'i, çift MemoryStore açılışı, üçlü loadConfig ve await'li auth probe kaldırılır veya ertelenir |
 | 7104 | `SYNC-PROVENANCE-TRUTH-001` | OPEN | P1 | TRUTH | `TERMINAL-OPERATOR-SURFACE-CLOSURE-001` | — | `deckent sync` ve `/sync` özeti: 'önceki sync imzası yok' ile gerçek 3-yollu çakışma ayrışır; aggregate özet export edilir ve REPL kartında gösterilir |
 | 7105 | `TERMINAL-CONTEXT-CONTINUITY-001` | OPEN | P0 | TERMINAL | `TERMINAL-OPERATOR-SURFACE-CLOSURE-001` | — | **Owner-admitted 2026-09-09 (Alperen canlı vaka):** Native terminal sonsuz-akış — tur içi bağlam kararı admission ile AYNI ölçüm otoritesini (measureProviderRequest, utf8-wire-bytes-plus-framing) kullanır, tur içinde ölçülü high-water tetiği epoch'u erkenden ilerletir, INPUT_CONTEXT_OVERFLOW'da tek bounded epoch+retry koşulsuz denenir, tool-result önizleme tavanı pencereye göre config-resolved çözülür ve LLM'siz deterministik mikro-compaction (eski tool sonuçlarını contentRef'e düşürme) checkpoint sığmadığında devreye girer |
+| 7106 | `TERMINAL-PREAMBLE-BUDGET-001` | OPEN | P0 | TERMINAL | `TERMINAL-CONTEXT-CONTINUITY-001` | — | **Owner-admitted 2026-09-09 (Alperen canlı vaka, "enterprise seviye çözüm öncelikli"):** Native terminal başlangıç preamble'ı (system prompt + 40+ tool şeması + DECKENT.md referansı + identity + güvenlik kuralları) 131072 pencereli local-llm'de tek "Selam" turunda ~48k token (%37) yiyor; preamble ölçülü ve pencere-oranlı bütçeye bağlanır (config-resolved pay, default provider/model pencere büyüklüğüne göre), tool şemaları progressive/lazy sunulur (mevcut deckent_search_tools üzerinden keşif + gerektiğinde tam şema), DECKENT.md/identity gibi referans metinleri inline yerine digest-doğrulanmış contentRef ile taşınır, her provider için preamble ölçümü /context'te görünür |
 | 7110 | `A2A-INTEROP-001` | OPEN | P2 | ECOSYSTEM | — | — | A2A v1.0 interop yönü: inbound A2A server (Agent Card + task-lifecycle projection) ve outbound A2A provider adapter için owner kararı ve plan admission |
 | 7120 | `SKILLMD-INGEST-001` | BLOCKED | P1 | ECOSYSTEM | — | `SKILL_V3_PROFILE_RECONCILIATION_REQUIRED` | Anthropic Agent-Skills (SKILL.md) open-standard ingest: `deckent skill import --format=skill-md` converter, typed `source` provenance ve frontmatter parser sertleştirmesi |
 | 7121 | `SKILLMD-V3-RECONCILIATION-001` | OPEN | P0 | ECOSYSTEM | `SKILL-CATALOG-AUTHORITY-001`, `SKILL-ROUTING-ELIGIBILITY-001`, `SKILL-SUPPLY-CHAIN-INGRESS-001` | — | SKILLMD-INGEST-001'in immutable V2 activation kabulünü production V3 SkillProfile ve fail-closed package ingress contractıyla lossless uzlaştır |

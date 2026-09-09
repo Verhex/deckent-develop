@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "d9a947d0e17bf0223853a1037d1193ab4c742ace4691eebbe4a6a28293b36317"
+    "value": "b8b82db4a8517a98cfffb5429ff3df9ab27d90486e46a93f1947f48a7ef95ba4"
   },
   "summary": {
-    "total": 591,
-    "active": 502,
+    "total": 592,
+    "active": 503,
     "terminal": 89,
     "receipts": 232,
     "byState": {
-      "OPEN": 380,
+      "OPEN": 381,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
@@ -21,7 +21,7 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 367,
+      "P0": 368,
       "P1": 174,
       "P2": 50
     },
@@ -57,7 +57,7 @@
       "SCALE": 1,
       "SECURITY": 11,
       "SURFACE": 1,
-      "TERMINAL": 27,
+      "TERMINAL": 28,
       "TOOL": 1,
       "TRUTH": 108,
       "XPLAT": 7
@@ -5606,6 +5606,17 @@
       "updated": "2026-09-09",
       "definitionDigest": "f80e81ef68d8ca1c0cd312fb56de019057a21547283d8cd48ef2d59c4500cae6",
       "progressDigest": "af4e0864cf3a570d8930359bb1037aeafaaf85d11d64216b101cb89cff41fc49",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7106,
+      "id": "TERMINAL-PREAMBLE-BUDGET-001",
+      "program": "TERMINAL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-09-09",
+      "definitionDigest": "06b91cb4abfd949dd5f43c76018c89f81782be2711257051614fb760a6f883f1",
+      "progressDigest": "a22c2577b947a88cb303904ee3d205ed56c10ce5306ea81b65143e54a43696d3",
       "terminalClosureDigest": null
     },
     {
@@ -24988,6 +24999,7 @@
         "TERMINAL-STARTUP-PERF-001",
         "SYNC-PROVENANCE-TRUTH-001",
         "TERMINAL-CONTEXT-CONTINUITY-001",
+        "TERMINAL-PREAMBLE-BUDGET-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
         "AGENT-RUNTIME-ADAPTER-001",
@@ -25056,6 +25068,7 @@
         "TERMINAL-STARTUP-PERF-001",
         "SYNC-PROVENANCE-TRUTH-001",
         "TERMINAL-CONTEXT-CONTINUITY-001",
+        "TERMINAL-PREAMBLE-BUDGET-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
         "AGENT-RUNTIME-ADAPTER-001",
@@ -26681,7 +26694,9 @@
       "dependsOn": [
         "TERMINAL-OPERATOR-SURFACE-CLOSURE-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "TERMINAL-PREAMBLE-BUDGET-001"
+      ],
       "children": [],
       "gates": [
         "G1",
@@ -26705,6 +26720,42 @@
       "evidenceReceipts": [],
       "acceptance": "loop fit kararı ile adapter admission ölçümü aynı sayıyı görür (tek authority, ikinci tahminci yok); 131k pencereli local-llm/Qwen ile 20+ tool çağrılı tek tur gerçek native terminalde overflow olmadan tamamlanır ve epoch otomatik ilerler (transcript kanıtı); overflow sonrası sonraki tur checkpoint boş kalmaz; tool-result preview tavanı hardcode değil, pencere oranından çözülür; hermetik regresyon testleri; Claude Code/Codex ile davranış paritesi (bounded tool output + otomatik compaction + compact-and-retry)",
       "evidence": "Vaka: /context 143420 token / 131072 pencere (%109), checkpoint empty, epoch 1, tek turda 18 tool çağrısı, sonraki basit soru da overflow; kaynak: src/agent/loop.ts:260-317 estimateTokens/overContext vs src/agent/context-budget.ts:117 measureProviderRequest; src/agent/session.ts:918-926 retry yalnız epochAdvancedThisTurn; src/agent/tool-result-broker.ts:33 DEFAULT_MAX_PREVIEW_BYTES=16384; session.ts:143 CONTEXT_HIGH_WATER_RATIO yalnız tur öncesi",
+      "updated": "2026-09-09"
+    },
+    {
+      "order": 7106,
+      "id": "TERMINAL-PREAMBLE-BUDGET-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TERMINAL",
+      "outcome": "**Owner-admitted 2026-09-09 (Alperen canlı vaka, \"enterprise seviye çözüm öncelikli\"):** Native terminal başlangıç preamble'ı (system prompt + 40+ tool şeması + DECKENT.md referansı + identity + güvenlik kuralları) 131072 pencereli local-llm'de tek \"Selam\" turunda ~48k token (%37) yiyor; preamble ölçülü ve pencere-oranlı bütçeye bağlanır (config-resolved pay, default provider/model pencere büyüklüğüne göre), tool şemaları progressive/lazy sunulur (mevcut deckent_search_tools üzerinden keşif + gerektiğinde tam şema), DECKENT.md/identity gibi referans metinleri inline yerine digest-doğrulanmış contentRef ile taşınır, her provider için preamble ölçümü /context'te görünür",
+      "priority": "P0",
+      "dependsOn": [
+        "TERMINAL-CONTEXT-CONTINUITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TERMINAL-CONTEXT-CONTINUITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Qwen3.8/131072 pencerede ilk tur ölçülü preamble ≤ config payı (default ≤ %15) ve aynı tool yetkinliği korunur (tool çağrıları keşif+lazy şema ile çalışır, gerçek transcript kanıtı); Claude/Codex pencerelerinde davranış değişmez veya config ile ölçeklenir; hardcode yok, i18n en+tr; regresyon testleri",
+      "evidence": "Vaka: /context ilk tur ~48k/131072 (owner 2026-09-09 10:2xZ), aynı oturumda 1.25 MB MASTER-PLAN okuma 285691 token (%218) — ikincisi 7105 tavanlarıyla kapanır, preamble payı 7106'nındır; preamble bileşenleri: tool şemaları (src/agent/tools, mcp-tool-catalog), DECKENT.md referansı, identity (src/agent/identity.ts), permission kuralları (src/agent/permission*.ts)",
       "updated": "2026-09-09"
     },
     {
@@ -29979,6 +30030,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "26864c3bdb9d04142587cbe5b608f8807a414998286cd705271c7d79188e3384"
+    "value": "6de3f2240da5b8160e089ce8064a9df7a30606a4ed3698231c8aa33ee7a465e4"
   }
 }

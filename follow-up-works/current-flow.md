@@ -1,6 +1,6 @@
 # Geçici iş imleci — 7099 Terminal
 
-Güncelleme: 2026-09-09T09:46Z. SSOT: [MASTER](../docs/MASTER-PLAN.md).
+Güncelleme: 2026-09-09T10:50Z. SSOT: [MASTER](../docs/MASTER-PLAN.md).
 Bu dosya authority, admission veya settlement receipt değildir.
 Silinme tetiği: onaylı sıra tüketilip kalıcı kanıtlar SSOT/evidence'a işlendiğinde.
 
@@ -182,6 +182,18 @@ duration performans kanıtı sayılmadı. WholeCLI/7099 veya platform closure de
 0a. LANDED (owner onayı 09:42Z): caa404984 fix(mcp) checkpoint read-only typed refusal (Cursor L3);
    27c9f9fd3 feat(custody) Lane D T1+T2 goal subject/ledger v3/settlement namespace (Astra; UNWIRED,
    T5–T7 bağlı). Push yok; main origin'den 4 ileride.
+0a1. LANDED 10:22Z (owner onayı): 72ca31c42 E077 paketi; b0b1626e0 governance docs; 87baca2e8 MASTER 7105
+   context continuity (Astra İŞ C, Opus review GO, gerçek Qwen 24-tool kanıtı); c56565f89 T3 purpose-bound
+   admission (Cursor); bfe8fd4c9 T4 non-reservable artifact (Cursor). Main origin'den 9 ileride, push yok.
+0a3. Canary run-4 (sprint-730, 09:54Z): worker dispatch KABUL, custody zinciri 01→06 tam (728 reader
+   sınıfı geçildi), effect landed; evaluation NO_GO (assessment-parity, worker öz-değerlendirme tutarsız,
+   ürün doğru); FIX fazı EXACT_LIFECYCLE_CONTAIN_HOLD ile crash → yeni sınıf: contain reconcile custody
+   store'u diskten tarayıp tarihsel 728-001'i hold'a çeviriyor. DÜZELTME (ajan kanıtı): barikat
+   sprint-controller.ts:4063 koşulsuz FIX-öncesi contain reconcile; EXECUTE admission hold yok, redispatch
+   hiç olmadı (ikinci defekt yok). Fix lane deckent-lane-contain-hold (Astra A3 doğrulaması bekleniyor).
+   sprint-730 kalıntısı recover ile arşivlendi. Build c842a396 (7105 dahil) bot 584802.
+0a4. MASTER 7106 TERMINAL-PREAMBLE-BUDGET-001 (owner-admitted 10:31Z, P0): "Selam" turu ~48k/131k preamble;
+   Astra İŞ D (ölçüm → progressive tool şeması, contentRef referans metin, config-resolved pay, /context).
 0a2. Canary run-3 (sprint-729, 09:03Z) worker gönderimi kabul edilmedi: kök neden = exact Docker
    dependency-population helper'ı (spawn-backend-docker.ts:2857-3108) ~33 s pencerede canlı proje
    kökünün byte-aynı kalmasını şart koşuyor (envanter untracked dahil), o pencerede main ağacına yazan
