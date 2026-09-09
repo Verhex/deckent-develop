@@ -46,7 +46,28 @@ export interface ResolvedNativeAgentBudget {
   readonly checkpointEveryToolCalls: number;
   readonly outputReserveTokens: number;
   readonly contextSafetyReserveTokens: number;
+  /** 7108: hidden-reasoning policy (see `NativeReasoningConfig`). */
+  readonly reasoning: ResolvedNativeReasoningPolicy;
+  /** 7108: bounded transient-transport retries per provider request (0..3). */
+  readonly transportRetry: number;
+  /** 7108: base backoff between transport retries, milliseconds. */
+  readonly transportRetryBackoffMs: number;
 }
+
+export type NativeReasoningMode = 'auto' | 'off' | 'on';
+
+export interface ResolvedNativeReasoningPolicy {
+  readonly mode: NativeReasoningMode;
+  /** Reasoning room added ON TOP of the visible reserve when the model's
+   *  descriptor proves hidden reasoning shares the completion ceiling. */
+  readonly budgetTokens: number;
+  /** Headroom for the single exhaustion retry when thinking cannot be toggled off. */
+  readonly exhaustedRetryBudgetTokens: number;
+}
+
+/** Hard upper bound for `transportRetry` — a transport hiccup is retried a
+ *  bounded number of times, never looped. */
+export const MAX_NATIVE_TRANSPORT_RETRY = 3;
 
 /** Bounded deep/extended defaults. Rationale (owner RCA 2026-08-17): a healthy
  *  50-distinct-call analysis died at the fixed 25-round wall, so rounds/calls
@@ -72,10 +93,58 @@ export const DEFAULT_NATIVE_AGENT_BUDGET: ResolvedNativeAgentBudget = Object.fre
   checkpointEveryToolCalls: 60,
   outputReserveTokens: 4_096,
   contextSafetyReserveTokens: 2_048,
+  // 7108 (owner RCA 2026-09-09): a thinking-mode local model burned the whole
+  // 4,096-token wire ceiling on hidden reasoning four times in one window and
+  // produced zero visible text. Reasoning room is now explicit and added ON TOP
+  // of the visible reserve when the model's descriptor proves budget sharing;
+  // the exhaustion retry may raise it once, bounded by exhaustedRetryBudgetTokens.
+  reasoning: Object.freeze({ mode: 'auto' as const, budgetTokens: 8_192, exhaustedRetryBudgetTokens: 16_384 }),
+  transportRetry: 1,
+  transportRetryBackoffMs: 250,
 });
 
 const NATIVE_AGENT_BUDGET_FIELDS = Object.keys(DEFAULT_NATIVE_AGENT_BUDGET) as
   ReadonlyArray<keyof ResolvedNativeAgentBudget>;
+const NATIVE_AGENT_RATIO_FIELDS: ReadonlySet<string> = new Set([
+  'minTranscriptShareOfContext', 'maxPreambleShareOfContext',
+  'contextHighWaterRatio', 'maxToolResultShareOfContext', 'maxTurnToolResultShareOfContext',
+]);
+const NATIVE_REASONING_MODES: ReadonlySet<string> = new Set(['auto', 'off', 'on']);
+const NATIVE_REASONING_FIELDS = ['mode', 'budgetTokens', 'exhaustedRetryBudgetTokens'] as const;
+
+/** 7108: validate + merge `execution_budget.native_agent.reasoning`. */
+function resolveNativeReasoningPolicy(authored: unknown): ResolvedNativeReasoningPolicy {
+  const defaults = DEFAULT_NATIVE_AGENT_BUDGET.reasoning;
+  if (authored === undefined) return defaults;
+  if (!isPlainObject(authored)) {
+    throw new ExecutionBudgetPolicyError('execution_budget.native_agent.reasoning must be an object');
+  }
+  assertKnownKeys(authored, NATIVE_REASONING_FIELDS, 'execution_budget.native_agent.reasoning');
+  const mode = authored['mode'] ?? defaults.mode;
+  if (typeof mode !== 'string' || !NATIVE_REASONING_MODES.has(mode)) {
+    throw new ExecutionBudgetPolicyError(
+      `execution_budget.native_agent.reasoning.mode must be one of ${[...NATIVE_REASONING_MODES].join('|')}`,
+    );
+  }
+  const positiveInt = (field: 'budgetTokens' | 'exhaustedRetryBudgetTokens'): number => {
+    const value = authored[field];
+    if (value === undefined) return defaults[field];
+    if (!Number.isSafeInteger(value) || (value as number) <= 0) {
+      throw new ExecutionBudgetPolicyError(
+        `execution_budget.native_agent.reasoning.${field} must be a positive safe integer`,
+      );
+    }
+    return value as number;
+  };
+  const budgetTokens = positiveInt('budgetTokens');
+  const exhaustedRetryBudgetTokens = positiveInt('exhaustedRetryBudgetTokens');
+  if (exhaustedRetryBudgetTokens < budgetTokens) {
+    throw new ExecutionBudgetPolicyError(
+      'execution_budget.native_agent.reasoning.exhaustedRetryBudgetTokens must be >= budgetTokens',
+    );
+  }
+  return Object.freeze({ mode: mode as NativeReasoningMode, budgetTokens, exhaustedRetryBudgetTokens });
+}
 
 /** Merge owner-authored execution_budget.native_agent over the defaults with
  *  loud validation — unknown keys and non-positive/non-integer values fail. */
@@ -88,16 +157,29 @@ export function resolveNativeAgentBudget(input: {
     throw new ExecutionBudgetPolicyError('execution_budget.native_agent must be an object');
   }
   assertKnownKeys(authored, NATIVE_AGENT_BUDGET_FIELDS as readonly string[], 'execution_budget.native_agent');
-  const merged: Record<string, number> = { ...DEFAULT_NATIVE_AGENT_BUDGET };
+  const merged: Record<string, number | ResolvedNativeReasoningPolicy> = { ...DEFAULT_NATIVE_AGENT_BUDGET };
   for (const field of NATIVE_AGENT_BUDGET_FIELDS) {
     const value = authored[field];
     if (value === undefined) continue;
-    if (field === 'minTranscriptShareOfContext' || field === 'maxPreambleShareOfContext' || field === 'contextHighWaterRatio' || field === 'maxToolResultShareOfContext'
-      || field === 'maxTurnToolResultShareOfContext') {
+    if (field === 'reasoning') {
+      merged[field] = resolveNativeReasoningPolicy(value);
+      continue;
+    }
+    if (NATIVE_AGENT_RATIO_FIELDS.has(field)) {
       if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value >= 1) {
         throw new ExecutionBudgetPolicyError(`execution_budget.native_agent.${field} must be a ratio strictly between 0 and 1`);
       }
       merged[field] = value;
+      continue;
+    }
+    if (field === 'transportRetry') {
+      // Zero is a legitimate owner choice ("never retry"); the cap is hard.
+      if (!Number.isSafeInteger(value) || (value as number) < 0 || (value as number) > MAX_NATIVE_TRANSPORT_RETRY) {
+        throw new ExecutionBudgetPolicyError(
+          `execution_budget.native_agent.transportRetry must be an integer between 0 and ${MAX_NATIVE_TRANSPORT_RETRY}`,
+        );
+      }
+      merged[field] = value as number;
       continue;
     }
     if (!Number.isSafeInteger(value) || (value as number) <= 0) {
@@ -107,8 +189,8 @@ export function resolveNativeAgentBudget(input: {
     }
     merged[field] = value as number;
   }
-  if (merged.maxToolResultShareOfContext! > merged.maxTurnToolResultShareOfContext!
-    || merged.maxTurnToolResultShareOfContext! >= merged.contextHighWaterRatio!) {
+  if ((merged.maxToolResultShareOfContext as number) > (merged.maxTurnToolResultShareOfContext as number)
+    || (merged.maxTurnToolResultShareOfContext as number) >= (merged.contextHighWaterRatio as number)) {
     throw new ExecutionBudgetPolicyError('execution_budget.native_agent requires single tool share <= retained turn share < context high-water ratio');
   }
   return Object.freeze(merged) as unknown as ResolvedNativeAgentBudget;

@@ -12,6 +12,7 @@ import type {
   ModelCapabilities,
   ModelDefinition,
   ParametricResolveOptions,
+  ReasoningControlDescriptor,
 } from './model-registry-types.js';
 
 declare module './model-registry-types.js' {
@@ -35,6 +36,9 @@ export type {
   ModelCost,
   ModelDefinition,
   ParametricResolveOptions,
+  ReasoningControlDescriptor,
+  ReasoningToggleDescriptor,
+  ReasoningControlProvenance,
 } from './model-registry-types.js';
 
 /** Canonical provider API identity for Claude Fable quota and routing scope. */
@@ -1061,7 +1065,19 @@ export interface LocalLlmModelFacts {
   tier: ModelTier;
   contextWindow: number;
   capabilities: ModelCapabilities;
+  /** 7108: reasoning-control evidence for the served model — owner config or a
+   *  live server-template probe. Absent = the honest `unknown` descriptor. */
+  reasoningControl?: ReasoningControlDescriptor;
 }
+
+/** The honest no-evidence descriptor attached to every local identity that
+ *  registers without reasoning-control facts (kept here, next to the registry
+ *  entry it decorates, so registration never depends on the resolver module). */
+const UNKNOWN_LOCAL_REASONING_CONTROL: ReasoningControlDescriptor = Object.freeze({
+  toggle: Object.freeze({ kind: 'unknown' as const }),
+  sharesCompletionBudget: 'unknown' as const,
+  provenance: 'unknown' as const,
+});
 
 /**
  * Register an explicitly owned local OpenAI-compatible identity only from a
@@ -1100,17 +1116,27 @@ export function ensureLocalLlmModelRegistered(
         `Model API ID ${modelId} is already owned by ${existing.provider}`,
       );
     }
+    // 7108: a later registration that brings REAL reasoning-control evidence
+    // upgrades an `unknown` entry in place; known evidence is never downgraded.
+    if (facts.reasoningControl
+      && (existing.reasoningControl === undefined || existing.reasoningControl.provenance === 'unknown')
+      && facts.reasoningControl.provenance !== 'unknown') {
+      registry.register({ ...existing, reasoningControl: facts.reasoningControl });
+    }
     return;
   }
-  registry.register(buildParametricModel(modelId, {
-    provider: 'local-llm',
-    tier: facts.tier,
-    contextWindow: facts.contextWindow,
-    capabilities: { ...facts.capabilities, toolUse: true },
-    costPerMillion: { input: 0, output: 0 },
-    status: 'ga',
-    register: false,
-  }));
+  registry.register({
+    ...buildParametricModel(modelId, {
+      provider: 'local-llm',
+      tier: facts.tier,
+      contextWindow: facts.contextWindow,
+      capabilities: { ...facts.capabilities, toolUse: true },
+      costPerMillion: { input: 0, output: 0 },
+      status: 'ga',
+      register: false,
+    }),
+    reasoningControl: facts.reasoningControl ?? UNKNOWN_LOCAL_REASONING_CONTROL,
+  });
 }
 
 /** Per-model facts a caller can supply when registering an OpenRouter id.

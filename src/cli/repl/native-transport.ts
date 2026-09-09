@@ -26,7 +26,14 @@ import {
   OLLAMA_BUILTIN_MODELS,
 } from '../../core/model-registry.js';
 import { OPENAI_COMPAT_PRESET_META } from '../../providers/openai-compatible.js';
-import type { ModelDefinition, RegistryProviderName } from '../../core/model-registry-types.js';
+import type { ModelDefinition, ReasoningControlDescriptor, RegistryProviderName } from '../../core/model-registry-types.js';
+import type { ReasoningControlConfig } from '../../core/config-types.js';
+import {
+  createReasoningControlResolver,
+  probeOpenAICompatReasoningControl,
+  resolveModelReasoningControl,
+  validateReasoningControlConfig,
+} from '../../core/reasoning-control.js';
 import { resolveProjectModelExecutionAuthority } from '../../core/model-activation-store.js';
 import { getMessage } from '../helpers/messages.js';
 import { createStreamSegmenter, type Segment } from './stream-segmenter.js';
@@ -124,6 +131,10 @@ export function withMeasuredAdmission(input: {
   return {
     name: input.adapter.name,
     requestMeasurement: input.capability,
+    // 7108 — the reasoning-control authority rides through the admission
+    // wrapper unchanged, so the loop's ceiling arithmetic and the transport's
+    // wire mapping read the SAME descriptor.
+    ...(input.adapter.reasoningControl ? { reasoningControl: input.adapter.reasoningControl } : {}),
     async *send(req: ProviderRequest) {
       const identity = typeof input.identity === 'function' ? await input.identity() : input.identity;
       const measurement = await measureProviderRequest({
@@ -213,7 +224,7 @@ export type NativeTransportConfig = TransportConfig & {
     [provider: string]: unknown;
   };
   /** Resolved direct llama.cpp lifecycle authority shared with the CLI command. */
-  local_llm?: { endpoint?: string; contextSize?: number };
+  local_llm?: { endpoint?: string; contextSize?: number; reasoningControl?: ReasoningControlConfig };
 };
 
 /** What a /model — /provider switch (or the settings pin) asks for. */
@@ -629,7 +640,11 @@ export function resolveNativeSelection(
         provider: 'openai',
       };
     }
-    const opts: Parameters<typeof createOpenAIAdapter>[0] = { baseUrl };
+    const opts: Parameters<typeof createOpenAIAdapter>[0] = {
+      baseUrl,
+      // 7108 — registry descriptor only (hosted endpoints publish no template).
+      reasoningControl: (wireModel) => resolveModelReasoningControl(wireModel),
+    };
     if (apiKey) opts.apiKey = apiKey;
     return measuredResolved({
       adapter: createOpenAIAdapter(opts), model, providerName: 'openai',
@@ -671,6 +686,22 @@ export function resolveNativeSelection(
     }
     const inactive = inactiveNativeModel('local-llm', selectedModel, ctx.projectRoot);
     if (inactive) return inactive;
+    // 7108 — reasoning-control authority for the served model: owner config
+    // (validated loudly) > registry entry with real evidence > live /props
+    // template probe > honest `unknown`. Invalid config is a typed refusal.
+    let configuredReasoningControl: ReasoningControlDescriptor | undefined;
+    if (config.local_llm?.reasoningControl !== undefined) {
+      try {
+        configuredReasoningControl = validateReasoningControlConfig(config.local_llm.reasoningControl, 'local_llm.reasoningControl');
+      } catch (error) {
+        return {
+          error: error instanceof Error ? error.message : String(error),
+          errorCode: 'invalid-reasoning-control',
+          detail: 'local_llm.reasoningControl',
+          provider: 'local-llm',
+        };
+      }
+    }
     // NT-07 — boot-time effective context resolution lives HERE, at the
     // local-llm resolution: the configured ceiling (narrowest authored knob) is
     // probed against the server-reported n_ctx and reduced by
@@ -691,9 +722,16 @@ export function resolveNativeSelection(
         contextProvenance: server ? 'server-reported' : configured ? 'configured-narrowing' : 'model-registry',
       };
     };
+    const reasoningControl = createReasoningControlResolver({
+      ...(configuredReasoningControl ? { configured: configuredReasoningControl } : {}),
+      probe: (wireModel) => probeOpenAICompatReasoningControl({ endpoint, model: wireModel, fetchFn }),
+    });
     return {
       ...measuredResolved({
-        adapter: createOpenAIAdapter({ baseUrl: endpoint, name: 'local-llm' }),
+        adapter: createOpenAIAdapter({
+          baseUrl: endpoint, name: 'local-llm',
+          reasoningControl: (wireModel) => reasoningControl.resolve(wireModel),
+        }),
         model: selectedModel,
         providerName: 'local-llm',
         capability: requestMeasurementCapability({ kind: 'llama.cpp', endpoint, fetchFn }),
@@ -740,7 +778,10 @@ export function resolveNativeSelection(
     }
     const model = requestedModel ?? meta.models[0]!;
     return measuredResolved({
-      adapter: createOpenAIAdapter({ baseUrl: meta.baseURL, apiKey, name: meta.name }), model, providerName: provider,
+      adapter: createOpenAIAdapter({
+        baseUrl: meta.baseURL, apiKey, name: meta.name,
+        reasoningControl: (wireModel) => resolveModelReasoningControl(wireModel),
+      }), model, providerName: provider,
       capability: requestMeasurementCapability({
         kind: 'llama.cpp', endpoint: meta.baseURL, fetchFn: ctx.fetchFn ?? globalThis.fetch,
         headers: { authorization: `Bearer ${apiKey}` },

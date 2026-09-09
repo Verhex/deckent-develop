@@ -16,6 +16,7 @@ import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-cata
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print } from '../helpers/output.js';
 import { deriveEffectiveContext, type EffectiveContextResult } from '../../agent/context-budget.js';
+import { assertReasoningControlConfig } from '../../core/reasoning-control.js';
 
 const PROVIDER_NAME = 'local-llm';
 const PID_FILE = join('.deckent', 'runtime', 'local-llm.pid');
@@ -185,6 +186,11 @@ export function resolveLocalLlmLaunchConfig(config: unknown): LocalLlmLaunchConf
     contextSize: requiredPositiveInteger(local.contextSize, 'contextSize'),
     modelAlias: requiredString(local.modelAlias, 'modelAlias'),
     acceleration: resolveLocalLlmAcceleration(local.acceleration),
+    // 7108 — optional owner-authored reasoning-control facts; validated loudly
+    // so a typo never degrades to the `unknown` descriptor silently.
+    ...(local.reasoningControl !== undefined
+      ? { reasoningControl: assertReasoningControlConfig(local.reasoningControl, 'local_llm.reasoningControl') }
+      : {}),
   };
 }
 

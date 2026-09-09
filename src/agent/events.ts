@@ -49,22 +49,40 @@ export type GenerationRecoveryClassification =
   | 'TRANSPORT_EMPTY';
 /** Privacy-safe generation recovery provenance. Hidden reasoning content is
  * never carried; only the fact that activity was observed crosses the loop. */
+/** 7108 — the two reasoning-exhaustion recovery actions join the classic
+ *  continuation pair: ONE bounded retry of the SAME request, either with hidden
+ *  reasoning switched off (descriptor-toggleable) or with a raised, config-bounded
+ *  ceiling. `hold` after such a retry is the typed end of the turn. */
+export type GenerationRecoveryAction = 'continue' | 'hold' | 'retry-reasoning-off' | 'retry-raised-ceiling';
 export interface GenerationRecoveryEvent {
   type: 'generation-recovery';
   classification: GenerationRecoveryClassification;
   continuationIndex: number;
   maxContinuations: number;
   hiddenReasoningObserved: boolean;
-  action: 'continue' | 'hold';
+  action: GenerationRecoveryAction;
 }
+/** 7108 — live hidden-reasoning progress (metadata only, privacy contract
+ *  7086/RCA §3: character counts, never the reasoning text) so a view can show
+ *  a collapsed "thinking… ~N tokens" indicator while nothing visible streams. */
+export interface ReasoningActivityEvent {
+  type: 'reasoning-activity';
+  /** Characters observed in this delta. */
+  chars: number;
+  /** Characters observed since the current provider request started. */
+  cumulativeChars: number;
+}
+/** Localization variables for a coded signal: plain values the view interpolates
+ *  into the catalog row (`{code}`, `{retries}`, …). Never secrets, never prompt text. */
+export type SignalVars = Readonly<Record<string, string>>;
 /** `code` is a stable machine-readable id ('empty-response' | …) so views can
  *  localize known failure classes; `message` stays the English default for
  *  views without a localizer. */
-export interface ErrorEvent { type: 'error'; message: string; code?: string; }
+export interface ErrorEvent { type: 'error'; message: string; code?: string; vars?: SignalVars; }
 /** Non-terminal honest signal ('truncated' | 'context-compacted' | …): the turn
  *  continues, but the view must tell the user something degraded — silence here
  *  is what turned a full context window into a "model stopped replying" mystery. */
-export interface NoticeEvent { type: 'notice'; code: string; message: string; }
+export interface NoticeEvent { type: 'notice'; code: string; message: string; vars?: SignalVars; }
 /** NATIVE-AGENT-HORIZON-001: the loop asks the session layer to take a scratch
  *  checkpoint (cadence or no-progress). Data-only — the session/view decides
  *  how to fulfil and render it. */
@@ -86,6 +104,7 @@ export type AgentEvent =
   | UsageEvent
   | RequestMeasurementEvent
   | GenerationRecoveryEvent
+  | ReasoningActivityEvent
   | BudgetCheckpointRequestEvent
   | ErrorEvent
   | NoticeEvent;

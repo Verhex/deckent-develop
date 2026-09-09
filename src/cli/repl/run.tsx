@@ -289,7 +289,7 @@ export function createResolvedNativeEngine(
 export const NATIVE_ERROR_CODES = Object.freeze([
   'missing-api-key', 'missing-ollama-host', 'missing-local-llm-endpoint', 'missing-native-model',
   'unsupported-native-provider', 'legacy-model-alias', 'unknown-model', 'model-inactive',
-  'model-authority-unavailable', 'no-transport',
+  'model-authority-unavailable', 'no-transport', 'invalid-reasoning-control',
 ] as const);
 
 /** Where a native-transport resolution failed: at REPL boot (the engine never

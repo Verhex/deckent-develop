@@ -8,6 +8,13 @@
 
 import type { AgentEvent, PermissionRequestEvent } from './events.js';
 import { providerContextErrorCode } from './provider-tooluse/context-errors.js';
+import { ProviderTransportError, resolveTransportRetryPolicy } from './provider-tooluse/transport-errors.js';
+import {
+  approximateReasoningTokens,
+  planReasoning,
+  planReasoningExhaustionRecovery,
+  resolveAdapterReasoningControl,
+} from './reasoning-control.js';
 import { composeSystemPrompt } from './identity.js';
 import { decide, resolveTier } from './permission.js';
 import type { PermissionPolicy } from './permission-policy.js';
@@ -236,8 +243,23 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     const rawBudget = deps.getContextBudgetTokens?.();
     // NT-08: the generation room the prompt arithmetic reserves is also the
     // ceiling the backend is told to respect (adapter → `max_tokens`).
-    const outputCeilingTokens = deps.nativeBudget?.outputReserveTokens ?? 0;
+    // 7108: that ceiling now INCLUDES the hidden-reasoning room when the
+    // model's descriptor proves reasoning shares the completion budget — the
+    // same number feeds prompt fitting, admission and the wire, so a thinking
+    // model can no longer spend the whole visible reserve on reasoning.
+    const reasoningPolicy = deps.nativeBudget?.reasoning;
+    const reasoningDescriptor = reasoningPolicy ? await resolveAdapterReasoningControl(adapter, model) : undefined;
+    const reasoningPlan = planReasoning({
+      policy: reasoningPolicy, descriptor: reasoningDescriptor, structured: false,
+      visibleReserveTokens: deps.nativeBudget?.outputReserveTokens ?? 0,
+    });
+    // `let`: the single exhaustion retry may raise it (config-bounded) — every
+    // closure below reads the CURRENT value, so admission follows the raise.
+    let outputCeilingTokens = reasoningPlan.outputCeilingTokens;
     const contextSafetyReserveTokens = deps.nativeBudget?.contextSafetyReserveTokens ?? 0;
+    const transportRetry = resolveTransportRetryPolicy(deps.nativeBudget);
+    // 7106 × 7108: the preamble hard limit subtracts the SAME inclusive ceiling
+    // (visible reserve + proven reasoning room) — one authority, counted once.
     if (deps.preambleBudgeter && rawBudget !== undefined && rawBudget > 0) {
       try {
         const prepared = await deps.preambleBudgeter.prepare({
@@ -367,20 +389,27 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       tools: toolSchemas,
       model,
       ...(outputCeilingTokens > 0 ? { outputCeilingTokens } : {}),
+      ...(reasoningPlan.directive ? { reasoning: reasoningPlan.directive } : {}),
+      ...(transportRetry ? { transportRetry } : {}),
     };
     let assistantText = '';
     let calls: ProviderToolCall[] = [];
     let continuationIndex = 0;
     let continuationMessages = messages;
+    // 7108 — the ONE bounded reasoning-exhaustion retry: fields it overrides on
+    // the otherwise identical request (reasoning off, or a raised ceiling).
+    let reasoningRetryOverride: Pick<ProviderRequest, 'reasoning' | 'outputCeilingTokens'> = {};
+    let reasoningRetryUsed = false;
     try {
       while (true) {
         let segmentText = '';
         const segmentCalls: ProviderToolCall[] = [];
         let segmentStopReason: string | undefined;
         let hiddenReasoningObserved = false;
+        let hiddenReasoningChars = 0;
         const turnSignal = deps.getTurnSignal?.();
         const segmentRequest: ProviderRequest = {
-          ...req, messages: continuationMessages, ...(turnSignal ? { signal: turnSignal } : {}),
+          ...req, ...reasoningRetryOverride, messages: continuationMessages, ...(turnSignal ? { signal: turnSignal } : {}),
         };
         if (continuationIndex > 0 && overContext(await measureMessages(continuationMessages))) {
           yield { type: 'error', code: 'native-context.admission-denied', message: 'native-context.admission-denied' };
@@ -401,7 +430,12 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
           // buffered until their overlap with already-visible text is known.
           if (continuationIndex === 0) yield { type: 'text-delta', text: ev.text };
         }
-        else if (ev.type === 'reasoning-activity') { hiddenReasoningObserved = true; }
+        else if (ev.type === 'reasoning-activity') {
+          hiddenReasoningObserved = true;
+          hiddenReasoningChars += ev.chars;
+          // Metadata only (privacy contract 7086/RCA §3): counts, never text.
+          yield { type: 'reasoning-activity', chars: ev.chars, cumulativeChars: hiddenReasoningChars };
+        }
         else if (ev.type === 'tool-call') { segmentCalls.push(ev); }
         else if (ev.type === 'usage') {
           yield { type: 'usage', inputTokens: ev.inputTokens, outputTokens: ev.outputTokens };
@@ -450,6 +484,56 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         const classification = segmentText === '' && hiddenReasoningObserved
           ? 'EMPTY_VISIBLE_AFTER_REASONING'
           : 'OUTPUT_LIMIT';
+        // 7108 — reasoning exhausted the ceiling with NO visible text: a plain
+        // continuation would resend the same prompt into the same trap (the
+        // measured incident: four 4,096-token hidden-only generations, 0 output).
+        // Instead: ONE retry of the SAME request with thinking off (when the
+        // descriptor can toggle it) or a raised, config-bounded ceiling; a second
+        // exhaustion ends the turn typed. Legacy callers (no native budget) keep
+        // the classic continuation path byte-identical.
+        if (classification === 'EMPTY_VISIBLE_AFTER_REASONING' && reasoningPolicy) {
+          const reasoningTokens = String(approximateReasoningTokens(hiddenReasoningChars));
+          const recovery = reasoningRetryUsed
+            ? { kind: 'none' as const }
+            : planReasoningExhaustionRecovery(reasoningPlan, reasoningPolicy);
+          if (recovery.kind === 'none') {
+            yield {
+              type: 'generation-recovery', classification,
+              continuationIndex, maxContinuations: MAX_OUTPUT_CONTINUATIONS,
+              hiddenReasoningObserved, action: 'hold',
+            };
+            yield {
+              type: 'error', code: 'native.reasoning_exhausted', message: 'native.reasoning_exhausted',
+              vars: { reasoningTokens, ceiling: String(segmentRequest.outputCeilingTokens ?? outputCeilingTokens) },
+            };
+            yield { type: 'turn-end' };
+            return;
+          }
+          reasoningRetryUsed = true;
+          if (recovery.kind === 'retry-raised-ceiling') {
+            outputCeilingTokens = recovery.outputCeilingTokens;
+            reasoningRetryOverride = { outputCeilingTokens };
+            // The raised ceiling must still be admissible: never ship a doomed call.
+            if (overContext(await measureMessages(continuationMessages))) {
+              yield { type: 'error', code: 'native-context.admission-denied', message: 'native-context.admission-denied' };
+              yield { type: 'turn-end' };
+              return;
+            }
+          } else {
+            reasoningRetryOverride = { reasoning: { mode: 'off' } };
+          }
+          yield {
+            type: 'generation-recovery', classification,
+            continuationIndex, maxContinuations: MAX_OUTPUT_CONTINUATIONS,
+            hiddenReasoningObserved, action: recovery.kind,
+          };
+          yield {
+            type: 'notice', code: 'native.reasoning_exhausted_output_ceiling',
+            message: 'native.reasoning_exhausted_output_ceiling',
+            vars: { action: recovery.kind, reasoningTokens, ceiling: String(outputCeilingTokens) },
+          };
+          continue;
+        }
         if (continuationIndex >= MAX_OUTPUT_CONTINUATIONS) {
           yield {
             type: 'generation-recovery', classification,
@@ -476,6 +560,19 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       // TERMINAL-TOOLS-008 — an aborted stream is the user's own cancel, not a
       // provider failure: end the turn honestly, never as an 'error' event.
       if (deps.isCancelled?.() || (e instanceof Error && e.name === 'AbortError')) {
+        yield { type: 'turn-end' };
+        return;
+      }
+      // 7108 §3 — a typed transport failure names the real socket cause and
+      // whether the bounded retry already ran, so the view can say
+      // "connection dropped (ECONNRESET) — retried once" instead of "fetch failed".
+      if (e instanceof ProviderTransportError) {
+        yield {
+          type: 'error',
+          code: e.retries > 0 ? 'native.transport-failure' : 'native.transport-failure.no-retry',
+          message: e.message,
+          vars: { code: e.failure.code ?? e.failure.class, class: e.failure.class, retries: String(e.retries), phase: e.phase },
+        };
         yield { type: 'turn-end' };
         return;
       }

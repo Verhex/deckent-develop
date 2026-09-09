@@ -74,6 +74,11 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
     en: 'cancel requested · {elapsed} · {tool}',
     tr: 'kesme istendi · {elapsed} · {tool}',
   },
+  // 7108 — collapsed hidden-reasoning progress on the phase anchor (counts only).
+  'tui.native_reasoning_active': {
+    en: '~{tokens} hidden reasoning tokens',
+    tr: '~{tokens} gizli akıl yürütme token\'ı',
+  },
 
   // ── live-footer elapsed-time unit suffixes (helpers/live-footer.ts
   //    formatElapsed — `2h 5m`, `10m`, `30s`). XVerify (codex/gpt-5.6-sol,
@@ -238,6 +243,14 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
   'native.boot.missing-local-llm-endpoint': {
     en: 'native engine not started — local-llm needs an endpoint: set {detail} in .deckent/config.json, then restart Deckent.',
     tr: 'native motor başlatılmadı — local-llm için endpoint gerekli: .deckent/config.json içinde {detail} tanımlayıp Deckent\'i yeniden başlatın.',
+  },
+  'native.switch.invalid-reasoning-control': {
+    en: 'switch failed — {detail} is invalid: toggle must be "chat_template_kwargs.enable_thinking", "none" or { kind: "reasoning_effort", on, off } and sharesCompletionBudget a boolean',
+    tr: 'geçiş başarısız — {detail} geçersiz: toggle "chat_template_kwargs.enable_thinking", "none" veya { kind: "reasoning_effort", on, off } olmalı; sharesCompletionBudget boolean olmalı',
+  },
+  'native.boot.invalid-reasoning-control': {
+    en: 'native engine not started — {detail} is invalid: toggle must be "chat_template_kwargs.enable_thinking", "none" or { kind: "reasoning_effort", on, off } and sharesCompletionBudget a boolean; fix .deckent/config.json, then restart Deckent.',
+    tr: 'native motor başlatılmadı — {detail} geçersiz: toggle "chat_template_kwargs.enable_thinking", "none" veya { kind: "reasoning_effort", on, off } olmalı; sharesCompletionBudget boolean olmalı; .deckent/config.json dosyasını düzeltip Deckent\'i yeniden başlatın.',
   },
   'native.boot.missing-native-model': {
     en: 'native engine not started — local-llm needs an exact model ID: set {detail} (deckent config set native_model <id>) to one of the endpoint\'s published /models IDs, then restart Deckent.',

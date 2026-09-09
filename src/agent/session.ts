@@ -39,6 +39,8 @@ import { createNativeBudgetState, evaluateNativeBudget, type NativeBudgetState }
 import { containToolResult, renderToolResultEnvelope, type ContentWriter } from './tool-result-broker.js';
 import { createPreambleBudgeter, PreambleBudgetError, type PreambleSnapshot } from './preamble-budget.js';
 import { composeSystemPrompt } from './identity.js';
+import { resolveTransportRetryPolicy } from './provider-tooluse/transport-errors.js';
+import { planReasoning, resolveAdapterReasoningControl } from './reasoning-control.js';
 import { resolveNativeAgentBudget } from '../core/execution-budget-policy.js';
 import { projectSlug } from '../core/project-slug.js';
 import { ALL_APPROVAL_RISKS, ALL_APPROVAL_SCOPES } from '../core/approval-contract.js';
@@ -690,6 +692,14 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       tools: [],
       model: deps.getModel?.() ?? deps.model,
       ...(deps.nativeBudget?.outputReserveTokens ? { outputCeilingTokens: deps.nativeBudget.outputReserveTokens } : {}),
+      // 7108 — the checkpoint is a STRUCTURED request (JSON only): hidden
+      // reasoning is switched off wherever the model's descriptor can, so the
+      // whole visible reserve goes to the payload; transient transport
+      // failures get the same bounded retry the turn loop authorizes.
+      ...(deps.nativeBudget ? {
+        reasoning: { mode: 'off' as const },
+        ...(resolveTransportRetryPolicy(contextBudget) ? { transportRetry: resolveTransportRetryPolicy(contextBudget)! } : {}),
+      } : {}),
       // TERMINAL-TOOLS-010 — the checkpoint call rides the same abort seam as
       // the turn (or the explicit /compact) it belongs to, so Esc cancels it.
       ...(turnAbort?.signal ? { signal: turnAbort.signal } : {}),
@@ -842,26 +852,38 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   /** Measure what the CURRENT transcript (plus any pending extra messages) would
    *  cost on the wire. `undefined` when no context authority is known — the
    *  caller then fails closed rather than guessing a window size. */
+  /** 7108 — the turn's INCLUSIVE output ceiling (visible reserve + reasoning
+   *  room proven by the transport's descriptor): the same authority the loop
+   *  uses, so measurement/admission here never under-reserve for a thinking model. */
+  async function turnOutputCeilingTokens(adapter: ProviderAdapter, model: string): Promise<number> {
+    if (!deps.nativeBudget) return 0;
+    return planReasoning({
+      policy: contextBudget.reasoning, descriptor: await resolveAdapterReasoningControl(adapter, model),
+      structured: false, visibleReserveTokens: contextBudget.outputReserveTokens,
+    }).outputCeilingTokens;
+  }
+
   async function measureContext(extra: readonly ProviderMessage[] = []): Promise<
-    { inputTokens: number; window: number; measurement: Awaited<ReturnType<typeof measureProviderRequest>> } | undefined
+    { inputTokens: number; window: number; outputCeilingTokens: number; measurement: Awaited<ReturnType<typeof measureProviderRequest>> } | undefined
   > {
     const window = deps.getContextBudgetTokens?.();
     if (window === undefined || !(window > 0)) return undefined;
     const adapter = deps.getAdapter?.() ?? deps.adapter;
     const model = deps.getModel?.() ?? deps.model;
+    const outputCeilingTokens = await turnOutputCeilingTokens(adapter, model);
     const request: ProviderRequest = {
       system: composeSystemPrompt({ cwd: deps.cwd, lang: deps.lang,
         ...(scratch ? { scratchDir: scratch.info.root } : {}) }),
       messages: [...transcript.toProviderMessages(), ...extra],
       tools: deps.getProviderToolSchemas?.() ?? deps.registry.toNativeSchemas(),
       model,
-      ...(deps.nativeBudget?.outputReserveTokens ? { outputCeilingTokens: deps.nativeBudget.outputReserveTokens } : {}),
+      ...(outputCeilingTokens > 0 ? { outputCeilingTokens } : {}),
     };
     if (preambleBudgeter) {
       const prepared = await preambleBudgeter.prepare({
         compose: {cwd: deps.cwd, lang: deps.lang, ...(scratch ? {scratchDir: scratch.info.root} : {})},
         tools: request.tools, adapter, model, window,
-        outputCeilingTokens: contextBudget.outputReserveTokens,
+        outputCeilingTokens,
         safetyReserveTokens: contextBudget.contextSafetyReserveTokens,
       });
       request.system = prepared.system; request.tools = prepared.tools;
@@ -877,7 +899,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       identity,
       ...(adapter.requestMeasurement ? { capability: adapter.requestMeasurement } : {}),
     });
-    return { inputTokens: measurement.inputTokens, window, measurement };
+    return { inputTokens: measurement.inputTokens, window, outputCeilingTokens, measurement };
   }
 
   /** Verified exact fit of the fresh epoch — the precondition for the single
@@ -889,7 +911,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     if (!measured) return false;
     return decideProviderAdmission(
       measured.measurement,
-      deps.nativeBudget?.outputReserveTokens ?? 0,
+      measured.outputCeilingTokens,
       deps.nativeBudget?.contextSafetyReserveTokens ?? 0,
     ).admitted;
   }

@@ -6,8 +6,24 @@
 // injectable for hermetic tests. Used directly (OpenAI/OpenRouter/vLLM) and via
 // the Ollama adapter (Ollama serves this same shape).
 
-import { validateProviderRequest, type ProviderAdapter, type ProviderEvent, type ProviderMessage, type ProviderRequest } from './types.js';
+import {
+  validateProviderRequest,
+  type ProviderAdapter,
+  type ProviderEvent,
+  type ProviderMessage,
+  type ProviderReasoningControlCapability,
+  type ProviderRequest,
+  type ReasoningDirective,
+} from './types.js';
 import { parseSSE } from './sse.js';
+import {
+  classifyTransportFailure,
+  isAbortError,
+  isTransientTransportFailure,
+  ProviderTransportError,
+  sleepWithSignal,
+} from './transport-errors.js';
+import type { ReasoningControlDescriptor } from '../../core/model-registry-types.js';
 
 export interface OpenAIAdapterOptions {
   baseUrl: string;
@@ -17,7 +33,39 @@ export interface OpenAIAdapterOptions {
    *  NO default — absent means "this adapter has no ceiling authority", not
    *  "use a constant". Outranked by ProviderRequest.outputCeilingTokens. */
   maxTokens?: number;
+  /** 7108 — reasoning-control authority for the wire model (registry / owner
+   *  config / live server evidence, resolved by the caller that owns those
+   *  sources). Absent → no descriptor → a `reasoning` directive puts NOTHING on
+   *  the wire (honest no-op), never a guessed field. */
+  reasoningControl?: ProviderReasoningControlCapability;
   fetchImpl?: typeof fetch;
+}
+
+/**
+ * 7108 — map the loop's {@link ReasoningDirective} onto the wire mechanism the
+ * descriptor names. Pure: returns the body fields to merge, or nothing when the
+ * descriptor has no known toggle (`none`/`unknown`). The completion ceiling is
+ * NOT touched here — it already arrived inclusive of reasoning room as
+ * `outputCeilingTokens` (single arithmetic authority: agent/reasoning-control.ts).
+ */
+export function mapReasoningDirectiveToWire(
+  directive: ReasoningDirective | undefined,
+  descriptor: ReasoningControlDescriptor | undefined,
+  existing: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!directive || !descriptor) return {};
+  const toggle = descriptor.toggle;
+  if (toggle.kind === 'chat_template_kwargs.enable_thinking') {
+    const prior = existing['chat_template_kwargs'];
+    const kwargs = prior && typeof prior === 'object' && !Array.isArray(prior)
+      ? { ...(prior as Record<string, unknown>) }
+      : {};
+    return { chat_template_kwargs: { ...kwargs, enable_thinking: directive.mode === 'on' } };
+  }
+  if (toggle.kind === 'reasoning_effort') {
+    return { reasoning_effort: directive.mode === 'on' ? toggle.on : toggle.off };
+  }
+  return {};
 }
 
 /** Outcome of the normalized output-ceiling resolution (RCA §2). `unresolved`
@@ -148,10 +196,13 @@ function parseUpstreamError(raw: string): { code: string | null; message: string
   return { code: null, message: clean(raw) };
 }
 
+const TRANSPORT_LABEL = 'openai-compatible';
+
 export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter {
   const fetchImpl = opts.fetchImpl ?? globalThis.fetch;
   return {
     name: opts.name ?? 'openai',
+    ...(opts.reasoningControl ? { reasoningControl: opts.reasoningControl } : {}),
     async *send(req: ProviderRequest): AsyncIterable<ProviderEvent> {
       const v = validateProviderRequest(req);
       if (v) throw new Error(`invalid provider request: ${v}`);
@@ -174,23 +225,45 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
       if (req.tools.length > 0) {
         body['tools'] = req.tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }));
       }
+      // 7108 — hidden-reasoning directive → wire toggle, per the descriptor
+      // this adapter was handed. No descriptor / unknown toggle → no field.
+      if (req.reasoning && opts.reasoningControl) {
+        let descriptor: ReasoningControlDescriptor | undefined;
+        try { descriptor = (await opts.reasoningControl(req.model)) ?? undefined; } catch { descriptor = undefined; }
+        Object.assign(body, mapReasoningDirectiveToWire(req.reasoning, descriptor, body));
+      }
 
+      // 7108 §3 — bounded retry for TRANSIENT failures that happen before any
+      // response byte arrived (connect refused/reset/timeout). The retry budget
+      // is the caller's (config-resolved); absent → exactly one attempt.
+      const retryBudget = req.transportRetry?.attempts ?? 0;
+      const backoffMs = req.transportRetry?.backoffMs ?? 0;
+      let attempts = 0;
       let resp: Response;
-      try {
-        resp = await fetchImpl(`${opts.baseUrl}/chat/completions`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', ...(opts.apiKey ? { authorization: `Bearer ${opts.apiKey}` } : {}) },
-          body: JSON.stringify(body),
-          // TERMINAL-TOOLS-008 — the turn's abort signal (see types.ts).
-          ...(req.signal ? { signal: req.signal } : {}),
-        });
-      } catch (cause) {
-        // An abort is the caller's own decision, never a connect failure.
-        if (cause instanceof Error && cause.name === 'AbortError') throw cause;
-        // Cold-start / connection-refused class: keep the honest low-level cause
-        // ('fetch failed', ECONNREFUSED, …) instead of an unhandled rejection.
-        const detail = cause instanceof Error ? cause.message : String(cause);
-        throw new Error(`openai-compatible connect failed — ${detail}`);
+      for (;;) {
+        attempts++;
+        try {
+          resp = await fetchImpl(`${opts.baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', ...(opts.apiKey ? { authorization: `Bearer ${opts.apiKey}` } : {}) },
+            body: JSON.stringify(body),
+            // TERMINAL-TOOLS-008 — the turn's abort signal (see types.ts).
+            ...(req.signal ? { signal: req.signal } : {}),
+          });
+          break;
+        } catch (cause) {
+          // An abort is the caller's own decision, never a connect failure.
+          if (isAbortError(cause)) throw cause;
+          // Cold-start / connection-refused / reset class: surface the undici
+          // cause chain (code, errno, syscall) instead of the opaque
+          // 'fetch failed' wrapper, and retry once when authorized.
+          const failure = classifyTransportFailure(cause, 'connect');
+          if (isTransientTransportFailure(failure, 'connect') && attempts <= retryBudget && !req.signal?.aborted) {
+            await sleepWithSignal(backoffMs * attempts, req.signal);
+            continue;
+          }
+          throw new ProviderTransportError(TRANSPORT_LABEL, 'connect', failure, attempts);
+        }
       }
       if (!resp.ok || !resp.body) {
         let raw = '';
@@ -203,33 +276,41 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
       // Last finish_reason seen — 'length' means the backend cut generation at
       // its token/context ceiling; normalized onto the final 'done' event.
       let finishReason: string | undefined;
-      for await (const ev of parseSSE(resp.body as AsyncIterable<Uint8Array>)) {
-        if (ev.data === '[DONE]') break;
-        let chunk: OpenAIChunk;
-        try { chunk = JSON.parse(ev.data) as OpenAIChunk; } catch { continue; }
+      try {
+        for await (const ev of parseSSE(resp.body as AsyncIterable<Uint8Array>)) {
+          if (ev.data === '[DONE]') break;
+          let chunk: OpenAIChunk;
+          try { chunk = JSON.parse(ev.data) as OpenAIChunk; } catch { continue; }
 
-        const choice = chunk.choices?.[0];
-        const delta = choice?.delta;
-        if (delta?.content) yield { type: 'text-delta', text: delta.content };
-        // Hidden reasoning (e.g. Qwen `reasoning_content`): surfaced as
-        // metadata-only activity — the text itself never leaves the adapter
-        // (privacy contract, 7086/RCA §3).
-        if (delta?.reasoning_content) yield { type: 'reasoning-activity', chars: delta.reasoning_content.length };
-        if (Array.isArray(delta?.tool_calls)) {
-          for (const tc of delta.tool_calls) {
-            const idx = tc.index ?? 0;
-            const cur = toolAcc.get(idx) ?? { id: '', name: '', args: '' };
-            if (tc.id) cur.id = tc.id;
-            if (tc.function?.name) cur.name = tc.function.name;
-            if (tc.function?.arguments) cur.args += tc.function.arguments;
-            toolAcc.set(idx, cur);
+          const choice = chunk.choices?.[0];
+          const delta = choice?.delta;
+          if (delta?.content) yield { type: 'text-delta', text: delta.content };
+          // Hidden reasoning (e.g. Qwen `reasoning_content`): surfaced as
+          // metadata-only activity — the text itself never leaves the adapter
+          // (privacy contract, 7086/RCA §3).
+          if (delta?.reasoning_content) yield { type: 'reasoning-activity', chars: delta.reasoning_content.length };
+          if (Array.isArray(delta?.tool_calls)) {
+            for (const tc of delta.tool_calls) {
+              const idx = tc.index ?? 0;
+              const cur = toolAcc.get(idx) ?? { id: '', name: '', args: '' };
+              if (tc.id) cur.id = tc.id;
+              if (tc.function?.name) cur.name = tc.function.name;
+              if (tc.function?.arguments) cur.args += tc.function.arguments;
+              toolAcc.set(idx, cur);
+            }
           }
+          if (choice?.finish_reason) finishReason = choice.finish_reason;
+          if (choice?.finish_reason === 'tool_calls') {
+            for (const e of drainToolCalls(toolAcc)) yield e;
+          }
+          if (chunk.usage) yield { type: 'usage', inputTokens: chunk.usage.prompt_tokens ?? 0, outputTokens: chunk.usage.completion_tokens ?? 0 };
         }
-        if (choice?.finish_reason) finishReason = choice.finish_reason;
-        if (choice?.finish_reason === 'tool_calls') {
-          for (const e of drainToolCalls(toolAcc)) yield e;
-        }
-        if (chunk.usage) yield { type: 'usage', inputTokens: chunk.usage.prompt_tokens ?? 0, outputTokens: chunk.usage.completion_tokens ?? 0 };
+      } catch (cause) {
+        // A failure AFTER the response started is never retried (the backend may
+        // already have generated part of the answer); it is surfaced typed, with
+        // the real socket cause, instead of an undici wrapper string.
+        if (isAbortError(cause)) throw cause;
+        throw new ProviderTransportError(TRANSPORT_LABEL, 'stream', classifyTransportFailure(cause, 'stream'), attempts);
       }
       // Stream ended (via [DONE] or close) without a `finish_reason:'tool_calls'`
       // chunk — flush any tool calls still accumulated so they are never dropped.

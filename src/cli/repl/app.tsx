@@ -31,7 +31,7 @@ import { TerminalViewportContext } from './terminal-resize-mediator.js';
 import { expandAtRefs } from './at-ref.js';
 import { resolveSlash, type SlashRegistry } from '../commands/chat-slash-registry.js';
 import type { ChatMode } from '../commands/chat-mode.js';
-import type { NativeToolActivityEvent, ReplEngine } from './native-agent-bridge.js';
+import type { NativeReasoningActivityEvent, NativeToolActivityEvent, ReplEngine } from './native-agent-bridge.js';
 import type { RequestMeasurementEvent } from '../../agent/events.js';
 import {
   formatNativeRequestMetricDetail,
@@ -1351,6 +1351,8 @@ export async function runNativeTurnLoop(
     onTurnStats: (stats: { elapsedMs: number; tokens?: number }) => void;
     onTurnError: (message: string) => void;
     onToolActivity?: (event: NativeToolActivityEvent, turnId: number) => void;
+    /** 7108 — collapsed hidden-reasoning progress for the phase anchor. */
+    onReasoningActivity?: (event: NativeReasoningActivityEvent, turnId: number) => void;
     /** Captured once before each engine call; callers can invalidate a prior
      * chat attribution without suppressing measurements from the next turn. */
     measurementAttribution?: () => number;
@@ -1389,6 +1391,11 @@ export async function runNativeTurnLoop(
             if (turnOpen) cbs.onToolActivity?.(event, currentTurnId);
           },
         } : {}),
+        ...(cbs.onReasoningActivity ? {
+          onReasoningActivity: (event) => {
+            if (turnOpen) cbs.onReasoningActivity?.(event, currentTurnId);
+          },
+        } : {}),
         ...(cbs.onRequestMeasurement ? {
           onRequestMeasurement: (event) => {
             if (turnOpen) cbs.onRequestMeasurement?.(event, currentTurnId, measurementAttribution);
@@ -1401,6 +1408,7 @@ export async function runNativeTurnLoop(
     } finally {
       turnOpen = false;
       cbs.onToolActivity?.({ kind: 'clear' }, currentTurnId);
+      cbs.onReasoningActivity?.({ kind: 'clear' }, currentTurnId);
     }
   }
 }
@@ -1825,6 +1833,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     statusLabel: string; cancelRequested: boolean; startedAt: number; generation: number;
   } | null>(null);
   const [nativeToolNow, setNativeToolNow] = useState(0);
+  // 7108 — collapsed "thinking… ~N tokens" fact while hidden reasoning streams.
+  const [nativeReasoningActivity, setNativeReasoningActivity] = useState<{
+    turnId: number; approxTokens: number; label: string; generation: number;
+  } | null>(null);
   const [healthAuthLine, setHealthAuthLine] = useState<string | null>(() => healthAuthFeed?.getSnapshot() ?? null);
   const nativeToolGenerationRef = useRef(0);
   const nativeRequestAttributionRef = useRef(0);
@@ -2590,6 +2602,20 @@ export function ReplApp(props: ReplAppProps): ReactElement {
             ? null
             : current);
         },
+        onReasoningActivity: (event, turnId) => {
+          if (!nativeLoopActive) return;
+          if (event.kind === 'thinking') {
+            setNativeReasoningActivity((current) => current !== null && current.generation > generation
+              ? current
+              : { turnId, approxTokens: event.approxTokens, label: event.label, generation });
+            return;
+          }
+          setNativeReasoningActivity((current) => current !== null
+            && current.generation === generation
+            && current.turnId === turnId
+            ? null
+            : current);
+        },
         measurementAttribution: () => nativeRequestAttributionRef.current,
         onRequestMeasurement: (event, _turnId, attribution) => {
           if (!nativeLoopActive || attribution !== nativeRequestAttributionRef.current) return;
@@ -2628,6 +2654,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       return () => {
         nativeLoopActive = false;
         setNativeToolActivity((current) => current?.generation === generation ? null : current);
+        setNativeReasoningActivity((current) => current?.generation === generation ? null : current);
       };
     } else {
       void runChatNativeLoop({
@@ -3390,6 +3417,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       );
     })()
     : null;
+  // 7108 — the collapsed reasoning fact rides the phase anchor (one line, no
+  // reasoning text): "thinking… · ~1.2k hidden reasoning tokens".
+  const nativeReasoningText = nativeReasoningActivity && replSurfaceEnabled && phase !== 'idle'
+    ? nativeReasoningActivity.label.replace('{tokens}', String(nativeReasoningActivity.approxTokens))
+    : null;
+  const phaseAnchorText = `${phase === 'thinking' ? labels.thinking : labels.generating}${nativeReasoningText ? ` ${glyphs.separator} ${nativeReasoningText}` : ''}`;
   const animateActivity = !reducedMotion && !pickerAscii && !pickerNoColor;
 
   return (
@@ -3559,7 +3592,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           ? <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`${glyphs.separator} ${nativeToolActivityText}`}</Text></>
           : phase === 'idle'
           ? <Text {...palette.muted}>{idleAnchorText}{nativeRequestMetricText ? ` ${glyphs.separator} ${nativeRequestMetricText}` : ''}</Text>
-          : <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`${glyphs.separator} ${phase === 'thinking' ? labels.thinking : labels.generating}${nativeRequestMetricText ? ` ${glyphs.separator} ${nativeRequestMetricText}` : ''}`}</Text></>}
+          : <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`${glyphs.separator} ${phaseAnchorText}${nativeRequestMetricText ? ` ${glyphs.separator} ${nativeRequestMetricText}` : ''}`}</Text></>}
         {/* TERMINAL-TOOLS-006: transient Ctrl-C hint (names the next key). */}
         {interruptHint ? <Text {...palette.info}>{`  ${glyphs.separator} ${interruptHint.text}`}</Text> : null}
       </Box>

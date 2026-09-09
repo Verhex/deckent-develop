@@ -31,6 +31,36 @@ export interface ModelCost {
   output: number;
 }
 
+// ─── Reasoning control (7108 TERMINAL-REASONING-CONTROL-001) ─────────────────
+// How a model's HIDDEN reasoning ("thinking") can be steered on the wire, and
+// whether that hidden reasoning is charged against the same completion ceiling
+// (`max_tokens`) as the visible answer. This is DATA on the registry entry —
+// never a model-name branch in a code path (KANUN 10 / ADR-G-036): the local
+// OpenAI-compatible provider attaches it from server-reported template
+// evidence or owner config, and the honest default is `unknown`.
+
+/** The wire mechanism that toggles hidden reasoning for one request. */
+export type ReasoningToggleDescriptor =
+  /** llama.cpp / Qwen-class chat templates: `chat_template_kwargs.enable_thinking`. */
+  | { readonly kind: 'chat_template_kwargs.enable_thinking' }
+  /** OpenAI-style `reasoning_effort`; the exact enum values are data, not code. */
+  | { readonly kind: 'reasoning_effort'; readonly on: string; readonly off: string }
+  /** The model exposes no thinking switch (evidence-backed). */
+  | { readonly kind: 'none' }
+  /** No evidence either way — the honest default; nothing is put on the wire. */
+  | { readonly kind: 'unknown' };
+
+export type ReasoningControlProvenance = 'configured' | 'server-reported' | 'catalog' | 'unknown';
+
+export interface ReasoningControlDescriptor {
+  readonly toggle: ReasoningToggleDescriptor;
+  /** `true` = hidden reasoning tokens count against the completion ceiling
+   *  (`max_tokens`) — the measured incident class: 4,096 tokens of thinking left
+   *  zero room for visible text. `'unknown'` never inflates a ceiling. */
+  readonly sharesCompletionBudget: boolean | 'unknown';
+  readonly provenance: ReasoningControlProvenance;
+}
+
 export interface ModelDefinition {
   id: string;
   apiId: string;
@@ -45,6 +75,9 @@ export interface ModelDefinition {
   capabilities: ModelCapabilities;
   status: ModelStatus;
   maxOutputTokens?: number;
+  /** 7108: how hidden reasoning is controlled on the wire (see
+   *  {@link ReasoningControlDescriptor}). Absent = no evidence = `unknown`. */
+  reasoningControl?: ReasoningControlDescriptor;
   /**
    * Marks this model as the current generation's answer for its
    * (provider, tier) pair — the one tier-equivalence should resolve to.

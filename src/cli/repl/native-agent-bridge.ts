@@ -17,6 +17,7 @@ import {
   type TurnReference,
   type NativePermissionDecisionCallback,
 } from '../../agent/session.js';
+import { approximateReasoningTokens } from '../../agent/reasoning-control.js';
 import type { RequestMeasurementEvent } from '../../agent/events.js';
 import type { PermissionRequestEvent } from '../../agent/events.js';
 import { permittedNativePermissionLifetimes } from '../../agent/native-permission-binding.js';
@@ -85,6 +86,10 @@ export interface ReplEngine {
       output: (text: string) => void;
       onTurnEnd: (stats: { inputTokens: number; outputTokens: number }) => void;
       onToolActivity?: (event: NativeToolActivityEvent) => void;
+      /** 7108 — live hidden-reasoning progress (counts only, never text), so the
+       * view can show a collapsed "thinking… ~N tokens" line while nothing
+       * visible streams; `clear` when visible output or a tool takes over. */
+      onReasoningActivity?: (event: NativeReasoningActivityEvent) => void;
       /** Privacy-safe admission fact for an actual provider request. An
        * admitted measurement never means the request completed or was sent. */
       onRequestMeasurement?: (event: RequestMeasurementEvent) => void;
@@ -182,6 +187,37 @@ export type NativeToolActivityEvent =
       readonly statusLabel: string;
     }
   | { readonly kind: 'clear'; readonly id?: string };
+
+/** 7108 — string-free reasoning indicator event; the label (with a `{tokens}`
+ *  placeholder) is injected by this bridge from the localizer, never by the view. */
+export type NativeReasoningActivityEvent =
+  | { readonly kind: 'thinking'; readonly approxTokens: number; readonly label: string }
+  | { readonly kind: 'clear' };
+
+/** Minimum interval between two rendered reasoning-progress updates: hidden
+ *  reasoning streams per token (~70/s on the measured local server); the view
+ *  needs a live number, not a re-render per token. */
+const REASONING_ACTIVITY_RENDER_INTERVAL_MS = 200;
+const REASONING_ACTIVITY_LABEL_KEY = 'tui.native_reasoning_active';
+const REASONING_RECOVERY_ACTION_KEY_PREFIX = 'native.reasoning_recovery.';
+
+/** Interpolate `{name}` placeholders from a coded signal's `vars`. The `action`
+ *  var names a recovery action and is itself localized through the catalog. */
+export function applySignalVars(
+  t: (key: string) => string,
+  text: string,
+  vars: Readonly<Record<string, string>> | undefined,
+): string {
+  if (!vars) return text;
+  let out = text;
+  for (const [name, value] of Object.entries(vars)) {
+    const rendered = name === 'action'
+      ? localizeOrFallback(t, `${REASONING_RECOVERY_ACTION_KEY_PREFIX}${value}`, value)
+      : value;
+    out = out.split(`{${name}}`).join(rendered);
+  }
+  return out;
+}
 
 export interface NativeEngineDeps {
   adapter: ProviderAdapter;
@@ -503,6 +539,11 @@ const NATIVE_AGENT_SIGNAL_KEYS = new Set([
   'native.permission.no-longer-current',
   'native.permission.grant-failed',
   'native.session.closed',
+  // 7108 — reasoning exhaustion + typed transport failure (vars-interpolated).
+  'native.reasoning_exhausted_output_ceiling',
+  'native.reasoning_exhausted',
+  'native.transport-failure',
+  'native.transport-failure.no-retry',
   INPUT_CONTEXT_OVERFLOW_KEY,
   CONTINUATION_EXHAUSTED_KEY,
 ]);
@@ -718,6 +759,10 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     (hydrated.length === 0 ? req : { ...req, messages: [...hydrated, ...req.messages] });
   const hydrating = (base: ProviderAdapter): ProviderAdapter => ({
     get name() { return base.name; },
+    // 7108 — the reasoning-control authority is a per-model capability, not a
+    // request; it rides through untouched so the loop's ceiling arithmetic
+    // sees the SAME descriptor the transport maps onto the wire.
+    ...(base.reasoningControl ? { reasoningControl: base.reasoningControl } : {}),
     ...(base.requestMeasurement
       // Measure the request the backend will actually receive — a measurement
       // that ignored the prefix would under-count and fail admission OPEN.
@@ -794,10 +839,14 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
 
   // Localize a loop signal by its stable code ('native.<code>' message key);
   // an unmapped/unlocalized code falls back to the loop's English default.
-  const localizeSignal = (code: string | undefined, fallback: string): string => {
+  const localizeSignal = (
+    code: string | undefined,
+    fallback: string,
+    vars?: Readonly<Record<string, string>>,
+  ): string => {
     if (code === 'INPUT_CONTEXT_OVERFLOW') return t('native-context.error_overflow').replace('{code}', code);
     if (code === 'INPUT_CONTEXT_AUTHORITY_UNAVAILABLE') return t('native-context.error_authority_unavailable').replace('{code}', code);
-    return localizeNativeAgentSignal(t, code, fallback);
+    return applySignalVars(t, localizeNativeAgentSignal(t, code, fallback), vars);
   };
 
   // NATIVE-BUDGET-RENEWAL (557-002) — one gate per engine (per session), so the
@@ -835,12 +884,36 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
       cbs.onToolActivity?.({ kind: 'clear', id: activeToolId });
       activeToolId = undefined;
     };
+    // 7108 — collapsed live "thinking… ~N tokens" indicator: shown while hidden
+    // reasoning streams, throttled, cleared the moment visible text/tool work
+    // takes over. Counts only — the reasoning text never reaches this layer.
+    let reasoningIndicatorShown = false;
+    let reasoningIndicatorLastRenderMs = 0;
+    const clearReasoningIndicator = (): void => {
+      if (!reasoningIndicatorShown) return;
+      cbs.onReasoningActivity?.({ kind: 'clear' });
+      reasoningIndicatorShown = false;
+    };
     try {
       for await (const ev of session.send(lineage) as AsyncIterable<AgentSessionEvent>) {
         switch (ev.type) {
         case 'text-delta':
+          clearReasoningIndicator();
           cbs.output(ev.text);
           break;
+        case 'reasoning-activity': {
+          if (!cbs.onReasoningActivity) break;
+          const now = Date.now();
+          if (reasoningIndicatorShown && now - reasoningIndicatorLastRenderMs < REASONING_ACTIVITY_RENDER_INTERVAL_MS) break;
+          reasoningIndicatorLastRenderMs = now;
+          reasoningIndicatorShown = true;
+          cbs.onReasoningActivity({
+            kind: 'thinking',
+            approxTokens: approximateReasoningTokens(ev.cumulativeChars),
+            label: t(REASONING_ACTIVITY_LABEL_KEY),
+          });
+          break;
+        }
         case 'permission-request': {
           const response = deps.decidePermission
             ? await deps.decidePermission(
@@ -864,6 +937,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           break;
         case 'tool-executing':
           clearActiveTool();
+          clearReasoningIndicator();
           activeToolId = ev.id;
           cbs.onToolActivity?.({
             kind: 'executing', id: ev.id, tool: ev.tool,
@@ -914,7 +988,8 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           break;
         case 'error': {
           clearActiveTool();
-          cbs.output(`\n[${localizeSignal(ev.code, ev.message)}]`);
+          clearReasoningIndicator();
+          cbs.output(`\n[${localizeSignal(ev.code, ev.message, ev.vars)}]`);
           // 560-005 (RCA §7) — durable, privacy-safe record of a typed
           // context-lifecycle terminal state (code + measured token counters
           // only — never the prompt body or the streamed answer text).
@@ -981,7 +1056,8 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           // Honest degradation signal (truncated / context-compacted): visible
           // but non-fatal — silence here is what made a full context window
           // read as "the REPL died" (2026-07-07 incident).
-          cbs.output(`\n[${localizeSignal(ev.code, ev.message)}]\n`);
+          clearReasoningIndicator();
+          cbs.output(`\n[${localizeSignal(ev.code, ev.message, ev.vars)}]\n`);
           // 560-004: a context epoch is a durable state transition, so it rides
           // the SAME canonical hash-chained audit sink every other subsystem
           // uses. Privacy-safe by construction: the stable CODE only — never the
@@ -1004,7 +1080,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
         // 'tool-proposed' is not execution; 'turn-end' falls through.
         }
       }
-    } finally { clearActiveTool(); }
+    } finally { clearActiveTool(); clearReasoningIndicator(); }
     cbs.onTurnEnd({ inputTokens, outputTokens });
     // 7089 — ONE seam: the same accumulated counters `onTurnEnd` just reported
     // now ride into the record layer, so usage reaches disk instead of dying at

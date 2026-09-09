@@ -9,10 +9,12 @@ import { loadDeckSecrets } from './deck-file.js';
 import { detectAndRegisterModels, type DetectResult, type DetectAndRegisterOptions } from './model-auto-detect.js';
 import {
   ensureLocalLlmModelRegistered,
+  type ReasoningControlDescriptor,
   modelRegistry as globalModelRegistry,
   type LocalLlmModelFacts,
   type ModelRegistry,
 } from './model-registry.js';
+import { probeOpenAICompatReasoningControl, validateReasoningControlConfig } from './reasoning-control.js';
 import { resolveActiveModelPolicy, emptyModelActivationPolicy } from './model-activation-store.js';
 import type { TokenUsage } from './token-usage.js';
 import { DeckBroker } from './deck-broker.js';
@@ -1333,6 +1335,9 @@ export interface OpenAICompatCandidate {
   baseURL?: string;
   /** Explicit model ids (set for config-driven providers). */
   models?: string[];
+  /** 7108: owner-authored reasoning-control facts for every served model
+   *  (validated at candidate resolution; typed failure, never silent). */
+  reasoningControl?: ReasoningControlDescriptor;
 }
 
 /**
@@ -1391,6 +1396,9 @@ export function resolveOpenAICompatCandidates(
         models,
         authMode: def.authMode,
         executionCostClass: def.executionCostClass,
+        ...(def.reasoningControl !== undefined
+          ? { reasoningControl: validateReasoningControlConfig(def.reasoningControl, `providers.registry[${name}].reasoningControl`) }
+          : {}),
       };
       const idx = merged.findIndex(c => c.name === name);
       if (idx >= 0) merged[idx] = candidate; // config precedence over built-in
@@ -1660,9 +1668,16 @@ export async function bootstrapProviders(
             adapter.fetchIdentity(),
           ]);
           for (const modelId of candidate.models ?? []) {
+            // 7108 — reasoning-control facts ride the registry entry: owner
+            // config first, else the live server template (/props), else the
+            // honest `unknown` (attached by ensureLocalLlmModelRegistered).
+            const reasoningControl = candidate.reasoningControl
+              ?? (healthy
+                ? await probeOpenAICompatReasoningControl({ endpoint: candidate.baseURL!, model: modelId })
+                : null);
             ensureLocalLlmModelRegistered(
               modelId,
-              LOCAL_LLM_MODEL_FACTS,
+              { ...LOCAL_LLM_MODEL_FACTS, ...(reasoningControl ? { reasoningControl } : {}) },
               { modelIds, healthy, checkedAtMs },
               _hooks?.mr ?? globalModelRegistry,
             );

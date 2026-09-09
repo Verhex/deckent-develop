@@ -3791,6 +3791,34 @@ const BASE_MESSAGES: MessageMap = {
     en: 'The model spent its output budget on hidden reasoning without producing visible text yet — continuing automatically to recover a visible answer. This is an output issue, not a full context window.',
     tr: 'Model çıktı bütçesini görünür metin üretmeden gizli akıl yürütmeye harcadı — görünür bir yanıt kurtarmak için otomatik olarak sürdürülüyor. Bu bir çıktı sorunudur, bağlam penceresinin dolması değil.',
   },
+  // 7108 TERMINAL-REASONING-CONTROL-001 — hidden reasoning exhausted the wire
+  // ceiling with no visible text: ONE bounded retry (reasoning off / raised
+  // ceiling), then a typed end. `{action}` is one of the recovery rows below.
+  'native.reasoning_exhausted_output_ceiling': {
+    en: 'The model spent its whole output ceiling ({ceiling} tokens) on ~{reasoningTokens} tokens of hidden reasoning and produced no visible text — {action}. This is an output limit, not a full context window.',
+    tr: 'Model çıktı tavanının tamamını ({ceiling} token) ~{reasoningTokens} token gizli akıl yürütmeye harcadı ve görünür metin üretmedi — {action}. Bu bir çıktı sınırıdır, bağlam penceresinin dolması değil.',
+  },
+  'native.reasoning_recovery.retry-reasoning-off': {
+    en: 'retrying the same request once with hidden reasoning switched off',
+    tr: 'aynı istek gizli akıl yürütme kapatılarak bir kez yeniden deneniyor',
+  },
+  'native.reasoning_recovery.retry-raised-ceiling': {
+    en: 'retrying the same request once with a raised output ceiling',
+    tr: 'aynı istek yükseltilmiş çıktı tavanıyla bir kez yeniden deneniyor',
+  },
+  'native.reasoning_exhausted': {
+    en: 'The retry also ended at the output ceiling ({ceiling} tokens) with ~{reasoningTokens} tokens of hidden reasoning and no visible text — the turn was ended. Lower execution_budget.native_agent.reasoning, set reasoning.mode to "off", or ask a narrower question.',
+    tr: 'Yeniden deneme de ~{reasoningTokens} token gizli akıl yürütmeyle çıktı tavanında ({ceiling} token) bitti ve görünür metin üretmedi — tur sonlandırıldı. execution_budget.native_agent.reasoning değerini düşürün, reasoning.mode değerini "off" yapın veya daha dar bir soru sorun.',
+  },
+  // 7108 §3 — typed transport failure with the REAL socket cause (undici cause chain).
+  'native.transport-failure': {
+    en: 'Connection to the provider dropped ({code}) — retried {retries} time(s) and failed again; the turn ended without a reply. Check that the endpoint is up and try again.',
+    tr: 'Sağlayıcıyla bağlantı koptu ({code}) — {retries} kez yeniden denendi ve yine başarısız oldu; tur yanıtsız sonlandı. Endpoint\'in ayakta olduğunu doğrulayıp tekrar deneyin.',
+  },
+  'native.transport-failure.no-retry': {
+    en: 'Connection to the provider failed ({code}) during the {phase} phase and was not retried (a retry after the response started could duplicate output); the turn ended without a reply.',
+    tr: 'Sağlayıcıyla bağlantı {phase} aşamasında başarısız oldu ({code}) ve yeniden denenmedi (yanıt başladıktan sonra yeniden deneme çıktıyı çoğaltabilir); tur yanıtsız sonlandı.',
+  },
   'native-context.checkpoint_token_pressure': {
     en: 'Measured context pressure pushed this turn\'s context near its limit — saving a checkpoint before continuing.',
     tr: 'Ölçülmüş bağlam baskısı bu turun bağlamını sınırına yaklaştırdı — devam etmeden önce bir checkpoint kaydediliyor.',

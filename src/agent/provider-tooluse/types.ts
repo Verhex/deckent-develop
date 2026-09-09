@@ -4,6 +4,29 @@
 // touches a provider's raw schema — only normalized ProviderEvents.
 
 import type { NativeToolSchema } from '../tools/registry.js';
+import type { ReasoningControlDescriptor } from '../../core/model-registry-types.js';
+
+/** 7108 — per-request hidden-reasoning directive. The LOOP decides (from the
+ *  config-resolved policy, the model's registry descriptor and whether the
+ *  request is structured); a transport only MAPS it to the wire mechanism its
+ *  descriptor names, and puts nothing on the wire when it cannot. `budgetTokens`
+ *  is informational for transports whose wire has an explicit reasoning budget
+ *  field; the completion ceiling itself always travels as `outputCeilingTokens`
+ *  (already inclusive of the reasoning room), so ceiling arithmetic lives in ONE
+ *  place — never recomputed by a transport. */
+export interface ReasoningDirective {
+  readonly mode: 'on' | 'off';
+  readonly budgetTokens?: number;
+}
+
+/** 7108 — bounded transient-transport retry the caller AUTHORIZES for one
+ *  request (config-resolved `execution_budget.native_agent.transportRetry`).
+ *  Absent → no retry (fail-closed). A transport may only retry a failure that
+ *  happened BEFORE any response byte was received. */
+export interface TransportRetryPolicy {
+  readonly attempts: number;
+  readonly backoffMs: number;
+}
 
 export interface ToolCallRef {
   id: string;
@@ -36,6 +59,11 @@ export interface ProviderRequest {
    *  Absent → the field is omitted on the wire and the backend keeps its own
    *  default (behavior unchanged for callers that never set it). */
   outputCeilingTokens?: number;
+  /** 7108 — hidden-reasoning directive (see {@link ReasoningDirective}).
+   *  Absent → the transport sends whatever the backend defaults to. */
+  reasoning?: ReasoningDirective;
+  /** 7108 — transient-transport retry authorization (see {@link TransportRetryPolicy}). */
+  transportRetry?: TransportRetryPolicy;
   /** TERMINAL-TOOLS-008 — the turn's abort signal. The session owns one
    *  AbortController per turn; HTTP adapters hand this to fetch so a cancel
    *  tears the stream down at once (even before the first token) instead of
@@ -106,10 +134,19 @@ export interface ProviderRequestMeasurementEvent {
 export type ProviderEvent = ProviderTextDelta | ProviderToolCall | ProviderUsage | ProviderDone
   | ProviderReasoningActivity | ProviderRequestMeasurementEvent;
 
+/** 7108 — the transport's reasoning-control authority for a wire model: the
+ *  registry/config/server-evidence descriptor that says how (and whether)
+ *  hidden reasoning can be steered. The loop reads it for ceiling arithmetic;
+ *  the transport reads it to map {@link ReasoningDirective} onto the wire.
+ *  Absent, or resolving to an `unknown` descriptor, means "no evidence". */
+export type ProviderReasoningControlCapability =
+  (model: string) => ReasoningControlDescriptor | undefined | Promise<ReasoningControlDescriptor | undefined>;
+
 /** Every LLM backend (Anthropic/OpenAI-compat/Ollama) implements this. */
 export interface ProviderAdapter {
   readonly name: string;
   readonly requestMeasurement?: ProviderRequestMeasurementCapability;
+  readonly reasoningControl?: ProviderReasoningControlCapability;
   send(req: ProviderRequest): AsyncIterable<ProviderEvent>;
 }
 
@@ -131,6 +168,23 @@ export function validateProviderRequest(req: unknown): string | null {
   if (r.outputCeilingTokens !== undefined
     && (!Number.isSafeInteger(r.outputCeilingTokens) || r.outputCeilingTokens <= 0)) {
     return 'outputCeilingTokens must be a positive integer when present';
+  }
+  if (r.reasoning !== undefined) {
+    if (!r.reasoning || typeof r.reasoning !== 'object') return 'reasoning must be an object when present';
+    if (r.reasoning.mode !== 'on' && r.reasoning.mode !== 'off') return 'reasoning.mode must be on|off';
+    if (r.reasoning.budgetTokens !== undefined
+      && (!Number.isSafeInteger(r.reasoning.budgetTokens) || r.reasoning.budgetTokens <= 0)) {
+      return 'reasoning.budgetTokens must be a positive integer when present';
+    }
+  }
+  if (r.transportRetry !== undefined) {
+    if (!r.transportRetry || typeof r.transportRetry !== 'object') return 'transportRetry must be an object when present';
+    if (!Number.isSafeInteger(r.transportRetry.attempts) || r.transportRetry.attempts < 0) {
+      return 'transportRetry.attempts must be a non-negative integer';
+    }
+    if (!Number.isSafeInteger(r.transportRetry.backoffMs) || r.transportRetry.backoffMs < 0) {
+      return 'transportRetry.backoffMs must be a non-negative integer';
+    }
   }
   return null;
 }

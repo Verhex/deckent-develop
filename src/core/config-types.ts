@@ -810,6 +810,21 @@ export interface LocalLlmAccelerationConfig {
   flashAttention?: LocalLlmFlashAttention;
 }
 
+/**
+ * 7108 TERMINAL-REASONING-CONTROL-001 — owner-authored reasoning-control facts
+ * for an OpenAI-compatible model: how hidden reasoning is toggled on the wire
+ * and whether it is charged against the completion ceiling. Validated by
+ * `core/reasoning-control.ts` (`validateReasoningControlConfig`); absent means
+ * the runtime relies on live server evidence, else the honest `unknown`.
+ */
+export interface ReasoningControlConfig {
+  toggle:
+    | 'chat_template_kwargs.enable_thinking'
+    | 'none'
+    | { kind: 'reasoning_effort'; on: string; off: string };
+  sharesCompletionBudget: boolean;
+}
+
 /** Owner-authored launch authority for a directly managed OpenAI-compatible local model server. */
 export interface LocalLlmLaunchConfig {
   serverBinary: string;
@@ -821,6 +836,8 @@ export interface LocalLlmLaunchConfig {
   modelAlias: string;
   /** Omitted preserves portable llama.cpp auto-discovery and the pre-acceleration argv. */
   acceleration?: LocalLlmAccelerationConfig;
+  /** 7108: reasoning-control facts for the served model (overrides the live probe). */
+  reasoningControl?: ReasoningControlConfig;
 }
 
 /**
@@ -950,6 +967,33 @@ export interface NativeAgentBudgetConfig {
   checkpointEveryToolCalls?: number;
   outputReserveTokens?: number;
   contextSafetyReserveTokens?: number;
+  /** 7108: hidden-reasoning policy for native turns (see {@link NativeReasoningConfig}). */
+  reasoning?: NativeReasoningConfig;
+  /** 7108: bounded retries for TRANSIENT transport failures (connect/reset/
+   *  timeout before any byte arrived). Integer 0..3; default 1. */
+  transportRetry?: number;
+  /** 7108: base backoff between transport retries (multiplied by the attempt
+   *  index). Positive integer milliseconds. */
+  transportRetryBackoffMs?: number;
+}
+
+/**
+ * 7108 — owner policy for hidden reasoning ("thinking") on native turns.
+ *  - `auto` (default): thinking allowed on ordinary turns; structured requests
+ *    (checkpoint JSON, tool-argument repair) run with thinking OFF; on
+ *    exhaustion the turn is retried once with thinking off when the model's
+ *    descriptor can toggle it, else with a raised (bounded) ceiling.
+ *  - `on`: thinking forced; exhaustion recovery raises the ceiling only.
+ *  - `off`: thinking disabled wherever the descriptor can switch it off.
+ * `budgetTokens` is added ON TOP of `outputReserveTokens` for the wire ceiling
+ * when the descriptor proves reasoning shares the completion budget.
+ */
+export interface NativeReasoningConfig {
+  mode?: 'auto' | 'off' | 'on';
+  budgetTokens?: number;
+  /** Ceiling headroom used by the single exhaustion retry when thinking cannot
+   *  be switched off; must be >= budgetTokens. */
+  exhaustedRetryBudgetTokens?: number;
 }
 
 export interface ProviderLimitPolicySourceScopeConfig {
@@ -1048,6 +1092,9 @@ export interface ProviderDefinition {
   executionCostClass?: 'remote' | 'local';
   /** Model ids this provider serves (type='openai-compatible'). */
   models?: string[];
+  /** 7108: reasoning-control facts attached to every model this provider
+   *  registers (type='openai-compatible'); absent → live evidence or `unknown`. */
+  reasoningControl?: ReasoningControlConfig;
 }
 
 /**
