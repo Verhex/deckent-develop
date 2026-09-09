@@ -41,7 +41,7 @@ export interface UsageEvent { type: 'usage'; inputTokens: number; outputTokens: 
 export interface RequestMeasurementEvent {
   readonly type: 'request-measurement';
   readonly decision: ProviderAdmissionDecision;
-  readonly purpose: 'turn' | 'checkpoint';
+  readonly purpose: 'turn' | 'checkpoint' | 'reference-map' | 'reference-reduce';
 }
 export type GenerationRecoveryClassification =
   | 'OUTPUT_LIMIT'
