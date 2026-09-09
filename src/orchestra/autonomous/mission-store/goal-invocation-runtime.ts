@@ -1,6 +1,15 @@
 import { createHash } from 'node:crypto';
 import type { HostRoleInvocationAdmissionRequest, HostRoleInvocationAdmissionRuntime } from '../../../core/host-role-invocation-admission-runtime.js';
-import { INVOCATION_RECEIPT_SCHEMA_VERSION, type InvocationOutputArtifactRef, type InvocationPurpose, type InvocationReceipt, type InvocationReceiptLedger, type InvocationRole, type InvocationSelection } from '../../../core/invocation-receipt.js';
+import {
+  INVOCATION_RECEIPT_SCHEMA_VERSION,
+  isReservedInvocationOutputArtifactRead,
+  type InvocationOutputArtifactRef,
+  type InvocationPurpose,
+  type InvocationReceipt,
+  type InvocationReceiptLedger,
+  type InvocationRole,
+  type InvocationSelection,
+} from '../../../core/invocation-receipt.js';
 import type { ProviderLimitAdmissionAllowed } from '../../../core/provider-limit-admission.js';
 import type { ProviderLimitReservationEvent } from '../../../core/provider-limit-truth.js';
 import type {
@@ -64,7 +73,8 @@ export class GoalInvocationRuntime {
         try {
           const artifact = this.deps.receiptLedger.readOutputArtifact(scope, invocationId);
           const candidate = artifact && input.admission.candidates[artifact.ref.provider];
-          if (!artifact || artifact.ref.promptDigest !== hash(input.prompt) || artifact.ref.purpose !== input.purpose
+          if (!artifact || !isReservedInvocationOutputArtifactRead(artifact)
+            || artifact.ref.promptDigest !== hash(input.prompt) || artifact.ref.purpose !== input.purpose
             || artifact.reservationRequest.runId !== input.missionId || artifact.reservationRequest.taskId !== null
             || artifact.reservationRequest.callId !== `${input.purpose}:${input.round}`
             || artifact.reservationRequest.receiptRef !== receiptAuthorityRef
@@ -190,7 +200,8 @@ export class GoalInvocationRuntime {
     const ref = checkpoint.invocationReceiptRef;
     const view = this.deps.receiptLedger.get(ref, ref.invocationId);
     const artifact = this.deps.receiptLedger.readOutputArtifact(ref, ref.invocationId);
-    if (!view || !artifact || view.receipt.tenantId !== checkpoint.tenantId
+    if (!view || !artifact || !isReservedInvocationOutputArtifactRead(artifact)
+      || view.receipt.tenantId !== checkpoint.tenantId
       || view.receipt.projectId !== checkpoint.projectId
       || view.receipt.invocationId !== ref.invocationId
       || view.receipt.runId !== checkpoint.missionId || view.receipt.taskId !== null

@@ -57,8 +57,13 @@ function harness(existing: unknown = null) {
         previousHash: null, hash: 'e'.repeat(64) };
     }),
     writeOutputArtifact: vi.fn(input => {
-      artifact = { ref: { ...input.ref, contentSha256: 'c'.repeat(64), byteLength: input.bytes.byteLength }, bytes: input.bytes,
-        reservationRequest: input.reservationRequest, usageEvent: input.usageEvent };
+      artifact = {
+        admissionMode: 'reserved' as const,
+        ref: { ...input.ref, contentSha256: 'c'.repeat(64), byteLength: input.bytes.byteLength },
+        bytes: input.bytes,
+        reservationRequest: input.reservationRequest,
+        usageEvent: input.usageEvent,
+      };
       events.push(input.transportEvent);
       return artifact.ref;
     }),
@@ -87,6 +92,7 @@ describe('GoalInvocationRuntime', () => {
     };
     const h = harness(existing);
     h.setArtifact({
+      admissionMode: 'reserved' as const,
       ref: {
         schemaVersion: 1, tenantId: 'tenant-a', projectId: 'project-a', invocationId,
         purpose: 'goal-authoring', provider: 'claude', model: 'claude-fable-5',
@@ -125,6 +131,7 @@ describe('GoalInvocationRuntime', () => {
     expect(() => runtime.settlePersistedConsumer({ ...checkpoint, outputDigest: 'f'.repeat(64) }))
       .toThrow('GOAL_INVOCATION_CHECKPOINT_RECEIPT_MISMATCH');
     h.setArtifact({
+      admissionMode: 'reserved' as const,
       ref: {
         schemaVersion: 1, tenantId: 'tenant-a', projectId: 'project-a', invocationId,
         purpose: 'goal-authoring', provider: 'claude', model: 'claude-fable-5',
@@ -180,7 +187,7 @@ describe('GoalInvocationRuntime', () => {
     const promptDigest = await import('node:crypto').then(({ createHash }) => createHash('sha256').update('p').digest('hex'));
     const invocationId = `goal-${await import('node:crypto').then(({ createHash }) => createHash('sha256').update('tenant-a\u0000mission-a\u00001\u0000goal-authoring').digest('hex'))}`;
     const receiptRef = `invocation-receipt:${await import('node:crypto').then(({ createHash }) => createHash('sha256').update(`tenant-a\u0000project-a\u0000${invocationId}`).digest('hex'))}`;
-    h.setArtifact({ ref: { tenantId: 'tenant-a', projectId: 'project-a', purpose: 'goal-authoring', provider: 'claude', model: 'claude-fable-5', promptDigest }, bytes: Buffer.from('answer'),
+    h.setArtifact({ admissionMode: 'reserved' as const, ref: { tenantId: 'tenant-a', projectId: 'project-a', purpose: 'goal-authoring', provider: 'claude', model: 'claude-fable-5', promptDigest }, bytes: Buffer.from('answer'),
       reservationRequest: { runId: 'mission-a', taskId: null, callId: 'goal-authoring:1', receiptRef,
         provider: 'claude', model: 'claude-fable-5', backend: { ...HOST_BACKEND } }, usageEvent: {} });
     const executeSelected = vi.fn();
@@ -202,7 +209,7 @@ describe('GoalInvocationRuntime', () => {
     } });
     const digest = (value: string) => import('node:crypto').then(({ createHash }) => createHash('sha256').update(value).digest('hex'));
     const invocationId = `goal-${await digest('tenant-a\u0000mission-a\u00001\u0000goal-authoring')}`;
-    h.setArtifact({ ref: { tenantId: 'tenant-a', projectId: 'project-a', purpose: 'goal-authoring', provider: 'claude', model: 'shared-model', promptDigest: await digest('p') },
+    h.setArtifact({ admissionMode: 'reserved' as const, ref: { tenantId: 'tenant-a', projectId: 'project-a', purpose: 'goal-authoring', provider: 'claude', model: 'shared-model', promptDigest: await digest('p') },
       bytes: Buffer.from('answer'), reservationRequest: { runId: 'mission-a', taskId: null, callId: 'goal-authoring:1',
         receiptRef: `invocation-receipt:${await digest(`tenant-a\u0000project-a\u0000${invocationId}`)}`,
         provider: 'claude', model: 'shared-model', backend: { ...HOST_BACKEND } }, usageEvent: {} });
@@ -226,6 +233,7 @@ describe('GoalInvocationRuntime', () => {
     const invocationId = `goal-${createHash('sha256').update('tenant-a\u0000mission-a\u00001\u0000goal-authoring').digest('hex')}`;
     const receiptRef = `invocation-receipt:${createHash('sha256').update(`tenant-a\u0000project-a\u0000${invocationId}`).digest('hex')}`;
     h.setArtifact({
+      admissionMode: 'reserved' as const,
       ref: {
         tenantId: 'tenant-a', projectId: 'project-a', purpose: 'goal-authoring',
         provider: 'claude', model: 'claude-fable-5', promptDigest: createHash('sha256').update('p').digest('hex'),

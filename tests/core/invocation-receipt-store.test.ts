@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -147,8 +147,254 @@ describe('InvocationReceiptStore', () => {
         fenceTokenHash: 'f'.repeat(64), evidenceRef: 'usage:test-0001', actual: [{ windowId: 'tokens', unit: 'tokens', amount: 5 }] },
     });
     expect(store.get(input, input.invocationId)?.transportOutcome).toBe('succeeded');
-    expect(Buffer.from(store.readOutputArtifact(input, input.invocationId)!.bytes).toString()).toBe('opaque answer');
+    const read = store.readOutputArtifact(input, input.invocationId)!;
+    expect(read.admissionMode).toBe('reserved');
+    expect(Buffer.from(read.bytes).toString()).toBe('opaque answer');
+    expect(read.ref.reservationDigest).toBe(ref.reservationDigest);
+    expect(read.ref.usageDigest).toBe(ref.usageDigest);
+    expect(read.ref.artifactSha256).toBe(ref.artifactSha256);
     expect(ref.contentSha256).toMatch(/^[a-f0-9]{64}$/u);
+    store.close();
+  });
+
+  it('persists a non-reservable output artifact without reservation authority', () => {
+    const store = new InvocationReceiptStore(makeRoot(), { idFactory: () => 'project-a' });
+    const input = receipt(store, {
+      purpose: 'goal-authoring',
+      called: { provider: 'claude', model: 'm', source: 'wire', reasonCode: 'none' },
+      backend: { transport: 'cli', executionBackend: 'host-subprocess', endpointRefHash: null },
+      auth: { mode: 'subscription', accountRefHash: 'a'.repeat(64) },
+    });
+    const receiptRef = `invocation-receipt:${sha256(`${input.tenantId}\0${input.projectId}\0${input.invocationId}`)}`;
+    store.declare(input);
+    store.append(input, input.invocationId, {
+      eventId: 'dispatch-1', type: 'dispatch_started', payload: { attempt: 1, calledProvider: 'claude', calledModel: 'm' },
+    });
+    const ref = store.writeOutputArtifact({
+      admissionMode: 'non_reservable_subscription',
+      ref: {
+        schemaVersion: 1, tenantId: input.tenantId, projectId: input.projectId, invocationId: input.invocationId,
+        purpose: 'goal-authoring', provider: 'claude', model: 'm', promptDigest: 'a'.repeat(64),
+      },
+      bytes: Buffer.from('non-reservable output'),
+      transportEvent: {
+        eventId: 'transport-1', type: 'transport_settled',
+        payload: { outcome: 'succeeded', exitCode: 0, signal: null, reasonCode: 'none', durationMs: 2 },
+      },
+      usageEvidenceRef: 'provider-usage:non-reservable-001',
+      terminationBindingRef: `execution-termination-binding:${receiptRef}`,
+      usage: { totalTokens: 12, inputTokens: 8, outputTokens: 4 },
+    });
+    const read = store.readOutputArtifact(input, input.invocationId)!;
+    expect(read.admissionMode).toBe('non_reservable_subscription');
+    expect(read.usageEvidenceRef).toBe('provider-usage:non-reservable-001');
+    expect(read.ref.reservationDigest).toBe(ref.reservationDigest);
+    expect(read.ref.usageDigest).toBe(ref.usageDigest);
+    expect(Buffer.from(read.bytes).toString()).toBe('non-reservable output');
+    const raw = new Database((store as unknown as { db: Database.Database }).db.name);
+    expect(() => raw.prepare("UPDATE invocation_output_artifacts SET content_sha256='evil'").run())
+      .toThrow(/immutable/u);
+    raw.close();
+    store.close();
+  });
+
+  it('rejects non-reservable writes that still carry reservation authority', () => {
+    const store = new InvocationReceiptStore(makeRoot(), { idFactory: () => 'project-a' });
+    const input = receipt(store, {
+      purpose: 'goal-authoring',
+      called: { provider: 'claude', model: 'm', source: 'wire', reasonCode: 'none' },
+      auth: { mode: 'subscription', accountRefHash: 'a'.repeat(64) },
+    });
+    const receiptRef = `invocation-receipt:${sha256(`${input.tenantId}\0${input.projectId}\0${input.invocationId}`)}`;
+    store.declare(input);
+    store.append(input, input.invocationId, {
+      eventId: 'dispatch-1', type: 'dispatch_started', payload: { attempt: 1, calledProvider: 'claude', calledModel: 'm' },
+    });
+    const reservationRequest = {
+      tenantId: input.tenantId, provider: 'claude', accountRefHash: 'a'.repeat(64), authMode: 'subscription' as const,
+      backend: { transport: 'cli' as const, executionBackend: 'host-subprocess' as const, endpointRefHash: null },
+      projectId: input.projectId, model: 'm', quotaScopeRefHash: deriveProviderQuotaScopeRefHash({
+        tenantId: input.tenantId, provider: 'claude', accountRefHash: 'a'.repeat(64), authMode: 'subscription',
+        backend: { transport: 'cli', executionBackend: 'host-subprocess', endpointRefHash: null },
+      }),
+      reservationId: 'reservation-1', idempotencyKey: 'reservation-key-1', runId: input.runId, taskId: null,
+      callId: input.callId, attemptId: 'attempt-1', fenceTokenHash: 'f'.repeat(64), receiptRef,
+      reachabilityEvidenceRef: 'reachability:test-0001', estimates: [{ windowId: 'tokens', unit: 'tokens' as const, amount: 10 }],
+      estimateEvidenceRefs: ['estimate:test-0001'], requestedAt: '2026-07-20T00:00:00.000Z', leaseExpiresAt: '2026-07-20T01:00:00.000Z',
+    };
+    expect(() => store.writeOutputArtifact({
+      admissionMode: 'non_reservable_subscription',
+      ref: {
+        schemaVersion: 1, tenantId: input.tenantId, projectId: input.projectId, invocationId: input.invocationId,
+        purpose: 'goal-authoring', provider: 'claude', model: 'm', promptDigest: 'a'.repeat(64),
+      },
+      bytes: Buffer.from('bad'),
+      transportEvent: {
+        eventId: 'transport-1', type: 'transport_settled',
+        payload: { outcome: 'succeeded', exitCode: 0, signal: null, reasonCode: 'none', durationMs: 2 },
+      },
+      usageEvidenceRef: 'provider-usage:non-reservable-001',
+      terminationBindingRef: `execution-termination-binding:${receiptRef}`,
+      usage: { totalTokens: 1, inputTokens: 1, outputTokens: 0 },
+      reservationRequest,
+      usageEvent: {
+        eventId: 'usage-1', type: 'consumed', occurredAt: '2026-07-20T00:01:00.000Z',
+        fenceTokenHash: 'f'.repeat(64), evidenceRef: 'usage:test-0001', actual: [{ windowId: 'tokens', unit: 'tokens', amount: 5 }],
+      },
+    } as never)).toThrow(/reservation authority/u);
+    store.close();
+  });
+
+  it('rejects non-reservable writes when receipt auth mode is not subscription', () => {
+    const store = new InvocationReceiptStore(makeRoot(), { idFactory: () => 'project-a' });
+    const input = receipt(store, {
+      purpose: 'goal-authoring',
+      called: { provider: 'claude', model: 'm', source: 'wire', reasonCode: 'none' },
+      auth: { mode: 'api', accountRefHash: 'a'.repeat(64) },
+    });
+    const receiptRef = `invocation-receipt:${sha256(`${input.tenantId}\0${input.projectId}\0${input.invocationId}`)}`;
+    store.declare(input);
+    store.append(input, input.invocationId, {
+      eventId: 'dispatch-1', type: 'dispatch_started', payload: { attempt: 1, calledProvider: 'claude', calledModel: 'm' },
+    });
+    expect(() => store.writeOutputArtifact({
+      admissionMode: 'non_reservable_subscription',
+      ref: {
+        schemaVersion: 1, tenantId: input.tenantId, projectId: input.projectId, invocationId: input.invocationId,
+        purpose: 'goal-authoring', provider: 'claude', model: 'm', promptDigest: 'a'.repeat(64),
+      },
+      bytes: Buffer.from('bad'),
+      transportEvent: {
+        eventId: 'transport-1', type: 'transport_settled',
+        payload: { outcome: 'succeeded', exitCode: 0, signal: null, reasonCode: 'none', durationMs: 2 },
+      },
+      usageEvidenceRef: 'provider-usage:non-reservable-001',
+      terminationBindingRef: `execution-termination-binding:${receiptRef}`,
+      usage: { totalTokens: 1, inputTokens: 1, outputTokens: 0 },
+    })).toThrow(/authority binding is invalid/u);
+    store.close();
+  });
+
+  it('adds admission_mode on pre-column databases and reads legacy rows as reserved', () => {
+    const root = makeRoot();
+    const dbPath = join(root, '.deckent', 'runtime', 'invocations.db');
+    const seedStore = new InvocationReceiptStore(root, { dbPath, idFactory: () => 'project-a' });
+    const input = receipt(seedStore, {
+      purpose: 'goal-authoring',
+      called: { provider: 'claude', model: 'm', source: 'wire', reasonCode: 'none' },
+      backend: { transport: 'cli', executionBackend: 'host-subprocess', endpointRefHash: null },
+      auth: { mode: 'subscription', accountRefHash: 'a'.repeat(64) },
+    });
+    seedStore.declare(input);
+    seedStore.append(input, input.invocationId, {
+      eventId: 'dispatch-1', type: 'dispatch_started', payload: { attempt: 1, calledProvider: 'claude', calledModel: 'm' },
+    });
+    const ref = seedStore.writeOutputArtifact({
+      ref: {
+        schemaVersion: 1, tenantId: input.tenantId, projectId: input.projectId, invocationId: input.invocationId,
+        purpose: 'goal-authoring', provider: 'claude', model: 'm', promptDigest: 'a'.repeat(64),
+      },
+      bytes: Buffer.from('legacy opaque answer'),
+      transportEvent: {
+        eventId: 'transport-1', type: 'transport_settled',
+        payload: { outcome: 'succeeded', exitCode: 0, signal: null, reasonCode: 'none', durationMs: 2 },
+      },
+      reservationRequest: (() => {
+        const identity = {
+          tenantId: input.tenantId, provider: 'claude', accountRefHash: 'a'.repeat(64), authMode: 'subscription' as const,
+          backend: { transport: 'cli' as const, executionBackend: 'host-subprocess' as const, endpointRefHash: null },
+        };
+        return {
+          ...identity, projectId: input.projectId, model: 'm', quotaScopeRefHash: deriveProviderQuotaScopeRefHash(identity),
+          reservationId: 'reservation-legacy-1', idempotencyKey: 'reservation-key-legacy-1', runId: input.runId, taskId: null,
+          callId: input.callId, attemptId: 'attempt-1', fenceTokenHash: 'f'.repeat(64),
+          receiptRef: `invocation-receipt:${createHash('sha256').update(`${input.tenantId}\u0000${input.projectId}\u0000${input.invocationId}`).digest('hex')}`,
+          reachabilityEvidenceRef: 'reachability:test-legacy-0001',
+          estimates: [{ windowId: 'tokens', unit: 'tokens' as const, amount: 10 }],
+          estimateEvidenceRefs: ['estimate:test-legacy-0001'], requestedAt: '2026-07-20T00:00:00.000Z', leaseExpiresAt: '2026-07-20T01:00:00.000Z',
+        };
+      })(),
+      usageEvent: {
+        eventId: 'usage-1', type: 'consumed', occurredAt: '2026-07-20T00:01:00.000Z',
+        fenceTokenHash: 'f'.repeat(64), evidenceRef: 'usage:test-legacy-0001',
+        actual: [{ windowId: 'tokens', unit: 'tokens', amount: 5 }],
+      },
+    });
+    const expectedRead = seedStore.readOutputArtifact(input, input.invocationId)!;
+    expect(expectedRead.admissionMode).toBe('reserved');
+    seedStore.close();
+
+    const raw = new Database(dbPath);
+    raw.exec(`
+      DROP TRIGGER IF EXISTS invocation_output_artifacts_no_update;
+      DROP TRIGGER IF EXISTS invocation_output_artifacts_no_delete;
+    `);
+    const row = raw.prepare('SELECT * FROM invocation_output_artifacts WHERE invocation_id = ?')
+      .get(input.invocationId) as Record<string, unknown>;
+    const recovery = JSON.parse(String(row.recovery_json)) as {
+      admissionMode?: string;
+      reservationRequest: unknown;
+      usageEvent: unknown;
+    };
+    const legacyRecoveryJson = canonicalJson({
+      reservationRequest: recovery.reservationRequest,
+      usageEvent: recovery.usageEvent,
+    });
+    raw.exec(`
+      CREATE TABLE invocation_output_artifacts_legacy (
+        invocation_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        project_id TEXT NOT NULL,
+        purpose TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        model TEXT NOT NULL,
+        prompt_digest TEXT NOT NULL,
+        reservation_digest TEXT NOT NULL,
+        usage_digest TEXT NOT NULL,
+        content_sha256 TEXT NOT NULL,
+        artifact_sha256 TEXT NOT NULL,
+        byte_length INTEGER NOT NULL,
+        recovery_json TEXT NOT NULL,
+        content BLOB NOT NULL,
+        FOREIGN KEY (tenant_id, project_id, invocation_id)
+          REFERENCES invocations (tenant_id, project_id, invocation_id)
+      );
+    `);
+    raw.prepare(`
+      INSERT INTO invocation_output_artifacts_legacy (
+        invocation_id, tenant_id, project_id, purpose, provider, model, prompt_digest,
+        reservation_digest, usage_digest, content_sha256, artifact_sha256, byte_length, recovery_json, content
+      )
+      SELECT
+        invocation_id, tenant_id, project_id, purpose, provider, model, prompt_digest,
+        reservation_digest, usage_digest, content_sha256, artifact_sha256, byte_length, ?, content
+      FROM invocation_output_artifacts
+      WHERE invocation_id = ?
+    `).run(legacyRecoveryJson, input.invocationId);
+    raw.exec(`
+      DROP TABLE invocation_output_artifacts;
+      ALTER TABLE invocation_output_artifacts_legacy RENAME TO invocation_output_artifacts;
+    `);
+    const preMigrationColumns = raw.prepare('PRAGMA table_info(invocation_output_artifacts)').all() as Array<{ name: string }>;
+    expect(preMigrationColumns.some(column => column.name === 'admission_mode')).toBe(false);
+    raw.close();
+
+    const store = new InvocationReceiptStore(root, { dbPath, idFactory: () => 'project-a' });
+    const columns = (store as unknown as { db: Database.Database }).db
+      .prepare('PRAGMA table_info(invocation_output_artifacts)').all() as Array<{ name: string }>;
+    expect(columns.some(column => column.name === 'admission_mode')).toBe(true);
+    const read = store.readOutputArtifact(input, input.invocationId)!;
+    expect(read.admissionMode).toBe('reserved');
+    expect(read.ref.reservationDigest).toBe(ref.reservationDigest);
+    expect(read.ref.usageDigest).toBe(ref.usageDigest);
+    expect(read.ref.contentSha256).toBe(ref.contentSha256);
+    expect(read.ref.artifactSha256).toBe(ref.artifactSha256);
+    expect(read.ref.artifactSha256).toBe(expectedRead.ref.artifactSha256);
+    expect(Buffer.from(read.bytes).toString()).toBe('legacy opaque answer');
+    const rawAfterMigration = new Database(dbPath);
+    expect(() => rawAfterMigration.prepare("UPDATE invocation_output_artifacts SET content_sha256='evil'").run())
+      .toThrow(/immutable/u);
+    rawAfterMigration.close();
     store.close();
   });
 

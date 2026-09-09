@@ -232,12 +232,62 @@ export interface InvocationOutputArtifactRef extends InvocationScope {
   readonly byteLength: number;
 }
 
-export interface InvocationOutputArtifactWrite {
+export type InvocationOutputArtifactAdmissionMode = 'reserved' | 'non_reservable_subscription';
+
+export interface InvocationOutputArtifactNonReservableUsage {
+  readonly totalTokens: number;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+}
+
+interface InvocationOutputArtifactWriteCommon {
   readonly ref: Omit<InvocationOutputArtifactRef, 'contentSha256' | 'artifactSha256' | 'reservationDigest' | 'usageDigest' | 'byteLength'>;
   readonly bytes: Uint8Array;
   readonly transportEvent: Extract<InvocationEvent, { type: 'transport_settled' }>;
+}
+
+export interface InvocationOutputArtifactWriteReserved extends InvocationOutputArtifactWriteCommon {
+  readonly admissionMode?: 'reserved';
   readonly reservationRequest: ProviderLimitReservationRequest;
   readonly usageEvent: ProviderLimitReservationEvent;
+}
+
+export interface InvocationOutputArtifactWriteNonReservable extends InvocationOutputArtifactWriteCommon {
+  readonly admissionMode: 'non_reservable_subscription';
+  readonly usageEvidenceRef: string;
+  readonly terminationBindingRef: string;
+  readonly usage: InvocationOutputArtifactNonReservableUsage;
+}
+
+export type InvocationOutputArtifactWrite =
+  | InvocationOutputArtifactWriteReserved
+  | InvocationOutputArtifactWriteNonReservable;
+
+export interface InvocationOutputArtifactReadReserved {
+  readonly admissionMode: 'reserved';
+  readonly ref: InvocationOutputArtifactRef;
+  readonly bytes: Uint8Array;
+  readonly reservationRequest: ProviderLimitReservationRequest;
+  readonly usageEvent: ProviderLimitReservationEvent;
+}
+
+export interface InvocationOutputArtifactReadNonReservable {
+  readonly admissionMode: 'non_reservable_subscription';
+  readonly ref: InvocationOutputArtifactRef;
+  readonly bytes: Uint8Array;
+  readonly usageEvidenceRef: string;
+  readonly terminationBindingRef: string;
+  readonly usage: InvocationOutputArtifactNonReservableUsage;
+}
+
+export type InvocationOutputArtifactRead =
+  | InvocationOutputArtifactReadReserved
+  | InvocationOutputArtifactReadNonReservable;
+
+export function isReservedInvocationOutputArtifactRead(
+  read: InvocationOutputArtifactRead,
+): read is InvocationOutputArtifactReadReserved {
+  return read.admissionMode === 'reserved';
 }
 
 export interface InvocationTaskReceiptScan extends InvocationScope {
@@ -338,7 +388,7 @@ export interface InvocationReceiptLedger {
   append(scope: InvocationScope, invocationId: string, event: InvocationEvent): StoredInvocationEvent;
   get(scope: InvocationScope, invocationId: string): InvocationReceiptView | null;
   writeOutputArtifact(input: InvocationOutputArtifactWrite): InvocationOutputArtifactRef;
-  readOutputArtifact(scope: InvocationScope, invocationId: string): { ref: InvocationOutputArtifactRef; bytes: Uint8Array; reservationRequest: ProviderLimitReservationRequest; usageEvent: ProviderLimitReservationEvent } | null;
+  readOutputArtifact(scope: InvocationScope, invocationId: string): InvocationOutputArtifactRead | null;
   close(): void;
 }
 
