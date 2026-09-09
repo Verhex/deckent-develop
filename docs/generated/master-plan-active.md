@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):4a2092257995ba1e24232f24ed3dd9b75165614018a72fca9d9b49144341a68d`
+**Source digest:** `sha256(normalized-lf-utf8):d9a947d0e17bf0223853a1037d1193ab4c742ace4691eebbe4a6a28293b36317`
 
-**Rows:** 589 total · 500 active · 89 terminal
+**Rows:** 591 total · 502 active · 89 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 378 |
+| OPEN | 380 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
@@ -299,6 +299,7 @@
 | 3354 | `FIX-SPAWN-DEPENDENCY-FRESHNESS-001` | VERIFY | P1 | KERNEL | `ORCHESTRA-RELIABILITY-001` | — | FIX-spawn dependency-settlement tazeliği: FIX dalgası spawn edilirken dependency lineage'ı result-ingest SONRASI taze snapshot'tan okunur; bayat 'Pending' penceresi kapanır |
 | 3355 | `EXECUTION-RESOURCE-REALM-001` | OPEN | P1 | KERNEL | — | — | Docker worker resource-policy + Firecracker execution-realm karar-paketi: kind-attribution telemetri dilimi, bounded light-kind memory-canary, typed ExecutionResourceEnvelope ile aggregate admission, renewable-lease ADR yönü ve KVM capability-probe tek owner-sıralı pakette (gündem-dışı park; owner 2026-08-26: uygun zamanda) |
 | 3356 | `TMP-DOGFOOD-MAIN-CONTROLLED-SYNC-001` | OPEN | P1 | KERNEL | `PROVIDER-OBS-MIGRATION-001` | — | Tmp-dogfood worktree'sinin doğrulanmış source-only işlerinin güncel main'e paket-paket kontrollü yeniden-uygulanması (P1–P5: typed planner-failure evidence, canonical project-root + Docker attempt-identity + route-aware worker-core, hermetik dispatcher-fixture, dar self-audit evidence adapter'ı, docs/rules onarım-sonrası-regen) |
+| 3357 | `RECOVERY-BORN-714-EXACT-DISPATCH-AND-TERMINAL-TRUTH-001` | OPEN | P0 | KERNEL | `RECOVERY-BORN-PLANNER-HOST-COMPLETED-WIRING-001` | — | Sprint-714 ilk 7099 dogfood run'ı provider işi doğmadan `PRIVATE_IPC_AUTHORITY_UNAVAILABLE` ile düştü; Normal Docker exact-attempt private IPC authority'si backend→registry→collector zincirinde eksik, portable source envanterinde case-fold collision var ve dead coordinator projection'ı native Terminal'de stale `Çalışıyor · SPAWN` gösteriyor — ADR-D-007 bounded recovery |
 | 3358 | `GOAL-DISPOSITION-LIFECYCLE-001` | OPEN | P1 | KERNEL | — | — | Autonomous goal cancel, abandon ve reset yaşam döngüsü canonical service üzerinden CLI/MCP parity ile işler |
 | 3359 | `BUILD-SOURCE-SURFACE-IDENTITY-001` | OPEN | P1 | ASSURANCE | — | — | Build identity uncommitted source, Git HEAD ve Terminal/Dashboard/Desktop source-bundle kökenini birbirine karıştırmadan gösterir |
 | 3360 | `RUNFLOW-INGRESS-HOLD-OBSERVABILITY-001` | OPEN | P1 | KERNEL | — | — | do ve plan dispatch öncesi HOLD/failure durumları kalıcı attribution ve ortak operator read-model üzerinden görünür |
@@ -448,6 +449,7 @@
 | 7102 | `TERMINAL-MASCOT-STATUS-001` | OPEN | P1 | TERMINAL | `TERMINAL-OPERATOR-SURFACE-CLOSURE-001` | — | Maskot decke: 5 durumlu mini Kraken + canlı durum satırı birleşimi (owner yön A, 2026-09-04); önce ADR-G-010 amendment 'maskot = durum taşıyıcı', sonra `terminal.mascot` flag-gated uygulama |
 | 7103 | `TERMINAL-STARTUP-PERF-001` | OPEN | P1 | TERMINAL | `TERMINAL-OPERATOR-SURFACE-CLOSURE-001` | — | Native terminal ilk boyama maliyeti: modül-kapsamı worktree binary authority hash'i, çift MemoryStore açılışı, üçlü loadConfig ve await'li auth probe kaldırılır veya ertelenir |
 | 7104 | `SYNC-PROVENANCE-TRUTH-001` | OPEN | P1 | TRUTH | `TERMINAL-OPERATOR-SURFACE-CLOSURE-001` | — | `deckent sync` ve `/sync` özeti: 'önceki sync imzası yok' ile gerçek 3-yollu çakışma ayrışır; aggregate özet export edilir ve REPL kartında gösterilir |
+| 7105 | `TERMINAL-CONTEXT-CONTINUITY-001` | OPEN | P0 | TERMINAL | `TERMINAL-OPERATOR-SURFACE-CLOSURE-001` | — | **Owner-admitted 2026-09-09 (Alperen canlı vaka):** Native terminal sonsuz-akış — tur içi bağlam kararı admission ile AYNI ölçüm otoritesini (measureProviderRequest, utf8-wire-bytes-plus-framing) kullanır, tur içinde ölçülü high-water tetiği epoch'u erkenden ilerletir, INPUT_CONTEXT_OVERFLOW'da tek bounded epoch+retry koşulsuz denenir, tool-result önizleme tavanı pencereye göre config-resolved çözülür ve LLM'siz deterministik mikro-compaction (eski tool sonuçlarını contentRef'e düşürme) checkpoint sığmadığında devreye girer |
 | 7110 | `A2A-INTEROP-001` | OPEN | P2 | ECOSYSTEM | — | — | A2A v1.0 interop yönü: inbound A2A server (Agent Card + task-lifecycle projection) ve outbound A2A provider adapter için owner kararı ve plan admission |
 | 7120 | `SKILLMD-INGEST-001` | BLOCKED | P1 | ECOSYSTEM | — | `SKILL_V3_PROFILE_RECONCILIATION_REQUIRED` | Anthropic Agent-Skills (SKILL.md) open-standard ingest: `deckent skill import --format=skill-md` converter, typed `source` provenance ve frontmatter parser sertleştirmesi |
 | 7121 | `SKILLMD-V3-RECONCILIATION-001` | OPEN | P0 | ECOSYSTEM | `SKILL-CATALOG-AUTHORITY-001`, `SKILL-ROUTING-ELIGIBILITY-001`, `SKILL-SUPPLY-CHAIN-INGRESS-001` | — | SKILLMD-INGEST-001'in immutable V2 activation kabulünü production V3 SkillProfile ve fail-closed package ingress contractıyla lossless uzlaştır |

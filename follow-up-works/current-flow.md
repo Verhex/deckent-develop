@@ -1,6 +1,6 @@
 # Geçici iş imleci — 7099 Terminal
 
-Güncelleme: 2026-09-09T07:46Z. SSOT: [MASTER](../docs/MASTER-PLAN.md).
+Güncelleme: 2026-09-09T09:46Z. SSOT: [MASTER](../docs/MASTER-PLAN.md).
 Bu dosya authority, admission veya settlement receipt değildir.
 Silinme tetiği: onaylı sıra tüketilip kalıcı kanıtlar SSOT/evidence'a işlendiğinde.
 
@@ -174,6 +174,30 @@ duration performans kanıtı sayılmadı. WholeCLI/7099 veya platform closure de
   Bu sayı ölçümdür; MASTER/ledger mutation veya ürün DONE değildir.
 
 ## Sıradaki exact iş
+
+0. **ACİL (owner 2026-09-09, MASTER 7105 TERMINAL-CONTEXT-CONTINUITY-001):** native terminal
+   tur içi bağlam taşması: loop estimateTokens ile adapter measureProviderRequest ayrı otorite;
+   overflow retry yalnız epochAdvancedThisTurn; 16 KB tool-result önizlemesi pencereden bağımsız.
+   Uygulama Astra izole worktree (communication.md ENTRY 1084 İŞ C), review/landing Fable.
+0a. LANDED (owner onayı 09:42Z): caa404984 fix(mcp) checkpoint read-only typed refusal (Cursor L3);
+   27c9f9fd3 feat(custody) Lane D T1+T2 goal subject/ledger v3/settlement namespace (Astra; UNWIRED,
+   T5–T7 bağlı). Push yok; main origin'den 4 ileride.
+0a2. Canary run-3 (sprint-729, 09:03Z) worker gönderimi kabul edilmedi: kök neden = exact Docker
+   dependency-population helper'ı (spawn-backend-docker.ts:2857-3108) ~33 s pencerede canlı proje
+   kökünün byte-aynı kalmasını şart koşuyor (envanter untracked dahil), o pencerede main ağacına yazan
+   ajan vardı → exit 78 → HELPER_RUN → lifecycle.ts:3161 catch yutuyor → ADAPTER_UNAVAILABLE/PRE_MOUNT_ABORTED.
+   Image/native/subscription temiz (rebuild gerekmez; 04 Eylül image'ı commit'li Dockerfile'dan
+   yeniden üretilemez — hijyen bulgusu). Fix: typed ordinal + bounded config-resolved retry
+   (izole worktree deckent-lane-populate-race) + lifecycle typed yakalama (Cursor ENTRY 47).
+   sprint-729 kalıntısı: sprint-state FIX/FIXING; recover dry-run task residue force-archive gösteriyor.
+0b. E077 makine-brick paketi (ADR-D-007, Fable epoch-5): (1) arşivlenmiş attempt cold-start atlama
+   (Astra CONFIRMED, canary run-2 724-001 geçti); (2) yabancı settle-edilemeyen attempt registry
+   emekliliği (uygulandı, doğrulama Astra'da); ardından build + canary run-3 (asıl hedef: exact
+   Docker accepted-result reader kanıtı). Bulgu: replay sözleşmesi versiyonsuz; emeklilik yalnız debugLog.
+0c. Fan-in kuyruğu (Fable; commit owner gate): MCP checkpoint paritesi (Cursor; main'e uygulandı,
+   152/152 + parity + i18n PASS); Lane D T1+T2 (Astra, 62/62 + tsc0, review sırada); hermeticity
+   gate main'de önceden kırmızı (harness:412) → owner bulgusu.
+
 
 Tamamlanan dar uygulamanın geçmişi: Sol, `/tmp/deckent-7099-approval-run-QBsITiyx/checkout`
 base809745720 üzerinde eksik `approvals run` consumer'ını mevcut XVerify +

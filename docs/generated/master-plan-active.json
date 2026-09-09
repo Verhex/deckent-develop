@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "4a2092257995ba1e24232f24ed3dd9b75165614018a72fca9d9b49144341a68d"
+    "value": "d9a947d0e17bf0223853a1037d1193ab4c742ace4691eebbe4a6a28293b36317"
   },
   "summary": {
-    "total": 589,
-    "active": 500,
+    "total": 591,
+    "active": 502,
     "terminal": 89,
-    "receipts": 218,
+    "receipts": 232,
     "byState": {
-      "OPEN": 378,
+      "OPEN": 380,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
@@ -21,7 +21,7 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 365,
+      "P0": 367,
       "P1": 174,
       "P2": 50
     },
@@ -41,7 +41,7 @@
       "ENTERPRISE": 4,
       "EVAL": 5,
       "EVOLUTION": 4,
-      "KERNEL": 133,
+      "KERNEL": 134,
       "LEARNING": 11,
       "OBS": 9,
       "ONBOARDING": 1,
@@ -57,7 +57,7 @@
       "SCALE": 1,
       "SECURITY": 11,
       "SURFACE": 1,
-      "TERMINAL": 26,
+      "TERMINAL": 27,
       "TOOL": 1,
       "TRUTH": 108,
       "XPLAT": 7
@@ -3860,6 +3860,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 3357,
+      "id": "RECOVERY-BORN-714-EXACT-DISPATCH-AND-TERMINAL-TRUTH-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-09-06",
+      "definitionDigest": "462a68671dd524f3b6b9251c0793a267766b19f0edcfd08c62f3c009ec489c6a",
+      "progressDigest": "c858628d9b0a604fc9b2c6b359aa93805858d1c39d23a6315ade5b2202520a75",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 3358,
       "id": "GOAL-DISPOSITION-LIFECYCLE-001",
       "program": "KERNEL",
@@ -5584,6 +5595,17 @@
       "updated": "2026-09-03",
       "definitionDigest": "4c761e75c192b6faeeca8284a1adea85f38fd832820cb28d30e2388c51d01057",
       "progressDigest": "60ed7bf857454068587a6fe39770ed207dfe6d4f3d801d5dfe23c614531ee819",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7105,
+      "id": "TERMINAL-CONTEXT-CONTINUITY-001",
+      "program": "TERMINAL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-09-09",
+      "definitionDigest": "f80e81ef68d8ca1c0cd312fb56de019057a21547283d8cd48ef2d59c4500cae6",
+      "progressDigest": "af4e0864cf3a570d8930359bb1037aeafaaf85d11d64216b101cb89cff41fc49",
       "terminalClosureDigest": null
     },
     {
@@ -8712,6 +8734,146 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-09-04T10:57:40+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-09-04-714-EXACT-DISPATCH-01",
+      "authorityDigest": "9b3c8a30e011db181f89ea8d65c259e280e4f1d7a118c60479d263905f9b0ef2",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-09-04T12:08:07+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-09-04-714-EXACT-DISPATCH-SUPP-01",
+      "authorityDigest": "996b8580220dcc58aa93d6b1ad55ed7f58dd9d322064fbb4063f6348989a9b73",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-09-04T12:20:09+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-09-04-714-IMAGE-AUTHORITY-SUPP-02",
+      "authorityDigest": "1dc91cdd622062bc0b6985f48ce294c0cd0b6ab27c415bd92cf90aacfc14cf3d",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-09-04T13:43:27+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-09-04-714-PLANNER-ADMISSION-SUPP-06",
+      "authorityDigest": "44c888e5c6da084837fcb78583cba5d500b24bda447c3c77b669fc282006d8d0",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-09-04T18:41:43+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-09-04-714-PLANNER-ADMISSION-GATE-SUPP-07",
+      "authorityDigest": "3641a560e32b33e456907cf5aff79ec3b09abe205235951eee0c1a5625c8dc23",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-09-04T18:55:48+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-09-04-714-PLANNER-PATH-FILTER-GATE-SUPP-08",
+      "authorityDigest": "8bbd435eca7f65a4a8c7fc7e16b59a6b472aae9a22aa6ee90b35bc9f65c11707",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-09-04T19:01:51+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-09-04-714-RESERVATION-RECOVERY-SUPP-09",
+      "authorityDigest": "531507de5e5eeda15d35ec2199df0e04a03c8a8f1aada677cda762f492bd36bb",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-09-04T19:37:06+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-09-04-714-PLANNING-HOLD-TRANSPORT-SUPP-10",
+      "authorityDigest": "6566d634e122d68867e36806690a5d136dd00b74179accc9bac3afff94e09805",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-09-04T19:55:10+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-09-04-714-RESERVATION-RECOVERY-GATE-SUPP-11",
+      "authorityDigest": "43253fafd4b77a6653cff9e332fa69c372ac6974e104640fa86064feec2e9c8a",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-09-04T20:04:31+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-09-04-714-CUSTODY-EPOCH-QUARANTINE-SUPP-12",
+      "authorityDigest": "cd552d76a5fd0a6b304219af96330e0e682c8b404959b257748df62dd6dda9aa",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-09-04T20:29:38+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-09-04-714-CUSTODY-EPOCH-GATE-SUPP-13",
+      "authorityDigest": "dad702f06a002e0c5ba104ebcd6120d3ada85a5174281f8d4fd35430f486ceb4",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-09-04T20:43:31+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-09-04-714-PLANNER-FAILURE-TRUTH-SUPP-14",
+      "authorityDigest": "7c815c18ebe10daefba3f1ecc5832019cc99b2f667ffa0fdad849625a713a752",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-09-04T21:06:10+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-09-04-714-CLOSED-SCOPE-PREWIRING-SUPP-15",
+      "authorityDigest": "1d14fbaee7a399221494ea57c56cf9c304b1596f98365f542af9775d14352952",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-09-04T21:11:41+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-09-04-714-PLANNER-FAILURE-GATE-SUPP-16",
+      "authorityDigest": "a8333e05e8d2000029a398da7ef7ade279550b28340040ad52da7398c45bf035",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-09-04T21:17:49+03:00"
       },
       "g7AttemptIdentity": null
     },
@@ -16413,7 +16575,8 @@
         "RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001",
         "RECOVERY-BORN-NATIVE-DO-SLASH-PROVIDER-BOOTSTRAP-001",
         "RECOVERY-BORN-PLANNER-DEPENDENCY-SHAPE-001",
-        "RECOVERY-BORN-PLANNER-HOST-COMPLETED-WIRING-001"
+        "RECOVERY-BORN-PLANNER-HOST-COMPLETED-WIRING-001",
+        "RECOVERY-BORN-714-EXACT-DISPATCH-AND-TERMINAL-TRUTH-001"
       ],
       "gates": [
         "G1"
@@ -16481,7 +16644,8 @@
         "RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001",
         "RECOVERY-BORN-NATIVE-DO-SLASH-PROVIDER-BOOTSTRAP-001",
         "RECOVERY-BORN-PLANNER-DEPENDENCY-SHAPE-001",
-        "RECOVERY-BORN-PLANNER-HOST-COMPLETED-WIRING-001"
+        "RECOVERY-BORN-PLANNER-HOST-COMPLETED-WIRING-001",
+        "RECOVERY-BORN-714-EXACT-DISPATCH-AND-TERMINAL-TRUTH-001"
       ],
       "evidenceReceipts": [
         "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01",
@@ -19884,7 +20048,9 @@
       "dependsOn": [
         "RECOVERY-BORN-PLANNER-DEPENDENCY-SHAPE-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "RECOVERY-BORN-714-EXACT-DISPATCH-AND-TERMINAL-TRUTH-001"
+      ],
       "children": [],
       "gates": [
         "G1",
@@ -20233,6 +20399,46 @@
       "acceptance": "Her paket güncel main üzerinde ayrı implementation + bağımsız verification pass ile yeniden uygulanır (wholesale merge/cherry-pick YASAK); her pakette scoped vitest + tsc-0 + gate-bataryası + production-wiring zinciri kanıtlanır; user-surface değişiklikte gerçek-binary proof; autonomous cleanup/status ve terminal/finalizer snapshot paketleri KAPSAM DIŞI (ayrı owner-admitted outcome ister)",
       "evidence": "Owner admission 2026-08-28 (\"ADMIT — kuyruk sonuna\"); owner 2026-08-28 bu satırı kuyruğun önüne aldı ve yan-oturum denetimini teslim etti. Devir-paketi 3 bütünlük-kontrolüyle doğrulandı: receipt digest `sha256:7bfc410f…` canonical-JSON yeniden-hesapla DIGEST-MATCH, base `417f4955b`→main `a4913b140` farkı tam 23 commit, blocking-gate disk-doğrulu; kanıt-korpusu `/tmp` volatilitesine karşı kalıcı: docs/audits/tmp-dogfood-main-sync-2026-08-27/. Admission engeli aynı gün kalktı (`PROVIDER-OBS-MIGRATION-001` `DONE`). Denetimin BEŞ iddiası diske karşı tek tek test edildi; varsayımla hiçbir şey uygulanmadı. SIKIŞTIRILDI 2026-08-28: hücre kendi 10.000-karakter sınırını aştığı için tur-tur anlatı yerleşik hâline indirildi (emsal: satır 31); tam anlatı git geçmişinde — commit'ler `f38595061` (P0), `2f65bf1c6` (P1 doc-truth), `862335638` (P2 hermetiklik), `8aaa44287` (planner-failure), `f25ee3799` (P3 scope), `eda5da8a2` (P3 attribution pini). DOĞRULANAN VE KAPATILAN: (a) worker-core teslimatı — karar yalnız provider+bayraktan veriliyordu, `coreExternalized` inline çekirdeği siliyordu, teslimat argv'si YALNIZ docker'daydı ve `spawn_backend:'auto'` Windows'ta koşulsuz, Docker'sız hostta da `subprocess`'e düşüyor; kusur latent değil BUGÜN canlıydı (Yasa-2). Onarım: `SpawnBackend.canDeliverWorkerCore` + compile-time ikizi, karar artık provider ∩ bayrak ∩ backend, bilinmeyen backend fail-closed inline. (b) MCP `deckent_memory_manage` `insert`/`update` yollarında `status` kapısızdı — ajan `type:'adr', status:'accepted'` yazıp kendi kararını kabul edebiliyordu; typed `DECISION_DISPOSITION_HOLD` kondu (önerme açık, kabul kapalı). (c) auditor template'i brain'in taşıdığı \"taklit edilecek fonksiyon değil\" çekincesinden yoksundu ve çıplak `store.insert` emrediyordu; çekince + public-capability/typed-HOLD dili eklendi, brain'e dogfood/ürün bellek ayrımı ve kendi-kararını-kabul-etme yasağı yazıldı. (d) `.plan` CUSTOM drift'i (codex/gemini/cursor \"write .plan file\") tek-seferlik migrasyonla sıfırlandı — generator CUSTOM'ı kasten senkronize etmediği için regen ile düzelmezdi. (e) worker'a verilen \".locks/ kontrol et\" talimatı kaldırıldı: kilit host-sahipli, per-file `acquireLock`'ın orchestra'da çağıranı yok, gerçek güvenlik plan-time scope-collision'da; talimat gereksiz ve TOCTOU telkin ediyordu. (f) onboarding komut-doğruluğu: DECKENT.md var olmayan `docs/reference/agents.md` yoluna ve `deckent agents`/`deckent skills` uydurma adlarına işaret ediyordu; düzeltildi ve tekrarı önleyen `scripts/lint-doc-command-truth.mjs` gate'i (registry'ye karşı fail-closed, yalnız code-span tarar) `lint:gates`e bağlandı — negatif kanıt: kusur geri konunca FAIL. (g) typed planner-failure: tipli sebep zaten vardı, ama nonzero-exit dalı ham `stderr`'i 500 bayta, parse dalı ham `stdout`'u 200 bayta kadar loglanan mesaja gömüyordu (token/auth-URL/path sızıntısı); ham interpolasyonlar kaldırıldı, yerine bayt-sayısı + bayt-uzunluğu-çerçeveli `sha256:` digest ve `PlannerFailureEvidence` zarfı kondu. (h) `filesWrite: ['src/']` sessizce `exact-file:'src'`e derlenip fiilen BOŞ yazma kapsamı üretiyordu; typed `DIRECTORY_INTENT_REQUIRES_DIRECTORIES` hold'u kondu (latent kusurdu, canlı değil). (i) Docker attribution tüketicisi (`resolveCanonicalAttributionFiles`) ilk kez doğrudan pinlendi; attribution YAZMA yetkisini izler (yalnız `filesWrite`), `directories` kredi vermez — ve `filesWrite` yalnız `exact-file`e derlendiği için `selectorMatches`'in tree/glob dalları bu tüketiciden ulaşılamaz; kod sadeleştirilmedi, değişmez pinlendi. ÇÜRÜTÜLENLER: WORKER-GUIDE protokol çelişkisi (şema tek kaynaktan gelir, guide generated+digest-bound, uyuşmazlıkta sistem zaten \"otorite sayma\" der), dispatcher'ın provider'a kaçması (32/32 yeşil, ~1.2sn, sıfır ağ — yine de tesadüfi hermetikliği sözleşmeye çevirmek için süit-seviyesi `HERMETICITY_GUARD` kondu ve ateşlendiği pinlendi), kök `manifest.json` referansı (DECKENT.md'de yok). Docker attempt-identity bağlaması güncel main'de zaten mevcut (`settlementRef` ↔ prompt ↔ heartbeat aynı attemptId). Doğrulama: tsc-0, 21-gate yeşil, bot-stop→build:all→bot-start ritüeli. P5 LANDED: paylaşımlı `src/core/output-digest.ts` (`framedOutputDigest`) tek kaynak oldu — planner ve İKİ canlı doğrulama adapter'ı (vitest · typescript) onu tüketir. Adapter'lar digest'i `${stdout}\\n${stderr}` düz birleştirmesiyle hesaplıyordu: stdout `a`/stderr `b\\nc` ile stdout `a\\nb`/stderr `c` AYNI kimliği üretiyordu, yani iki farklı doğrulama sonucu birbirinin yerine geçebiliyordu — devir-paketinin uyardığı kusur tmp'de değil canlı koddaydı. Ayrıca self-audit `hold` yolu süreç kanıtını tamamen kaybediyordu (yalnız sebep + cümle); artık typed `SelfAuditProcessEvidence` (exitCode · timedOut · stdoutBytes · stderrBytes · framed outputDigest) taşır — çıktının kendisi değil. 4 yeni pin: timeout, adapter-hold, sızıntı-yokluğu (token JSON'da geçmez) ve sınır-çökmesi ayrımı. Finalizer wiring bilinçli DIŞARIDA (devir-paketi HOLD diyor). Kanıtlamadığı: gerçek-binary Windows/subprocess koşusu yapılmadı (Linux-local; X açık); P6/P7 (autonomous cleanup/status, terminal-finalizer snapshot) HOLD kalır; 2026-08-28 XVERIFY: worker-core kapısının mekanizması farklı provider'ca doğrulandı (author claude/claude-opus-5 → verifier codex/gpt-5.6-sol), verdict CONFIRMED/ALLOW, durable receipt `cross-verify-verdict:sha256:301feacc2c7a6f271c7ab083e959f6e1b404d46ac2e857d1ca0f543b15c5178c`; ilk iki deneme dürüst HOLD döndü — doğrulayıcı fix-öncesi tarihsel hâli ve repo-geneli negatifi mount'lardan göremediği için reddetti, iddia görülebilene daraltıldı ve kanıtlanamayan kısım açıkça kapsam-dışı ilan edildi",
       "updated": "2026-08-28"
+    },
+    {
+      "order": 3357,
+      "id": "RECOVERY-BORN-714-EXACT-DISPATCH-AND-TERMINAL-TRUTH-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Sprint-714 ilk 7099 dogfood run'ı provider işi doğmadan `PRIVATE_IPC_AUTHORITY_UNAVAILABLE` ile düştü; Normal Docker exact-attempt private IPC authority'si backend→registry→collector zincirinde eksik, portable source envanterinde case-fold collision var ve dead coordinator projection'ı native Terminal'de stale `Çalışıyor · SPAWN` gösteriyor — ADR-D-007 bounded recovery",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-BORN-PLANNER-HOST-COMPLETED-WIRING-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "0",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-BORN-PLANNER-HOST-COMPLETED-WIRING-001"
+      ],
+      "evidenceReceipts": [
+        "GR-2026-09-04-714-EXACT-DISPATCH-01",
+        "GR-2026-09-04-714-IMAGE-AUTHORITY-SUPP-02",
+        "GR-2026-09-04-714-PLANNER-ADMISSION-SUPP-06"
+      ],
+      "acceptance": "Store-backed exact-attempt question/answer authority normal Docker production zincirinden collector'a ulaşır; public `.tasks` veya authored digest authority olamaz; portable collision pre-dispatch typed NOT_DISPATCHED olur; fatal IPC hold canlı etkileri `contain` etmeden PID/lock emekliye ayıramaz; detached failure canonical ABORTED/ORPHANED truth yayınlar ve native Terminal stale running alanlarını göstermez; TDD + build:all/restart + gerçek CLI/native dogfood settlement kanıtı zorunlu",
+      "evidence": "Owner admission 2026-09-04: \"doğru kapsamı belirletip doğru çözümü uygulayalım\" + \"onaylandı\"; Fable read-only RCA disk kanıtıyla aynı sınıfı doğruladı; capsule `docs/execution/active/RECOVERY-BORN-714-EXACT-DISPATCH-AND-TERMINAL-TRUTH-001.md`; admission HEAD `68f3d6686`, policy `c4c96a97…`, baseline exact-scope `1d0c306d…`; `receipt=GR-2026-09-04-714-EXACT-DISPATCH-01`; `receipt=GR-2026-09-04-714-IMAGE-AUTHORITY-SUPP-02`; full recovery fan-in 20 dosya/474 pass + 3 skip, tsc ve required gates PASS; production image `sha256:d076030c…`, native authority `sha256:4e4dd558…`; gerçek compiled native TTY `sprint-714 · Başarısız` + exact neden gösterdi ve stale SPAWN alanlarını bastırdı; informed Anthropic consent flow `afb58a0d…` tarafından bir kez tüketildi fakat eski pre-build custody epoch'u `ARTIFACT_CHANGED` ile `RUN_STARTED` öncesi fail-closed oldu, worker/container/task/tracked diff oluşmadı; current-process-owned pre-plan lock retirement TDD ile kapandı ve dead `sprint-002` lock'u canonical PID/start-token reconciliation ile temizlendi; ikinci informed retry iki planner cevabını `host-proof-profile-unregistered` ile flow oluşmadan reddetti; `BLOCKS_CURRENT_DONE` planner applicability supplement'i non-production proposal'ı authority olmadan atarken production scope'un exact registry gate'ini korudu, failing-first regression + compiled parser proof + 28 dosya/664 pass + 3 skip ve `build:all` PASS; supplement scope `7261c531…`, build identity `c383da00…`; ilk detached bot child'ı çıktıktan sonra documented restart yeniden uygulandı ve compiled dist PID `4013915` readiness hold boyunca OS+canonical status ile canlı kaldı; dördüncü bounded canary'de tek-file hedefin prompt tarafından dört writer'a zorlanması immutable topology gate'inde `undeclared-writer-collision` ile doğru biçimde DENY oldu; cross-provider XVerify causal core'u CONFIRMED etti (`cross-verify-verdict:sha256:30a2d1f6…`); host-derived cardinality + bounded contract-repair + pre-planner Docker custody proof supplement'i IN_PROGRESS; `receipt=GR-2026-09-04-714-PLANNER-ADMISSION-SUPP-06`; fresh current-byte scope `2055b3f5…`; gerçek worker terminal settlement için fresh G7 retry consent HOLD, commit/push yok; 7099 L1–L6 ve 7101–7104 feature scope'u hariç 2026-09-06 evidence reconciliation: önceki retry HOLD kaydından sonra Sprint 724 gerçek worker→main effect→accepted result→T11→outer terminal settlement zinciri 2026-09-05T20:50:26.871Z tarihinde COMPLETE oldu. Task 724-001, attempt 63e1b622-7e30-8de2-8e76-fbb5cd238b83 generation 1; historical flow 591a6ff1-8cc9-4dc8-b0a2-e2cf49144882 FAILED olarak korunur, yeni worker/tekrar effect yok. Terminal receipt .deckent/recently-works/sprint-724-terminal-receipt.json sha256 15b9f2f4fc5cd2d9214ba037367b98a516e24fa2dc767e2a0489cd999e8a39d4; archive .deckent/archive/sprints/sprint-724/ 19 artifact/138513 byte, terminal seal applied, canonical CLI COMPLETE/inactive ve SPRINT-LOG 1/1 DONE. Main canary note sha256 3a40f4d925a6a14be18cc3b7ef0501601b30a848dd12e3f1898c58134b7e2942. Yerel targeted 23 suite/261 test ve tsc PASS; full hermetic 18371/18157 HOLD, multiworker/handoff ve operator gözlemlenebilirliği henüz kanıtlanmadı. Fable independent disk verification doğruladı, bu signed XVerify receipt değildir. Yalnız run-level closure; 3357 State/Truth değiştirilmedi, capsule açık. Kanıt: docs/execution/active/RECOVERY-BORN-714-EXACT-DISPATCH-AND-TERMINAL-TRUTH-001.md.",
+      "updated": "2026-09-06"
     },
     {
       "order": 3358,
@@ -24781,6 +24987,7 @@
         "TERMINAL-MASCOT-STATUS-001",
         "TERMINAL-STARTUP-PERF-001",
         "SYNC-PROVENANCE-TRUTH-001",
+        "TERMINAL-CONTEXT-CONTINUITY-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
         "AGENT-RUNTIME-ADAPTER-001",
@@ -24848,6 +25055,7 @@
         "TERMINAL-MASCOT-STATUS-001",
         "TERMINAL-STARTUP-PERF-001",
         "SYNC-PROVENANCE-TRUTH-001",
+        "TERMINAL-CONTEXT-CONTINUITY-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
         "AGENT-RUNTIME-ADAPTER-001",
@@ -26257,6 +26465,7 @@
       ],
       "dependents": [
         "SYNC-PROVENANCE-TRUTH-001",
+        "TERMINAL-CONTEXT-CONTINUITY-001",
         "TERMINAL-MASCOT-STATUS-001",
         "TERMINAL-STARTUP-PERF-001",
         "USAGE-PROVIDER-NEUTRAL-001"
@@ -26461,6 +26670,42 @@
       "acceptance": "sync.ts aggregate özeti export edilir ve `--json` tek kaynaktır; missing-baseline uyarıları tek satır sayıya iner, gerçek çakışmalar listelenir; REPL `/sync` kartı N adapter / N skill / N commit özetini gösterir; hermetik test; i18n en+tr",
       "evidence": "Terminal audit 2026-09-04 (bulgu 14): sync.ts:763 unexported aggregate, agent-prompt-sync.ts:239 ve agent-manifest-sync.ts:234 baseline-yok dalı gerçek çakışmayla aynı görünüyor",
       "updated": "2026-09-03"
+    },
+    {
+      "order": 7105,
+      "id": "TERMINAL-CONTEXT-CONTINUITY-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TERMINAL",
+      "outcome": "**Owner-admitted 2026-09-09 (Alperen canlı vaka):** Native terminal sonsuz-akış — tur içi bağlam kararı admission ile AYNI ölçüm otoritesini (measureProviderRequest, utf8-wire-bytes-plus-framing) kullanır, tur içinde ölçülü high-water tetiği epoch'u erkenden ilerletir, INPUT_CONTEXT_OVERFLOW'da tek bounded epoch+retry koşulsuz denenir, tool-result önizleme tavanı pencereye göre config-resolved çözülür ve LLM'siz deterministik mikro-compaction (eski tool sonuçlarını contentRef'e düşürme) checkpoint sığmadığında devreye girer",
+      "priority": "P0",
+      "dependsOn": [
+        "TERMINAL-OPERATOR-SURFACE-CLOSURE-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TERMINAL-OPERATOR-SURFACE-CLOSURE-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "loop fit kararı ile adapter admission ölçümü aynı sayıyı görür (tek authority, ikinci tahminci yok); 131k pencereli local-llm/Qwen ile 20+ tool çağrılı tek tur gerçek native terminalde overflow olmadan tamamlanır ve epoch otomatik ilerler (transcript kanıtı); overflow sonrası sonraki tur checkpoint boş kalmaz; tool-result preview tavanı hardcode değil, pencere oranından çözülür; hermetik regresyon testleri; Claude Code/Codex ile davranış paritesi (bounded tool output + otomatik compaction + compact-and-retry)",
+      "evidence": "Vaka: /context 143420 token / 131072 pencere (%109), checkpoint empty, epoch 1, tek turda 18 tool çağrısı, sonraki basit soru da overflow; kaynak: src/agent/loop.ts:260-317 estimateTokens/overContext vs src/agent/context-budget.ts:117 measureProviderRequest; src/agent/session.ts:918-926 retry yalnız epochAdvancedThisTurn; src/agent/tool-result-broker.ts:33 DEFAULT_MAX_PREVIEW_BYTES=16384; session.ts:143 CONTEXT_HIGH_WATER_RATIO yalnız tur öncesi",
+      "updated": "2026-09-09"
     },
     {
       "order": 7110,
@@ -29734,6 +29979,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "9c9f19a6b7d60d972c1182f5e1439fa492fbc3663d579f49374b6f0292c99e9c"
+    "value": "26864c3bdb9d04142587cbe5b608f8807a414998286cd705271c7d79188e3384"
   }
 }
