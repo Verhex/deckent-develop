@@ -1,0 +1,73 @@
+[
+  {
+    "command": [
+      "node",
+      "scripts/lint-i18n-hardcode.mjs"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-09T12:39:24.233576+00:00",
+    "log": "i18n.log",
+    "sha256": "f52908b2f5f092dc5ee9e1bbe63170b881fec62bad16207cf712077241ddb725"
+  },
+  {
+    "command": [
+      "node",
+      "scripts/lint-config-writers.mjs"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-09T12:39:24.469925+00:00",
+    "log": "config-writers.log",
+    "sha256": "8fcc18dac19132af86bf7085bfbd0d5a24aab541793ee6090d8b10d69a60aa4d"
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exitCode": 0,
+    "utc": "2026-09-09T12:39:24.519265+00:00",
+    "log": "diff.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "log": "final-tests.log",
+    "exitCode": 0,
+    "sha256": "f40eb142f4c973b7e3c20d20b5cedf2d9f573e9e60bd1b6ba4624431d43378a0",
+    "command": "VITEST_MAX_FORKS=1 npx vitest run tests/agent/preamble-budget.test.ts tests/agent/preamble-budget-registry-matrix.test.ts tests/agent/loop.test.ts tests/agent/loop-budget.test.ts tests/agent/tool-result-broker.test.ts tests/agent/context-budget.test.ts tests/agent/context-admission.test.ts tests/agent/context-continuity-session.test.ts tests/agent/context-epoch-lineage.test.ts tests/agent/context-lifecycle-battery.test.ts tests/agent/session.test.ts tests/cli/repl/context-slashes.test.tsx tests/cli/native-agent-bridge.test.ts tests/agent/tool-exposure.test.ts tests/agent/tool-surface-scale.test.ts tests/core/execution-budget-policy.test.ts tests/core/config-execution-budget-policy.test.ts tests/cli/context-lifecycle-ux.test.ts --no-cache",
+    "logMtimeUtc": "2026-09-09T12:37:30.724874+00:00",
+    "exitCodeVerifiedUtc": "2026-09-09T12:42:33.655696+00:00"
+  },
+  {
+    "log": "final-battery.log",
+    "exitCode": 0,
+    "sha256": "44f7af7afafb0d9723aa007c49745e78e09f3044480ff382b214588a7e104828",
+    "command": "VITEST_MAX_FORKS=1 npx vitest run tests/agent/context-lifecycle-battery.test.ts --no-cache",
+    "logMtimeUtc": "2026-09-09T12:37:51.240073+00:00",
+    "exitCodeVerifiedUtc": "2026-09-09T12:42:33.655709+00:00"
+  },
+  {
+    "log": "final-tsc.log",
+    "exitCode": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "command": "npx tsc --noEmit",
+    "logMtimeUtc": "2026-09-09T12:37:21.284065+00:00",
+    "exitCodeVerifiedUtc": "2026-09-09T12:42:33.655710+00:00"
+  },
+  {
+    "log": "private-build.log",
+    "exitCode": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "command": "npx tsc",
+    "logMtimeUtc": "2026-09-09T12:38:10.983134+00:00",
+    "exitCodeVerifiedUtc": "2026-09-09T12:42:33.655711+00:00"
+  },
+  {
+    "log": "private-assets.log",
+    "exitCode": 0,
+    "sha256": "19351da42802c41293aef857e94c15dce33c6248d088541b81acebcb7aa472dc",
+    "command": "node scripts/copy-assets.mjs",
+    "logMtimeUtc": "2026-09-09T12:39:03.598491+00:00",
+    "exitCodeVerifiedUtc": "2026-09-09T12:42:33.655712+00:00"
+  }
+]

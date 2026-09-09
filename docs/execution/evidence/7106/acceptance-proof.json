@@ -1,0 +1,77 @@
+{
+  "utc": "2026-09-09T12:42:33.678431+00:00",
+  "status": "LOCAL_VERIFIED / READY_FOR_REVIEW",
+  "productDone": false,
+  "cwd": "/tmp/astra-7106-32k-acceptance-20260909",
+  "window": 32768,
+  "preamble": {
+    "tokens": 5146,
+    "target": 4915,
+    "hardLimit": 23347,
+    "status": "floor-admitted",
+    "schemaCount": 3,
+    "quality": "conservative-upper-bound",
+    "provenance": "utf8-wire-bytes-plus-framing"
+  },
+  "providerUsage": {
+    "inputTokens": 6495,
+    "outputTokens": 681,
+    "reports": 3
+  },
+  "calls": [
+    {
+      "name": "deckent_search_tools"
+    },
+    {
+      "name": "deckent_call_tool",
+      "delegatedName": "deckent_list_dir"
+    },
+    {
+      "name": "deckent_call_tool",
+      "delegatedName": "deckent_read_file"
+    },
+    {
+      "name": "deckent_call_tool",
+      "delegatedName": "deckent_grep"
+    }
+  ],
+  "terminalExitCode": 0,
+  "checkpointEpoch": 1,
+  "checkpoint": "empty",
+  "interrupted": false,
+  "promptShape": "One limited search and three read-only calls with explicit arguments; unrestricted discovery stress is separately retained and was interrupted.",
+  "files": [
+    {
+      "path": "acceptance.typescript",
+      "sha256": "d7c3403a7428b4ca44be169365f6e2db879424209d4ba8c94fca7c19c2b765c6"
+    },
+    {
+      "path": "acceptance.txt",
+      "sha256": "5748b214bb2ff5de436c5be2d2554205e77e20e4e916553314fcfb67d743b2ef"
+    },
+    {
+      "path": "wire-32k.jsonl",
+      "sha256": "1633c357e10a2f817f4be07cfb8370b7fa54d0a5dd6e75a1ef68a10bc4aaca73"
+    },
+    {
+      "path": "wire-32k.mjs",
+      "sha256": "7fa8070f84dde2e08bb8c6c5d2d55ef7df32f3e58e616c88fefcf2bdb50623c8"
+    },
+    {
+      "path": "config-evidence.json",
+      "sha256": "353a74238f0c15bdf06b0b2ce5cb2972d5d76579a6c54ca5aec54d9fed468b64"
+    },
+    {
+      "path": "source-manifest.json",
+      "sha256": "58cd3e87e3a5fbe9abaa77c2cbf1c07a7bffb6fd246b5382687fa2568424024b"
+    },
+    {
+      "path": "binary-manifest.json",
+      "sha256": "7a520de97e33b1d6a4ad0a394f22b70e244f1e16ad324c981ea7beed7d342015"
+    },
+    {
+      "path": "checks.json",
+      "sha256": "b4a3048cb5b0e9adebf00270ad4e30daedf46786087eb34d151b9f0abd3bfb71"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "utc": "2026-09-09T12:39:23.864706+00:00",
+  "base": "e7b32aaf8de67d3f8c8e42e9d9a7dde41e329037",
+  "files": [
+    {
+      "path": "src/agent/identity.ts",
+      "sha256": "63dbb0f41aa761f2053795dabf4ba55bf753715f1ac05d917fed32daa327f01f"
+    },
+    {
+      "path": "src/agent/loop.ts",
+      "sha256": "1af0ed20e6a1ae9fdc3bab9da51155a694be38cf3a4c85982dd7922d1f4c9696"
+    },
+    {
+      "path": "src/agent/session.ts",
+      "sha256": "2b75341052c185cf849d0245b45eda01571e7470f561d5394127a97fc0cbeb87"
+    },
+    {
+      "path": "src/cli/helpers/messages.ts",
+      "sha256": "9858a5c631a0edf0eaca752f1a82000a51315e96d6f4e4649ea0b9422e7f7ed7"
+    },
+    {
+      "path": "src/cli/repl/native-agent-bridge.ts",
+      "sha256": "4b25bf136bebae47742dc9055dda8f5feacf5207947d8ba07dc48d97979e4cf4"
+    },
+    {
+      "path": "src/cli/repl/run.tsx",
+      "sha256": "3fc9a5cfd3877eb675acb426473a6da25fb5feb81394e21f508025ed28568945"
+    },
+    {
+      "path": "src/core/config-types.ts",
+      "sha256": "3896ae0cc3d51713f808d7e0527f82bda8d7bdb981288f91e5be5d8e780c8cb6"
+    },
+    {
+      "path": "src/core/execution-budget-policy.ts",
+      "sha256": "090f92e41bd7f24fc92896d9f9daf0620d3aa0dac15f60c0cf2753d2781454ff"
+    },
+    {
+      "path": "tests/agent/context-lifecycle-battery.test.ts",
+      "sha256": "724a41853063525ad56a736879bc30f4349ac23c6d30f169e63111cc3f595cce"
+    },
+    {
+      "path": "tests/cli/repl/context-slashes.test.tsx",
+      "sha256": "5ae9dd885de98c2176bfd0b39294fea62c3b6d52cdefecaff3a7e167bc37866b"
+    },
+    {
+      "path": "src/agent/preamble-budget.ts",
+      "sha256": "eb6a99dfebe7aa00c904891d3b50ef3a836474140943007762a084d5a167339f"
+    },
+    {
+      "path": "tests/agent/preamble-budget.test.ts",
+      "sha256": "ae1b3438fb7e08c23b5f03bccd5adfc430cf865d497146e27c9b5231ad4ab8eb"
+    },
+    {
+      "path": "tests/agent/preamble-budget-registry-matrix.test.ts",
+      "sha256": "95bc2b02b08c3b866a2c613165ec22ffbecfdf76232aa3b7810060a6235add8a"
+    }
+  ]
+}
