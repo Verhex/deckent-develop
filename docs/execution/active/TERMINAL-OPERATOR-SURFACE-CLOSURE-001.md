@@ -1,5 +1,23 @@
 # TERMINAL-OPERATOR-SURFACE-CLOSURE-001 — v2 dogfood yürütme
 
+### Main Native/status delivery — 2026-09-09
+
+Owner requested on-demand runtime details, then Fable handoff due remaining limit.
+Catalog/checkpoint landed `3df2f1138` (12 paths): main91/91 targeted, actual compiled
+EN/TR help38/38 and checkpoint8/8 PASS. Status landed `e7adcc04f` (6 paths):
+141/141 terminal tests PASS; full build:all exit0 with source/native/input pins stable.
+Actual WSL80x24 Native PTY: default details hidden, /status open/page/Esc/reopen,
+clean /exit0; zero full-screen/scrollback clears. Digest
+`f4403f9e5544bb25e361cb297bf6c5eac5fd21aeb875f7192bb28198d8f20a0a`.
+Earlier real local Qwen conversation + deckent_read_file succeeded; not multiworker proof.
+Evidence: `.deckent/recovery-snapshots/7099-catalog-YLr6iwUC/{proof,verify-cUNzW4pb}`.
+Own duplicate bots8959/14358 normal exact-identity stop; fresh bot153705 canonical
+start/status and host process agree. MCP reconnect NOT_VERIFIED; Windows/macOS NOT_RUN.
+7099 remains VERIFY. Open: Goal execution/admission bindings, MCP checkpoint decision
+parity, dependent multiworker and next-Goal settlement, original closure/Windows proof.
+No raw memory/credential reads, ledger/DONE mutation or inherited-dirt blanket landing.
+Handoff authority changes only with canonical COMMITTED; receiver Fable identity accepted.
+
 OUTCOME_ID: TERMINAL-OPERATOR-SURFACE-CLOSURE-001
 DOGFOOD_MODE: ON
 BASE_SHA: b68b11ddaa4fd2b23bef7a61ed253e5d0de86dfd
