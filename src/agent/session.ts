@@ -57,7 +57,12 @@ import { CONTENT_REF_TOOL_NAME } from './tools/content-ref-tool.js';
 import { createNativeBudgetState, evaluateNativeBudget, type NativeBudgetState } from './guards/recursion.js';
 import { containToolResult, renderToolResultEnvelope, type ContentWriter } from './tool-result-broker.js';
 import { createPreambleBudgeter, PreambleBudgetError, type PreambleSnapshot } from './preamble-budget.js';
-import { composeSystemPrompt } from './identity.js';
+import { composeSystemPrompt, type ComposeOptions } from './identity.js';
+import {
+  createInterimDeliverableTracker,
+  type InterimDeliverableSnapshot,
+  type InterimDeliverableTracker,
+} from './interim-deliverable.js';
 import { resolveTransportRetryPolicy } from './provider-tooluse/transport-errors.js';
 import { planReasoning, resolveAdapterReasoningControl } from './reasoning-control.js';
 import { resolveNativeAgentBudget } from '../core/execution-budget-policy.js';
@@ -361,6 +366,8 @@ export interface ContextSnapshot {
   lastCheckpointPressure?: BudgetCheckpointPressure;
   /** Boot-time exact-counter probe — honest unavailable is visible on /context. */
   measurementAuthority?: RequestMeasurementAuthorityStatus;
+  /** 7114 — interim-deliverable counters of the current (or last) turn. */
+  interimDeliverable?: InterimDeliverableSnapshot;
 }
 
 export function createAgentSession(deps: AgentSessionDeps): AgentSession {
@@ -375,6 +382,21 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   }) : undefined;
   let lastContextTrigger: ContextSnapshot['lastContextTrigger'];
   let lastCheckpointPressure: BudgetCheckpointPressure | undefined;
+  // 7114 — one tracker per turn (fresh on every send()); kept after the turn
+  // so `/context` reports the counters the last turn ended with.
+  let interimTracker: InterimDeliverableTracker | undefined;
+  const nowMs = (): number => (deps.now?.() ?? new Date()).getTime();
+  /** 7114 — the SAME compose options the loop uses, so measurement and
+   *  admission price the narration contract the request actually carries. */
+  const turnComposeOptions = (): ComposeOptions => ({
+    cwd: deps.cwd, lang: deps.lang,
+    ...(scratch ? { scratchDir: scratch.info.root } : {}),
+    ...(deps.nativeBudget ? { narration: {
+      progressNoteEveryToolCalls: contextBudget.progressNoteEveryToolCalls,
+      interimAnswerAfterToolCalls: contextBudget.interimAnswerAfterToolCalls,
+      interimAnswerAfterMs: contextBudget.interimAnswerAfterMs,
+    } } : {}),
+  });
   let mode: ApprovalMode = deps.policy.defaultMode;
   /** TERMINAL-TOOLS-008 — abort seam of the turn in flight (fresh per send()). */
   let turnAbort: AbortController | undefined;
@@ -961,8 +983,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     const model = deps.getModel?.() ?? deps.model;
     const outputCeilingTokens = await turnOutputCeilingTokens(adapter, model);
     const request: ProviderRequest = {
-      system: composeSystemPrompt({ cwd: deps.cwd, lang: deps.lang,
-        ...(scratch ? { scratchDir: scratch.info.root } : {}) }),
+      system: composeSystemPrompt(turnComposeOptions()),
       messages: [...transcript.toProviderMessages(), ...extra],
       tools: deps.getProviderToolSchemas?.() ?? deps.registry.toNativeSchemas(),
       model,
@@ -1278,6 +1299,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       claimPermissionEffect,
       // 7110 restart-loop guard — consulted only after the loop's own
       // permission/policy chain admitted this exact call.
+      ...(interimTracker ? { interimDeliverable: interimTracker } : {}),
       interceptToolCall(call) {
         if (!replayArmed) return undefined;
         // Explicit purity predicate, never tier: `deckent_call_tool` is silent
@@ -1338,6 +1360,15 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       };
       activePermissionTurn = turn;
       const attributionGeneration = requestAttributionGeneration;
+      // 7114 — fresh per-turn deliverable counters; created BEFORE the loop deps
+      // so the loop and `/context` read the same instance.
+      interimTracker = deps.nativeBudget
+        ? createInterimDeliverableTracker({
+            interimAnswerAfterToolCalls: contextBudget.interimAnswerAfterToolCalls,
+            interimAnswerAfterMs: contextBudget.interimAnswerAfterMs,
+            interimAnswerMinChars: contextBudget.interimAnswerMinChars,
+          }, nowMs)
+        : undefined;
       return runWithCheckpoints(
         normalizeTurnInput(userInput),
         turnId,
@@ -1429,6 +1460,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
           const authority = deriveMeasurementAuthority(deps.measurementAuthority, decision?.measurement);
           return authority ? { measurementAuthority: authority } : {};
         })()),
+        ...(interimTracker ? { interimDeliverable: interimTracker.snapshot() } : {}),
       };
     },
     clearLastRequestMeasurement(): void {

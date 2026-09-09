@@ -82,6 +82,16 @@ export class Transcript {
     return { status: 'appended' };
   }
 
+  /** 7114 — a host-injected user-role instruction (interim deliverable /
+   *  continue). Rides the CURRENT turn id with origin 'system' so a context
+   *  epoch and the ledger attribute it to the host, never to the user. */
+  appendHostUser(content: string): void {
+    const message: ProviderMessage = { role: 'user', content };
+    this.messages.push(message);
+    this.entries.push({ message, turnId: this.currentTurnId(), origin: 'system', contentHash: createHash('sha256').update(content).digest('hex') });
+    this.evict();
+  }
+
   appendAssistant(content: string, toolCalls: ToolCallRef[] = []): void {
     const m: ProviderMessage = { role: 'assistant', content };
     if (toolCalls.length > 0) m.toolCalls = toolCalls.map((tc) => ({ id: tc.id, name: tc.name, args: tc.args }));
@@ -118,10 +128,19 @@ export class Transcript {
 
   compactForContextEpoch(objective: string, checkpoint: string, turnId: string, lineageLimit = 8): void {
     const lineage = pairingSafeLineage(this.messages, lineageLimit);
+    // 7114 — a trailing host instruction (appendHostUser: role user, origin
+    // system) is a question the model has not answered yet; the epoch keeps it
+    // so the interim-deliverable request survives compaction on every trigger
+    // path (post-batch high-water, next-round admission, pre-batch reserve).
+    const tail = this.entries.at(-1);
+    const trailingHost = tail !== undefined && tail.message.role === 'user' && tail.origin === 'system'
+      ? [{ ...tail.message }]
+      : [];
     this.replaceForContextEpoch([
       { role: 'user', content: objective },
       { role: 'user', content: checkpoint },
       ...lineage,
+      ...trailingHost,
     ], turnId);
   }
 

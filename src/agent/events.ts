@@ -105,6 +105,22 @@ export interface BudgetCheckpointRequestEvent {
   pressure?: BudgetCheckpointPressure;
 }
 
+/** 7114 — host-enforced interim deliverable lifecycle (counts only, never
+ *  text). `required`: the loop injected the interim-answer host turn (the view
+ *  shows a localized notice); `delivered`: a visible answer of at least the
+ *  configured size landed and the counters reset; `continued`: the model
+ *  answered a request with text only and the loop appended one continue
+ *  host turn instead of ending the turn. */
+export interface InterimDeliverableEvent {
+  type: 'interim-deliverable';
+  phase: 'required' | 'delivered' | 'continued';
+  trigger?: 'tool-calls' | 'elapsed';
+  /** Tool calls executed since the last deliverable (at the moment of the event). */
+  toolCalls: number;
+  /** Milliseconds since the last deliverable (at the moment of the event). */
+  elapsedMs: number;
+}
+
 export type AgentEvent =
   | TextDeltaEvent
   | ToolProposedEvent
@@ -118,6 +134,7 @@ export type AgentEvent =
   | GenerationRecoveryEvent
   | ReasoningActivityEvent
   | BudgetCheckpointRequestEvent
+  | InterimDeliverableEvent
   | ErrorEvent
   | NoticeEvent;
 

@@ -3617,6 +3617,21 @@ const BASE_MESSAGES: MessageMap = {
     en: 'tool ran',
     tr: 'araç çalıştı',
   },
+  // 7114 TERMINAL-INTERACTION-FLOW-001 — the tool line names what ran and how
+  // long it took; the host-enforced interim deliverable and the interrupt
+  // summary say what the assistant is doing / did instead of silence.
+  'native.tool_elapsed': {
+    en: '{ms} ms',
+    tr: '{ms} ms',
+  },
+  'native.interim_deliverable_required': {
+    en: 'interim answer requested — {toolCalls} tool calls / {elapsed} s since the last visible result; the assistant now reports known so far · remaining · next step, then continues',
+    tr: 'ara yanıt istendi — son görünür sonuçtan bu yana {toolCalls} araç çağrısı / {elapsed} sn; asistan şimdi bilinen · kalan · sonraki adımı raporlayıp devam edecek',
+  },
+  'native.turn_interrupted': {
+    en: 'interrupted after {toolCalls} tool calls / {elapsed} s — the partial output above is kept',
+    tr: '{toolCalls} araç çağrısı / {elapsed} sn sonra kesildi — yukarıdaki kısmi çıktı korundu',
+  },
   // 560-005 (RCA §7) — this line used to claim "its context window may be
   // full", conflating a genuinely empty (output-side) turn with a real
   // context-window overflow (that has its own typed class, see

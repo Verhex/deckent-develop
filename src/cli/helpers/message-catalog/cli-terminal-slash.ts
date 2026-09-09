@@ -115,6 +115,9 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
   'native-context.slash.checkpoint': { en: 'checkpoint: {status}', tr: 'checkpoint: {status}' },
   'native-context.slash.high_water': { en: 'auto-compaction at {percent}% of the window', tr: 'otomatik sıkıştırma pencerenin %{percent} doluluğunda' },
   'native-context.slash.refresh_planned': { en: 'a compaction is planned for the next turn', tr: 'bir sonraki tur için sıkıştırma planlandı' },
+  // 7114 — interim-deliverable counters (session tracker; last turn's values).
+  'native-context.slash.interim_deliverable': { en: 'interim deliverable: {calls}/{callsLimit} tool calls · {elapsed}/{elapsedLimit} s since the last one · delivered {delivered} · host-requested {requested}', tr: 'ara teslimat: son teslimattan bu yana {calls}/{callsLimit} araç çağrısı · {elapsed}/{elapsedLimit} sn · teslim edilen {delivered} · host isteği {requested}' },
+  'native-context.slash.interim_deliverable_pending': { en: 'an interim answer is outstanding (host-requested, not yet delivered)', tr: 'bekleyen bir ara yanıt var (host istedi, henüz teslim edilmedi)' },
   'native-context.slash.unknown': { en: 'unknown', tr: 'bilinmiyor' },
   'native-context.slash.unavailable': { en: '/context is not available on this engine (legacy loop) — no context authority to read', tr: '/context bu motorda yok (eski döngü) — okunacak bağlam otoritesi yok' },
   'native-context.compact.compacted': { en: 'context compacted — epoch {epoch}, checkpoint saved', tr: 'bağlam sıkıştırıldı — epoch {epoch}, checkpoint kaydedildi' },

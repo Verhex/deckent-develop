@@ -43,6 +43,14 @@ function defaultSoul(): string {
   return readIfExists(join(here, 'assets', 'soul.default.md')) ?? 'Sen deckent: bağımsız bir AI agent\'sın.';
 }
 
+/** 7114 — config-resolved narration thresholds the contract cites
+ *  (`execution_budget.native_agent.*`). Numbers only: the wording is owned here. */
+export interface NarrationPolicy {
+  readonly progressNoteEveryToolCalls: number;
+  readonly interimAnswerAfterToolCalls: number;
+  readonly interimAnswerAfterMs: number;
+}
+
 export interface ComposeOptions {
   cwd: string;
   /** Measured session composition; immutable safety text is never transformed. */
@@ -51,6 +59,38 @@ export interface ComposeOptions {
   /** Session scratchpad root (`ScratchStoreInfo.root`). Present → the mechanism
    *  section below is injected; absent → the prompt is byte-identical to before. */
   scratchDir?: string;
+  /** 7114 — present → the narration contract rides right after the immutable
+   *  core (never transformable); absent → byte-identical to the pre-7114 prompt. */
+  narration?: NarrationPolicy;
+}
+
+/**
+ * 7114 — narration contract (TERMINAL-INTERACTION-FLOW-001). Part of the
+ * non-overridable core block: a soul/knowledge file cannot remove it. Wording
+ * is deliberately tight — it rides every request and 7106 prices the
+ * preamble. Localized because it sits in the user-visible answer register
+ * (the model narrates in the session language); the thresholds are the
+ * config-resolved numbers the host actually enforces, so the contract never
+ * promises a cadence the runtime does not keep.
+ */
+export function narrationContractSection(policy: NarrationPolicy, lang?: 'en' | 'tr'): string {
+  const seconds = Math.max(1, Math.round(policy.interimAnswerAfterMs / 1000));
+  const n = String(policy.progressNoteEveryToolCalls);
+  const m = String(policy.interimAnswerAfterToolCalls);
+  const s = String(seconds);
+  return lang === 'en'
+    ? [
+        'NARRATION (immutable): never work silently.',
+        'Before each tool batch write one short line: what you are about to do and why.',
+        `After every ${n} tool calls write a 1–3 line interim finding.`,
+        `Never pass ${m} tool calls or ${s} s without an interim structured answer (known so far / remaining / next step), then continue.`,
+      ].join(' ')
+    : [
+        'ANLATIM (değiştirilemez): asla sessiz çalışma.',
+        'Her araç grubundan önce tek kısa satır yaz: ne yapacaksın ve neden.',
+        `Her ${n} araç çağrısında 1–3 satırlık ara bulgu yaz.`,
+        `${m} araç çağrısını veya ${s} sn'yi ara yapılandırılmış yanıt (şimdiye kadar bilinen / kalan / sonraki adım) vermeden asla geçme, sonra devam et.`,
+      ].join(' ');
 }
 
 /**
@@ -71,13 +111,15 @@ export function scratchpadSection(scratchDir: string): string {
 }
 
 /**
- * Compose the full system prompt. Order: immutable core → persona (soul.md or
- * default) → project knowledge (DECKENT.md, IDENTITY.md). The immutable core is
- * always first and always present.
+ * Compose the full system prompt. Order: immutable core → narration contract
+ * (7114, when a policy is supplied) → scratchpad mechanism → persona (soul.md
+ * or default) → project knowledge (DECKENT.md, IDENTITY.md). The immutable
+ * core is always first and always present.
  */
 export function composeSystemPrompt(opts: ComposeOptions): string {
   const isEnglish = opts.lang === 'en';
   const parts: string[] = [isEnglish ? IMMUTABLE_CORE_EN : IMMUTABLE_CORE];
+  if (opts.narration !== undefined) parts.push(narrationContractSection(opts.narration, opts.lang));
   if (opts.scratchDir !== undefined && opts.scratchDir !== '') parts.push(scratchpadSection(opts.scratchDir));
 
   const soul = readIfExists(join(opts.cwd, '.deckent', 'soul.md')) ?? defaultSoul();

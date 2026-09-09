@@ -62,6 +62,12 @@ import type {
 import { classifyNativeToolApproval } from './native-tool-approval.js';
 import type { NativeToolApprovalClassification } from './tools/types.js';
 import { ALL_APPROVAL_RISKS, ALL_APPROVAL_SCOPES } from '../core/approval-contract.js';
+import {
+  INTERIM_CONTINUE_INSTRUCTION,
+  INTERIM_DELIVERABLE_INSTRUCTION,
+  type InterimDeliverableTracker,
+} from './interim-deliverable.js';
+import type { ComposeOptions } from './identity.js';
 
 const MAX_OUTPUT_CONTINUATIONS = 2;
 
@@ -199,6 +205,14 @@ export interface LoopDeps {
    * a denied/held call never reaches it.
    */
   interceptToolCall?: (call: { readonly id: string; readonly name: string; readonly args: Record<string, unknown> }) => ToolResult | undefined;
+  /**
+   * 7114 — per-turn interim-deliverable tracker (session-owned so `/context`
+   * can read it). Present → after each executed tool batch the loop asks it
+   * whether the host owes an interim structured answer, injects the host turn
+   * and lets the model answer before continuing. Absent → byte-identical
+   * pre-7114 behavior (legacy callers, no native budget).
+   */
+  interimDeliverable?: InterimDeliverableTracker;
 }
 
 /** Best-effort primary resource for permission glob matching. Exported for the
@@ -220,11 +234,22 @@ export function writeTargets(args: Record<string, unknown>): string[] {
 
 export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, userInput: string): AsyncIterable<AgentEvent> {
   transcript.appendUser(userInput);
-  let system = composeSystemPrompt({
+  // 7114 — ONE compose authority for every system-prompt composition of this
+  // turn (first prepare, exhaustion re-prepare): the narration contract cites
+  // the config-resolved thresholds the host enforces, so the persona and the
+  // runtime never disagree. Absent native budget → legacy prompt, byte-identical.
+  const composeOptions: ComposeOptions = {
     cwd: deps.cwd,
     lang: deps.lang,
-    ...(deps.scratchDir !== undefined ? { scratchDir: deps.scratchDir } : {}),
-  });
+    ...(deps.scratchDir !== undefined && deps.scratchDir !== '' ? { scratchDir: deps.scratchDir } : {}),
+    ...(deps.nativeBudget ? { narration: {
+      progressNoteEveryToolCalls: deps.nativeBudget.progressNoteEveryToolCalls ?? DEFAULT_NATIVE_AGENT_BUDGET.progressNoteEveryToolCalls,
+      interimAnswerAfterToolCalls: deps.nativeBudget.interimAnswerAfterToolCalls ?? DEFAULT_NATIVE_AGENT_BUDGET.interimAnswerAfterToolCalls,
+      interimAnswerAfterMs: deps.nativeBudget.interimAnswerAfterMs ?? DEFAULT_NATIVE_AGENT_BUDGET.interimAnswerAfterMs,
+    } } : {}),
+  };
+  let system = composeSystemPrompt(composeOptions);
+  const interim = deps.interimDeliverable;
   let iterations = 0;
   let lastPressureTranscript: string | undefined;
   const budgetState = deps.nativeBudget
@@ -296,8 +321,7 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     if (deps.preambleBudgeter && rawBudget !== undefined && rawBudget > 0) {
       try {
         const prepared = await deps.preambleBudgeter.prepare({
-          compose: {cwd: deps.cwd, lang: deps.lang,
-            ...(deps.scratchDir ? {scratchDir: deps.scratchDir} : {})},
+          compose: composeOptions,
           tools: toolSchemas, adapter, model, window: rawBudget,
           outputCeilingTokens, safetyReserveTokens: contextSafetyReserveTokens,
         });
@@ -472,6 +496,11 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       ...(transportRetry ? { transportRetry } : {}),
     };
     let assistantText = '';
+    // 7114 — exactly the text this round already PUT ON THE USER'S SCREEN
+    // (every yielded text-delta, continuation de-dup included). On a clean
+    // round it equals `assistantText`; on an interrupt it is the only carrier,
+    // because the segment fold below is short-circuited by the cancel check.
+    let streamedText = '';
     let calls: ProviderToolCall[] = [];
     let continuationIndex = 0;
     let continuationMessages = messages;
@@ -507,7 +536,7 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
           segmentText += ev.text;
           // Preserve ordinary streaming order. Continuation segments alone are
           // buffered until their overlap with already-visible text is known.
-          if (continuationIndex === 0) yield { type: 'text-delta', text: ev.text };
+          if (continuationIndex === 0) { streamedText += ev.text; yield { type: 'text-delta', text: ev.text }; }
         }
         else if (ev.type === 'reasoning-activity') {
           hiddenReasoningObserved = true;
@@ -548,6 +577,7 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
           : removeRepeatedPrefix(assistantText, segmentText);
         assistantText += novelText;
         if (continuationIndex > 0 && novelText !== '') {
+          streamedText += novelText;
           yield { type: 'text-delta', text: novelText };
         }
 
@@ -604,8 +634,7 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
             if (deps.preambleBudgeter && rawBudget !== undefined && rawBudget > 0) {
               try {
                 const prepared = await deps.preambleBudgeter.prepare({
-                  compose: {cwd: deps.cwd, lang: deps.lang,
-                    ...(deps.scratchDir ? {scratchDir: deps.scratchDir} : {})},
+                  compose: composeOptions,
                   tools: deps.getProviderToolSchemas?.() ?? deps.registry.toNativeSchemas(),
                   adapter, model, window: rawBudget,
                   outputCeilingTokens, safetyReserveTokens: contextSafetyReserveTokens,
@@ -688,6 +717,13 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       // TERMINAL-TOOLS-008 — an aborted stream is the user's own cancel, not a
       // provider failure: end the turn honestly, never as an 'error' event.
       if (deps.isCancelled?.() || (e instanceof Error && e.name === 'AbortError')) {
+        // 7114 — interrupt retention. Text the user ALREADY SAW streamed is
+        // kept in the transcript, so the next turn continues from the partial
+        // narration instead of pretending the round never happened (the
+        // measured incident: interrupt after 665 s discarded everything).
+        // The round's proposed tool calls are deliberately NOT carried: none
+        // executed, and an unpaired tool_use id is rejected on the next send.
+        if (streamedText !== '') transcript.appendAssistant(streamedText);
         yield { type: 'turn-end' };
         return;
       }
@@ -727,9 +763,26 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     }
 
     // The stream was interrupted mid-turn: nothing proposed this round was ever
-    // executed, so committing it (transcript.appendAssistant below) would leave
-    // orphan tool_use ids with no matching tool_result — reject before that happens.
-    if (deps.isCancelled?.()) { yield { type: 'turn-end' }; return; }
+    // executed, so committing the tool_use ids (transcript.appendAssistant with
+    // `calls` below) would leave orphans with no matching tool_result — reject
+    // those before that happens. 7114 — the visible text is a different matter:
+    // the user already read it, so it is retained (text only, no tool calls).
+    if (deps.isCancelled?.()) {
+      if (streamedText !== '') transcript.appendAssistant(streamedText);
+      yield { type: 'turn-end' };
+      return;
+    }
+
+    // 7114 — a visible answer of at least the configured size is a deliverable:
+    // the counters reset whether the model volunteered it (narration contract)
+    // or the host asked for it (interim turn below).
+    if (interim) {
+      interim.observeAssistantText(assistantText);
+      if (interim.settleRound()) {
+        const snap = interim.snapshot();
+        yield { type: 'interim-deliverable', phase: 'delivered', toolCalls: snap.toolCallsSinceDeliverable, elapsedMs: snap.elapsedMsSinceDeliverable };
+      }
+    }
 
     // Skip a truly-empty assistant turn (no text, no tool calls) — appending
     // `{role:'assistant', content:''}` would replay to the provider next send
@@ -782,6 +835,17 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       transcript.appendAssistant(assistantText, calls.map((c) => ({ id: c.id, name: c.name, args: c.args })));
     }
     if (calls.length === 0) {
+      // 7114 — the model answered the host's interim request with text only
+      // (the measured incident's "shall I continue?" shape). Exactly one
+      // continue host turn per request, then the turn proceeds autonomously;
+      // a second text-only answer ends the turn normally. Bounded by the
+      // existing round/tool/wall budgets like every other round.
+      if (assistantText !== '' && interim?.consumeContinuation()) {
+        transcript.appendHostUser(INTERIM_CONTINUE_INSTRUCTION);
+        const snap = interim.snapshot();
+        yield { type: 'interim-deliverable', phase: 'continued', toolCalls: snap.toolCallsSinceDeliverable, elapsedMs: snap.elapsedMsSinceDeliverable };
+        continue;
+      }
       // Empty turn (no text, no tool calls): a healthy model never does this —
       // it is the signature of a full context window (or a broken backend).
       // Fail honestly instead of closing the turn as if it succeeded.
@@ -1047,6 +1111,23 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       for (const call of calls.slice(cancelledAt)) transcript.appendToolResult(call.id, '[cancelled]');
       yield { type: 'turn-end' };
       return;
+    }
+    // 7114 — host-enforced interim deliverable. Evaluated AFTER the batch so
+    // every proposed call is paired in the transcript before the host speaks;
+    // the instruction rides as a user-role host turn the next request carries,
+    // the model's answer streams live (text-delta), and the counters reset
+    // through settleRound() above once that answer lands.
+    if (interim) {
+      interim.observeToolCalls(calls.length);
+      const requirement = interim.evaluate();
+      if (requirement) {
+        interim.markRequested(requirement.trigger);
+        yield {
+          type: 'interim-deliverable', phase: 'required', trigger: requirement.trigger,
+          toolCalls: requirement.toolCallsSinceDeliverable, elapsedMs: requirement.elapsedMsSinceDeliverable,
+        };
+        transcript.appendHostUser(INTERIM_DELIVERABLE_INSTRUCTION);
+      }
     }
     if (deps.nativeBudget && rawBudget !== undefined && rawBudget > 0) {
       const highWater = deps.nativeBudget.contextHighWaterRatio ?? DEFAULT_NATIVE_AGENT_BUDGET.contextHighWaterRatio;

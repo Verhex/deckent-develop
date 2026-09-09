@@ -983,6 +983,18 @@ export interface NativeAgentBudgetConfig {
   checkpointReplayCacheEntries?: number;
   /** 7110 — window share the rendered checkpoint trail may occupy in the epoch opening; ratio in (0,1). */
   checkpointTrailShareOfContext?: number;
+  /** 7114 — narration contract: interim finding owed after this many tool calls
+   *  (<= interimAnswerAfterToolCalls). Positive integer; default 5. */
+  progressNoteEveryToolCalls?: number;
+  /** 7114 — host-enforced interim deliverable after this many tool calls since
+   *  the last deliverable (< maxToolCalls). Positive integer; default 12. */
+  interimAnswerAfterToolCalls?: number;
+  /** 7114 — host-enforced interim deliverable after this many milliseconds since
+   *  the last deliverable (< maxWallTimeMs). Positive integer; default 90000. */
+  interimAnswerAfterMs?: number;
+  /** 7114 — visible assistant characters that count as a deliverable and reset
+   *  the counters. Positive integer; default 200. */
+  interimAnswerMinChars?: number;
 }
 
 /**

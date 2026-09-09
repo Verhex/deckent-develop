@@ -63,6 +63,18 @@ export interface ResolvedNativeAgentBudget {
    *  half of `minTranscriptShareOfContext`); the full trail lives only on disk
    *  / in the content store. Strictly between 0 and 1. */
   readonly checkpointTrailShareOfContext: number;
+  /** 7114 — narration contract: after this many tool calls the model owes a
+   *  1–3 line interim finding (persona text; not host-enforced). */
+  readonly progressNoteEveryToolCalls: number;
+  /** 7114 — host-enforced interim deliverable: tool calls executed since the
+   *  last deliverable before the host injects the interim-answer turn. */
+  readonly interimAnswerAfterToolCalls: number;
+  /** 7114 — wall-clock milliseconds since the last deliverable before the host
+   *  injects the interim-answer turn. */
+  readonly interimAnswerAfterMs: number;
+  /** 7114 — visible assistant characters that count as a deliverable (the
+   *  counters reset only when the model produced at least this much text). */
+  readonly interimAnswerMinChars: number;
 }
 
 export type NativeReasoningMode = 'auto' | 'off' | 'on';
@@ -119,6 +131,14 @@ export const DEFAULT_NATIVE_AGENT_BUDGET: ResolvedNativeAgentBudget = Object.fre
   reasoningProbeTimeoutMs: 2_000,
   checkpointReplayCacheEntries: 64,
   checkpointTrailShareOfContext: 0.03,
+  // 7114 (owner incident 2026-09-09): ~40 silent tool calls over 665 s with no
+  // visible text. A human does not wait ten minutes without output — the
+  // persona narrates every batch, notes progress every N calls, and the host
+  // forces an interim structured answer at the call/wall-clock bound below.
+  progressNoteEveryToolCalls: 5,
+  interimAnswerAfterToolCalls: 12,
+  interimAnswerAfterMs: 90_000,
+  interimAnswerMinChars: 200,
 });
 
 const NATIVE_AGENT_BUDGET_FIELDS = Object.keys(DEFAULT_NATIVE_AGENT_BUDGET) as
@@ -212,6 +232,14 @@ export function resolveNativeAgentBudget(input: {
   if ((merged.maxToolResultShareOfContext as number) > (merged.maxTurnToolResultShareOfContext as number)
     || (merged.maxTurnToolResultShareOfContext as number) >= (merged.contextHighWaterRatio as number)) {
     throw new ExecutionBudgetPolicyError('execution_budget.native_agent requires single tool share <= retained turn share < context high-water ratio');
+  }
+  // 7114: the persona progress-note cadence can never be looser than the
+  // host-enforced deliverable bound (the note is the cheap early signal, the
+  // deliverable is the enforced one). A session cap (maxToolCalls /
+  // maxWallTimeMs) tighter than the deliverable bound is legitimate: the
+  // budget then terminates first and the deliverable simply never fires.
+  if ((merged.progressNoteEveryToolCalls as number) > (merged.interimAnswerAfterToolCalls as number)) {
+    throw new ExecutionBudgetPolicyError('execution_budget.native_agent requires progressNoteEveryToolCalls <= interimAnswerAfterToolCalls');
   }
   return Object.freeze(merged) as unknown as ResolvedNativeAgentBudget;
 }

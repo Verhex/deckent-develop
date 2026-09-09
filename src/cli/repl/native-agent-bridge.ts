@@ -18,6 +18,7 @@ import {
   type NativePermissionDecisionCallback,
 } from '../../agent/session.js';
 import { approximateReasoningTokens } from '../../agent/reasoning-control.js';
+import { describeToolTarget, toolElapsedMs } from './tool-target.js';
 import type { CheckpointTrailLabels } from '../../agent/checkpoint-trail.js';
 import { CONTENT_REF_CODE_PREFIX, CONTENT_REF_REASON_CODES } from '../../agent/tools/content-ref-tool.js';
 import type { RequestMeasurementEvent } from '../../agent/events.js';
@@ -267,6 +268,9 @@ export interface NativeEngineDeps {
   usdPerMillionTokens?: number;
   /** Localizer (run.tsx: (key) => getMessage(key, lang)). Defaults to identity. */
   t?: (key: string) => string;
+  /** 7114 — wall clock for tool-line elapsed and the interrupt summary
+   *  (milliseconds). Injected for fake-clock tests; default `Date.now`. */
+  now?: () => number;
   /**
    * Called with the full cross-turn transcript AND this turn's accounting after
    * each completed turn. 7089 (NATIVE-SESSION-LEDGER) unified what used to be
@@ -548,6 +552,11 @@ const CADENCE_CHECKPOINT_KEY = 'native-context.checkpoint_cadence';
 // 562-003 — REFERENCE_DESCRIPTOR fallback family: a Task-1 (562-001) descriptor
 // fallback is INFORMATION about what happened this turn, never a rejection.
 const REFERENCE_DESCRIPTOR_FALLBACK_KEY = 'native.reference-descriptor-fallback';
+
+/** 7114 — catalog keys of the interaction-flow lines (bridge-owned, EN+TR). */
+const INTERIM_DELIVERABLE_REQUIRED_KEY = 'native.interim_deliverable_required';
+const TURN_INTERRUPTED_KEY = 'native.turn_interrupted';
+const TOOL_ELAPSED_KEY = 'native.tool_elapsed';
 
 const NATIVE_AGENT_SIGNAL_KEYS = new Set([
   'native-budget.rounds-exhausted',
@@ -954,6 +963,9 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     ...(deps.contentStore ? { contentStore: deps.contentStore } : {}),
     ...(deps.measurementAuthority ? { measurementAuthority: deps.measurementAuthority } : {}),
     checkpointLabels: buildCheckpointTrailLabels(t),
+    // 7114 — one clock: the session's interim-deliverable tracker and this
+    // bridge's elapsed/interrupt lines read the same injected source.
+    ...(deps.now ? { now: (): Date => new Date(deps.now!()) } : {}),
   });
 
   // born-607 CALLTOOL-EXEC-WIRE: arm `deckent_call_tool` with the engine-parity
@@ -1014,11 +1026,22 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
    *  path; the bg-turn wrapper below runs its drained turns sequentially). */
   let turnsInFlight = 0;
   let permissionWaitAbort: AbortController | undefined;
+  /** 7114 — set by cancelTurn() for the turn in flight; the turn's closing
+   *  line then reports "interrupted after N tool calls / M s" honestly. */
+  let cancelRequestedForTurn = false;
+  const nowMs = (): number => deps.now?.() ?? Date.now();
 
   const runTurnInner: ReplEngine = async (input, cbs) => {
     permissionWaitAbort = new AbortController();
+    cancelRequestedForTurn = false;
+    const turnStartedMs = nowMs();
+    let toolResultsThisTurn = 0;
     let inputTokens = 0;
     let outputTokens = 0;
+    // 7114 — tool-line enrichment: the args the model proposed (bounded,
+    // redacted target) and the executing start per call id (elapsed ms).
+    const proposedArgs = new Map<string, Record<string, unknown>>();
+    const executingSince = new Map<string, number>();
     // 560-004: the three carriers are separated HERE, at the last seam before the
     // session — the live turn still rides the expanded payload, but a context
     // epoch now compacts onto the raw intent plus reference identity.
@@ -1078,6 +1101,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
         }
         case 'tool-proposed':
           roundTracker.observeProposed({ id: ev.id, tool: ev.tool, args: ev.args });
+          proposedArgs.set(ev.id, ev.args);
           break;
         case 'permission-request': {
           roundTracker.observeExecution();
@@ -1102,10 +1126,21 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
             cbs.output(`\n${localizeNativeAgentSignal(t, ev.code, ev.code)}\n`);
           }
           const readOnly = readOnlyMarker.consumeResult(ev);
+          toolResultsThisTurn++;
+          // 7114 — the line names WHAT ran (bounded, secret-free target) and
+          // how long it took; both are data the engine already had.
+          const elapsedMs = toolElapsedMs(executingSince.get(ev.id), nowMs());
+          executingSince.delete(ev.id);
+          const target = describeToolTarget(ev.tool, proposedArgs.get(ev.id));
+          proposedArgs.delete(ev.id);
+          const notes = [
+            ...(readOnly ? [t('native.tool_read_only_marker')] : []),
+            ...(elapsedMs !== undefined ? [t(TOOL_ELAPSED_KEY).replace('{ms}', String(elapsedMs))] : []),
+          ];
           deps.toolSink({
             verb: `${ev.tool} — ${t('native.tool_ran')}`,
-            target: '',
-            ...(readOnly ? { note: t('native.tool_read_only_marker') } : {}),
+            target,
+            ...(notes.length > 0 ? { note: notes.join(' · ') } : {}),
             ...(ev.ok ? {} : { failed: true }),
           });
           break;
@@ -1116,6 +1151,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           clearActiveTool();
           clearReasoningIndicator();
           activeToolId = ev.id;
+          executingSince.set(ev.id, nowMs());
           cbs.onToolActivity?.({
             kind: 'executing', id: ev.id, tool: ev.tool,
             label: t('tui.native_tool_executing'),
@@ -1230,6 +1266,27 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           if (offer) cbs.output(`\n[${offer}]\n`);
           break;
         }
+        case 'interim-deliverable': {
+          // 7114 — the host asked for an interim structured answer (the
+          // "Ne durumdasın?" effect without the user typing it). The model's
+          // answer streams next through the ordinary text-delta path; this
+          // line tells the user WHY the assistant is about to report.
+          clearReasoningIndicator();
+          if (ev.phase === 'required') {
+            cbs.output(`\n[${t(INTERIM_DELIVERABLE_REQUIRED_KEY)
+              .replace('{toolCalls}', String(ev.toolCalls))
+              .replace('{elapsed}', String(Math.round(ev.elapsedMs / 1000)))}]\n`);
+          }
+          // Privacy-safe audit: phase, trigger and counters only — never text.
+          writeAuditEvent(deps.cwd, NATIVE_AGENT_AUDIT_PARTITION, {
+            tenantId: deps.scratch?.tenantId ?? 'local',
+            actor: 'native-agent',
+            action: `interim-deliverable.${ev.phase}`,
+            target: deps.scratch?.sessionId ?? 'session',
+            metadata: { ...(ev.trigger ? { trigger: ev.trigger } : {}), toolCalls: ev.toolCalls, elapsedMs: ev.elapsedMs },
+          });
+          break;
+        }
         case 'notice':
           // Honest degradation signal (truncated / context-compacted): visible
           // but non-fatal — silence here is what made a full context window
@@ -1259,6 +1316,15 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
         }
       }
     } finally { clearActiveTool(); clearReasoningIndicator(); }
+    // 7114 — an interrupted turn closes with what actually happened. Rides the
+    // same output stream as the streamed text, so the partial narration and
+    // the last interim deliverable stay above it in order (never discarded).
+    if (cancelRequestedForTurn) {
+      cancelRequestedForTurn = false;
+      cbs.output(`\n[${t(TURN_INTERRUPTED_KEY)
+        .replace('{toolCalls}', String(toolResultsThisTurn))
+        .replace('{elapsed}', String(Math.max(0, Math.round((nowMs() - turnStartedMs) / 1000))))}]\n`);
+    }
     cbs.onTurnEnd({ inputTokens, outputTokens });
     // 7089 — ONE seam: the same accumulated counters `onTurnEnd` just reported
     // now ride into the record layer, so usage reaches disk instead of dying at
@@ -1376,6 +1442,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   // TERMINAL-TOOLS-008 — see the ReplEngine.cancelTurn doc comment above.
   engine.cancelTurn = () => {
     if (turnsInFlight === 0) return false;
+    cancelRequestedForTurn = true;
     permissionWaitAbort?.abort();
     session.cancel();
     return true;

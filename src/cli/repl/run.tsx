@@ -856,6 +856,9 @@ export interface ContextSlashLabels extends NativeRequestMetricLabels {
   measurementReasonFailed?: string;
   highWater: string;      // "auto-compaction at {percent}% of the window"
   refreshPlanned: string; // "a compaction is planned for the next turn"
+  /** 7114 — interim-deliverable counters; optional so older label sets still type. */
+  interimDeliverable?: string;
+  interimDeliverablePending?: string;
   unknown: string;        // "unknown"
   unavailable: string;    // "/context is not available on this engine"
   compacted: string;      // "context compacted — epoch {epoch}, checkpoint saved"
@@ -897,6 +900,8 @@ export function buildContextSlashLabels(t: (key: string) => string): ContextSlas
     },
     highWater: t('native-context.slash.high_water'),
     refreshPlanned: t('native-context.slash.refresh_planned'),
+    interimDeliverable: t('native-context.slash.interim_deliverable'),
+    interimDeliverablePending: t('native-context.slash.interim_deliverable_pending'),
     unknown: t('native-context.slash.unknown'),
     unavailable: t('native-context.slash.unavailable'),
     compacted: t('native-context.compact.compacted'),
@@ -981,6 +986,18 @@ export function formatContextSnapshot(snapshot: ContextSnapshot, labels: Context
     lines.push(`  ${labels.measurementAuthority.replace('{state}', stateLabel).replace('{reason}', reasonSuffix)}`);
   }
   if (snapshot.refreshPlanned) lines.push(`  ${labels.refreshPlanned}`);
+  // 7114 — what the host-enforced interim deliverable currently sees.
+  if (snapshot.interimDeliverable && labels.interimDeliverable) {
+    const interim = snapshot.interimDeliverable;
+    lines.push(`  ${labels.interimDeliverable
+      .replace('{calls}', String(interim.toolCallsSinceDeliverable))
+      .replace('{callsLimit}', String(interim.toolCallsLimit))
+      .replace('{elapsed}', String(Math.round(interim.elapsedMsSinceDeliverable / 1000)))
+      .replace('{elapsedLimit}', String(Math.round(interim.elapsedMsLimit / 1000)))
+      .replace('{delivered}', String(interim.delivered))
+      .replace('{requested}', String(interim.requested))}`);
+    if (interim.pending && labels.interimDeliverablePending) lines.push(`  ${labels.interimDeliverablePending}`);
+  }
   return lines.join('\n');
 }
 

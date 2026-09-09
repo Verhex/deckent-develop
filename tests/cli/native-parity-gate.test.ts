@@ -511,7 +511,8 @@ describe('NATIVE-M5-GATE — 2. tool-call → confirm → result', () => {
     // The denial marker fed back to the model as the tool-result content differs — documented.
     const legacyToolResult = legacy.transcript.find((m) => m.role === 'tool');
     expect(legacyToolResult?.content).toBe('[deckent-denied] deckent_write_file');
-    expect(native.toolSinkCalls).toEqual([{ verb: expect.stringContaining('writer'), target: '', failed: true }]);
+    // 7114 — the tool line now names the bounded target the model proposed.
+    expect(native.toolSinkCalls).toEqual([{ verb: expect.stringContaining('writer'), target: 'notes.md', failed: true }]);
   });
 });
 

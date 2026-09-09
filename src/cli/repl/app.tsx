@@ -1747,9 +1747,12 @@ function TurnView({ turn, hyperlinks }: { turn: Turn; hyperlinks: boolean }): Re
     // Denied/errored action: honest "✗ verb target" with NO success delta —
     // never let a blocked write look like it landed (REPL-TOOL-DEBT-1).
     if (failed) {
+      // 7114 — a failed line carries the same glanceable detail as a successful
+      // one (target + elapsed/read-only note); dropping `note` here used to hide
+      // how long a denied or errored call actually cost.
       return (
         <Box marginTop={1}>
-          <Text {...palette.muted}><Text {...palette.error}>{`${glyphs.failure} `}</Text>{verb}<Text {...palette.muted}> {target}</Text></Text>
+          <Text {...palette.muted}><Text {...palette.error}>{`${glyphs.failure} `}</Text>{verb}<Text {...palette.muted}> {target}</Text>{note !== undefined ? <Text {...palette.muted}>{` ${glyphs.separator} ${note}`}</Text> : null}</Text>
         </Box>
       );
     }

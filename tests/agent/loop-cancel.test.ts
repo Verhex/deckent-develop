@@ -66,10 +66,54 @@ describe('runAgentTurn — cancel() interrupt + orphan tool_use', () => {
     expect(evs.some((e) => e.type === 'tool-proposed')).toBe(false);
     expect(evs.some((e) => e.type === 'tool-executing')).toBe(false);
 
-    // The interrupted turn never committed an assistant message — nothing to orphan.
+    // 7114 interrupt retention — the text the user already saw IS committed
+    // (previously the whole round was discarded); the tool call proposed after
+    // the cancel is not, so there is still nothing to orphan.
     const messages = t.toProviderMessages();
-    expect(messages.some((m) => m.role === 'assistant')).toBe(false);
+    const assistant = messages.filter((m) => m.role === 'assistant');
+    expect(assistant).toHaveLength(1);
+    expect(assistant[0]!.content).toBe('partial');
+    expect(assistant[0]!.toolCalls).toBeUndefined();
     expectNoOrphanToolUse(messages);
+  });
+
+  it('7114: an AbortError thrown mid-stream retains the streamed narration, text-only', async () => {
+    // The Esc path the bridge actually produces: the signal aborts the fetch, so
+    // the adapter's generator throws AbortError on the very next pull — the
+    // stream loop's own cancel check never gets a turn.
+    const adapter: ProviderAdapter = {
+      name: 'abort-mid-stream',
+      async *send(): AsyncIterable<ProviderEvent> {
+        yield { type: 'text-delta', text: 'Reading the plan to map its sections.' };
+        throw new DOMException('The operation was aborted', 'AbortError');
+      },
+    };
+    const t = new Transcript();
+    const evs = await drain(runAgentTurn(baseDeps({ adapter }), t, 'go'));
+
+    expect(evs.at(-1)).toEqual({ type: 'turn-end' });
+    expect(evs.some((e) => e.type === 'error')).toBe(false);
+    const messages = t.toProviderMessages();
+    const assistant = messages.filter((m) => m.role === 'assistant');
+    expect(assistant).toHaveLength(1);
+    expect(assistant[0]!.content).toBe('Reading the plan to map its sections.');
+    expect(assistant[0]!.toolCalls).toBeUndefined();
+    expectNoOrphanToolUse(messages);
+  });
+
+  it('7114: an interrupt with nothing streamed commits no empty assistant message', async () => {
+    const adapter: ProviderAdapter = {
+      name: 'abort-before-text',
+      async *send(): AsyncIterable<ProviderEvent> {
+        throw new DOMException('The operation was aborted', 'AbortError');
+        // eslint-disable-next-line no-unreachable
+        yield { type: 'done' };
+      },
+    };
+    const t = new Transcript();
+    const evs = await drain(runAgentTurn(baseDeps({ adapter }), t, 'go'));
+    expect(evs.at(-1)).toEqual({ type: 'turn-end' });
+    expect(t.toProviderMessages().some((m) => m.role === 'assistant')).toBe(false);
   });
 
   it('the next turn after a mid-stream cancel is clean (no leftover state breaks the following provider call)', async () => {

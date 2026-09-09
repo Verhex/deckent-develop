@@ -8,6 +8,7 @@ import { createSessionContentStore } from '../../src/agent/tool-result-broker.js
 import { ToolRegistry } from '../../src/agent/tools/registry.js';
 import { SAFE_DEFAULT_POLICY } from '../../src/agent/permission-policy.js';
 import { resolveNativeAgentBudget } from '../../src/core/execution-budget-policy.js';
+import { INTERIM_CONTINUE_INSTRUCTION, INTERIM_DELIVERABLE_INSTRUCTION } from '../../src/agent/interim-deliverable.js';
 import type { ProviderAdapter, ProviderEvent, ProviderMessage, ProviderRequest, RequestMeasurement } from '../../src/agent/provider-tooluse/types.js';
 import { providerRequestWireUtf8Bytes } from '../../src/agent/context-budget.js';
 
@@ -421,8 +422,15 @@ describe('large completed batch survives an automatic context epoch', () => {
       expect(events.some(event => event.type === 'error')).toBe(false);
       expect(handlerCalls).toBe(24);
       expect(checkpointCalls).toBe(1);
-      expect(normalRequests).toHaveLength(2);
+      // 7114 — a 24-call silent batch is exactly the measured incident shape:
+      // after the batch the host injects the interim-deliverable turn (request
+      // 2 carries it), the fixture answers with text only, so ONE continue
+      // host turn follows (request 3) and the turn ends. Still no re-execution.
+      expect(normalRequests).toHaveLength(3);
+      expect(normalRequests[1]!.messages.at(-1)).toEqual({ role: 'user', content: INTERIM_DELIVERABLE_INSTRUCTION });
+      expect(normalRequests[2]!.messages.at(-1)).toEqual({ role: 'user', content: INTERIM_CONTINUE_INSTRUCTION });
       expect((await session.contextSnapshot()).epoch).toBe(2);
+      expect((await session.contextSnapshot()).interimDeliverable).toMatchObject({ requested: 1, lastTrigger: 'tool-calls' });
       const resumed = normalRequests[1]!.messages;
       const owners = resumed.filter(message => message.role === 'assistant' && message.toolCalls?.length);
       expect(owners).toHaveLength(1);
