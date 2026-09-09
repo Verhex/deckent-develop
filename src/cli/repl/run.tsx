@@ -815,6 +815,8 @@ export interface ContextSlashLabels extends NativeRequestMetricLabels {
   epoch: string;          // "epoch: {epoch}"
   messages: string;       // "messages: {messages} · checkpoint preamble: {preamble}"
   checkpoint: string;     // "checkpoint: {status}"
+  contextTrigger?: string;
+  contextTriggers?: Record<NonNullable<ContextSnapshot['lastContextTrigger']>, string>;
   highWater: string;      // "auto-compaction at {percent}% of the window"
   refreshPlanned: string; // "a compaction is planned for the next turn"
   unknown: string;        // "unknown"
@@ -833,6 +835,14 @@ export function buildContextSlashLabels(t: (key: string) => string): ContextSlas
     epoch: t('native-context.slash.epoch'),
     messages: t('native-context.slash.messages'),
     checkpoint: t('native-context.slash.checkpoint'),
+    contextTrigger: t('native-context.slash.trigger'),
+    contextTriggers: {
+      'token-pressure': t('native-context.trigger.token_pressure'),
+      overflow: t('native-context.trigger.overflow'),
+      manual: t('native-context.trigger.manual'),
+      planned: t('native-context.trigger.planned'),
+      cadence: t('native-context.trigger.cadence'),
+    },
     highWater: t('native-context.slash.high_water'),
     refreshPlanned: t('native-context.slash.refresh_planned'),
     unknown: t('native-context.slash.unknown'),
@@ -874,6 +884,9 @@ export function formatContextSnapshot(snapshot: ContextSnapshot, labels: Context
   lines.push(`  ${labels.messages.replace('{messages}', String(snapshot.messages)).replace('{preamble}', String(snapshot.preambleMessages))}`);
   lines.push(`  ${labels.checkpoint.replace('{status}', snapshot.checkpoint)}`);
   lines.push(`  ${labels.highWater.replace('{percent}', String(Math.round(snapshot.highWaterRatio * 100)))}`);
+  if (snapshot.lastContextTrigger && labels.contextTrigger && labels.contextTriggers) {
+    lines.push(`  ${labels.contextTrigger.replace('{trigger}', labels.contextTriggers[snapshot.lastContextTrigger])}`);
+  }
   if (snapshot.refreshPlanned) lines.push(`  ${labels.refreshPlanned}`);
   return lines.join('\n');
 }

@@ -492,6 +492,7 @@ const NATIVE_AGENT_SIGNAL_KEYS = new Set([
   'native-budget.tokens-exhausted',
   'native-budget.noprogress-terminated',
   'native.checkpoint.saved',
+  'native.checkpoint.deterministic',
   'native.checkpoint.epoch-advanced',
   'native.checkpoint.degraded',
   'native.permission.classification-unavailable',

@@ -3732,6 +3732,14 @@ const BASE_MESSAGES: MessageMap = {
     en: 'Session stopped after repeated rounds without progress.',
     tr: 'Oturum, ilerleme sağlamayan tekrarlı turlardan sonra durduruldu.',
   },
+  'native.checkpoint.deterministic': {
+    en: 'The model summary was unavailable. A checkpoint preserves the full transcript by content reference; it contains no generated summary.',
+    tr: 'Model özeti alınamadı. Checkpoint tam konuşmayı içerik referansıyla koruyor; üretilmiş bir özet içermiyor.',
+  },
+  'native.TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED': {
+    en: 'Tool results reached the context storage limit. The turn stopped because a complete content reference could not fit safely.',
+    tr: 'Araç sonuçları bağlam saklama sınırına ulaştı. Tam içerik referansı güvenli biçimde sığmadığı için tur durdu.',
+  },
   'native.checkpoint.saved': {
     en: 'Scratch checkpoint saved.',
     tr: 'Scratch checkpoint kaydedildi.',
@@ -3749,6 +3757,12 @@ const BASE_MESSAGES: MessageMap = {
   // must never read like a context-window overflow, and vice versa. Only the
   // INPUT_CONTEXT_OVERFLOW line below claims the context window is full; every
   // output-side line explicitly says it is NOT that, by construction.
+  'native-context.slash.trigger': { en: 'last compaction trigger: {trigger}', tr: 'son sıkıştırma tetikleyicisi: {trigger}' },
+  'native-context.trigger.token_pressure': { en: 'measured context pressure', tr: 'ölçülmüş bağlam baskısı' },
+  'native-context.trigger.overflow': { en: 'input overflow recovery', tr: 'girdi taşması kurtarması' },
+  'native-context.trigger.manual': { en: 'explicit compaction', tr: 'doğrudan sıkıştırma' },
+  'native-context.trigger.planned': { en: 'planned context refresh', tr: 'planlanmış bağlam yenileme' },
+  'native-context.trigger.cadence': { en: 'execution budget checkpoint', tr: 'yürütme bütçesi checkpoint’i' },
   'native-context.admission-denied': {
     en: 'The conversation\'s context window is full even after compacting older messages — this turn cannot be sent as-is. Start a fresh context epoch (/renew) or shorten the request.',
     tr: 'Konuşmanın bağlam penceresi, eski mesajlar sıkıştırıldıktan sonra bile dolu — bu tur olduğu gibi gönderilemez. Yeni bir bağlam dönemi başlatın (/renew) veya isteği kısaltın.',

@@ -121,3 +121,22 @@ describe('token accounting honesty (live incident 2026-08-18)', () => {
     expect(s.tokenPressureCheckpointRequested).toBe(false);
   });
 });
+
+
+describe('native context share policy', () => {
+  it('resolves window and tool shares from owner config', () => {
+    expect(resolveNativeAgentBudget({})).toMatchObject({ contextHighWaterRatio: 0.75, maxToolResultShareOfContext: 0.05, maxTurnToolResultShareOfContext: 0.20 });
+    expect(resolveNativeAgentBudget({ policy: { roles: {}, native_agent: {
+      contextHighWaterRatio: 0.8, maxToolResultShareOfContext: 0.1, maxTurnToolResultShareOfContext: 0.3,
+    } } })).toMatchObject({ contextHighWaterRatio: 0.8, maxToolResultShareOfContext: 0.1, maxTurnToolResultShareOfContext: 0.3 });
+  });
+  it.each([0, -1, 1, NaN, Infinity])('rejects invalid native ratio %s', (value) => {
+    for (const field of ['contextHighWaterRatio', 'maxToolResultShareOfContext', 'maxTurnToolResultShareOfContext']) {
+      expect(() => resolveNativeAgentBudget({ policy: { roles: {}, native_agent: { [field]: value } } })).toThrow(/ratio/);
+    }
+  });
+  it('rejects contradictory single, retained and highwater allocations', () => {
+    expect(() => resolveNativeAgentBudget({ policy: { roles: {}, native_agent: { maxToolResultShareOfContext: 0.3 } } })).toThrow(/single tool share/);
+    expect(() => resolveNativeAgentBudget({ policy: { roles: {}, native_agent: { contextHighWaterRatio: 0.1 } } })).toThrow(/single tool share/);
+  });
+});

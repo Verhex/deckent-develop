@@ -916,6 +916,12 @@ export interface ExecutionBudgetPolicyConfig {
 /** Owner-authored overrides for the native-agent session budget (all optional,
  *  positive safe integers; unknown keys fail loudly at validation). */
 export interface NativeAgentBudgetConfig {
+  /** Request utilization that asks for an epoch checkpoint; strictly between 0 and 1. */
+  contextHighWaterRatio?: number;
+  /** Maximum rendered tool-result bytes as a conservative share of the context window. */
+  maxToolResultShareOfContext?: number;
+  /** Maximum retained tool-result bytes within the current context epoch. */
+  maxTurnToolResultShareOfContext?: number;
   maxModelRounds?: number;
   maxToolCalls?: number;
   maxWallTimeMs?: number;

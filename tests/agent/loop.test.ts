@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { resolveNativeAgentBudget } from '../../src/core/execution-budget-policy.js';
 // tests/agent/loop.test.ts
 import { describe, it, expect } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
@@ -227,5 +229,175 @@ describe('runAgentTurn', () => {
     await drain(runAgentTurn(baseDeps({ adapter }), t, 'second'));
     const assistantMsgs = requests[1]!.messages.filter((m) => m.role === 'assistant');
     expect(assistantMsgs.every((m) => m.content !== '' || (m.toolCalls?.length ?? 0) > 0)).toBe(true);
+  });
+});
+
+
+describe('measured request and retained tool context', () => {
+  const budget = resolveNativeAgentBudget({ policy: { roles: {}, native_agent: { outputReserveTokens: 1, contextSafetyReserveTokens: 1 } } });
+  it('uses the selected adapter measurement before dropping old context', async () => {
+    const { adapter, requests } = scriptedAdapter([[{ type: 'text-delta', text: 'ok' }, { type: 'done' }]]);
+    const measuredRequests: ProviderRequest[] = [];
+    const measured: ProviderAdapter = { ...adapter, name: 'exact-fit-test', requestMeasurement: {
+      measure: async (request) => { measuredRequests.push(request); return { inputTokens: 100, provenance: 'test-exact' }; },
+    } };
+    const transcript = new Transcript();
+    transcript.appendUser('old'.repeat(10000));
+    transcript.appendAssistant('answer');
+    const events = await drain(runAgentTurn(baseDeps({ adapter: measured, nativeBudget: budget, getContextBudgetTokens: () => 10000 }), transcript, 'next'));
+    expect(events.some(event => event.type === 'error')).toBe(false);
+    expect(requests[0]?.messages[0]?.content).toBe('old'.repeat(10000));
+    expect(measuredRequests[0]?.system).toBe(requests[0]?.system);
+    expect(measuredRequests[0]?.tools).toEqual(requests[0]?.tools);
+  });
+
+  it('requests a highwater checkpoint immediately after a measured tool round', async () => {
+    const { adapter, requests } = scriptedAdapter([
+      [{ type: 'tool-call', id: 'a', name: 'echo', args: { v: 'one' } }, { type: 'done' }],
+      [{ type: 'text-delta', text: 'finished' }, { type: 'done' }],
+    ]);
+    const measured: ProviderAdapter = { ...adapter, name: 'exact-highwater-test', requestMeasurement: {
+      measure: async request => ({ inputTokens: request.messages.some(message => message.role === 'tool') ? 7600 : 100, provenance: 'test-exact' }),
+    } };
+    const transcript = new Transcript();
+    const events: AgentEvent[] = [];
+    for await (const event of runAgentTurn(baseDeps({ adapter: measured, nativeBudget: budget, getContextBudgetTokens: () => 10000 }), transcript, 'go')) {
+      events.push(event);
+      if (event.type === 'budget-checkpoint-request') {
+        expect(requests).toHaveLength(1);
+        expect(event).toMatchObject({ reason: 'token-pressure', rounds: 1 });
+        transcript.replaceForContextEpoch([{ role: 'user', content: 'summary of tool result' }], 'next-epoch');
+      }
+    }
+    expect(events.filter(event => event.type === 'budget-checkpoint-request')).toHaveLength(1);
+    expect(events.some(event => event.type === 'error')).toBe(false);
+    expect(requests).toHaveLength(2);
+  });
+
+  it('bounds aggregate tool bytes and renews allocation after a context epoch', async () => {
+    const calls = (suffix: string): ProviderEvent[] => [1, 2, 3].map(index => ({ type: 'tool-call', id: `${suffix}-${index}`, name: 'echo', args: { v: 'x'.repeat(12000) } } as const));
+    const { adapter, requests } = scriptedAdapter([
+      [...calls('one'), { type: 'done' }], [...calls('two'), { type: 'done' }],
+      [{ type: 'text-delta', text: 'done' }, { type: 'done' }],
+    ]);
+    const measured: ProviderAdapter = { ...adapter, name: 'retained-budget-test', requestMeasurement: {
+      measure: async () => ({ inputTokens: 100, provenance: 'test-exact' }),
+    } };
+    const content = new Map<string, Buffer>();
+    const transcript = new Transcript();
+    let checkpoints = 0;
+    const events: AgentEvent[] = [];
+    for await (const event of runAgentTurn(baseDeps({
+      adapter: measured, nativeBudget: budget, getContextBudgetTokens: () => 100000,
+      contentStore: { write(bytes) { const sha256 = createHash('sha256').update(bytes).digest('hex'); content.set(sha256, bytes); return { path: `content:${sha256}`, sha256 }; } },
+    }), transcript, 'go')) {
+      events.push(event);
+      if (event.type === 'tool-result') expect(Buffer.byteLength(event.output, 'utf8')).toBeLessThanOrEqual(5000);
+      if (event.type === 'budget-checkpoint-request') {
+        const total = transcript.toProviderMessages().filter(message => message.role === 'tool').reduce((sum, message) => sum + Buffer.byteLength(message.content), 0);
+        expect(total).toBeLessThanOrEqual(20000);
+        checkpoints++;
+        transcript.replaceForContextEpoch([{ role: 'user', content: 'retained objective and completed tools' }], `epoch-${checkpoints}`);
+      }
+    }
+    expect(events.some(event => event.type === 'error')).toBe(false);
+    expect(checkpoints).toBe(2);
+    expect(requests).toHaveLength(3);
+    expect([...content.values()][0]?.toString()).toBe(`echoed:${'x'.repeat(12000)}`);
+  });
+});
+
+
+describe('large tool batch context allocation', () => {
+  it('shares the remaining allocation across all results and preserves every content reference', async () => {
+    const batch: ProviderEvent[] = Array.from({ length: 8 }, (_, index) => ({
+      type: 'tool-call', id: `large-${index}`, name: 'echo', args: { v: `${index}:` + 'raw-evidence-'.repeat(1000) },
+    }));
+    const { adapter, requests } = scriptedAdapter([
+      [...batch, { type: 'done' }], [{ type: 'text-delta', text: 'done' }, { type: 'done' }],
+    ]);
+    const measured: ProviderAdapter = { ...adapter, name: 'shared-batch-budget', requestMeasurement: {
+      measure: async () => ({ inputTokens: 100, provenance: 'fixture-exact' }),
+    } };
+    const content = new Map<string, Buffer>();
+    const budget = resolveNativeAgentBudget({ policy: { roles: {}, native_agent: { outputReserveTokens: 1, contextSafetyReserveTokens: 1 } } });
+    const events = await drain(runAgentTurn(baseDeps({ adapter: measured, nativeBudget: budget, getContextBudgetTokens: () => 100000,
+      contentStore: { write(bytes) {
+        const sha256 = createHash('sha256').update(bytes).digest('hex');
+        const path = `content:${sha256}`;
+        content.set(path, bytes);
+        return { path, sha256 };
+      } },
+    }), new Transcript(), 'read every result'));
+    expect(events.some(event => event.type === 'error')).toBe(false);
+    const results = events.filter(event => event.type === 'tool-result');
+    expect(results).toHaveLength(8);
+    expect(results.reduce((sum, result) => sum + Buffer.byteLength(result.output), 0)).toBeLessThanOrEqual(20000);
+    for (const [index, result] of results.entries()) {
+      expect(Buffer.byteLength(result.output)).toBeLessThanOrEqual(2500);
+      const ref = /full content at (.+)$/.exec(result.output)?.[1];
+      expect(ref).toBeDefined();
+      expect(content.get(ref!)?.toString()).toBe(`echoed:${index}:` + 'raw-evidence-'.repeat(1000));
+    }
+    expect(requests).toHaveLength(2);
+    expect(requests[1]?.messages.filter(message => message.role === 'tool')).toHaveLength(8);
+  });
+});
+
+
+describe('checkpoint before publishing an incoming tool batch', () => {
+  it('compacts old retained results before owning new calls, then emits every paired result within budget', async () => {
+    const incoming = ['incoming-one', 'incoming-two'];
+    const batch: ProviderEvent[] = incoming.map(id => ({ type: 'tool-call', id, name: 'echo', args: { v: `${id}:` + 'evidence'.repeat(2000) } }));
+    const { adapter, requests } = scriptedAdapter([
+      [...batch, { type: 'done' }], [{ type: 'text-delta', text: 'complete' }, { type: 'done' }],
+    ]);
+    const measured: ProviderAdapter = { ...adapter, name: 'pre-batch-checkpoint', requestMeasurement: {
+      measure: async () => ({ inputTokens: 100, provenance: 'fixture-exact' }),
+    } };
+    const transcript = new Transcript();
+    transcript.appendUser('prior objective');
+    transcript.appendAssistant('prior inspection', [{ id: 'prior-result', name: 'echo', args: {} }]);
+    transcript.appendToolResult('prior-result', 'old-evidence-'.repeat(1200));
+    const budget = resolveNativeAgentBudget({ policy: { roles: {}, native_agent: { outputReserveTokens: 1, contextSafetyReserveTokens: 1 } } });
+    const stored = new Map<string, Buffer>();
+    const events: AgentEvent[] = [];
+    let checkpoints = 0;
+    for await (const event of runAgentTurn(baseDeps({ adapter: measured, nativeBudget: budget, getContextBudgetTokens: () => 100000,
+      contentStore: { write(bytes) {
+        const sha256 = createHash('sha256').update(bytes).digest('hex');
+        const path = `content:${sha256}`;
+        stored.set(path, bytes);
+        return { path, sha256 };
+      } },
+    }), transcript, 'continue with the next inspection')) {
+      events.push(event);
+      if (event.type === 'budget-checkpoint-request') {
+        checkpoints++;
+        expect(requests).toHaveLength(1);
+        expect(events.some(previous => previous.type === 'tool-executing')).toBe(false);
+        const duringCheckpoint = transcript.toProviderMessages();
+        expect(duringCheckpoint.some(message => message.toolCallId === 'prior-result')).toBe(true);
+        expect(duringCheckpoint.flatMap(message => message.toolCalls ?? []).map(call => call.id)).not.toEqual(expect.arrayContaining(incoming));
+        for (const id of incoming) {
+          expect(duringCheckpoint.some(message => message.toolCallId === id || message.toolCalls?.some(call => call.id === id))).toBe(false);
+        }
+        transcript.replaceForContextEpoch([{ role: 'user', content: 'original objective and verified previous result summary' }], 'pre-batch-epoch');
+      }
+    }
+    expect(checkpoints).toBe(1);
+    expect(events.some(event => event.type === 'error')).toBe(false);
+    const results = events.filter(event => event.type === 'tool-result');
+    expect(results.map(result => result.id)).toEqual(incoming);
+    expect(results.reduce((sum, result) => sum + Buffer.byteLength(result.output), 0)).toBeLessThanOrEqual(20000);
+    for (const result of results) {
+      expect(Buffer.byteLength(result.output)).toBeLessThanOrEqual(5000);
+      const ref = /full content at (.+)$/.exec(result.output)?.[1];
+      expect(stored.get(ref!)?.toString()).toBe(`echoed:${result.id}:` + 'evidence'.repeat(2000));
+    }
+    expect(requests).toHaveLength(2);
+    const continued = requests[1]!.messages;
+    expect(continued.flatMap(message => message.toolCalls ?? []).map(call => call.id)).toEqual(incoming);
+    expect(continued.filter(message => message.role === 'tool').map(message => message.toolCallId)).toEqual(incoming);
   });
 });

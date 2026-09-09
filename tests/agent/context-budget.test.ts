@@ -1,7 +1,7 @@
 // tests/agent/context-budget.test.ts
 import { describe, it, expect } from 'vitest';
-import { estimateTokens, estimateMessageTokens, fitMessagesToBudget } from '../../src/agent/context-budget.js';
-import type { ProviderMessage } from '../../src/agent/provider-tooluse/types.js';
+import { estimateTokens, estimateMessageTokens, fitMessagesToBudget, digestProviderRequest, conservativeRequestTokenUpperBound, measureProviderRequest } from '../../src/agent/context-budget.js';
+import type { ProviderMessage, ProviderRequest } from '../../src/agent/provider-tooluse/types.js';
 
 const user = (content: string): ProviderMessage => ({ role: 'user', content });
 const assistant = (content: string, toolCalls?: ProviderMessage['toolCalls']): ProviderMessage =>
@@ -81,5 +81,58 @@ describe('fitMessagesToBudget', () => {
   it('handles an empty transcript', () => {
     const fit = fitMessagesToBudget([], 100);
     expect(fit).toEqual({ messages: [], droppedCount: 0, estimatedTokens: 0 });
+  });
+});
+
+
+describe('request wire identity excludes transport cancellation', () => {
+  const request: ProviderRequest = {
+    system: 'Session policy', model: 'wire-identity-fixture',
+    messages: [user('漢字🙂 request')],
+    tools: [{ name: 'read', description: 'Read a file', inputSchema: { type: 'object' } }],
+    outputCeilingTokens: 128,
+  };
+
+  it('keeps the digest and conservative upper bound identical with absent, live and aborted signals', () => {
+    const live = new AbortController();
+    const aborted = new AbortController();
+    aborted.abort('transport-only-reason');
+    const expectedDigest = digestProviderRequest(request);
+    const expectedBound = conservativeRequestTokenUpperBound(request);
+    for (const signal of [undefined, live.signal, aborted.signal]) {
+      const candidate = { ...request, signal };
+      expect(digestProviderRequest(candidate)).toBe(expectedDigest);
+      expect(conservativeRequestTokenUpperBound(candidate)).toBe(expectedBound);
+    }
+    expect(expectedBound).toBeGreaterThan(Buffer.byteLength(request.messages[0]!.content, 'utf8'));
+  });
+
+  it('still measures changes to actual message, tool schema and output-ceiling fields', () => {
+    const variants: ProviderRequest[] = [
+      { ...request, messages: [user('漢字🙂 request with additional content')] },
+      { ...request, tools: [{ ...request.tools[0]!, description: 'A longer provider-visible tool description' }] },
+      { ...request, outputCeilingTokens: 16384 },
+    ];
+    for (const variant of variants) {
+      expect(digestProviderRequest(variant)).not.toBe(digestProviderRequest(request));
+      expect(conservativeRequestTokenUpperBound(variant)).toBeGreaterThan(conservativeRequestTokenUpperBound(request));
+    }
+  });
+
+  it('reuses the measured wire request across cancellation handles without altering the capability input', async () => {
+    const first = new AbortController();
+    const second = new AbortController();
+    const observed: ProviderRequest[] = [];
+    const capability = { measure: async (actual: ProviderRequest) => {
+      observed.push(actual);
+      return { inputTokens: 173, provenance: 'wire-signal-fixture-counter' };
+    } };
+    const identity = { provider: 'wire-signal-fixture', model: request.model, contextWindowTokens: 8192, contextProvenance: 'configured-narrowing' as const };
+    const measuredFirst = await measureProviderRequest({ request: { ...request, signal: first.signal }, identity, capability });
+    const measuredSecond = await measureProviderRequest({ request: { ...request, signal: second.signal }, identity, capability });
+    expect(observed).toHaveLength(1);
+    expect(observed[0]?.signal).toBe(first.signal);
+    expect(measuredSecond).toEqual(measuredFirst);
+    expect(measuredSecond).toMatchObject({ quality: 'exact', inputTokens: 173, provenance: 'wire-signal-fixture-counter' });
   });
 });

@@ -228,3 +228,59 @@ describe('shortcuts panel — catalog-built, shown on `?` from an empty composer
     unmount();
   });
 });
+
+
+describe('/context trigger and cached request provenance', () => {
+  const triggerCases = [
+    ['token-pressure', 'measured context pressure', 'ölçülmüş bağlam baskısı'],
+    ['overflow', 'input overflow recovery', 'girdi taşması kurtarması'],
+    ['manual', 'explicit compaction', 'doğrudan sıkıştırma'],
+    ['planned', 'planned context refresh', 'planlanmış bağlam yenileme'],
+    ['cadence', 'execution budget checkpoint', 'yürütme bütçesi checkpoint’i'],
+  ] as const;
+
+  it.each(triggerCases)('localizes the %s trigger in EN and TR without a provider turn', async (trigger, en, tr) => {
+    for (const [lang, expected] of [['en', en], ['tr', tr]] as const) {
+      const engine = fakeEngine({ contextSnapshot: async () => ({ ...snapshot, lastContextTrigger: trigger }) });
+      const text = await resolveContextSlash('/context', engine, buildContextSlashLabels(tFor(lang)));
+      expect(text).toContain(expected);
+      expect(text).not.toContain(lang === 'en' ? tr : en);
+      expect(text).not.toContain('native-context.trigger.');
+      expect(engine.sends).toEqual([]);
+    }
+  });
+
+  it.each(['en', 'tr'] as const)('retains the actual cached request provenance across changed live snapshot fields in %s', async (lang) => {
+    const labels = buildContextSlashLabels(tFor(lang));
+    const engine = fakeEngine({ contextSnapshot: async () => ({
+      ...snapshot,
+      window: 800_000,
+      measuredInputTokens: 799_999,
+      epoch: 9,
+      lastContextTrigger: 'manual',
+    }) });
+    const text = await resolveContextSlash('/context', engine, labels);
+    expect(text).toContain(labels.provenance.replace('{provenance}', 'provider-counter'));
+    expect(text).toContain(labels.digest.replace('{digest}', 'safe-digest'));
+    expect(text).toContain(labels.providerModel.replace('{provider}', 'openai').replace('{model}', 'model-a'));
+    expect(text).toContain(labels.measurement.replace('{tokens}', '50000').replace('{quality}', labels.qualityExact));
+    expect(text).toContain(labels.capacity.replace('{available}', '150000').replace('{window}', '200000'));
+    expect(text).toContain(labels.window.replace('{window}', '800000'));
+    expect(text).not.toContain('799999');
+    expect(text).not.toContain('100%');
+    expect(engine.sends).toEqual([]);
+  });
+
+  it.each(['en', 'tr'] as const)('does not invent a trigger or provenance before any actual request in %s', async (lang) => {
+    const labels = buildContextSlashLabels(tFor(lang));
+    const engine = fakeEngine({ contextSnapshot: async () => ({
+      ...snapshot, lastContextTrigger: undefined, lastRequestMeasurement: undefined,
+    }) });
+    const text = await resolveContextSlash('/context', engine, labels);
+    expect(text).toContain(labels.requestUnavailable);
+    expect(text).not.toContain('provider-counter');
+    expect(text).not.toContain('safe-digest');
+    for (const value of Object.values(labels.contextTriggers!)) expect(text).not.toContain(value);
+    expect(engine.sends).toEqual([]);
+  });
+});

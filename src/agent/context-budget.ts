@@ -40,14 +40,17 @@ function stableJson(value: unknown): string {
 }
 
 export function digestProviderRequest(req: ProviderRequest): string {
-  return createHash('sha256').update(stableJson(req)).digest('hex');
+  const { signal: _signal, ...wireRequest } = req;
+  return createHash('sha256').update(stableJson(wireRequest)).digest('hex');
 }
 
 /** A tokenizer-independent upper bound. Byte-token tokenizers cannot emit
  * more content tokens than UTF-8 bytes; the additive envelope covers message,
  * role and tool/chat-template framing without relying on chars/4. */
 export function conservativeRequestTokenUpperBound(req: ProviderRequest): number {
-  const wireBytes = Buffer.byteLength(stableJson(req), 'utf8');
+  // AbortSignal is transport control, never part of the provider wire payload.
+  const { signal: _signal, ...wireRequest } = req;
+  const wireBytes = Buffer.byteLength(stableJson(wireRequest), 'utf8');
   const framingTokens = 64 + (req.messages.length * 16) + (req.tools.length * 32);
   return wireBytes + framingTokens;
 }

@@ -125,6 +125,8 @@ export interface ContainToolResultOptions {
   store: ContentWriter;
   /** Preview budget in bytes; clamped to [1, HARD_MAX_PREVIEW_BYTES]. */
   maxPreviewBytes?: number;
+  /** Cap the entire model-facing result, including spill and failure receipts. */
+  maxRenderedBytes?: number;
 }
 
 // ─── UTF-8-safe slicing ─────────────────────────────────────────────────────
@@ -214,8 +216,11 @@ export function resolveExitTruth(raw: RawToolResult): {
  * byte-identical to what the tool produced.
  */
 export function containToolResult(raw: RawToolResult, opts: ContainToolResultOptions): ToolResultEnvelope {
+  if (opts.maxRenderedBytes !== undefined && (!Number.isSafeInteger(opts.maxRenderedBytes) || opts.maxRenderedBytes < 1)) {
+    throw new ToolResultContextBudgetError('Tool result has no remaining context allocation');
+  }
   const output = typeof raw.output === 'string' ? raw.output : '';
-  const cap = clampPreviewBytes(opts.maxPreviewBytes);
+  const cap = Math.min(clampPreviewBytes(opts.maxPreviewBytes), opts.maxRenderedBytes ?? HARD_MAX_PREVIEW_BYTES);
   const buf = Buffer.from(output, 'utf8');
   const bytes = buf.byteLength;
   const sha256 = createHash('sha256').update(buf).digest('hex');
@@ -272,7 +277,15 @@ function failureIsVisible(text: string): boolean {
  *   • a failure the preview does not already advertise gets an explicit
  *     not-ok line — the model is never told a failed command succeeded.
  */
-export function renderToolResultEnvelope(env: ToolResultEnvelope): string {
+export class ToolResultContextBudgetError extends Error {
+  readonly code = 'TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED';
+}
+
+export function renderToolResultEnvelope(env: ToolResultEnvelope, maxRenderedBytes = RENDER_HARD_CAP_BYTES): string {
+  if (!Number.isSafeInteger(maxRenderedBytes) || maxRenderedBytes < 1) {
+    throw new ToolResultContextBudgetError('Tool result has no remaining context allocation');
+  }
+  const cap = Math.min(RENDER_HARD_CAP_BYTES, maxRenderedBytes);
   const tail: string[] = [];
   if (env.stderr !== null) tail.push(`[deckent-stderr] ${env.stderr}`);
   if (env.truncated) {
@@ -288,17 +301,23 @@ export function renderToolResultEnvelope(env: ToolResultEnvelope): string {
       `[deckent] tool-result not ok: ${env.reason ?? 'tool-error'}${env.exitCode !== null ? ` (exit ${env.exitCode})` : ''}`,
     );
   }
-  if (tail.length === 0) return env.boundedPreview;
+  if (tail.length === 0) {
+    if (Buffer.byteLength(env.boundedPreview, 'utf8') > cap) {
+      throw new ToolResultContextBudgetError('Tool result needs a durable spill receipt before truncation');
+    }
+    return env.boundedPreview;
+  }
 
   const tailText = `\n${tail.join('\n')}`;
-  const budget = RENDER_HARD_CAP_BYTES - Buffer.byteLength(tailText, 'utf8');
+  const budget = cap - Buffer.byteLength(tailText, 'utf8');
+  if (budget < 0) throw new ToolResultContextBudgetError('Tool result receipt exceeds the remaining context allocation');
   const head = sliceUtf8(Buffer.from(env.boundedPreview, 'utf8'), Math.max(0, budget));
   return `${head}${tailText}`;
 }
 
 /** Contain + render in one call — the shape both dispatchers use. */
 export function brokerToolResult(raw: RawToolResult, opts: ContainToolResultOptions): string {
-  return renderToolResultEnvelope(containToolResult(raw, opts));
+  return renderToolResultEnvelope(containToolResult(raw, opts), opts.maxRenderedBytes);
 }
 
 export interface CapturedToolResult {

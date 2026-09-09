@@ -322,3 +322,19 @@ describe('dispatcher wiring — no raw unbounded path survives', () => {
     expect(brokerToolResult({ output: 'small', ok: true }, { store })).toBe('small');
   });
 });
+
+
+describe('context-derived rendered byte allocation', () => {
+  it('bounds preview plus durable receipt and preserves the complete UTF8 content', () => {
+    const output = '漢字🙂'.repeat(5000);
+    const rendered = brokerToolResult({ ok: true, output }, { store, maxRenderedBytes: 800 });
+    expect(Buffer.byteLength(rendered, 'utf8')).toBeLessThanOrEqual(800);
+    expect(rendered).not.toContain('\ufffd');
+    const ref = /full content at (.+)$/.exec(rendered)?.[1];
+    expect(ref).toBeDefined();
+    expect(readFileSync(ref!, 'utf8')).toBe(output);
+  });
+  it('fails closed when even the durable receipt cannot fit', () => {
+    expect(() => brokerToolResult({ ok: false, output: 'x'.repeat(1000) }, { store, maxRenderedBytes: 20 })).toThrow(/receipt exceeds/);
+  });
+});

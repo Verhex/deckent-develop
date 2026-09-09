@@ -23,7 +23,7 @@ import {
   type ResolvedProvider,
 } from '../../src/cli/repl/native-transport.js';
 import { estimateTokens } from '../../src/agent/context-budget.js';
-import type { ResolvedNativeAgentBudget } from '../../src/core/execution-budget-policy.js';
+import { DEFAULT_NATIVE_AGENT_BUDGET, type ResolvedNativeAgentBudget } from '../../src/core/execution-budget-policy.js';
 
 // ── shared fixtures ─────────────────────────────────────────────────────────
 
@@ -51,6 +51,7 @@ function memRuleStore(): RuleStore {
 /** Small explicit reserves so the FIRST round is comfortably admissible and only
  *  the oversized tool result of round two can trip the gate. */
 const TEST_BUDGET: ResolvedNativeAgentBudget = {
+  ...DEFAULT_NATIVE_AGENT_BUDGET,
   maxModelRounds: 120,
   maxToolCalls: 400,
   maxWallTimeMs: 45 * 60_000,
@@ -98,7 +99,9 @@ describe('NT-02 per-request context admission', () => {
   it('denies the doomed request typed instead of shipping an oversized body', async () => {
     const { adapter, requests } = scriptedAdapter(TOOL_THEN_ANSWER);
     const evs = await drain(runAgentTurn(
-      baseDeps({ adapter, nativeBudget: TEST_BUDGET, getContextBudgetTokens: () => 20_000 }),
+      baseDeps({ adapter: { ...adapter, name: 'nt02-exact-overflow', requestMeasurement: {
+        measure: async request => ({ inputTokens: request.messages.some(message => message.role === 'tool') ? 30000 : 100, provenance: 'test-exact' }),
+      } }, nativeBudget: TEST_BUDGET, getContextBudgetTokens: () => 20_000 }),
       new Transcript(),
       'go',
     ));
@@ -118,14 +121,16 @@ describe('NT-02 per-request context admission', () => {
   it('requests ONE budget checkpoint BEFORE denying', async () => {
     const { adapter } = scriptedAdapter(TOOL_THEN_ANSWER);
     const evs = await drain(runAgentTurn(
-      baseDeps({ adapter, nativeBudget: TEST_BUDGET, getContextBudgetTokens: () => 20_000 }),
+      baseDeps({ adapter: { ...adapter, name: 'nt02-exact-overflow', requestMeasurement: {
+        measure: async request => ({ inputTokens: request.messages.some(message => message.role === 'tool') ? 30000 : 100, provenance: 'test-exact' }),
+      } }, nativeBudget: TEST_BUDGET, getContextBudgetTokens: () => 20_000 }),
       new Transcript(),
       'go',
     ));
 
     const checkpoints = evs.filter((e) => e.type === 'budget-checkpoint-request');
     expect(checkpoints).toHaveLength(1);
-    expect(checkpoints[0]).toMatchObject({ reason: 'token-pressure', rounds: 2, toolCalls: 1 });
+    expect(checkpoints[0]).toMatchObject({ reason: 'token-pressure', rounds: 1, toolCalls: 1 });
     const checkpointAt = evs.findIndex((e) => e.type === 'budget-checkpoint-request');
     const errorAt = evs.findIndex((e) => e.type === 'error');
     expect(checkpointAt).toBeGreaterThanOrEqual(0);
@@ -137,7 +142,9 @@ describe('NT-02 per-request context admission', () => {
     const transcript = new Transcript();
     const evs: AgentEvent[] = [];
     for await (const e of runAgentTurn(
-      baseDeps({ adapter, nativeBudget: TEST_BUDGET, getContextBudgetTokens: () => 20_000 }),
+      baseDeps({ adapter: { ...adapter, name: 'nt02-exact-overflow', requestMeasurement: {
+        measure: async request => ({ inputTokens: request.messages.some(message => message.role === 'tool') ? 30000 : 100, provenance: 'test-exact' }),
+      } }, nativeBudget: TEST_BUDGET, getContextBudgetTokens: () => 20_000 }),
       transcript,
       'go',
     )) {

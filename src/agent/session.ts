@@ -22,7 +22,7 @@ import {
 import type { PermissionPolicy } from './permission-policy.js';
 import type { RuleStore } from './permission-store.js';
 import type { ApprovalMode } from './permission-types.js';
-import { accrue, type CostGuardState } from './guards/cost.js';
+import { accrue, costExceeded, type CostGuardState } from './guards/cost.js';
 import { ToolRegistry } from './tools/registry.js';
 import { Transcript } from './transcript.js';
 import type {
@@ -31,11 +31,14 @@ import type {
   ProviderMessage,
   ProviderRequest,
 } from './provider-tooluse/types.js';
+import { InputContextOverflowError } from './provider-tooluse/context-errors.js';
 import { providerContextErrorCode } from './provider-tooluse/context-errors.js';
 import { decideProviderAdmission, estimateTokens, measureProviderRequest } from './context-budget.js';
 import { openScratchStore, type CheckpointReadResult, type ScratchCheckpointPayload, type ScratchStore } from './scratch-checkpoint.js';
-import { createNativeBudgetState, type NativeBudgetState } from './guards/recursion.js';
-import type { ContentWriter } from './tool-result-broker.js';
+import { createNativeBudgetState, evaluateNativeBudget, type NativeBudgetState } from './guards/recursion.js';
+import { containToolResult, renderToolResultEnvelope, type ContentWriter } from './tool-result-broker.js';
+import { composeSystemPrompt } from './identity.js';
+import { resolveNativeAgentBudget } from '../core/execution-budget-policy.js';
 import { projectSlug } from '../core/project-slug.js';
 import { ALL_APPROVAL_RISKS, ALL_APPROVAL_SCOPES } from '../core/approval-contract.js';
 import { maskArgs } from '../core/approval-masking.js';
@@ -140,7 +143,7 @@ const CHECKPOINT_MESSAGE_CHARS = 2_000;
 const CHECKPOINT_MERGE_MAX_DEPTH = 4;
 /** Measured share of the context window that triggers a PROACTIVE checkpoint —
  *  the epoch turns over BEFORE the request jams, not after it is refused. */
-const CONTEXT_HIGH_WATER_RATIO = 0.75;
+// High-water comes from the same resolved native budget as the loop.
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -322,10 +325,13 @@ export interface ContextSnapshot {
   checkpoint: CheckpointReadResult['status'];
   refreshPlanned: boolean;
   highWaterRatio: number;
+  lastContextTrigger?: 'token-pressure' | 'overflow' | 'manual' | 'planned' | 'cadence';
 }
 
 export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   const transcript = new Transcript();
+  const contextBudget = { ...resolveNativeAgentBudget({}), ...deps.nativeBudget };
+  let lastContextTrigger: ContextSnapshot['lastContextTrigger'];
   let mode: ApprovalMode = deps.policy.defaultMode;
   /** TERMINAL-TOOLS-008 — abort seam of the turn in flight (fresh per send()). */
   let turnAbort: AbortController | undefined;
@@ -634,6 +640,8 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   type CheckpointFailureCode =
     | 'CHECKPOINT_PROVIDER_FAILED'
     | 'CHECKPOINT_RESPONSE_MISSING'
+    | 'CHECKPOINT_OUTPUT_CONTINUATION_EXHAUSTED'
+    | 'CHECKPOINT_SESSION_BUDGET_EXHAUSTED'
     | 'CHECKPOINT_RESPONSE_TOO_LARGE'
     | 'CHECKPOINT_RESPONSE_INVALID_JSON'
     | 'CHECKPOINT_PAYLOAD_INVALID'
@@ -671,33 +679,122 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       messages,
       tools: [],
       model: deps.getModel?.() ?? deps.model,
+      ...(deps.nativeBudget?.outputReserveTokens ? { outputCeilingTokens: deps.nativeBudget.outputReserveTokens } : {}),
       // TERMINAL-TOOLS-010 — the checkpoint call rides the same abort seam as
       // the turn (or the explicit /compact) it belongs to, so Esc cancels it.
       ...(turnAbort?.signal ? { signal: turnAbort.signal } : {}),
     };
     let text = '';
-    for await (const response of adapter.send(request)) {
-      if (response.type === 'request-measurement') {
-        const event = Object.freeze({
-          type: 'request-measurement' as const,
-          decision: response.decision,
-          purpose: 'checkpoint' as const,
+    // Same bounded output-recovery contract as the turn loop. JSON fragments
+    // are appended byte-for-byte: overlap removal can corrupt string values.
+    for (let continuation = 0; continuation <= 2; continuation++) {
+      if (turnAbort?.signal.aborted) throw new CheckpointFailure('CHECKPOINT_PROVIDER_FAILED');
+      if (deps.nativeBudget && nativeBudgetState) {
+        const verdict = evaluateNativeBudget({ ...nativeBudgetState, rounds: nativeBudgetState.rounds + 1 }, deps.nativeBudget);
+        if (verdict.verdict === 'terminate') throw new CheckpointFailure('CHECKPOINT_SESSION_BUDGET_EXHAUSTED');
+      }
+      if (deps.costGuard && costExceeded({ ...deps.costGuard,
+        spentTokens: deps.costGuard.spentTokens + usage.inputTokens + usage.outputTokens }).exceeded) {
+        throw new CheckpointFailure('CHECKPOINT_SESSION_BUDGET_EXHAUSTED');
+      }
+      const segmentRequest: ProviderRequest = continuation === 0 ? request : {
+        ...request,
+        messages: [...messages,
+          ...(text === '' ? [] : [{ role: 'assistant' as const, content: text }]),
+          { role: 'user', content: text === ''
+            ? 'Return the requested checkpoint JSON now. Keep it concise and return only the complete JSON object.'
+            : 'Continue the incomplete JSON exactly from its final byte. Return only the missing suffix, without repeating any previous bytes or adding fences.' }],
+      };
+      const window = deps.getContextBudgetTokens?.();
+      const canRepair = !checkpointPressureRepaired && transcript.toProviderMessages().some(
+        message => message.role === 'tool' && Buffer.byteLength(message.content, 'utf8') > 512);
+      if (window !== undefined && window > 0 && (continuation > 0 || canRepair)) {
+        const measurement = await measureProviderRequest({ request: segmentRequest,
+          identity: { provider: adapter.name, model: request.model, contextWindowTokens: window,
+            contextProvenance: 'configured-narrowing' },
+          ...(adapter.requestMeasurement ? { capability: adapter.requestMeasurement } : {}),
         });
-        if (attributionGeneration === requestAttributionGeneration) {
-          lastRequestMeasurement = event;
+        const decision = decideProviderAdmission(measurement, deps.nativeBudget?.outputReserveTokens ?? 0,
+          deps.nativeBudget?.contextSafetyReserveTokens ?? 0);
+        if (!decision.admitted) {
+          if (continuation === 0 && canRepair) throw new CheckpointPressure();
+          throw new InputContextOverflowError(decision);
         }
-        yield event;
       }
-      else if (response.type === 'text-delta') text += response.text;
-      else if (response.type === 'usage') {
-        usage.inputTokens += response.inputTokens;
-        usage.outputTokens += response.outputTokens;
-        providerReportedUsage.inputTokens += response.inputTokens;
-        providerReportedUsage.outputTokens += response.outputTokens;
-        providerReportedUsage.reports++;
+      if (nativeBudgetState) nativeBudgetState.rounds++;
+      let truncated = false;
+      let tooLarge = false;
+      for await (const response of adapter.send(segmentRequest)) {
+        if (response.type === 'request-measurement') {
+          const event = Object.freeze({ type: 'request-measurement' as const,
+            decision: response.decision, purpose: 'checkpoint' as const });
+          if (attributionGeneration === requestAttributionGeneration) lastRequestMeasurement = event;
+          yield event;
+        } else if (response.type === 'text-delta') {
+          if (text.length + response.text.length > CHECKPOINT_JSON_RESPONSE_CHAR_CAP) tooLarge = true;
+          if (!tooLarge) text += response.text;
+        } else if (response.type === 'usage') {
+          usage.inputTokens += response.inputTokens;
+          usage.outputTokens += response.outputTokens;
+          providerReportedUsage.inputTokens += response.inputTokens;
+          providerReportedUsage.outputTokens += response.outputTokens;
+          providerReportedUsage.reports++;
+          if (nativeBudgetState) nativeBudgetState.cumulativeTokens += response.inputTokens + response.outputTokens;
+        } else if (response.type === 'done') truncated = response.stopReason === 'length';
       }
+      if (tooLarge) throw new CheckpointFailure('CHECKPOINT_RESPONSE_TOO_LARGE');
+      if (!truncated) return text;
+      // With no visible bytes there is no JSON suffix to continue. When source
+      // persistence is available, use the deterministic checkpoint immediately
+      // instead of paying for repeated hidden-only generations.
+      if (text === '' && deps.contentStore) throw new CheckpointFailure('CHECKPOINT_RESPONSE_MISSING');
     }
-    return text;
+    throw new CheckpointFailure('CHECKPOINT_OUTPUT_CONTINUATION_EXHAUSTED');
+  }
+
+  class CheckpointPressure extends Error {}
+  let checkpointPressureRepaired = false;
+
+  function microCompactToolResults(turnId: string): boolean {
+    if (!deps.contentStore) return false;
+    let changed = false;
+    const messages = transcript.toProviderMessages().map(message => {
+      if (message.role !== 'tool' || Buffer.byteLength(message.content, 'utf8') <= 512) return message;
+      const envelope = containToolResult({ output: message.content, ok: !/\[deckent\] tool-result not ok/u.test(message.content) }, {
+        store: deps.contentStore!, maxPreviewBytes: 1,
+      });
+      // Persistence failure never licenses dropping the source bytes.
+      if (!envelope.contentRef || envelope.storeError) return message;
+      const content = renderToolResultEnvelope(envelope);
+      if (Buffer.byteLength(content, 'utf8') >= Buffer.byteLength(message.content, 'utf8')) return message;
+      changed = true;
+      return { ...message, content };
+    });
+    if (changed) transcript.replaceForContextEpoch(messages, turnId);
+    return changed;
+  }
+
+  /** A failed model summary never licenses losing source data. A deterministic
+   * checkpoint references the complete original transcript, verified at the
+   * content-store boundary, and explicitly records the unsummarized cause. */
+  function deterministicCheckpoint(reasonCode: string): string | undefined {
+    if (!deps.contentStore || !scratch || turnAbort?.signal.aborted) return undefined;
+    try {
+      const bytes = Buffer.from(JSON.stringify(transcript.toEntries()), 'utf8');
+      const digest = createHash('sha256').update(bytes).digest('hex');
+      const receipt = deps.contentStore.write(bytes);
+      if (receipt.sha256 !== digest || receipt.path.length === 0) return undefined;
+      const payload: ScratchCheckpointPayload = {
+        schemaVersion: 1, objective: epochObjective(), findings: [],
+        evidenceRefs: [receipt.path], decisions: [], unresolved: [reasonCode],
+        nextActions: [], inspectedAreas: [], toolResultDigests: [digest],
+        cumulativeCounters: { deterministicFallback: 1,
+          modelRounds: nativeBudgetState?.rounds ?? 0, toolCalls: nativeBudgetState?.toolCalls ?? 0 },
+        createdAt: new Date().toISOString(),
+      };
+      scratch.writeCheckpoint(payload);
+      return JSON.stringify(payload);
+    } catch { return undefined; }
   }
 
   /**
@@ -709,10 +806,11 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   async function* summarizeBoundedDelta(
     usage: UsageTotals,
     attributionGeneration: number,
+    compacted = false,
   ): AsyncGenerator<RequestMeasurementEvent, string, void> {
     const all = transcript.toProviderMessages();
     const delta = all.slice(Math.min(epochPreambleLength, all.length));
-    const budget = checkpointDeltaBudget();
+    const budget = compacted ? Math.max(1, Math.floor(checkpointDeltaBudget() / 4)) : checkpointDeltaBudget();
     const previousSummary = previousCheckpointSummary();
     let chunks = planCheckpointDelta(delta, budget);
     if (chunks.length === 0) chunks = ['(no new activity since the previous checkpoint)'];
@@ -735,17 +833,19 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
    *  cost on the wire. `undefined` when no context authority is known — the
    *  caller then fails closed rather than guessing a window size. */
   async function measureContext(extra: readonly ProviderMessage[] = []): Promise<
-    { inputTokens: number; window: number } | undefined
+    { inputTokens: number; window: number; measurement: Awaited<ReturnType<typeof measureProviderRequest>> } | undefined
   > {
     const window = deps.getContextBudgetTokens?.();
     if (window === undefined || !(window > 0)) return undefined;
     const adapter = deps.getAdapter?.() ?? deps.adapter;
     const model = deps.getModel?.() ?? deps.model;
     const request: ProviderRequest = {
-      system: '',
+      system: composeSystemPrompt({ cwd: deps.cwd, lang: deps.lang,
+        ...(scratch ? { scratchDir: scratch.info.root } : {}) }),
       messages: [...transcript.toProviderMessages(), ...extra],
-      tools: [],
+      tools: deps.getProviderToolSchemas?.() ?? deps.registry.toNativeSchemas(),
       model,
+      ...(deps.nativeBudget?.outputReserveTokens ? { outputCeilingTokens: deps.nativeBudget.outputReserveTokens } : {}),
     };
     const identity: ProviderContextIdentity = {
       provider: adapter.name,
@@ -758,7 +858,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       identity,
       ...(adapter.requestMeasurement ? { capability: adapter.requestMeasurement } : {}),
     });
-    return { inputTokens: measurement.inputTokens, window };
+    return { inputTokens: measurement.inputTokens, window, measurement };
   }
 
   /** Verified exact fit of the fresh epoch — the precondition for the single
@@ -768,21 +868,8 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     if (window === undefined || !(window > 0)) return false;
     const measured = await measureContext([{ role: 'user', content: retryInput }]);
     if (!measured) return false;
-    const adapter = deps.getAdapter?.() ?? deps.adapter;
-    const model = deps.getModel?.() ?? deps.model;
     return decideProviderAdmission(
-      {
-        inputTokens: measured.inputTokens,
-        quality: 'conservative-upper-bound',
-        provenance: 'session-epoch-fit',
-        requestDigest: '',
-        identity: {
-          provider: adapter.name,
-          model,
-          contextWindowTokens: measured.window,
-          contextProvenance: 'configured-narrowing',
-        },
-      },
+      measured.measurement,
       deps.nativeBudget?.outputReserveTokens ?? 0,
       deps.nativeBudget?.contextSafetyReserveTokens ?? 0,
     ).admitted;
@@ -801,15 +888,23 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   ): AsyncIterable<AgentSessionEvent> {
     if (closed || !scratch || !scratchDeps) return;
     const usage: UsageTotals = { inputTokens: 0, outputTokens: 0 };
+    checkpointPressureRepaired = false;
     let text: string | undefined;
     let failureCode: CheckpointFailureCode | undefined;
     let providerFailureCode: string | undefined;
     try {
       try {
-        text = yield* summarizeBoundedDelta(usage, attributionGeneration);
+        try {
+          text = yield* summarizeBoundedDelta(usage, attributionGeneration);
+        } catch (error) {
+          if (!(error instanceof CheckpointPressure)) throw error;
+          checkpointPressureRepaired = true;
+          microCompactToolResults(turnId);
+          text = yield* summarizeBoundedDelta(usage, attributionGeneration, true);
+        }
       } catch (error) {
         providerFailureCode = providerContextErrorCode(error);
-        failureCode = 'CHECKPOINT_PROVIDER_FAILED';
+        failureCode = error instanceof CheckpointFailure ? error.code : 'CHECKPOINT_PROVIDER_FAILED';
       }
     } finally {
       // A consumer may close the outer session iterator between checkpoint
@@ -841,6 +936,14 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       }
     }
     if (failureCode !== undefined || text === undefined) {
+      const fallback = deterministicCheckpoint(failureCode ?? 'CHECKPOINT_RESPONSE_MISSING');
+      if (fallback !== undefined) {
+        text = fallback;
+        failureCode = undefined;
+        yield { type: 'notice', code: 'native.checkpoint.deterministic', message: 'native.checkpoint.deterministic' };
+      }
+    }
+    if (failureCode !== undefined || text === undefined) {
       const reasonCode = failureCode ?? 'CHECKPOINT_RESPONSE_MISSING';
       checkpointDegradation = {
         status: 'degraded',
@@ -852,7 +955,19 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       yield { type: 'notice', code: 'native.checkpoint.degraded', message: `checkpoint degraded — context epoch ${contextEpoch} kept` };
       return;
     }
-    transcript.compactForContextEpoch(epochObjective(), text, turnId);
+    microCompactToolResults(turnId);
+    // Keep the latest completed call group atomically. The transcript helper's
+    // default count of eight can otherwise select eight results from a large
+    // batch, miss their earlier assistant owner, and discard every result.
+    const lineage = transcript.toProviderMessages();
+    let lineageLimit = 8;
+    for (let index = lineage.length - 1; index >= 0; index--) {
+      if (lineage[index]!.role === 'assistant' && lineage[index]!.toolCalls?.length) {
+        lineageLimit = Math.max(lineageLimit, lineage.length - index);
+        break;
+      }
+    }
+    transcript.compactForContextEpoch(epochObjective(), text, turnId, lineageLimit);
     epochPreambleLength = transcript.toProviderMessages().length;
     contextEpoch++;
     epochAdvancedThisTurn = true;
@@ -870,12 +985,14 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     contextRefreshPlanned = false;
     if (!scratch || !scratchDeps) return;
     if (planned) {
+      lastContextTrigger = 'planned';
       yield* takeContextEpoch(turnId, attributionGeneration);
       return;
     }
     const measured = await measureContext();
     if (!measured) return;
-    if (measured.inputTokens >= Math.floor(measured.window * CONTEXT_HIGH_WATER_RATIO)) {
+    if (measured.inputTokens >= Math.floor(measured.window * contextBudget.contextHighWaterRatio)) {
+      lastContextTrigger = 'token-pressure';
       yield* takeContextEpoch(turnId, attributionGeneration);
     }
   }
@@ -917,18 +1034,23 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
         }
         if (
           event.type === 'error'
-          && event.code === 'native-context.admission-denied'
+          && (event.code === 'native-context.admission-denied' || event.code === 'INPUT_CONTEXT_OVERFLOW')
           && attempt === 0
-          && epochAdvancedThisTurn
-          && await epochFits(retryInput)
         ) {
           // ONE bounded recovery path for a typed overflow: a verified-exact-fit
           // fresh epoch, the original turn retried exactly once. No loop.
-          retry = true;
-          break;
+          if (!epochAdvancedThisTurn) {
+            lastContextTrigger = 'overflow';
+            yield* takeContextEpoch(turnId, attributionGeneration);
+          }
+          if (epochAdvancedThisTurn && await epochFits(retryInput)) {
+            retry = true;
+            break;
+          }
         }
         yield event;
         if (event.type !== 'budget-checkpoint-request') continue;
+        lastContextTrigger = event.reason === 'token-pressure' ? 'token-pressure' : 'cadence';
         yield* takeContextEpoch(turnId, attributionGeneration);
       }
       if (!retry) return;
@@ -947,6 +1069,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       adapter: deps.adapter,
       ...(deps.nativeBudget ? { nativeBudget: deps.nativeBudget } : {}),
       ...(nativeBudgetState ? { nativeBudgetState } : {}),
+      ...(deps.contentStore ? { contentStore: deps.contentStore } : {}),
       registry: deps.registry,
       policy: deps.policy,
       ruleStore: deps.ruleStore,
@@ -1069,6 +1192,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     validatePermissionRequest,
     cancel(): void {
       if (activePermissionTurn) retireTurn(activePermissionTurn, 'PERMISSION_CANCELLED');
+      turnAbort?.abort();
     },
     setApprovalMode(next: ApprovalMode): void {
       mode = next;
@@ -1094,7 +1218,8 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
         preambleMessages: epochPreambleLength,
         checkpoint: (checkpointDegradation ?? scratch?.readLatestCheckpoint() ?? { status: 'empty' }).status,
         refreshPlanned: contextRefreshPlanned,
-        highWaterRatio: CONTEXT_HIGH_WATER_RATIO,
+        highWaterRatio: contextBudget.contextHighWaterRatio,
+        ...(lastContextTrigger ? { lastContextTrigger } : {}),
       };
     },
     clearLastRequestMeasurement(): void {
@@ -1119,6 +1244,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       const attributionGeneration = requestAttributionGeneration;
       // A fresh abort seam for the explicit compaction (cancel() aborts it).
       turnAbort = new AbortController();
+      lastContextTrigger = 'manual';
       return takeContextEpoch(`compact-${compactSequence}`, attributionGeneration);
     },
     close(options = {}): void {

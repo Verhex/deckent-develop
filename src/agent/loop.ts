@@ -23,14 +23,16 @@ import {
   evaluateNativeBudget,
   type NativeBudgetState,
 } from './guards/recursion.js';
-import type { ResolvedNativeAgentBudget } from '../core/execution-budget-policy.js';
+import { DEFAULT_NATIVE_AGENT_BUDGET, type ResolvedNativeAgentBudget } from '../core/execution-budget-policy.js';
+import { brokerToolResult, ToolResultContextBudgetError, type ContentWriter } from './tool-result-broker.js';
 import { checkSelfModifying } from './guards/self-modifying.js';
 import { accrue, costExceeded, type CostGuardState } from './guards/cost.js';
 import { classifyShellCommand } from './guards/shell-risk.js';
 import {
   fitMessagesToBudget,
   derivePromptBudget,
-  estimateTokens,
+  measureProviderRequest,
+  digestProviderRequest,
   estimateMessageTokens,
 } from './context-budget.js';
 import { matchRule } from './permission-types.js';
@@ -84,6 +86,7 @@ export interface PermissionIssueInput {
 }
 
 export interface LoopDeps {
+  contentStore?: ContentWriter;
   adapter: ProviderAdapter;
   registry: ToolRegistry;
   policy: PermissionPolicy;
@@ -186,6 +189,7 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     ...(deps.scratchDir !== undefined ? { scratchDir: deps.scratchDir } : {}),
   });
   let iterations = 0;
+  let lastPressureTranscript: string | undefined;
   const budgetState = deps.nativeBudget
     ? (deps.nativeBudgetState ?? createNativeBudgetState())
     : undefined;
@@ -257,24 +261,39 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     // a single round of oversized tool results still overflows, and the 25%
     // floor above deliberately keeps a window even when overheads swallow the
     // context. Measure the ACTUAL request the way the wire will carry it.
-    const fixedOverheadTokens = estimateTokens(system)
-      + estimateTokens(JSON.stringify(toolSchemas))
-      + outputCeilingTokens
-      + contextSafetyReserveTokens;
-    const fitRequest = (source: readonly ProviderMessage[]): {
+    const measureMessages = async (source: readonly ProviderMessage[]): Promise<number> => {
+      if (rawBudget === undefined || rawBudget <= 0) return 0;
+      const measurement = await measureProviderRequest({
+        request: {
+          system, messages: [...source], tools: toolSchemas, model,
+          ...(outputCeilingTokens > 0 ? { outputCeilingTokens } : {}),
+        },
+        identity: {
+          provider: adapter.name, model, contextWindowTokens: rawBudget,
+          contextProvenance: 'configured-narrowing',
+        },
+        ...(adapter.requestMeasurement ? { capability: adapter.requestMeasurement } : {}),
+      });
+      return measurement.inputTokens + outputCeilingTokens + contextSafetyReserveTokens;
+    };
+    const fitRequest = async (source: readonly ProviderMessage[]): Promise<{
       messages: ProviderMessage[];
       droppedCount: number;
       keptTokens: number;
       requiredTokens: number;
-    } => {
-      const fit = budget !== undefined && budget > 0
+    }> => {
+      const measured = await measureMessages(source);
+      // Exact measurement is authority. The heuristic chooses a pairing-safe
+      // candidate only after the whole request is proven too large.
+      const needsFit = deps.nativeBudget === undefined || (rawBudget !== undefined && measured > rawBudget);
+      const fit = needsFit && budget !== undefined && budget > 0
         ? fitMessagesToBudget(source, budget)
         : { messages: [...source], droppedCount: 0, estimatedTokens: source.reduce((n, m) => n + estimateMessageTokens(m), 0) };
       return {
         messages: fit.messages,
         droppedCount: fit.droppedCount,
         keptTokens: fit.estimatedTokens,
-        requiredTokens: fixedOverheadTokens + fit.messages.reduce((n, m) => n + estimateMessageTokens(m), 0),
+        requiredTokens: fit.droppedCount > 0 ? await measureMessages(fit.messages) : measured,
       };
     };
     // Admission needs BOTH a known effective context and a resolved native
@@ -286,7 +305,7 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       deps.nativeBudget !== undefined && rawBudget !== undefined && rawBudget > 0
       && requiredTokens > rawBudget;
 
-    let fitted = fitRequest(transcript.toProviderMessages());
+    let fitted = await fitRequest(transcript.toProviderMessages());
     if (fitted.droppedCount > 0) {
       yield {
         type: 'notice',
@@ -298,15 +317,17 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       // Epoch-compaction path: ask the session layer ONCE to checkpoint (which
       // may compact the transcript into a fresh epoch while this generator is
       // suspended on the yield), then re-read + re-fit and judge again.
-      yield {
-        type: 'budget-checkpoint-request',
-        reason: 'token-pressure',
-        rounds: budgetState?.rounds ?? iterations,
-        toolCalls: budgetState?.toolCalls ?? 0,
-      };
+      const pressureTranscript = digestProviderRequest({ system, messages: transcript.toProviderMessages(), tools: toolSchemas, model });
+      if (pressureTranscript !== lastPressureTranscript) {
+        lastPressureTranscript = pressureTranscript;
+        yield {
+          type: 'budget-checkpoint-request', reason: 'token-pressure',
+          rounds: budgetState?.rounds ?? iterations, toolCalls: budgetState?.toolCalls ?? 0,
+        };
+      }
       // Re-fit silently: a consumer that ignored the checkpoint would otherwise
       // get the identical compaction notice twice for one round.
-      fitted = fitRequest(transcript.toProviderMessages());
+      fitted = await fitRequest(transcript.toProviderMessages());
       if (overContext(fitted.requiredTokens)) {
         // Shipping this request would be a doomed call — the backend truncates
         // server-side and returns an empty turn. Current-turn messages are
@@ -343,6 +364,11 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         const segmentRequest: ProviderRequest = {
           ...req, messages: continuationMessages, ...(turnSignal ? { signal: turnSignal } : {}),
         };
+        if (continuationIndex > 0 && overContext(await measureMessages(continuationMessages))) {
+          yield { type: 'error', code: 'native-context.admission-denied', message: 'native-context.admission-denied' };
+          yield { type: 'turn-end' };
+          return;
+        }
         for await (const ev of adapter.send(segmentRequest)) {
         // Mid-stream cancel(): stop consuming further provider events instead of
         // running the in-flight turn to completion (breaking a for-await triggers
@@ -472,6 +498,19 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         budgetState.noProgressCheckpointRequested = false;
       } else {
         budgetState.noProgressRounds++;
+      }
+    }
+    // Reserve room for the incoming batch before publishing its tool-call
+    // owner. A checkpoint here cannot orphan pending call/result pairs.
+    if (calls.length > 0 && deps.nativeBudget && rawBudget !== undefined && rawBudget > 0) {
+      const retained = transcript.toProviderMessages().reduce(
+        (bytes, message) => bytes + (message.role === 'tool' ? Buffer.byteLength(message.content, 'utf8') : 0), 0);
+      const total = rawBudget * deps.nativeBudget.maxTurnToolResultShareOfContext;
+      const desired = Math.min(rawBudget * deps.nativeBudget.maxToolResultShareOfContext * calls.length,
+        total * deps.nativeBudget.contextHighWaterRatio);
+      if (retained > 0 && total - retained < desired) {
+        yield { type: 'budget-checkpoint-request', reason: 'token-pressure',
+          rounds: budgetState?.rounds ?? iterations, toolCalls: budgetState?.toolCalls ?? 0 };
       }
     }
     if (assistantText !== '' || calls.length > 0) {
@@ -684,6 +723,28 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       try { result = await def.handler(call.args); }
       catch (e) { result = { ok: false, output: e instanceof Error ? e.message : String(e) }; }
       finally { leaveToolExecution?.(); }
+      if (deps.nativeBudget && rawBudget !== undefined && rawBudget > 0) {
+        const retainedBytes = transcript.toProviderMessages().reduce(
+          (total, message) => total + (message.role === 'tool' ? Buffer.byteLength(message.content, 'utf8') : 0), 0,
+        );
+        const singleShare = deps.nativeBudget.maxToolResultShareOfContext ?? DEFAULT_NATIVE_AGENT_BUDGET.maxToolResultShareOfContext;
+        const turnShare = deps.nativeBudget.maxTurnToolResultShareOfContext ?? DEFAULT_NATIVE_AGENT_BUDGET.maxTurnToolResultShareOfContext;
+        // One UTF-8 byte is the conservative token upper bound. Never multiply
+        // a context allocation by the optimistic chars/4 display estimate.
+        const cap = Math.min(Math.floor(rawBudget * singleShare), Math.floor((Math.floor(rawBudget * turnShare) - retainedBytes) / (calls.length - callIndex)));
+        try {
+          result = { ...result, output: brokerToolResult(result, {
+            store: deps.contentStore ?? { write: () => { throw new Error('Session content store unavailable'); } },
+            maxPreviewBytes: Math.max(1, cap), maxRenderedBytes: cap,
+          }) };
+        } catch (error) {
+          if (!(error instanceof ToolResultContextBudgetError)) throw error;
+          for (const pending of calls.slice(callIndex)) transcript.appendToolResult(pending.id, '[context-budget-hold]');
+          yield { type: 'error', code: error.code, message: error.code };
+          yield { type: 'turn-end' };
+          return;
+        }
+      }
       yield { type: 'tool-result', id: call.id, tool: call.name, ok: result.ok, output: result.output };
       transcript.appendToolResult(call.id, result.output);
     }
@@ -698,6 +759,24 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       for (const call of calls.slice(cancelledAt)) transcript.appendToolResult(call.id, '[cancelled]');
       yield { type: 'turn-end' };
       return;
+    }
+    if (deps.nativeBudget && rawBudget !== undefined && rawBudget > 0) {
+      const highWater = deps.nativeBudget.contextHighWaterRatio ?? DEFAULT_NATIVE_AGENT_BUDGET.contextHighWaterRatio;
+      const retainedBytes = transcript.toProviderMessages().reduce(
+        (total, message) => total + (message.role === 'tool' ? Buffer.byteLength(message.content, 'utf8') : 0), 0,
+      );
+      const retainedCap = rawBudget * (deps.nativeBudget.maxTurnToolResultShareOfContext ?? DEFAULT_NATIVE_AGENT_BUDGET.maxTurnToolResultShareOfContext);
+      if (await measureMessages(transcript.toProviderMessages()) >= rawBudget * highWater
+        || retainedBytes >= retainedCap * highWater) {
+        const pressureTranscript = digestProviderRequest({ system, messages: transcript.toProviderMessages(), tools: toolSchemas, model });
+        if (pressureTranscript !== lastPressureTranscript) {
+          lastPressureTranscript = pressureTranscript;
+          yield {
+            type: 'budget-checkpoint-request', reason: 'token-pressure',
+            rounds: budgetState?.rounds ?? iterations, toolCalls: budgetState?.toolCalls ?? 0,
+          };
+        }
+      }
     }
     // loop continues — the model sees the tool results on the next iteration.
   }

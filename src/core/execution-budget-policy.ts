@@ -31,6 +31,9 @@ export interface XverifyAdjudicationPurposeProfile {
 // ─── NATIVE-AGENT-HORIZON-001: terminal/native-agent session budget ─────────
 
 export interface ResolvedNativeAgentBudget {
+  readonly contextHighWaterRatio: number;
+  readonly maxToolResultShareOfContext: number;
+  readonly maxTurnToolResultShareOfContext: number;
   readonly maxModelRounds: number;
   readonly maxToolCalls: number;
   readonly maxWallTimeMs: number;
@@ -51,6 +54,9 @@ export interface ResolvedNativeAgentBudget {
  *  land instead of drowning. NO provider-name-keyed values — owner config is
  *  the only override authority. */
 export const DEFAULT_NATIVE_AGENT_BUDGET: ResolvedNativeAgentBudget = Object.freeze({
+  contextHighWaterRatio: 0.75,
+  maxToolResultShareOfContext: 0.05,
+  maxTurnToolResultShareOfContext: 0.20,
   maxModelRounds: 120,
   maxToolCalls: 400,
   maxWallTimeMs: 45 * 60_000,
@@ -80,12 +86,24 @@ export function resolveNativeAgentBudget(input: {
   for (const field of NATIVE_AGENT_BUDGET_FIELDS) {
     const value = authored[field];
     if (value === undefined) continue;
+    if (field === 'contextHighWaterRatio' || field === 'maxToolResultShareOfContext'
+      || field === 'maxTurnToolResultShareOfContext') {
+      if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value >= 1) {
+        throw new ExecutionBudgetPolicyError(`execution_budget.native_agent.${field} must be a ratio strictly between 0 and 1`);
+      }
+      merged[field] = value;
+      continue;
+    }
     if (!Number.isSafeInteger(value) || (value as number) <= 0) {
       throw new ExecutionBudgetPolicyError(
         `execution_budget.native_agent.${field} must be a positive safe integer`,
       );
     }
     merged[field] = value as number;
+  }
+  if (merged.maxToolResultShareOfContext! > merged.maxTurnToolResultShareOfContext!
+    || merged.maxTurnToolResultShareOfContext! >= merged.contextHighWaterRatio!) {
+    throw new ExecutionBudgetPolicyError('execution_budget.native_agent requires single tool share <= retained turn share < context high-water ratio');
   }
   return Object.freeze(merged) as unknown as ResolvedNativeAgentBudget;
 }
