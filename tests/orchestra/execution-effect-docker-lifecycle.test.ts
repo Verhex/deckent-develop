@@ -55,6 +55,7 @@ import {
   type ExecutionEffectDockerRawCaptureV1,
   type ExecutionEffectDockerWorkspacePlanV1,
   type PrepareExecutionEffectDockerWorkspaceV1Input,
+  _adapterFailureDiagnosticsInternals,
 } from '../../src/orchestra/execution-effect-docker-lifecycle.js';
 import {
   createExecutionEffectStoreAdapterV1,
@@ -215,6 +216,8 @@ interface AdapterOptions {
   readonly finalFirstIdentitySalt?: string;
   readonly finalSecondIdentitySalt?: string;
   readonly finalCaptureError?: Error;
+  readonly prepareCallError?: Error;
+  readonly providerStartRevalidationError?: Error;
 }
 
 function fakeAdapter(
@@ -323,6 +326,7 @@ function fakeAdapter(
     },
     async inspectImage(input) {
       calls.push('inspect:image');
+      if (options.prepareCallError) throw options.prepareCallError;
       const observedImageDigest = options.wrongImageDigest
         ? sha('foreign-image') : input.expectedImageDigest;
       return createExecutionEffectDockerImageObservationV1({
@@ -455,6 +459,9 @@ function fakeAdapter(
     },
     async captureWorkspace(input) {
       calls.push(`capture:${input.operation}`);
+      if (input.operation === 'BASELINE_REVALIDATION' && options.providerStartRevalidationError) {
+        throw options.providerStartRevalidationError;
+      }
       if (input.operation.startsWith('FINAL_QUIESCENCE_') && options.finalCaptureError) {
         throw options.finalCaptureError;
       }
@@ -1591,8 +1598,150 @@ describe('execution effect Docker lifecycle authority', () => {
     const result = await prepareExecutionEffectDockerWorkspaceV1(
       prepareInput(workspacePlan), adapter, clock(),
     );
-    expect(result).toMatchObject({ state: 'HOLD', code: 'ADAPTER_UNAVAILABLE' });
+    expect(result).toMatchObject({
+      state: 'HOLD', code: 'ADAPTER_UNAVAILABLE', failure: { stage: 'prepare', errorName: 'Error' },
+    });
     expect(valid.calls).toEqual([]);
+  });
+
+  describe('ADAPTER_UNAVAILABLE failure diagnostics', () => {
+    const { projectAdapterFailureDetail, formatAdapterFailureForDebugLog } = _adapterFailureDiagnosticsInternals;
+
+    function expectBoundedFailure(
+      result: unknown,
+      stage: string,
+    ): asserts result is { state: 'HOLD'; code: 'ADAPTER_UNAVAILABLE'; failure: { message: string } } {
+      expect(result).toMatchObject({ state: 'HOLD', code: 'ADAPTER_UNAVAILABLE', failure: { stage } });
+      if (!result || typeof result !== 'object' || !('failure' in result)) throw new Error('missing failure');
+      const failure = (result as { failure: { message: string; errorName: string } }).failure;
+      expect(failure.message.length).toBeGreaterThan(0);
+      expect(Buffer.byteLength(failure.message, 'utf8')).toBeLessThanOrEqual(512);
+      expect(JSON.stringify(result)).not.toMatch(/private\/custody/u);
+    }
+
+    it('redacts Bearer tokens without requiring sk-ant in the same message', () => {
+      const failure = projectAdapterFailureDetail(
+        new Error('Authorization failed: Bearer eyJhbGciOiJIUzI1NiJ9.payload'),
+        'prepare-call',
+      );
+      expect(failure.message).toMatch(/Bearer \[REDACTED\]/u);
+      expect(failure.message).not.toMatch(/eyJhbGciOiJIUzI1NiJ9/u);
+    });
+
+    it('redacts sk-ant keys without requiring Bearer in the same message', () => {
+      const failure = projectAdapterFailureDetail(
+        new Error('auth rejected sk-ant-test-secret-token at gateway'),
+        'prepare-call',
+      );
+      expect(failure.message).toMatch(/\[REDACTED\]/u);
+      expect(failure.message).not.toMatch(/sk-ant-test-secret-token/u);
+    });
+
+    it('strips control characters from adapter failure messages', () => {
+      const failure = projectAdapterFailureDetail(
+        new Error('before\x00\x1Fafter\x7Fvisible'),
+        'prepare-call',
+      );
+      expect(failure.message).toBe('before  after visible');
+    });
+
+    it('truncates multibyte adapter failure messages without splitting code units', () => {
+      const emojiBlock = '🙂'.repeat(300);
+      const failure = projectAdapterFailureDetail(new Error(emojiBlock), 'prepare-call');
+      expect(Buffer.byteLength(failure.message, 'utf8')).toBeLessThanOrEqual(512);
+      expect(failure.message.endsWith('🙂')).toBe(true);
+    });
+
+    it('truncates long single-byte adapter failure messages to 512 bytes', () => {
+      const failure = projectAdapterFailureDetail(new Error('x'.repeat(700)), 'prepare-call');
+      expect(Buffer.byteLength(failure.message, 'utf8')).toBeLessThanOrEqual(512);
+      expect(failure.message.length).toBeGreaterThan(400);
+    });
+
+    it('preserves string error codes on adapter failures when present', () => {
+      const coded = Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' });
+      const failure = projectAdapterFailureDetail(coded, 'prepare-call');
+      expect(failure.code).toBe('ECONNRESET');
+    });
+
+    it('serializes debugLog adapter failures with stage before message', () => {
+      const failure = projectAdapterFailureDetail(
+        Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }),
+        'prepare-call',
+      );
+      const serialized = formatAdapterFailureForDebugLog(failure);
+      expect(serialized.indexOf('"stage"')).toBeLessThan(serialized.indexOf('"code"'));
+      expect(serialized.indexOf('"code"')).toBeLessThan(serialized.indexOf('"errorName"'));
+      expect(serialized.indexOf('"errorName"')).toBeLessThan(serialized.indexOf('"message"'));
+    });
+
+    it('keeps evidenceDigest stable when only adapter failure message differs', async () => {
+      const workspacePlan = plan();
+      const input = prepareInput(workspacePlan);
+      const resultA = await prepareExecutionEffectDockerWorkspaceV1(
+        input,
+        fakeAdapter(workspacePlan, { prepareCallError: new Error('alpha failure detail') }).adapter,
+        clock(),
+      );
+      const resultB = await prepareExecutionEffectDockerWorkspaceV1(
+        input,
+        fakeAdapter(workspacePlan, { prepareCallError: new Error('beta failure detail completely different') }).adapter,
+        clock(),
+      );
+      expect(resultA).toMatchObject({ state: 'HOLD', code: 'ADAPTER_UNAVAILABLE' });
+      expect(resultB).toMatchObject({ state: 'HOLD', code: 'ADAPTER_UNAVAILABLE' });
+      if (resultA.state !== 'HOLD' || resultB.state !== 'HOLD') throw new Error('expected holds');
+      expect(resultA.evidenceDigest).toBe(resultB.evidenceDigest);
+      expect(resultA.failure?.message).not.toBe(resultB.failure?.message);
+    });
+
+    it('surfaces prepare-call adapter failures with redacted bounded detail', async () => {
+      const workspacePlan = plan();
+      const secretError = new Error(
+        'Bearer sk-ant-test-secret-token failed at /private/custody/provider.stderr',
+      );
+      const fake = fakeAdapter(workspacePlan, { prepareCallError: secretError });
+      const result = await prepareExecutionEffectDockerWorkspaceV1(
+        prepareInput(workspacePlan), fake.adapter, clock(),
+      );
+      expectBoundedFailure(result, 'prepare-call');
+      expect(result.failure?.message).toMatch(/\[REDACTED\]/u);
+      expect(fake.calls).toContain('inspect:image');
+    });
+
+    it('surfaces provider-start revalidation adapter failures with redacted bounded detail', async () => {
+      const workspacePlan = plan();
+      const secretError = new Error(
+        'Bearer sk-ant-test-secret-token failed at /private/custody/provider.stderr',
+      );
+      const fake = fakeAdapter(workspacePlan, { providerStartRevalidationError: secretError });
+      const prepared = await prepareExecutionEffectDockerWorkspaceV1(
+        prepareInput(workspacePlan), fake.adapter, clock(),
+      );
+      if (prepared.state !== 'PREPARED') throw new Error('prepare failed');
+      const result = await authorizeExecutionEffectDockerProviderStartV1(prepared.session);
+      expectBoundedFailure(result, 'provider-start-revalidation-call');
+    });
+
+    it('surfaces rehydrate-allocation adapter failures when allocation methods are missing', async () => {
+      const workspacePlan = plan();
+      const input = prepareInput(workspacePlan);
+      const allocation = allocateExecutionEffectDockerWorkspaceV1(input);
+      if (allocation.state !== 'ALLOCATING') throw new Error('allocation failed');
+      const valid = fakeAdapter(workspacePlan);
+      const adapter = Object.create(null) as ExecutionEffectDockerLifecycleAdapterV1;
+      Object.defineProperty(adapter, 'inspectImage', { enumerable: true, value: valid.adapter.inspectImage });
+      const result = await rehydrateExecutionEffectDockerLifecycleV1({
+        authority: allocation.lifecycleAuthority,
+        adapter,
+        clock: clock(),
+      });
+      expect(result).toMatchObject({
+        state: 'HOLD',
+        code: 'ADAPTER_UNAVAILABLE',
+        failure: { stage: 'rehydrate-allocation', errorName: 'Error', message: 'adapter methods unavailable' },
+      });
+    });
   });
 
   it('does not accept forged or reused opaque lifecycle sessions', async () => {

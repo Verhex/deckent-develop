@@ -480,8 +480,9 @@ const INPUT_CONTEXT_OVERFLOW_KEY = 'native-context.admission-denied';
 const CONTINUATION_EXHAUSTED_KEY = 'native-output.continuation-exhausted';
 const OUTPUT_CEILING_REACHED_KEY = 'native.output-ceiling-reached';
 const EMPTY_VISIBLE_WITH_REASONING_KEY = 'native.empty-visible-with-reasoning';
-const REFERENCE_EXPANSION_CHECKPOINT_KEY = 'native.reference-expansion-checkpoint';
-// 562-003 — the same REFERENCE_EXPANSION class family: a Task-1 (562-001) descriptor
+const MEASURED_CONTEXT_PRESSURE_CHECKPOINT_KEY = 'native-context.checkpoint_token_pressure';
+const CADENCE_CHECKPOINT_KEY = 'native-context.checkpoint_cadence';
+// 562-003 — REFERENCE_DESCRIPTOR fallback family: a Task-1 (562-001) descriptor
 // fallback is INFORMATION about what happened this turn, never a rejection.
 const REFERENCE_DESCRIPTOR_FALLBACK_KEY = 'native.reference-descriptor-fallback';
 
@@ -512,29 +513,32 @@ const NATIVE_AGENT_SIGNAL_KEYS = new Set([
  * EMPTY_VISIBLE_CONTENT_WITH_REASONING) must never read like a genuine
  * INPUT_CONTEXT_OVERFLOW, and vice versa — today's "context window may be
  * full" mislabel on a plain output-exhaustion event is the bug this type
- * exists to prevent. REFERENCE_EXPANSION_REQUIRES_CHECKPOINT covers the
- * distinct case where expanded @ref material forces a mid-turn checkpoint.
+ * exists to prevent. MEASURED_CONTEXT_PRESSURE_REQUIRES_CHECKPOINT covers
+ * measured token-pressure checkpoints; CADENCE_REQUIRES_CHECKPOINT covers
+ * round/tool-call budget cadence ticks only (never no-progress stalls).
  */
 export type ContextLifecycleClass =
   | 'INPUT_CONTEXT_OVERFLOW'
   | 'OUTPUT_CEILING_REACHED'
   | 'CONTINUATION_EXHAUSTED'
   | 'EMPTY_VISIBLE_CONTENT_WITH_REASONING'
-  | 'REFERENCE_EXPANSION_REQUIRES_CHECKPOINT';
+  | 'MEASURED_CONTEXT_PRESSURE_REQUIRES_CHECKPOINT'
+  | 'CADENCE_REQUIRES_CHECKPOINT';
 
 const CONTEXT_LIFECYCLE_MESSAGE_KEY: Record<ContextLifecycleClass, string> = {
   INPUT_CONTEXT_OVERFLOW: INPUT_CONTEXT_OVERFLOW_KEY,
   OUTPUT_CEILING_REACHED: OUTPUT_CEILING_REACHED_KEY,
   CONTINUATION_EXHAUSTED: CONTINUATION_EXHAUSTED_KEY,
   EMPTY_VISIBLE_CONTENT_WITH_REASONING: EMPTY_VISIBLE_WITH_REASONING_KEY,
-  REFERENCE_EXPANSION_REQUIRES_CHECKPOINT: REFERENCE_EXPANSION_CHECKPOINT_KEY,
+  MEASURED_CONTEXT_PRESSURE_REQUIRES_CHECKPOINT: MEASURED_CONTEXT_PRESSURE_CHECKPOINT_KEY,
+  CADENCE_REQUIRES_CHECKPOINT: CADENCE_CHECKPOINT_KEY,
 };
 
 /**
  * Classify one AgentSessionEvent into a typed context-lifecycle UX class, or
- * `undefined` when the event carries none of the five (e.g. a non-token-
- * pressure checkpoint reason, or any other event type) — pure, so the
- * 5-way separation is directly unit-testable without driving the real loop.
+ * `undefined` when the event carries none of the typed classes (e.g. an
+ * unrecognized checkpoint reason, or any other event type) — pure, so the
+ * separation is directly unit-testable without driving the real loop.
  */
 export function classifyContextLifecycleEvent(ev: AgentSessionEvent): ContextLifecycleClass | undefined {
   if (ev.type === 'error' && ev.code === INPUT_CONTEXT_OVERFLOW_KEY) return 'INPUT_CONTEXT_OVERFLOW';
@@ -544,8 +548,11 @@ export function classifyContextLifecycleEvent(ev: AgentSessionEvent): ContextLif
       ? 'EMPTY_VISIBLE_CONTENT_WITH_REASONING'
       : 'OUTPUT_CEILING_REACHED';
   }
-  if (ev.type === 'budget-checkpoint-request' && ev.reason === 'token-pressure') {
-    return 'REFERENCE_EXPANSION_REQUIRES_CHECKPOINT';
+  if (ev.type === 'budget-checkpoint-request') {
+    if (ev.reason === 'token-pressure') return 'MEASURED_CONTEXT_PRESSURE_REQUIRES_CHECKPOINT';
+    if (ev.reason === 'cadence-rounds' || ev.reason === 'cadence-toolcalls') {
+      return 'CADENCE_REQUIRES_CHECKPOINT';
+    }
   }
   return undefined;
 }

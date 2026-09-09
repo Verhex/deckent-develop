@@ -17,6 +17,11 @@
 //      enters `closedAbsentAfterExit` / `exactEntries`, with no hold.
 //   2. The SAME attempt without the archive chain (chain ends at accepted-result)
 //      keeps today's behaviour: it is recovered as an `accepted` exact entry.
+//   3. Containment (2026-09-09, sprint-731 flow `fd218d1c`): an archived attempt
+//      is inventoried `absent` ONLY after the daemon proves its container gone
+//      (one read-only `docker inspect`, no stop). A container the daemon still
+//      knows, or a probe that cannot decide, is a typed hold and never absence.
+//      Resume mode never probes.
 //
 // Hermetic: node:child_process + file-lock mocked; the project root is a
 // per-test `mkdtemp` directory; the custody store is the in-memory helper
@@ -76,9 +81,16 @@ function projectRoot(): string {
  * real custody-store fixture, so the reconciler reads the fixture's genuine
  * chain receipts while every unrelated Store query stays explicit.
  */
+type DaemonAnswer =
+  | 'container-absent'
+  | 'container-present'
+  | 'container-probe-failed'
+  | 'container-probe-malformed'
+  | 'unstubbed';
+
 function recoveryHarness(
   fixture: TaskResultAcceptedV2Fixture,
-  daemon: 'container-absent' | 'unstubbed' = 'unstubbed',
+  daemon: DaemonAnswer = 'unstubbed',
 ) {
   const identity = fixture.identity;
   const admissionRef = {
@@ -174,19 +186,56 @@ function recoveryHarness(
   // runner. `docker inspect` on a removed container answers exit 1 with an
   // empty stdout and the daemon's "no such object" line — the exact shape
   // `isExactDockerContainerAbsent` accepts.
-  const workspaceCommands = vi.fn(async () => Object.freeze({
-    status: 1,
-    signal: null,
-    stdout: new Uint8Array(),
-    stderr: Buffer.from(`error: no such object: ${authority.backendExecutionId}`),
-    error: false,
-    overflow: false,
-  }));
-  if (daemon === 'container-absent') {
+  const workspaceCommands = vi.fn(async () => {
+    if (daemon === 'container-present') {
+      // A stopped-but-not-removed container: the daemon still owns an object
+      // for it, so `inspect` succeeds and reports `running|exitCode`.
+      return Object.freeze({
+        status: 0,
+        signal: null,
+        stdout: Buffer.from('true|0\n'),
+        stderr: new Uint8Array(),
+        error: false,
+        overflow: false,
+      });
+    }
+    if (daemon === 'container-probe-failed') {
+      throw new Error('docker transport unavailable');
+    }
+    if (daemon === 'container-probe-malformed') {
+      // Non-zero exit that is NOT the daemon's "no such object" answer: the
+      // probe can neither prove absence nor success.
+      return Object.freeze({
+        status: 1,
+        signal: null,
+        stdout: new Uint8Array(),
+        stderr: Buffer.from('permission denied while trying to connect to the daemon'),
+        error: false,
+        overflow: false,
+      });
+    }
+    return Object.freeze({
+      status: 1,
+      signal: null,
+      stdout: new Uint8Array(),
+      stderr: Buffer.from(`error: no such object: ${authority.backendExecutionId}`),
+      error: false,
+      overflow: false,
+    });
+  });
+  if (daemon !== 'unstubbed') {
     internals.exactWorkspaceCommandRunner = workspaceCommands;
   }
+  // Containment of an archived attempt is never attempted automatically: the
+  // call-through spy proves no stop-and-record path is entered for terminal
+  // history, while the non-archived tests keep the real containment behaviour.
+  const containExactDockerCustodyAttempt = vi.spyOn(
+    backend as unknown as { containExactDockerCustodyAttempt: (...args: unknown[]) => Promise<unknown> },
+    'containExactDockerCustodyAttempt',
+  );
   return {
     backend, identity, store, readColdExactDockerAcceptedResult, workspaceCommands,
+    containExactDockerCustodyAttempt, containerId: authority.backendExecutionId,
   };
 }
 
@@ -232,19 +281,92 @@ describe('docker restart reconciliation of terminally archived attempts', () => 
     expect(harness.readColdExactDockerAcceptedResult).not.toHaveBeenCalled();
   });
 
-  // Pin the deliberate containment delta: the skip lands BEFORE the
-  // `mode: 'contain'` branch, so an archived attempt is no longer inspected /
-  // stopped as if a container could still exist for it. There is nothing to
-  // contain in terminal history.
-  it('reports an archived attempt as history in containment mode too', async () => {
+  // Measured 2026-09-09 (sprint-731 flow `fd218d1c`): the run's OWN `731-001`
+  // was archived before FIX, the containment barrier requires every owned
+  // entry to inventory `absent`, and the archived skip recorded nothing — so
+  // the run died with `EXACT_CONTAINMENT_INCOMPLETE`. Absence is now recorded
+  // by observation: one read-only `docker inspect`, no stop, no containment.
+  it('inventories an archived attempt absent in containment mode once the daemon proves it', async () => {
     const fixture = createTaskResultSettlementV2Fixture();
-    const harness = recoveryHarness(fixture);
+    const harness = recoveryHarness(fixture, 'container-absent');
+    expect(harness.backend.workerInventoryState(harness.identity.taskId)).toBe('unknown');
 
     const report = await harness.backend.reconcilePendingAttempts({ mode: 'contain' });
 
     expect(report.historicalArchived).toEqual([harness.identity.taskId]);
     expect(report.adopted).not.toContain(harness.identity.taskId);
     expect(report.held).toEqual([]);
+    expect(harness.backend.workerInventoryState(harness.identity.taskId)).toBe('absent');
+    expect(harness.workspaceCommands).toHaveBeenCalledTimes(1);
+    expect(harness.workspaceCommands.mock.calls[0]?.[0]).toMatchObject({
+      command: 'docker',
+      args: ['inspect', '--format', '{{.State.Running}}|{{.State.ExitCode}}', harness.containerId],
+    });
+    expect(harness.containExactDockerCustodyAttempt).not.toHaveBeenCalled();
+    expect(harness.readColdExactDockerAcceptedResult).not.toHaveBeenCalled();
+  });
+
+  // Archived history whose container the daemon STILL knows is a real
+  // containment problem: it is reported as a typed hold with the daemon fact,
+  // never stopped automatically (no dispatch authority covers a stop for a
+  // closed attempt) and never projected `absent`.
+  it('holds an archived attempt whose container the daemon still reports present', async () => {
+    const fixture = createTaskResultSettlementV2Fixture();
+    const harness = recoveryHarness(fixture, 'container-present');
+
+    const report = await harness.backend.reconcilePendingAttempts({ mode: 'contain' });
+
+    expect(report.historicalArchived).toBeUndefined();
+    expect(report.adopted).not.toContain(harness.identity.taskId);
+    expect(report.held).toEqual([expect.objectContaining({
+      kind: 'spawn-backend-recovery-hold',
+      backend: 'docker',
+      taskId: harness.identity.taskId,
+      admissionRefDigest: digest('4'),
+      authorityState: 'DISPATCH_TERMINAL',
+      reasonCode: 'ARCHIVED_ATTEMPT_CONTAINER_PRESENT',
+      daemonContainerState: 'present',
+    })]);
+    expect(harness.backend.workerInventoryState(harness.identity.taskId)).toBe('unknown');
+    expect(harness.workspaceCommands).toHaveBeenCalledTimes(1);
+    expect(harness.containExactDockerCustodyAttempt).not.toHaveBeenCalled();
+  });
+
+  // Fail closed: a probe that cannot decide proves nothing, so the attempt is
+  // held as `unknown` — absence is a fact the daemon states, never a default.
+  it.each([
+    ['throws', 'container-probe-failed' as const],
+    ['answers a malformed non-absence failure', 'container-probe-malformed' as const],
+  ])('holds an archived attempt as state-unknown when the daemon probe %s', async (_label, daemon) => {
+    const fixture = createTaskResultSettlementV2Fixture();
+    const harness = recoveryHarness(fixture, daemon);
+
+    const report = await harness.backend.reconcilePendingAttempts({ mode: 'contain' });
+
+    expect(report.historicalArchived).toBeUndefined();
+    expect(report.held).toEqual([expect.objectContaining({
+      taskId: harness.identity.taskId,
+      authorityState: 'DISPATCH_TERMINAL',
+      reasonCode: 'ARCHIVED_ATTEMPT_CONTAINER_STATE_UNKNOWN',
+      daemonContainerState: 'unknown',
+    })]);
+    expect(harness.backend.workerInventoryState(harness.identity.taskId)).toBe('unknown');
+    expect(harness.workspaceCommands).toHaveBeenCalledTimes(1);
+    expect(harness.containExactDockerCustodyAttempt).not.toHaveBeenCalled();
+  });
+
+  // Resume never needs containment proof: byte-identical to before — no
+  // probe, history reported, inventory left `unknown`.
+  it('never probes the daemon for an archived attempt in resume mode', async () => {
+    const fixture = createTaskResultSettlementV2Fixture();
+    const harness = recoveryHarness(fixture, 'container-present');
+
+    const report = await harness.backend.reconcilePendingAttempts({ mode: 'resume' });
+
+    expect(report.historicalArchived).toEqual([harness.identity.taskId]);
+    expect(report.held).toEqual([]);
+    expect(harness.workspaceCommands).not.toHaveBeenCalled();
+    expect(harness.backend.workerInventoryState(harness.identity.taskId)).toBe('unknown');
   });
 
   // The 2026-09-09 `EXACT_LIFECYCLE_CONTAIN_HOLD` shape: a released,

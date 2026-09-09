@@ -3779,11 +3779,15 @@ const BASE_MESSAGES: MessageMap = {
     en: 'The model spent its output budget on hidden reasoning without producing visible text yet — continuing automatically to recover a visible answer. This is an output issue, not a full context window.',
     tr: 'Model çıktı bütçesini görünür metin üretmeden gizli akıl yürütmeye harcadı — görünür bir yanıt kurtarmak için otomatik olarak sürdürülüyor. Bu bir çıktı sorunudur, bağlam penceresinin dolması değil.',
   },
-  'native.reference-expansion-checkpoint': {
-    en: 'Expanded reference material pushed this turn\'s context near its limit — saving a checkpoint before continuing.',
-    tr: 'Genişletilmiş referans içeriği bu turun bağlamını sınırına yaklaştırdı — devam etmeden önce bir checkpoint kaydediliyor.',
+  'native-context.checkpoint_token_pressure': {
+    en: 'Measured context pressure pushed this turn\'s context near its limit — saving a checkpoint before continuing.',
+    tr: 'Ölçülmüş bağlam baskısı bu turun bağlamını sınırına yaklaştırdı — devam etmeden önce bir checkpoint kaydediliyor.',
   },
-  // 562-003 — REFERENCE_EXPANSION family: informational, never a rejection. Fires
+  'native-context.checkpoint_cadence': {
+    en: 'Execution budget checkpoint reached — saving progress before continuing.',
+    tr: 'Yürütme bütçesi checkpoint’ine ulaşıldı — devam etmeden önce ilerleme kaydediliyor.',
+  },
+  // 562-003 — REFERENCE_DESCRIPTOR family: informational, never a rejection. Fires
   // when at-ref.ts's expandAtRefs (562-001) could not fit one or more `@ref`
   // references inline within the measured budget and fell back to a descriptor
   // (path + size + digest) that the model reads itself via deckent_read_file.

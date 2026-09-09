@@ -971,7 +971,8 @@ describe('560-006 · incident-shaped hermetic battery (11/11 regression proofs)'
       'OUTPUT_CEILING_REACHED',
       'CONTINUATION_EXHAUSTED',
       'EMPTY_VISIBLE_CONTENT_WITH_REASONING',
-      'REFERENCE_EXPANSION_REQUIRES_CHECKPOINT',
+      'MEASURED_CONTEXT_PRESSURE_REQUIRES_CHECKPOINT',
+      'CADENCE_REQUIRES_CHECKPOINT',
     ];
 
     const SAMPLE_EVENTS: Record<ContextLifecycleClass, AgentSessionEvent> = {
@@ -979,7 +980,8 @@ describe('560-006 · incident-shaped hermetic battery (11/11 regression proofs)'
       OUTPUT_CEILING_REACHED: { type: 'generation-recovery', classification: 'OUTPUT_LIMIT', continuationIndex: 0, maxContinuations: 2, hiddenReasoningObserved: false, action: 'continue' },
       CONTINUATION_EXHAUSTED: { type: 'error', code: 'native-output.continuation-exhausted', message: 'native-output.continuation-exhausted' },
       EMPTY_VISIBLE_CONTENT_WITH_REASONING: { type: 'generation-recovery', classification: 'EMPTY_VISIBLE_AFTER_REASONING', continuationIndex: 1, maxContinuations: 2, hiddenReasoningObserved: true, action: 'continue' },
-      REFERENCE_EXPANSION_REQUIRES_CHECKPOINT: { type: 'budget-checkpoint-request', reason: 'token-pressure', rounds: 3, toolCalls: 1 },
+      MEASURED_CONTEXT_PRESSURE_REQUIRES_CHECKPOINT: { type: 'budget-checkpoint-request', reason: 'token-pressure', rounds: 3, toolCalls: 1 },
+      CADENCE_REQUIRES_CHECKPOINT: { type: 'budget-checkpoint-request', reason: 'cadence-rounds', rounds: 10, toolCalls: 0 },
     };
 
     it('classifyContextLifecycleEvent resolves every real wire event to its class, pure', () => {
@@ -992,7 +994,7 @@ describe('560-006 · incident-shaped hermetic battery (11/11 regression proofs)'
     });
 
     for (const lang of ['en', 'tr'] as const) {
-      it(`renders five pairwise-distinct real ${lang} messages (no class shows another class's message)`, () => {
+      it(`renders pairwise-distinct real ${lang} messages (no class shows another class's message)`, () => {
         const identityT = (k: string) => k;
         const t = (key: string) => getMessage(key, lang);
         const rendered = ALL_CLASSES.map((cls) => localizeContextLifecycleClass(t, cls));
@@ -1084,7 +1086,7 @@ describe('560-006 · incident-shaped hermetic battery (11/11 regression proofs)'
       expect(text).not.toContain(getMessage('native-context.admission-denied', 'en'));
     });
 
-    it('INPUT_CONTEXT_OVERFLOW + REFERENCE_EXPANSION_REQUIRES_CHECKPOINT end-to-end: a genuinely overflowed context renders both the checkpoint attempt and the terminal overflow notice, never output-exhaustion wording', async () => {
+    it('INPUT_CONTEXT_OVERFLOW + MEASURED_CONTEXT_PRESSURE end-to-end: overflowed context renders measured-pressure checkpoint and terminal overflow notice', async () => {
       const adapter = scriptedNativeAdapter([]);
       const out: string[] = [];
       const nativeBudget = {
@@ -1103,11 +1105,11 @@ describe('560-006 · incident-shaped hermetic battery (11/11 regression proofs)'
         confirm: async () => 'y', toolSink: () => {},
         t: (k) => getMessage(k, 'en'),
         nativeBudget,
-        getContextBudgetTokens: () => 5,
+        getContextBudgetTokens: () => 20_000,
       });
-      await engine('go', { output: (t) => out.push(t), onTurnEnd: () => {} });
+      await engine('x '.repeat(30_000), { output: (t) => out.push(t), onTurnEnd: () => {} });
       const text = out.join('');
-      expect(text).toContain(getMessage('native.reference-expansion-checkpoint', 'en'));
+      expect(text).toContain(getMessage('native-context.checkpoint_token_pressure', 'en'));
       expect(text).toContain(getMessage('native-context.admission-denied', 'en'));
       expect(text).not.toContain(getMessage('native-output.continuation-exhausted', 'en'));
       expect(text).not.toContain(getMessage('native.output-ceiling-reached', 'en'));

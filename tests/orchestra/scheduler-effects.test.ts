@@ -277,3 +277,164 @@ describe('historical foreign task predicate ordinal boundary', () => {
     expect(isHistorical('728-001')).toBe(false);
   });
 });
+
+// ─── The run's OWN archived attempt must satisfy the containment sweep ───────
+//
+// Measured 2026-09-09 (sprint-731, flow `fd218d1c`): `731-001` was evaluated,
+// settled and archived (custody chain 01→06 complete, container long exited)
+// BEFORE the FIX-phase containment barrier ran. The docker backend reported it
+// as `historicalArchived` but recorded no worker absence, the sweep below read
+// its inventory back as `unknown` and the run died with
+// `EXACT_CONTAINMENT_INCOMPLETE` — one line after the previous fix had
+// correctly retired foreign `728-001`.
+//
+// The backend now inventories an archived attempt `absent` only after the
+// daemon proves the container gone. The sweep's own semantics are unchanged:
+// `absent` is REQUIRED, `unknown` still throws, and an archived attempt whose
+// container the daemon still knows is a hold that history retirement never
+// consumes — even for a strictly earlier ordinal.
+describe('exact registry containment sweep over archived attempts', () => {
+  const taskId = '731-001';
+  const accepted = {
+    reader: { kind: 'accepted-result-reader', taskId },
+    acceptedResultRef: `sha256:${'1'.repeat(64)}`,
+    acceptedResultChainDigest: `sha256:${'2'.repeat(64)}`,
+    resultDigest: `sha256:${'3'.repeat(64)}`,
+  };
+  const query = {
+    custodyRef: {
+      identity: { taskId, attemptId: 'attempt-1', generation: 1, projectId: 'project' },
+      admissionReceiptDigest: `sha256:${'4'.repeat(64)}`,
+    },
+  };
+  const emptyReport = (): SpawnBackendRecoveryReport => ({
+    adopted: [], closedNotDispatched: [], closedAbsentAfterExit: [],
+    retiredLanded: [], resumedContinuations: [], exactEntries: [], held: [],
+  });
+
+  function harness(
+    inventoryAfterContain: 'absent' | 'unknown',
+    containReport: SpawnBackendRecoveryReport,
+  ) {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-archived-sweep-'));
+    roots.push(root);
+    mkdirSync(join(root, '.tasks'));
+    const registry = createExactNormalDockerExecutionRegistry(root);
+    let contained = false;
+    const backend = {
+      name: 'docker',
+      // `absent` is recorded by the backend only during containment, exactly
+      // as `exactReconciledWorkerAbsence` is populated in production.
+      workerInventoryState: (): 'active' | 'absent' | 'unknown' =>
+        (contained ? inventoryAfterContain : 'unknown'),
+      readExactDockerAcceptedResult: () => accepted,
+      reconcilePendingAttempts: vi.fn(async () => {
+        contained = true;
+        return containReport;
+      }),
+    } as unknown as SpawnBackend;
+    // Seed the CURRENT run's accepted entry, owned by this backend, exactly
+    // as the EXECUTE/EVALUATE phases leave it before FIX runs containment.
+    registry.rehydrateRecovery({
+      ...emptyReport(),
+      exactEntries: [{ kind: 'accepted', taskId, query, accepted }],
+    } as unknown as SpawnBackendRecoveryReport, backend);
+    // An accepted entry awaiting settlement — the shape the sweep iterates.
+    expect(registry.readExactTerminalAuthority(taskId)).toMatchObject({
+      state: 'hold', reasonCode: 'exact-terminal-awaiting-settlement',
+    });
+    return { registry, backend, root };
+  }
+
+  // sprint-728 is durably terminal; sprint-731 is the run being reconciled.
+  const foreignHistory = (projectRoot: string) => createHistoricalForeignTaskPredicate(
+    projectRoot,
+    'sprint-731',
+    sprintId => (sprintId === 'sprint-728' ? 'terminal' : 'unknown'),
+  );
+
+  it('completes containment when the archived current-run attempt inventories absent', async () => {
+    const { registry, backend, root } = harness('absent', {
+      ...emptyReport(), historicalArchived: [taskId],
+    });
+
+    await expect(registry.reconcileExactLifecycle('contain', {
+      isHistoricalForeignTask: foreignHistory(root),
+    })).resolves.toHaveLength(1);
+
+    expect(vi.mocked(backend.reconcilePendingAttempts!)).toHaveBeenCalledWith({ mode: 'contain' });
+    // The entry is the run's own settled result: it is neither retired as
+    // history nor held — it simply passes the sweep by observed absence.
+    expect(registry.readExactTerminalAuthority(taskId)).toMatchObject({
+      state: 'hold', reasonCode: 'exact-terminal-awaiting-settlement',
+    });
+    expect(registry.snapshotHistoricalUnsettleableAttempts().has(taskId)).toBe(false);
+  });
+
+  // Regression guard for the sweep itself: `historicalArchived` alone is never
+  // proof of containment; the inventory must read `absent`.
+  it('still throws EXACT_CONTAINMENT_INCOMPLETE when the archived attempt inventories unknown', async () => {
+    const { registry, root } = harness('unknown', {
+      ...emptyReport(), historicalArchived: [taskId],
+    });
+
+    await expect(registry.reconcileExactLifecycle('contain', {
+      isHistoricalForeignTask: foreignHistory(root),
+    })).rejects.toMatchObject({
+      code: 'DECKENT_E091',
+      message: 'EXACT_CONTAINMENT_INCOMPLETE',
+    });
+    expect(registry.readExactTerminalAuthority(taskId)).toMatchObject({
+      state: 'hold', reasonCode: 'EXACT_CONTAINMENT_INCOMPLETE',
+    });
+  });
+
+  it('never retires an archived attempt whose container is present, even from an earlier run', async () => {
+    const { registry, root } = harness('absent', {
+      ...emptyReport(),
+      held: [{
+        kind: 'spawn-backend-recovery-hold',
+        backend: 'docker',
+        dispatchRequestId: 'dreq-728-001',
+        taskId: '728-001',
+        admissionRefDigest: `sha256:${'6'.repeat(64)}`,
+        authorityState: 'DISPATCH_TERMINAL',
+        reasonCode: 'ARCHIVED_ATTEMPT_CONTAINER_PRESENT',
+        daemonContainerState: 'present',
+      }],
+    });
+
+    await expect(registry.reconcileExactLifecycle('contain', {
+      isHistoricalForeignTask: foreignHistory(root),
+    })).rejects.toMatchObject({
+      code: 'DECKENT_E091',
+      message: 'EXACT_LIFECYCLE_CONTAIN_HOLD',
+    });
+    expect(registry.readTaskResultAuthority('728-001').state).toBe('authority-hold');
+    expect(registry.readExactTerminalAuthority('728-001')).toMatchObject({
+      state: 'hold', reasonCode: 'ARCHIVED_ATTEMPT_CONTAINER_PRESENT',
+    });
+    expect(registry.snapshotHistoricalUnsettleableAttempts().has('728-001')).toBe(false);
+  });
+
+  it('never retires an archived attempt whose container state is unknown', async () => {
+    const { registry, root } = harness('absent', {
+      ...emptyReport(),
+      held: [{
+        kind: 'spawn-backend-recovery-hold',
+        backend: 'docker',
+        dispatchRequestId: 'dreq-728-001',
+        taskId: '728-001',
+        admissionRefDigest: `sha256:${'6'.repeat(64)}`,
+        authorityState: 'DISPATCH_TERMINAL',
+        reasonCode: 'ARCHIVED_ATTEMPT_CONTAINER_STATE_UNKNOWN',
+        daemonContainerState: 'unknown',
+      }],
+    });
+
+    await expect(registry.reconcileExactLifecycle('contain', {
+      isHistoricalForeignTask: foreignHistory(root),
+    })).rejects.toMatchObject({ message: 'EXACT_LIFECYCLE_CONTAIN_HOLD' });
+    expect(registry.readTaskResultAuthority('728-001').state).toBe('authority-hold');
+  });
+});

@@ -89,7 +89,13 @@ export interface SpawnBackendRecoveryReport {
   /** Attempts whose custody chain is complete through `archive`. They are already
    * terminally settled history: recovery skips them instead of replaying a cold
    * accepted result against today's derivation, which would hold every later run
-   * on the machine (same failure class as the MASTER-PLAN 664 lesson). */
+   * on the machine (same failure class as the MASTER-PLAN 664 lesson).
+   *
+   * In `contain` mode an attempt is listed here ONLY after the daemon has proven
+   * its container absent; the backend then inventories the task `absent`. A
+   * container the daemon still knows, or a probe that cannot decide, becomes a
+   * typed hold (`ARCHIVED_ATTEMPT_CONTAINER_PRESENT` /
+   * `ARCHIVED_ATTEMPT_CONTAINER_STATE_UNKNOWN`) instead. */
   historicalArchived?: string[];
   closedAbsentAfterExit: string[];
   retiredLanded: string[];
@@ -136,6 +142,23 @@ export type SpawnBackendRecoveryHoldReasonCode =
   | 'ADMISSION_RECONCILIATION_REQUIRED'
   | 'PRE_PROVIDER_RECONCILIATION_REQUIRED'
   | 'TERMINAL_RECONCILIATION_REQUIRED'
+  /**
+   * Containment-only. The attempt's custody chain is complete through
+   * `archive`, yet the daemon still knows a container for its backend
+   * execution. Terminal history with a live backend object is a real
+   * containment problem that is never stopped automatically — the archived
+   * disposition already closed the attempt, so an automatic stop would be an
+   * effect outside any dispatch authority. Reported for the operator; never
+   * retired as history (`daemonContainerState` is `present`).
+   */
+  | 'ARCHIVED_ATTEMPT_CONTAINER_PRESENT'
+  /**
+   * Containment-only. The attempt is archived but the daemon could not prove
+   * its container absent (transport failure, malformed answer, ambiguous
+   * probe). Absence is a fact the daemon must state; it is never inferred from
+   * the archive chain alone, so containment for the attempt stays incomplete.
+   */
+  | 'ARCHIVED_ATTEMPT_CONTAINER_STATE_UNKNOWN'
   | 'ENTRY_RECONCILIATION_FAILED';
 
 export interface SpawnBackendRecoveryHold {

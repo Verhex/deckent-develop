@@ -19503,6 +19503,50 @@ export class DockerSpawnBackend implements SpawnBackend {
           );
         }
         if (this.readExactArchivedAttemptDisposition(scope)) {
+          if (options.mode === 'contain') {
+            // Measured 2026-09-09 (sprint-731 flow `fd218d1c`): the FIX-phase
+            // containment barrier requires EVERY registry entry this backend
+            // owns to inventory `absent`. The run's own `731-001` was
+            // evaluated, settled and archived (chain 01→06 complete, container
+            // long exited) BEFORE FIX, so this branch skipped it without
+            // recording absence, inventory read `unknown`, and the run died
+            // with `EXACT_CONTAINMENT_INCOMPLETE`. Absence is recorded here
+            // by OBSERVATION, never by inference: a complete archive chain says
+            // the attempt is closed history, and only the daemon can say no
+            // live effect of it remains. The probe is the same read-only
+            // `docker inspect` the live containment path takes.
+            const daemonContainerState = await this.observeExactDockerDaemonContainerState(
+              releasedAuthority.backendExecutionId,
+            );
+            if (daemonContainerState !== 'absent') {
+              // Archived history with a container the daemon still knows (or a
+              // probe that cannot decide) is a real containment problem. It is
+              // never stopped automatically — the archived disposition already
+              // closed the attempt, so no dispatch authority covers a stop —
+              // and it is never projected `absent`. The typed hold carries the
+              // daemon fact; the registry keeps it (never retirable as
+              // history, which needs `daemonContainerState === 'absent'`).
+              appendHold(Object.freeze({
+                kind: 'spawn-backend-recovery-hold' as const,
+                backend: 'docker' as const,
+                dispatchRequestId: entry.ref.dispatchRequestId,
+                taskId: scope.identity.taskId,
+                admissionRefDigest: entry.ref.refDigest,
+                authorityState: holdAuthorityState,
+                reasonCode: daemonContainerState === 'present'
+                  ? 'ARCHIVED_ATTEMPT_CONTAINER_PRESENT' as const
+                  : 'ARCHIVED_ATTEMPT_CONTAINER_STATE_UNKNOWN' as const,
+                daemonContainerState,
+              }));
+              debugLog(
+                'docker-backend:historical-archived-attempt-contain-hold',
+                `taskId=${scope.identity.taskId};attemptId=${scope.identity.attemptId}`
+                + `;daemonContainerState=${daemonContainerState}`,
+              );
+              continue;
+            }
+            this.exactReconciledWorkerAbsence.add(scope.identity.taskId);
+          }
           const archived = report.historicalArchived
             ?? (report.historicalArchived = []);
           if (!archived.includes(scope.identity.taskId)) {
@@ -19511,7 +19555,8 @@ export class DockerSpawnBackend implements SpawnBackend {
           debugLog(
             'docker-backend:historical-archived-attempt-skipped',
             `taskId=${scope.identity.taskId};attemptId=${scope.identity.attemptId}`
-            + ';reason=complete-archive-chain',
+            + ';reason=complete-archive-chain'
+            + (options.mode === 'contain' ? ';daemonContainerState=absent' : ''),
           );
           continue;
         }

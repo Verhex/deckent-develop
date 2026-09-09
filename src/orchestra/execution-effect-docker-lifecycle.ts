@@ -38,8 +38,11 @@ import {
   parseExecutionEffectWritePolicy,
   type ExecutionEffectWritePolicy,
 } from '../core/execution-write-scope-policy.js';
+import { redactSensitive } from '../core/redact-sensitive.js';
+import { debugLog } from '../core/utils.js';
 
 const DIGEST = /^sha256:[a-f0-9]{64}$/u;
+const ADAPTER_FAILURE_MESSAGE_MAX_BYTES = 512;
 const WORKSPACE_VOLUME_NAME = /^deckent-xw-[a-f0-9]{48}$/u;
 const DEPENDENCY_VOLUME_NAME = /^deckent-xd-[a-f0-9]{48}$/u;
 const VOLUME_NAME = /^deckent-x[wd]-[a-f0-9]{48}$/u;
@@ -1746,6 +1749,14 @@ export type ExecutionEffectDockerLifecycleHoldCode =
   | 'LANDING_NOT_COMMITTED'
   | 'RELEASE_EVIDENCE_INVALID';
 
+/** Bounded, secret-free adapter failure detail for operator-visible ADAPTER_UNAVAILABLE holds. */
+export interface ExecutionEffectDockerLifecycleAdapterFailureV1 {
+  readonly errorName: string;
+  readonly message: string;
+  readonly code?: string;
+  readonly stage: string;
+}
+
 export interface ExecutionEffectDockerLifecycleHoldV1 {
   readonly state: 'HOLD';
   readonly code: ExecutionEffectDockerLifecycleHoldCode;
@@ -1753,6 +1764,8 @@ export interface ExecutionEffectDockerLifecycleHoldV1 {
   readonly containmentDecision: ExecutionEffectContainmentDecision | null;
   /** Path-free diagnostic only; never a lifecycle or landing authority. */
   readonly diagnostic?: ExecutionEffectDockerFinalDiagnosticV1;
+  /** Present on ADAPTER_UNAVAILABLE holds when a catch boundary swallowed the root error. */
+  readonly failure?: ExecutionEffectDockerLifecycleAdapterFailureV1;
 }
 
 export const EXECUTION_EFFECT_DOCKER_CAPTURE_ADAPTER_STAGES = Object.freeze([
@@ -1786,14 +1799,86 @@ function hold(
   code: ExecutionEffectDockerLifecycleHoldCode,
   evidence: unknown,
   containmentDecision: ExecutionEffectContainmentDecision | null = null,
+  failure?: ExecutionEffectDockerLifecycleAdapterFailureV1,
 ): ExecutionEffectDockerLifecycleHoldV1 {
   return Object.freeze({
     state: 'HOLD' as const,
     code,
-    evidenceDigest: digest('execution-effect-docker-lifecycle-hold-v1', { code, evidence }),
+    evidenceDigest: digest('execution-effect-docker-lifecycle-hold-v1', {
+      code,
+      evidence,
+    }),
     containmentDecision,
+    ...(failure ? { failure } : {}),
   });
 }
+
+function truncateUtf8ByBytes(text: string, maxBytes: number): string {
+  const bytes = Buffer.from(text, 'utf8');
+  if (bytes.length <= maxBytes) return text;
+  let end = maxBytes;
+  while (end > 0 && (bytes[end]! & 0b1100_0000) === 0b1000_0000) {
+    end -= 1;
+  }
+  return bytes.subarray(0, end).toString('utf8');
+}
+
+function projectAdapterFailureDetail(
+  error: unknown,
+  stage: string,
+): ExecutionEffectDockerLifecycleAdapterFailureV1 {
+  const errorName = error instanceof Error && error.name ? error.name : 'Error';
+  let message = error instanceof Error ? error.message : String(error ?? 'adapter unavailable');
+  message = redactSensitive(message);
+  message = message.replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ');
+  message = message.replace(
+    /(?:\/(?:home|tmp|var|private|Users|root)(?:\/[^\s]*)+)/g,
+    '[REDACTED_PATH]',
+  );
+  message = truncateUtf8ByBytes(message, ADAPTER_FAILURE_MESSAGE_MAX_BYTES);
+  const code = error && typeof error === 'object' && 'code' in error
+    && typeof (error as { code: unknown }).code === 'string'
+    ? (error as { code: string }).code : undefined;
+  return Object.freeze({
+    errorName,
+    message,
+    ...(code ? { code } : {}),
+    stage,
+  });
+}
+
+function formatAdapterFailureForDebugLog(
+  failure: ExecutionEffectDockerLifecycleAdapterFailureV1,
+): string {
+  const ordered = {
+    stage: failure.stage,
+    ...(failure.code ? { code: failure.code } : {}),
+    errorName: failure.errorName,
+    message: failure.message,
+  };
+  return truncateUtf8ByBytes(JSON.stringify(ordered), ADAPTER_FAILURE_MESSAGE_MAX_BYTES);
+}
+
+function holdAdapterUnavailable(
+  evidence: Record<string, unknown>,
+  error: unknown,
+  stage: string,
+  containmentDecision: ExecutionEffectContainmentDecision | null = null,
+): ExecutionEffectDockerLifecycleHoldV1 {
+  const failure = projectAdapterFailureDetail(error, stage);
+  debugLog(
+    'execution-effect-docker-lifecycle:adapter-unavailable',
+    formatAdapterFailureForDebugLog(failure),
+  );
+  return hold('ADAPTER_UNAVAILABLE', evidence, containmentDecision, failure);
+}
+
+/** @internal Hermetic unit tests for adapter failure projection only. */
+export const _adapterFailureDiagnosticsInternals = Object.freeze({
+  projectAdapterFailureDetail,
+  formatAdapterFailureForDebugLog,
+  ADAPTER_FAILURE_MESSAGE_MAX_BYTES,
+});
 
 export interface PrepareExecutionEffectDockerWorkspaceV1Input {
   readonly platform: 'linux' | 'wsl' | 'darwin' | 'win32';
@@ -2896,7 +2981,13 @@ export async function prepareAllocatedExecutionEffectDockerWorkspaceV1(
   if (!allocationAuthority) return hold('SESSION_INVALID', { stage: 'durable-allocation' });
   const base = allocationAuthority.base;
   const adapters = snapshotAdapters(adapter, clock);
-  if (!adapters) return hold('ADAPTER_UNAVAILABLE', { stage: 'prepare' });
+  if (!adapters) {
+    return holdAdapterUnavailable(
+      { stage: 'prepare' },
+      new Error('adapter snapshot unavailable'),
+      'prepare',
+    );
+  }
   const plan = base.workspacePlan;
   try {
     const imageRaw = await Reflect.apply(adapters.inspectImage, adapters.adapterThis, [
@@ -3158,9 +3249,9 @@ export async function prepareAllocatedExecutionEffectDockerWorkspaceV1(
       session: opaque,
     });
   } catch (error) {
-    return hold('ADAPTER_UNAVAILABLE', {
+    return holdAdapterUnavailable({
       stage: 'prepare-call', preparationAuthorityDigest: base.preparationAuthorityDigest,
-    });
+    }, error, 'prepare-call');
   }
 }
 
@@ -3325,10 +3416,10 @@ export async function authorizeExecutionEffectDockerProviderStartV1(
       lifecycleAuthority,
       session: opaque,
     });
-  } catch {
-    return hold('ADAPTER_UNAVAILABLE', {
+  } catch (error) {
+    return holdAdapterUnavailable({
       stage: 'provider-start-revalidation-call', authorityDigest: attachmentAuthorityDigest,
-    });
+    }, error, 'provider-start-revalidation-call');
   }
 }
 
@@ -3740,9 +3831,9 @@ export async function rehydrateExecutionEffectDockerLifecycleV1(input: Readonly<
       nowIso = null;
     }
     if (!inspectAllocation || !nowIso) {
-      return hold('ADAPTER_UNAVAILABLE', {
+      return holdAdapterUnavailable({
         stage: 'rehydrate-allocation', authorityDigest: authority.authorityDigest,
-      });
+      }, new Error('adapter methods unavailable'), 'rehydrate-allocation');
     }
     const observationAuthorityDigest = digest(
       'execution-effect-docker-allocation-rehydration-observation-authority-v1',
