@@ -6,6 +6,7 @@ import {
   executionBudgetPolicyDigest,
   resolveExecutionBudgetPolicy,
   resolveGoalInvocationBudgetPolicy,
+  resolveGoalPurposeAdmissionPolicy,
   resolveXverifyAdjudicationPurposeProfile,
 } from '../../src/core/execution-budget-policy.js';
 import type { ExecutionBudgetPolicyConfig } from '../../src/core/config-types.js';
@@ -31,6 +32,86 @@ function policy(): ExecutionBudgetPolicyConfig {
 }
 
 describe('execution budget policy', () => {
+  it('resolves goal purpose admission as hold when the block is absent or configured to hold', () => {
+    const configured: ExecutionBudgetPolicyConfig = {
+      roles: { brain: { default: { maxTokens: 1_000, maxTurns: 8 } } },
+      landing: { reserve_ratio: 0.25 },
+      final_only_usage: { action: 'allow-wall-clock-containment', roles: ['brain'], max_wall_clock_seconds: 120 },
+      purposes: { 'goal-authoring': { maxTokens: 400, maxTurns: 2 } },
+    };
+    expect(resolveGoalPurposeAdmissionPolicy({ policy: configured, purpose: 'goal-authoring' }))
+      .toMatchObject({ state: 'unavailable', reasonCode: 'goal-purpose-admission-missing' });
+    expect(resolveGoalPurposeAdmissionPolicy({
+      policy: {
+        ...configured,
+        purpose_admission: {
+          'goal-authoring': { non_reservable_subscription: 'hold', max_tokens: 400, max_wall_clock_seconds: 90 },
+        },
+      },
+      purpose: 'goal-authoring',
+    })).toMatchObject({ state: 'unavailable', reasonCode: 'goal-purpose-admission-hold' });
+  });
+
+  it('resolves allow-role-ceiling goal purpose admission with owner ceiling', () => {
+    const configured: ExecutionBudgetPolicyConfig = {
+      roles: { brain: { default: { maxTokens: 1_000, maxTurns: 8 } } },
+      landing: { reserve_ratio: 0.25 },
+      final_only_usage: { action: 'allow-wall-clock-containment', roles: ['brain'], max_wall_clock_seconds: 120 },
+      purposes: { 'goal-authoring': { maxTokens: 400, maxTurns: 2 } },
+      purpose_admission: {
+        'goal-authoring': { non_reservable_subscription: 'allow-role-ceiling', max_tokens: 400, max_wall_clock_seconds: 90 },
+      },
+    };
+    const decision = resolveGoalPurposeAdmissionPolicy({ policy: configured, purpose: 'goal-authoring' });
+    expect(decision).toMatchObject({
+      state: 'available',
+      profileRef: 'execution_budget.purpose_admission.goal-authoring',
+      ceiling: { maxTokens: 400, maxWallClockSeconds: 90 },
+    });
+    expect(() => assertExecutionBudgetPolicyConfig({
+      ...configured,
+      purpose_admission: {
+        'goal-authoring': { non_reservable_subscription: 'allow-role-ceiling', max_tokens: 500, max_wall_clock_seconds: 90 },
+      },
+    })).not.toThrow();
+    expect(resolveGoalPurposeAdmissionPolicy({
+      policy: {
+        ...configured,
+        purpose_admission: {
+          'goal-authoring': { non_reservable_subscription: 'allow-role-ceiling', max_tokens: 500, max_wall_clock_seconds: 90 },
+        },
+      },
+      purpose: 'goal-authoring',
+    })).toMatchObject({ state: 'unavailable', reasonCode: 'goal-purpose-admission-exceeds-role-ceiling' });
+  });
+
+  it('resolves goal-acceptance admission through auditor role ceiling mapping', () => {
+    const configured: ExecutionBudgetPolicyConfig = {
+      roles: { auditor: { default: { maxTokens: 800, maxTurns: 4 } } },
+      landing: { reserve_ratio: 0.25 },
+      final_only_usage: { action: 'allow-wall-clock-containment', roles: ['auditor'], max_wall_clock_seconds: 90 },
+      purposes: { 'goal-acceptance': { maxTokens: 300, maxTurns: 2 } },
+      purpose_admission: {
+        'goal-acceptance': { non_reservable_subscription: 'allow-role-ceiling', max_tokens: 300, max_wall_clock_seconds: 60 },
+      },
+    };
+    expect(resolveGoalPurposeAdmissionPolicy({ policy: configured, purpose: 'goal-acceptance' }))
+      .toMatchObject({
+        state: 'available',
+        profileRef: 'execution_budget.purpose_admission.goal-acceptance',
+        ceiling: { maxTokens: 300, maxWallClockSeconds: 60 },
+      });
+    expect(resolveGoalPurposeAdmissionPolicy({
+      policy: {
+        ...configured,
+        purpose_admission: {
+          'goal-acceptance': { non_reservable_subscription: 'allow-role-ceiling', max_tokens: 301, max_wall_clock_seconds: 60 },
+        },
+      },
+      purpose: 'goal-acceptance',
+    })).toMatchObject({ state: 'unavailable', reasonCode: 'goal-purpose-admission-exceeds-role-ceiling' });
+  });
+
   it('narrows a goal purpose under role authority and requires final-only containment', () => {
     const configured: ExecutionBudgetPolicyConfig = {
       roles: { brain: { default: { maxTokens: 1_000, maxTurns: 8 } } },

@@ -192,6 +192,22 @@ Güncel local effective snapshot [Configuration](../configuration.md) içinde ka
 
 [Her satır için kanıt: `dist/core/config.js` içinden `createDefaultConfig` import eden read-only command, 2026-08-01; source definition `src/core/config.ts:1613-1784`]
 
+## execution_budget.purpose_admission (Goal non-reservable admission)
+
+Goal çağrıları için default-off owner politikası: seçilen provider yalnız advisory `percent` birimli limit pencereleri bildirdiğinde (abonelik hesabında sayısal rezervasyon yok). Blok yok veya `non_reservable_subscription: "hold"` → fail-closed hold; `"allow-role-ceiling"` → owner tavanları altında typed `non_reservable_subscription` kabulü — XVerify flag ödünç alma yok, percent→sayı türetme yok.
+
+| Dot path | Anlam |
+|---|---|
+| `execution_budget.purpose_admission.goal-authoring` | Brain goal-authoring admission bloğu |
+| `execution_budget.purpose_admission.goal-acceptance` | Auditor goal-acceptance admission bloğu |
+| `*.non_reservable_subscription` | `"hold"` (default-off) veya `"allow-role-ceiling"` |
+| `*.max_tokens` | Hard total-token tavanı; runtime resolver ≤ `execution_budget.purposes.<purpose>.maxTokens` ≤ eşlenen rol default kontrol eder |
+| `*.max_wall_clock_seconds` | Host wall-clock containment; runtime resolver `final_only_usage.action === allow-wall-clock-containment`, eşlenen rolün `final_only_usage.roles` içinde olmasını ve wall clock ≤ `final_only_usage.max_wall_clock_seconds` şartını arar (bare spec'e göre fail-closed) |
+
+Purpose→role eşlemesi sabittir (`goal-authoring`→`brain`, `goal-acceptance`→`auditor`); çağıranlar bunları transpose etmemelidir. Tavan cross-check'leri config assert zamanında değil resolve zamanında çalışır; `goal-purpose-admission-exceeds-role-ceiling` erişilebilir runtime sonucudur.
+
+Resolver: `resolveGoalPurposeAdmissionPolicy({ policy, purpose })` (`src/core/execution-budget-policy.ts`). Tüketici (T7): `admitGoalInvocation` (`src/orchestra/autonomous/mission-store/goal-invocation-admission-authority.ts`).
+
 ## Modes, providers ve routing
 
 Dört built-in mode preset'i ve verified local effective projection [Configuration](../configuration.md) içinde belgelenir. Preset içindeki literal model ID seed input'tur; effective provider/model authority ayrıca registry, task routing, auth/account, reachability, provider limit ve budget admission'a bağlıdır. [Kanıt: `src/core/config.ts:1969-2021`; `src/core/model-registry.ts:568-800`; `.deckent/workspace/IDENTITY.md:10`]

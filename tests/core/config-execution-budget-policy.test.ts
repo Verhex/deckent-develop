@@ -78,6 +78,27 @@ describe('execution_budget config round-trip', () => {
     });
   });
 
+  it('accepts structurally valid purpose_admission at config time and defers ceiling cross-checks to runtime', async () => {
+    const { resolveGoalPurposeAdmissionPolicy } = await import('../../src/core/execution-budget-policy.js');
+    const config = createDefaultConfig();
+    config.execution_budget = {
+      roles: { brain: { default: { maxTokens: 1_000, maxTurns: 8 } } },
+      landing: { reserve_ratio: 0.25 },
+      final_only_usage: { action: 'allow-wall-clock-containment', roles: ['brain'], max_wall_clock_seconds: 120 },
+      purposes: { 'goal-authoring': { maxTokens: 400, maxTurns: 2 } },
+      purpose_admission: {
+        'goal-authoring': { non_reservable_subscription: 'allow-role-ceiling', max_tokens: 400, max_wall_clock_seconds: 90 },
+      },
+    };
+    expect(() => validateConfig(config)).not.toThrow();
+    config.execution_budget!.purpose_admission!['goal-authoring']!.max_tokens = 401;
+    expect(() => validateConfig(config)).not.toThrow();
+    expect(resolveGoalPurposeAdmissionPolicy({
+      policy: config.execution_budget,
+      purpose: 'goal-authoring',
+    })).toMatchObject({ state: 'unavailable', reasonCode: 'goal-purpose-admission-exceeds-role-ceiling' });
+  });
+
   it('surfaces malformed JSON policy through canonical config validation', () => {
     const config = createDefaultConfig();
     config.execution_budget = {

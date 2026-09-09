@@ -888,6 +888,16 @@ export interface FinalOnlyUsagePolicyConfig {
   max_wall_clock_seconds?: number;
 }
 
+/**
+ * Owner admission policy for Goal invocations when provider limit windows are
+ * advisory percent-only (never numerically reservable). Absent block = fail-closed hold.
+ */
+export interface GoalPurposeAdmissionProfileConfig {
+  non_reservable_subscription: 'hold' | 'allow-role-ceiling';
+  max_tokens: number;
+  max_wall_clock_seconds: number;
+}
+
 /** Owner policy that produces remote invocation budgets before side effects. */
 export interface ExecutionBudgetPolicyConfig {
   roles: Partial<Record<ExecutionBudgetRole, ExecutionBudgetRolePolicyConfig>>;
@@ -910,6 +920,11 @@ export interface ExecutionBudgetPolicyConfig {
     'xverify-adjudication'?: { maxTokens: number; maxWallClockSeconds: number; maxVerificationsPerSprint: number };
     'goal-authoring'?: ExecutionBudget;
     'goal-acceptance'?: ExecutionBudget;
+  };
+  /** Default-off Goal admission for subscription percent-only windows; absence = hold. */
+  purpose_admission?: {
+    'goal-authoring'?: GoalPurposeAdmissionProfileConfig;
+    'goal-acceptance'?: GoalPurposeAdmissionProfileConfig;
   };
 }
 

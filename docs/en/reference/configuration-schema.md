@@ -192,6 +192,22 @@ The current local effective snapshot is recorded in [Configuration](../configura
 
 [Evidence for every row: read-only command importing `createDefaultConfig` from `dist/core/config.js`, 2026-08-01; source definition `src/core/config.ts:1613-1784`]
 
+## execution_budget.purpose_admission (Goal non-reservable admission)
+
+Default-off owner policy for Goal invocations when the selected provider exposes only advisory `percent`-unit limit windows (never numerically reservable on a subscription account). Absent block or `non_reservable_subscription: "hold"` keeps today's fail-closed hold; `"allow-role-ceiling"` admits via the typed `non_reservable_subscription` outcome under owner ceilings — no XVerify flag borrowing, no percent→number derivation.
+
+| Dot path | Meaning |
+|---|---|
+| `execution_budget.purpose_admission.goal-authoring` | Brain goal-authoring admission block |
+| `execution_budget.purpose_admission.goal-acceptance` | Auditor goal-acceptance admission block |
+| `*.non_reservable_subscription` | `"hold"` (default-off) or `"allow-role-ceiling"` |
+| `*.max_tokens` | Hard total-token ceiling; runtime resolver checks ≤ `execution_budget.purposes.<purpose>.maxTokens` ≤ mapped role default |
+| `*.max_wall_clock_seconds` | Host wall-clock containment; runtime resolver requires `final_only_usage.action === allow-wall-clock-containment`, mapped role in `final_only_usage.roles`, and wall clock ≤ `final_only_usage.max_wall_clock_seconds` (fail-closed vs bare spec) |
+
+Purpose→role mapping is fixed (`goal-authoring`→`brain`, `goal-acceptance`→`auditor`); callers must not transpose them. Ceiling cross-checks run at resolve time, not config assert time, so `goal-purpose-admission-exceeds-role-ceiling` is a reachable runtime outcome.
+
+Resolver: `resolveGoalPurposeAdmissionPolicy({ policy, purpose })` in `src/core/execution-budget-policy.ts`. Consumer (T7): `admitGoalInvocation` in `src/orchestra/autonomous/mission-store/goal-invocation-admission-authority.ts`.
+
 ## Modes, providers, and routing
 
 The four built-in mode presets and the verified local effective projection are documented in [Configuration](../configuration.md). Literal model IDs in presets are seed inputs; effective provider/model authority also depends on the registry, task routing, auth/account, reachability, provider limits, and budget admission. [Evidence: `src/core/config.ts:1969-2021`; `src/core/model-registry.ts:568-800`; `.deckent/workspace/IDENTITY.md:10`]

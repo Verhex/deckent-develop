@@ -4,6 +4,7 @@ import type {
   ExecutionBudgetPolicyConfig,
   ExecutionBudgetRole,
   FinalOnlyUsagePolicyConfig,
+  GoalPurposeAdmissionProfileConfig,
 } from './config-types.js';
 import { TASK_KINDS, type ExecutionBudget, type TaskKind } from './work-model.js';
 import type { ProviderCommandSpec } from './provider-command-spec.js';
@@ -115,7 +116,45 @@ type ExecutionBudgetPolicyWithPurposeProfiles = ExecutionBudgetPolicyConfig & {
     readonly 'goal-authoring'?: import('./work-model.js').ExecutionBudget;
     readonly 'goal-acceptance'?: import('./work-model.js').ExecutionBudget;
   };
+  readonly purpose_admission?: ExecutionBudgetPolicyConfig['purpose_admission'];
 };
+
+const GOAL_PURPOSE_ADMISSION_PURPOSES = ['goal-authoring', 'goal-acceptance'] as const;
+type GoalPurposeAdmissionPurpose = typeof GOAL_PURPOSE_ADMISSION_PURPOSES[number];
+/** Canonical purpose→role binding; callers must not transpose purpose/role at resolve time. */
+export const GOAL_PURPOSE_ADMISSION_ROLE: Record<
+  GoalPurposeAdmissionPurpose,
+  Extract<ExecutionBudgetRole, 'brain' | 'auditor'>
+> = {
+  'goal-authoring': 'brain',
+  'goal-acceptance': 'auditor',
+};
+
+export interface GoalPurposeAdmissionProfile {
+  readonly maxTokens: number;
+  readonly maxWallClockSeconds: number;
+  readonly nonReservableSubscription: 'hold' | 'allow-role-ceiling';
+}
+
+export type GoalPurposeAdmissionUnavailableReason =
+  | 'goal-purpose-admission-missing'
+  | 'goal-purpose-admission-hold'
+  | 'goal-purpose-admission-exceeds-role-ceiling';
+
+export type GoalPurposeAdmissionDecision =
+  | {
+    readonly state: 'available';
+    readonly profile: Readonly<GoalPurposeAdmissionProfile>;
+    readonly profileRef: `execution_budget.purpose_admission.${GoalPurposeAdmissionPurpose}`;
+    readonly policyDigest: string;
+    readonly ceiling: Readonly<{ maxTokens: number; maxWallClockSeconds: number }>;
+  }
+  | {
+    readonly state: 'unavailable';
+    readonly reasonCode: GoalPurposeAdmissionUnavailableReason;
+    readonly profileRef: `execution_budget.purpose_admission.${GoalPurposeAdmissionPurpose}`;
+    readonly policyDigest?: string;
+  };
 
 /**
  * Provider-declared usage-reporting granularity (`ProviderCommandSpec.liveUsage`),
@@ -375,6 +414,49 @@ function assertXverifyAdjudicationPurposeProfile(
   }
 }
 
+function assertGoalPurposeAdmissionProfile(
+  value: unknown,
+  path: string,
+): asserts value is GoalPurposeAdmissionProfileConfig {
+  if (!isPlainObject(value)) {
+    throw new ExecutionBudgetPolicyError(`${path} must be an object`);
+  }
+  assertKnownKeys(value, ['non_reservable_subscription', 'max_tokens', 'max_wall_clock_seconds'], path);
+  if (value.non_reservable_subscription !== 'hold' && value.non_reservable_subscription !== 'allow-role-ceiling') {
+    throw new ExecutionBudgetPolicyError(
+      `${path}.non_reservable_subscription must be 'hold' or 'allow-role-ceiling'`,
+    );
+  }
+  if (!Number.isSafeInteger(value.max_tokens) || (value.max_tokens as number) <= 0) {
+    throw new ExecutionBudgetPolicyError(`${path}.max_tokens must be a positive safe integer`);
+  }
+  if (!Number.isSafeInteger(value.max_wall_clock_seconds) || (value.max_wall_clock_seconds as number) <= 0) {
+    throw new ExecutionBudgetPolicyError(`${path}.max_wall_clock_seconds must be a positive safe integer`);
+  }
+}
+
+function goalPurposeAdmissionCeilingUnavailable(
+  policy: Pick<ExecutionBudgetPolicyConfig, 'roles' | 'purposes' | 'final_only_usage'>,
+  purpose: GoalPurposeAdmissionPurpose,
+  block: GoalPurposeAdmissionProfileConfig,
+): GoalPurposeAdmissionUnavailableReason | null {
+  const role = GOAL_PURPOSE_ADMISSION_ROLE[purpose];
+  const purposeBudget = policy.purposes?.[purpose]?.maxTokens;
+  const roleBudget = policy.roles?.[role]?.default?.maxTokens;
+  const finalOnly = policy.final_only_usage;
+  if (purposeBudget === undefined
+    || roleBudget === undefined
+    || block.max_tokens > purposeBudget
+    || purposeBudget > roleBudget
+    || block.max_tokens > roleBudget
+    || finalOnly?.action !== 'allow-wall-clock-containment'
+    || !finalOnly.roles?.includes(role)
+    || block.max_wall_clock_seconds > (finalOnly.max_wall_clock_seconds ?? 0)) {
+    return 'goal-purpose-admission-exceeds-role-ceiling';
+  }
+  return null;
+}
+
 function assertReachabilityProbePurposeProfile(
   value: unknown,
 ): asserts value is ReachabilityProbePurposeProfile {
@@ -403,7 +485,7 @@ export function assertExecutionBudgetPolicyConfig(
   }
   assertKnownKeys(
     value,
-    ['roles', 'landing', 'unmetered_backend', 'final_only_usage', 'purposes', 'native_agent'],
+    ['roles', 'landing', 'unmetered_backend', 'final_only_usage', 'purposes', 'purpose_admission', 'native_agent'],
     'execution_budget',
   );
   if (!isPlainObject(value.roles)) {
@@ -467,6 +549,22 @@ export function assertExecutionBudgetPolicyConfig(
       if (value.purposes[purpose] !== undefined) {
         assertBudget(value.purposes[purpose], `execution_budget.purposes.${purpose}`);
       }
+    }
+  }
+
+  if (value.purpose_admission !== undefined) {
+    if (!isPlainObject(value.purpose_admission)) {
+      throw new ExecutionBudgetPolicyError('execution_budget.purpose_admission must be an object');
+    }
+    assertKnownKeys(
+      value.purpose_admission,
+      GOAL_PURPOSE_ADMISSION_PURPOSES,
+      'execution_budget.purpose_admission',
+    );
+    for (const purpose of GOAL_PURPOSE_ADMISSION_PURPOSES) {
+      const block = value.purpose_admission[purpose];
+      if (block === undefined) continue;
+      assertGoalPurposeAdmissionProfile(block, `execution_budget.purpose_admission.${purpose}`);
     }
   }
 
@@ -555,6 +653,52 @@ export type XverifyAdjudicationPurposeProfileDecision =
       readonly profileRef: 'execution_budget.purposes.xverify-adjudication';
       readonly policyDigest?: string;
     };
+
+/**
+ * Resolve owner-authored Goal purpose admission. Role is derived from purpose
+ * ({@link GOAL_PURPOSE_ADMISSION_ROLE}); callers must not transpose them.
+ * Ceiling cross-checks run here (not at config assert time) so
+ * `goal-purpose-admission-exceeds-role-ceiling` is a reachable runtime outcome.
+ * A purpose_admission block additionally requires matching
+ * `final_only_usage.action === allow-wall-clock-containment` with the mapped role
+ * listed — fail-closed vs bare spec, documented in configuration-schema.
+ */
+export function resolveGoalPurposeAdmissionPolicy(input: {
+  readonly policy?: ExecutionBudgetPolicyConfig;
+  readonly purpose: GoalPurposeAdmissionPurpose;
+}): GoalPurposeAdmissionDecision {
+  const profileRef = `execution_budget.purpose_admission.${input.purpose}` as const;
+  if (!input.policy) {
+    return { state: 'unavailable', reasonCode: 'goal-purpose-admission-missing', profileRef };
+  }
+  assertExecutionBudgetPolicyConfig(input.policy);
+  const policyDigest = executionBudgetPolicyDigest(input.policy);
+  const block = input.policy.purpose_admission?.[input.purpose];
+  if (!block) {
+    return { state: 'unavailable', reasonCode: 'goal-purpose-admission-missing', profileRef, policyDigest };
+  }
+  if (block.non_reservable_subscription === 'hold') {
+    return { state: 'unavailable', reasonCode: 'goal-purpose-admission-hold', profileRef, policyDigest };
+  }
+  const ceilingUnavailable = goalPurposeAdmissionCeilingUnavailable(input.policy, input.purpose, block);
+  if (ceilingUnavailable) {
+    return { state: 'unavailable', reasonCode: ceilingUnavailable, profileRef, policyDigest };
+  }
+  return {
+    state: 'available',
+    profile: Object.freeze({
+      maxTokens: block.max_tokens,
+      maxWallClockSeconds: block.max_wall_clock_seconds,
+      nonReservableSubscription: block.non_reservable_subscription,
+    }),
+    profileRef,
+    policyDigest,
+    ceiling: Object.freeze({
+      maxTokens: block.max_tokens,
+      maxWallClockSeconds: block.max_wall_clock_seconds,
+    }),
+  };
+}
 
 /**
  * Resolve the owner-authored xverify-adjudication purpose profile. Absence, or a
