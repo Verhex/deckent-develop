@@ -1,0 +1,876 @@
+{
+  "utc": "2026-09-09T22:21:14.529689+00:00",
+  "head": "5f093d31aca4a957c5da45c737b03e19bc1ce4a1",
+  "upstream": "0\t0",
+  "processes": [
+    {
+      "pid": 5058,
+      "kind": "mcp",
+      "executable": "node",
+      "cwd": "/home/alperen/deckent-dev",
+      "live": true
+    },
+    {
+      "pid": 5271,
+      "kind": "mcp",
+      "executable": "node",
+      "cwd": "/home/alperen/deckent-dev",
+      "live": true
+    },
+    {
+      "pid": 5433,
+      "kind": "mcp",
+      "executable": "node",
+      "cwd": "/home/alperen/deckent-dev",
+      "live": true
+    },
+    {
+      "pid": 6232,
+      "kind": "mcp",
+      "executable": "node",
+      "cwd": "/home/alperen/deckent-dev",
+      "live": true
+    },
+    {
+      "pid": 6297,
+      "kind": "mcp",
+      "executable": "node",
+      "cwd": "/home/alperen/deckent-dev",
+      "live": true
+    },
+    {
+      "pid": 71984,
+      "kind": "llama",
+      "executable": "llama-server",
+      "cwd": "/app",
+      "live": true
+    },
+    {
+      "pid": 189596,
+      "kind": "mcp",
+      "executable": "node",
+      "cwd": "/home/alperen/deckent-dev",
+      "live": true
+    },
+    {
+      "pid": 231653,
+      "kind": "mcp",
+      "executable": "node",
+      "cwd": "/home/alperen/deckent-dev",
+      "live": true
+    },
+    {
+      "pid": 344665,
+      "kind": "mcp",
+      "executable": "node",
+      "cwd": "/home/alperen/deckent-dev",
+      "live": true
+    },
+    {
+      "pid": 1368315,
+      "kind": "llama",
+      "executable": "llama-server",
+      "cwd": "/app",
+      "live": true
+    },
+    {
+      "pid": 1576022,
+      "kind": "bot",
+      "executable": "node",
+      "cwd": "/home/alperen/deckent-dev",
+      "live": true
+    }
+  ],
+  "tasks": [
+    {
+      "path": ".tasks/task-xv-1788532784916-f20a36de-d50d-4fec-91a9-49a4ad3671bb.result",
+      "mtime": 1788532788.0171056,
+      "bytes": 2284
+    },
+    {
+      "path": ".tasks/task-xv-1788455355601-ae2a92e2-224d-4513-8143-0d549b7f5796-xverify.result",
+      "mtime": 1788509278.4642475,
+      "bytes": 910
+    },
+    {
+      "path": ".tasks/task-xv-1788532784916-f20a36de-d50d-4fec-91a9-49a4ad3671bb-xverify.json",
+      "mtime": 1788532904.7080142,
+      "bytes": 14215
+    },
+    {
+      "path": ".tasks/.task-cas-d3f19e01de4768aa185161cc-9cb717df0928ef0c4be8c01d-4989579ed1328327f05c1b40b15a0eda1c678b2370f958836b131ef0d7b2b306.previous",
+      "mtime": 1788668432.1187117,
+      "bytes": 60654
+    },
+    {
+      "path": ".tasks/repair-queue-authority.json",
+      "mtime": 1788944859.1841087,
+      "bytes": 2681
+    },
+    {
+      "path": ".tasks/task-xv-1788532784916-f20a36de-d50d-4fec-91a9-49a4ad3671bb-xverify.plan",
+      "mtime": 1788532803.504874,
+      "bytes": 234
+    },
+    {
+      "path": ".tasks/.task-cas-c097c86a6687ab9c8a3dee7f-755bf961add1201543763d7e-29da076a11eb8d3f59703952b0e173639c9714182bfad4c985dd5a8285f16876.previous",
+      "mtime": 1788677683.0324388,
+      "bytes": 60654
+    },
+    {
+      "path": ".tasks/.task-cas-fa1bb19986a5c0983265b03e-211336fb464f4b77dd2196af-bd4139936a71ae413d628175fa9cda4b0f0e48c0efc651b9e392c2c631619e97.previous",
+      "mtime": 1788598725.813286,
+      "bytes": 13723
+    },
+    {
+      "path": ".tasks/.task-cas-519be1960b766ed0caf2c35a-d14e7f3ea2239138ff8d7264-5b75c472a16e7898cadfe6408479e194d171124a94928e7d89e6bc95a0c23e9c.previous",
+      "mtime": 1788670806.8604803,
+      "bytes": 60654
+    },
+    {
+      "path": ".tasks/task-xv-1788115606656-b0dfaafb-ca8d-4803-96c0-35410a1e0063-xverify.result",
+      "mtime": 1788509278.4393597,
+      "bytes": 910
+    },
+    {
+      "path": ".tasks/task-xv-1788532784916-f20a36de-d50d-4fec-91a9-49a4ad3671bb.json",
+      "mtime": 1788532788.0171056,
+      "bytes": 5840
+    }
+  ],
+  "locks": [
+    {
+      "path": ".locks/execution-lock-authority.sentinel.json",
+      "mtime": 1785220136.6001244,
+      "bytes": 114
+    },
+    {
+      "path": ".locks/execution-lock-authority.sqlite3",
+      "mtime": 1788989658.8388531,
+      "bytes": 5603328
+    }
+  ],
+  "build": [
+    {
+      "path": ".deckent/build/runs/2f6c17d2-f095-454f-9d46-1a5a19f4d357/journal.json",
+      "keys": [
+        "schemaVersion",
+        "runId",
+        "scope",
+        "state",
+        "source",
+        "artifact",
+        "oldArtifact",
+        "toolchain",
+        "environment",
+        "nodeRuntime",
+        "liveDistExisted",
+        "authority",
+        "paths",
+        "preparedAt",
+        "committedAt",
+        "authorityAuditEventId"
+      ],
+      "sha256": "ae7d33dbc9f826398b953fb8938934a69384e7b0c3ea259a950f6c6f02f5d834"
+    },
+    {
+      "path": ".deckent/build/runs/7ae1f1fa-39b1-46d5-b8de-734f621ec5bc/journal.json",
+      "keys": [
+        "schemaVersion",
+        "runId",
+        "scope",
+        "state",
+        "source",
+        "artifact",
+        "oldArtifact",
+        "toolchain",
+        "environment",
+        "nodeRuntime",
+        "liveDistExisted",
+        "authority",
+        "paths",
+        "preparedAt",
+        "committedAt",
+        "authorityAuditEventId"
+      ],
+      "sha256": "cec68daa95cb9f22a9a4fd2c5dffa054d7f54cb91ba9af81404349feac0834f6"
+    }
+  ],
+  "runtimeDisposition": "Observed bot PID1576022 and MCP processes; no node worker/xverify dispatch found. Process scan + no current task heartbeat; not a terminal settlement claim.",
+  "projection": {
+    "runGeneration": "lease:1610cc47-ebb6-4fce-80c8-40180b11088b",
+    "logicalProgress": {
+      "done": 0,
+      "active": 1,
+      "blocked": 0,
+      "total": 1,
+      "attemptCount": 1,
+      "lineages": [
+        {
+          "logicalTaskId": "731-001",
+          "attemptIds": [
+            "731-001"
+          ],
+          "attemptCount": 1,
+          "status": "active"
+        }
+      ],
+      "fixRetry": []
+    },
+    "providerConcurrency": [
+      {
+        "providerPrincipalDigest": "03e0f3b5b8ce9c19a4c757e8cec7228570a07270321ca99f234883258ecd7902",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "291f7870849d303af0ad43e4f4de3a506a5b355a884c4ed20628bcbf5afd7cab",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "2d2aa7098002f824a9306fb934095b60a76d659efd14400745debff6fa00e909",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "35bb05849c5818030025c944ec5984cadc95c4ddcec9964888f0a3e09a1bbd2e",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "3739553e56bf298918a97cddd8bb0f8abd3cf03a4cf586d38fd8b4f302d77975",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "50d885403902ca8571cd1c2d40f304df738fa1edc5eacd0b7950944a1537d892",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "5feeb83246264cbad70ce24724b5754d10617579417751ea74ca9e36f91e8f78",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "6dd2ec387192e086cd1143ce9a67c76358b93738a198cf379ff1ea9693593429",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "785b6e3e6cb77c9039be01cc9961df83bfb9c24cd471c5f1fb311e61eca5a396",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "8dde088206284c94ad1e86d57a1853d9ae882023a09ab654fe4c152d735a18e1",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "9fef852ffe7184b2fb9b5e48c7350a9d0eb862868e6a9febcbcb51e3891be5ba",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "acf9f33056e152408dba5317a214ba93ee0c75f7cfa4791286d445f22b5fb72f",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "b1a3998c1cb52133fc396b85579c39a12806d94111483b75968dd5e367bc8691",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "c38a48e4f687a6a5830f4823cc336280bd47ea004840991dd89172e001a4172e",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 4,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "c48667515d3cc162ffa195ae698d8f4e661c16bd68de9b0fa4c438c3c7045a5c",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "d1f76960c0fc9d577c86a30dd9f88a33ae3d2d0a1eea46cd4cb27962b42e9925",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "d4ba48495470d025afbf5cf65337ed5170c6dd520afae3617bf5e95ccb19644a",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "df407d9d378b94d85e69de91df6e622388452d714bc9282f14fbd6386f2e24a5",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "dff9a3c5d7b7a9c0b2de9d0b2552ff4849b85c574fb6f4f303073de0f3ca8d7c",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "e8b6711e702fe263b65c6ae953b62bee4b0daac329493d9bec5da5f9440bbe93",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "ea23de7d5b2478127a563f557f75dd0972ea495d3c6d3f62f089d3b0e49e99dd",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "ee6b2260ee5116e2c4533403de1f6eb035130236ba3a4abef267aab111dcfa33",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "ee8f03700440fabe781bdbddeedb633d83687736ae7d04b146524edf5621e740",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      },
+      {
+        "providerPrincipalDigest": "fcb4f2d2d95fe6f8716740aca6e480906eac83478a274ef54e24bfce387d5b0f",
+        "admission": "HOLD",
+        "admittedCeiling": "unknown",
+        "currentAttained": 0,
+        "peakAttained": 0,
+        "unresolvedOpenIntervals": 0,
+        "observationScope": "exact-task-set",
+        "evidenceRefs": []
+      }
+    ],
+    "terminalPublication": {
+      "version": 1,
+      "state": "open",
+      "receipt": null
+    },
+    "holds": [],
+    "revision": 3053,
+    "publishedAt": "2026-09-09T11:43:05.506Z"
+  },
+  "dirty": [
+    {
+      "status": " M",
+      "path": ".brain/ERRORS-critical.md",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "09f109d13e2fd64a2ec34b523a38db8fddfffa3aaeb959ca135b4efb83c9e572"
+    },
+    {
+      "status": " M",
+      "path": ".brain/exports/debt.md",
+      "owner": "inherited/unattributed; preserve"
+    },
+    {
+      "status": " M",
+      "path": ".brain/exports/decisions.md",
+      "owner": "inherited/unattributed; preserve"
+    },
+    {
+      "status": " M",
+      "path": ".brain/exports/memory.md",
+      "owner": "inherited/unattributed; preserve"
+    },
+    {
+      "status": " M",
+      "path": ".brain/exports/summary.md",
+      "owner": "inherited/unattributed; preserve"
+    },
+    {
+      "status": " M",
+      "path": ".deckent/runtime/bot-listen.log",
+      "owner": "inherited/unattributed; preserve"
+    },
+    {
+      "status": " M",
+      "path": ".deckent/settings/features-manifest.json",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "879e9229fcfb86cce398100621ec498e3ad457f80dfeed18decb82f03fd0a727"
+    },
+    {
+      "status": " D",
+      "path": ".github/pull_request_template.md",
+      "owner": "inherited/unattributed; preserve"
+    },
+    {
+      "status": " M",
+      "path": "DIRECTIVES.md",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "f0a7d429b0203c6d8d3cd4a6ac38eafc1b0cc6da46b620c070a186b6aae3836a"
+    },
+    {
+      "status": " M",
+      "path": "docs/CHANGELOG.md",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "385919235ab38eab2c93020db358986b08e72a9687721ce0caf34ea859c67246"
+    },
+    {
+      "status": " M",
+      "path": "docs/SPRINT-LOG.md",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "2855c9d170c7c5a9b384f236ce3bd7b69ec5fd6a4a57779f2d2b249967070d40"
+    },
+    {
+      "status": " M",
+      "path": "docs/execution/active/TERMINAL-OPERATOR-SURFACE-CLOSURE-001.md",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "603f1c3bac8a215e9fd80b669f3dab1cd0a161c3cd18a4b4718a60f397319f35"
+    },
+    {
+      "status": " M",
+      "path": "docs/execution/canary/CANARY-NOTE.md",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "ed2234d2bda01a41e3d1dd29411d7828c46a7746d570b00a63860b83ed875958"
+    },
+    {
+      "status": " M",
+      "path": "scripts/build.mjs",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "6c524751bccd6fe4609d1d4d5aa2f66507c9ad635c78a3fbda2431589c3b2dd6"
+    },
+    {
+      "status": " M",
+      "path": "scripts/clean.mjs",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "a12f6465044d11137a22d52a8961de03d1ba9896398917cec65eb8cbf0b07d1c"
+    },
+    {
+      "status": " M",
+      "path": "scripts/lint-test-hermeticity.mjs",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "10f6e7045ca5dc9b8cd043f52eb3267fcb35e219bcd6e9fa28c62593099b768c"
+    },
+    {
+      "status": " M",
+      "path": "scripts/script-registry.json",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "b83a3f19c35bd263e6c001ba5ba4b54e8823c9f45b3e2ad9c0772010762dc1b0"
+    },
+    {
+      "status": " M",
+      "path": "src/cli/repl/native-transport.ts",
+      "owner": "Cursor 7109-c",
+      "sha256": "b57be8ae1d8df57d319019efbce553c330ff3782083c557b6423f48886675139"
+    },
+    {
+      "status": " M",
+      "path": "src/cli/repl/run.tsx",
+      "owner": "Cursor 7109-c",
+      "sha256": "5d887eb714aee9140148e1fd8786223a3a0ae73a7f07e7b2e07c58c3b0d5353d"
+    },
+    {
+      "status": " M",
+      "path": "src/core/model-registry.ts",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "47bb43697ea14f050814eadb88aacf58be6a5e5d52151c05905ecb987a6f69db"
+    },
+    {
+      "status": " M",
+      "path": "src/core/pricing-data-baseline.json",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "eb4993e737253e6bd5c28005ef91b72f9b0a88891faf9f131ef1a80bd4986bc2"
+    },
+    {
+      "status": " M",
+      "path": "tests/agents/agentic-worker-entry.test.ts",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "039dcd6712aab1ebda740e1da8ae21749e54c8b2b6197e90a9edd323f9a05486"
+    },
+    {
+      "status": " M",
+      "path": "tests/agents/http-agentic-worker.test.ts",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "d1c8291136796165a1814e3094d8e99b985d86e2394e266e3ff096582d9e7d75"
+    },
+    {
+      "status": " M",
+      "path": "tests/cli/archive-terminal-seal.test.ts",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "cc39416721f37c06f1e338443b1d6484f69b7ae992c37b93323be3217fed127e"
+    },
+    {
+      "status": " M",
+      "path": "tests/cli/native-transport-measurement-root.test.ts",
+      "owner": "Cursor 7109-c",
+      "sha256": "828816cf2f5257ff5c2d6dd59a98011bb1bdb9e1a40f15d9df7fbc22f57033f8"
+    },
+    {
+      "status": " M",
+      "path": "tests/connectors/bot-agentic.test.ts",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "9f20fb0bc49032bad862f5ee15b3238163029bf486691f0c10af9dcac64e0b02"
+    },
+    {
+      "status": " M",
+      "path": "tests/core/constants.test.ts",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "a8118d1e1b3869eaa2a2c5481f4c3b03ee4a26de081213cbb92ef7f34334439c"
+    },
+    {
+      "status": " M",
+      "path": "tests/core/execution-effect-containment.test.ts",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "bc8d3ba7bbb8c3363f9397af4eb88f933c345c2ef35a8a58c12ad5af677666f2"
+    },
+    {
+      "status": " M",
+      "path": "tests/core/identity-generator.test.ts",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "e294d76783724afcc3900415c5ac33edb5a508a38e0c4e62cce23f11e0e19967"
+    },
+    {
+      "status": " M",
+      "path": "tests/core/model-registry.test.ts",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "8623f3c5e12a03f43917298ae6976cb49424a0ad2bb1aa98a9737eb776ce5563"
+    },
+    {
+      "status": " M",
+      "path": "tests/providers/codex.test.ts",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "ed0b57658484a9a540b2de5e5df81ced019145f1053075643d11ab711d687994"
+    },
+    {
+      "status": " M",
+      "path": "tests/scripts/build-lifecycle.test.ts",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "2187c2e77dc04f661c34cfd32f2fd1a08ede6619ec2d3e09fb8b1860079d826d"
+    },
+    {
+      "status": " M",
+      "path": "tests/scripts/clean-active-execution-guard.test.ts",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "0be28325b7cc504b487706f751c23ae72b362f1e9d9b189d2796ed2364d6a64c"
+    },
+    {
+      "status": "??",
+      "path": ".brain/exports/memory-details.md",
+      "owner": "inherited/unattributed; preserve"
+    },
+    {
+      "status": "??",
+      "path": ".codex/hooks.json",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "067fa9305851faa27d882f4a6d2a2d9a75af88da34cf885020dbf9eb251af108"
+    },
+    {
+      "status": "??",
+      "path": ".codex/hooks/channel-read.test.mjs",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "80461ca4111e2eea6ec724cc9f3bfc376cd972dd62ab745f0ff1514851c7cd65"
+    },
+    {
+      "status": "??",
+      "path": ".codex/hooks/communication-read.mjs",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "f306bae31693ca357e2c4688d9661b093cd0f38a8b5b6ed1645ea20b9787263b"
+    },
+    {
+      "status": "??",
+      "path": ".cursor/hooks.json",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "bd5ccc358876d7678e5e7e162a8b3fffbc7dfeb0710d4b808c33b3d3202846af"
+    },
+    {
+      "status": "??",
+      "path": ".cursor/hooks/",
+      "owner": "inherited/unattributed; preserve"
+    },
+    {
+      "status": "??",
+      "path": ".cursor/rules/production-channel.mdc",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "97f9ab50ed0b5961f94433082edd3769c261980e30e8c64baa558ab0ba15d6c2"
+    },
+    {
+      "status": "??",
+      "path": ".cursor/skills/",
+      "owner": "inherited/unattributed; preserve"
+    },
+    {
+      "status": "??",
+      "path": ".deckent/build/",
+      "owner": "inherited/unattributed; preserve"
+    },
+    {
+      "status": "??",
+      "path": ".deckent/runtime/local-llm.pid",
+      "owner": "inherited/unattributed; preserve"
+    },
+    {
+      "status": "??",
+      "path": ".deckent/runtime/recover-resume-outcome-sprint724-20260905T1718Z.json",
+      "owner": "inherited/unattributed; preserve"
+    },
+    {
+      "status": "??",
+      "path": ".deckent/runtime/recover-resume-outcome-sprint724-20260905T1751Z.json",
+      "owner": "inherited/unattributed; preserve"
+    },
+    {
+      "status": "??",
+      "path": ".deckent/runtime/recover-resume-outcome-sprint724-20260905T1825Z.json",
+      "owner": "inherited/unattributed; preserve"
+    },
+    {
+      "status": "??",
+      "path": ".deckent/runtime/recover-resume-outcome-sprint724-20260905T1930Z.json",
+      "owner": "inherited/unattributed; preserve"
+    },
+    {
+      "status": "??",
+      "path": ".deckent/runtime/recover-resume-outcome-sprint724-20260905T2041Z.json",
+      "owner": "inherited/unattributed; preserve"
+    },
+    {
+      "status": "??",
+      "path": "docs/execution/active/RECOVERY-BORN-714-EXACT-DISPATCH-AND-TERMINAL-TRUTH-001.md",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "af4246ed7300a6c495e6f6876441b8b030207fbf2998b65493eb54536e4508af"
+    },
+    {
+      "status": "??",
+      "path": "docs/execution/evidence/3357/",
+      "owner": "inherited/unattributed; preserve"
+    },
+    {
+      "status": "??",
+      "path": "durum-raporu.md",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "88e661cfd0c62dffdf7307c2323b442b6183b02a76b25a09daddfcb3000eb735"
+    },
+    {
+      "status": "??",
+      "path": "follow-up-works/cursor-7099-cli-help-matrix.md",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "7047f7d88b4ff7c88f00226b807c9ebb1574d603a9b537c1f3302aadee3615cf"
+    },
+    {
+      "status": "??",
+      "path": "follow-up-works/fable-7104-sync-async.md",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "13e331124528db3ceaa73c19cd4ff7a71e8a8861b4dfbe996b6420c5aa1b2100"
+    },
+    {
+      "status": "??",
+      "path": "proof/",
+      "owner": "inherited/unattributed; preserve"
+    },
+    {
+      "status": "??",
+      "path": "tests/cli/recover.test.ts",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "6d797e0defb083f9aa434349bce9497c60e4d4900c0966094091514416540cfb"
+    },
+    {
+      "status": "??",
+      "path": "tests/core/gpt6-astra-catalog.test.ts",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "d4d93ed9613820fe76ce9a8e2e1b9f68e20863c05489f29aa801cbdc753c9e9c"
+    },
+    {
+      "status": "??",
+      "path": "tests/orchestra/exact-docker-private-output-contract.test.ts",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "17911a7e773f43b934698e179a007cedf020ad0a4619c5d18801c8d94434be33"
+    },
+    {
+      "status": "??",
+      "path": "tests/orchestra/spawn-backend-docker-dependency-inspection.test.ts",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "7b627c3694ba717015b3df506eb3abe982557ff0c3d85abcc49c039950991c6d"
+    },
+    {
+      "status": "??",
+      "path": "tests/orchestra/spawn-backend-docker-ipc-authority.test.ts",
+      "owner": "inherited/unattributed; preserve",
+      "sha256": "88d9f474f9f98dadaed5233fc2e95d5108fa921de2b8401baf9100595ec9b285"
+    }
+  ],
+  "approvals": {
+    "observation": "read-only request/decision sidecar reconciliation",
+    "requests": 16,
+    "allHaveDecision": true,
+    "pendingWithoutTerminalSidecar": 0,
+    "notInspected": [
+      "gateway pairing",
+      "external approval stores"
+    ]
+  },
+  "buildDisposition": "Current dist source provenance UNVERIFIED; handoff HANDOFF.md reports last 5767c83e6 build, PREPARED default build:all@02d1e13e6 is not supported. Recent build lifecycle journal is old 2026-09-05. No build/restart permission inferred.",
+  "checks": [
+    {
+      "name": "master",
+      "utc": "2026-09-09T22:20:53.048507+00:00",
+      "command": [
+        "node",
+        "scripts/lint-master-plan.mjs",
+        "--check"
+      ],
+      "exit": 0,
+      "logSha256": "a3c76bd208e65e66662d00e2e78ac3857670ee875afb37932f11ac5853ee4894"
+    },
+    {
+      "name": "closure",
+      "utc": "2026-09-09T22:20:53.277936+00:00",
+      "command": [
+        "node",
+        "scripts/lint-closure-dispositions.mjs"
+      ],
+      "exit": 0,
+      "logSha256": "2eadbad7f343fae93ecf6790b5ee696a38d2568ea897fd0a96c912c5698eac9c"
+    },
+    {
+      "name": "policy",
+      "utc": "2026-09-09T22:20:53.451351+00:00",
+      "command": [
+        "node",
+        "scripts/lint-operating-policy.mjs",
+        "--digest"
+      ],
+      "exit": 0,
+      "logSha256": "4e702ed9337c0c8d9836eb49fe553703586552152bc27d0f0507eb9eb65149dc"
+    }
+  ],
+  "files": {
+    "AGENTS.md": "57e10d5cdf852a41726a6a2c13721570265b8836ca544b6a45647256e987725a",
+    "DECKENT.md": "acdb8f12fcfb08c48fe6fc95024ff9895332b888aa2b4589108b67b5934a8881",
+    "docs/governance/deckent-dev-operating-policy.md": "a44c27d496e863fd69723e8d1168fce7cb4d6bcc6d687705559c42bb22f68795",
+    "docs/MASTER-PLAN.md": "f5c7d22cfc3f92926df04edbc4867a9f165efcd2cf4ba772659ad78dec673b1c",
+    "dist/cli/entry.js": "c7df3d28480d8efa10b489353aa557435d2b03c0c56d7ac78e6bf5c73d45b118",
+    "src/cli/repl/native-transport.ts": "b57be8ae1d8df57d319019efbce553c330ff3782083c557b6423f48886675139",
+    "src/cli/repl/run.tsx": "5d887eb714aee9140148e1fd8786223a3a0ae73a7f07e7b2e07c58c3b0d5353d"
+  },
+  "observedAt": "2026-09-09T22:22:17.788658+00:00",
+  "negativeScope": [
+    "owner-only commit/push/MASTER admission/mode/kill/cleanup",
+    "runtime auth mutation",
+    "own C self-verification",
+    "unadmitted 7114-b/7109-d/7111-c"
+  ],
+  "verificationDisposition": "HANDOFF identity/epoch/scope/digests VERIFIED; inherited product/runtime/build HOLDs preserved. Prepared buildStateRef is transferor-reported default, not independently verified build evidence. No build/active-run mutation admitted.",
+  "docsOnlyHeadDelta": [
+    "docs/execution/handoffs/ah-2026-09-10-fable-astra-terminal-v2/0001-prepared.json",
+    "docs/execution/handoffs/ah-2026-09-10-fable-astra-terminal/0002-aborted.json"
+  ],
+  "firstAuthorizedAction": "Read-only review Cursor 7109-c and 7107-c; arrange different-provider C review, then 7113 D/E under live owner instruction; owner admission questions remain pending."
+}
