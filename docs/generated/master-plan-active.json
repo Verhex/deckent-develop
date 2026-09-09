@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "0d128bce2437a347da115065d534dbf021c259f26c74dd0e6b81dacb21070211"
+    "value": "287227d29da9c60c2ce1b1b5f2eca851acb6e2973549255a8b67983ff2c194ab"
   },
   "summary": {
     "total": 599,
@@ -5671,7 +5671,7 @@
       "state": "OPEN",
       "updated": "2026-09-09",
       "definitionDigest": "89d419a60213350ef0a764e81a0742f63558710268ca8a8ce39a04b0be6de5cd",
-      "progressDigest": "00426e367f74559a8bc3b270bf22ef9483ae03f23a076335de5189cfb55b5628",
+      "progressDigest": "fb75adaeb25f2e20b07b8e4043b05c3d0ba2d963be673664348d1414383ad4de",
       "terminalClosureDigest": null
     },
     {
@@ -5693,7 +5693,7 @@
       "state": "OPEN",
       "updated": "2026-09-09",
       "definitionDigest": "aaf443c722f064cf4eb9d713bcc40dc1d178101ebd84110eeca43797b7c69580",
-      "progressDigest": "30856410b42251c7ba04bb2ba9ec12c6d5f1f4b115eb0c6c40d67ffe2207adf5",
+      "progressDigest": "3250e85d81ba5335beeabb3a1305ee79bdd7f2932018eae7ef00e3a8a5559428",
       "terminalClosureDigest": null
     },
     {
@@ -27036,7 +27036,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Adversarial sınıflandırma matrisi (≥40) fail-closed; standart modda salt-okunur bash sessiz + audit izinde görünür; 20 KB satırlı fixture outline/range/search broker tavanına sığar; gerçek binary standart modda MASTER-PLAN senaryosu yalnız yazma/exec için onay ister.",
-      "evidence": "approval-command-classification.ts:64; native-tool-approval.ts:22; trace: 11/13 deckent_bash.",
+      "evidence": "approval-command-classification.ts:64; native-tool-approval.ts:22; trace: 11/13 deckent_bash. Astra A7d post-landing CONFIRMED b4de8a1df (285/285, 2026-09-09).",
       "updated": "2026-09-09"
     },
     {
@@ -27115,7 +27115,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "1.25 MB MASTER-PLAN @ref ile tek turda yapılandırılmış analiz ≤N dk, checkpoint 0, digest scratch'te kalıcı ve /context görünür; 32k pencerede aynı.",
-      "evidence": "Vaka: \"[1 referans ölçülen bütçeye sığmadı; araçlı parçalı okumaya geçildi.]\" sonrası 19 tool çağrısı, cevap yok.",
+      "evidence": "Vaka: \"[1 referans ölçülen bütçeye sığmadı; araçlı parçalı okumaya geçildi.]\" sonrası 19 tool çağrısı, cevap yok. Dilim B landed 7c64f3c8d 2026-09-09 (Astra; runner + journal + ledger; canlı 1.4 MB→440057 token/308 ms; 149/149; main dry-run 42/42). C/D/E OPEN.",
       "updated": "2026-09-09"
     },
     {
@@ -30399,6 +30399,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "b0fd75c159f282bc62284bc405e60f26ba4e08cbec6efd4eb73bf965f6e07cbc"
+    "value": "62a48dbd22e19188e3484a089c65f4c4864d8e422f39f677bf9c8e0aaaa44e8e"
   }
 }
