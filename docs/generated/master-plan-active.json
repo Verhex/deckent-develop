@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "b8b82db4a8517a98cfffb5429ff3df9ab27d90486e46a93f1947f48a7ef95ba4"
+    "value": "8238b998448db21524cbced7976f0397508e9cef6ae3a563cbfb7311e596a326"
   },
   "summary": {
-    "total": 592,
-    "active": 503,
+    "total": 598,
+    "active": 509,
     "terminal": 89,
     "receipts": 232,
     "byState": {
-      "OPEN": 381,
+      "OPEN": 387,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
@@ -21,8 +21,8 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 368,
-      "P1": 174,
+      "P0": 373,
+      "P1": 175,
       "P2": 50
     },
     "byProgram": {
@@ -57,7 +57,7 @@
       "SCALE": 1,
       "SECURITY": 11,
       "SURFACE": 1,
-      "TERMINAL": 28,
+      "TERMINAL": 34,
       "TOOL": 1,
       "TRUTH": 108,
       "XPLAT": 7
@@ -5620,6 +5620,39 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 7107,
+      "id": "TERMINAL-FLUENCY-PROGRAM-001",
+      "program": "TERMINAL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-09-09",
+      "definitionDigest": "bc7759bd9ca5b582202a41dacd59a1e2f814b3044776cedc7a5a735668f34701",
+      "progressDigest": "0203a1b528ae3ef5b2223e2401b5bec15e8e69c595196c5c21478f490bbd6305",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7108,
+      "id": "TERMINAL-REASONING-CONTROL-001",
+      "program": "TERMINAL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-09-09",
+      "definitionDigest": "266ac69f8f975108a4de02be1d1c68ade27e53cf7a139476f92d30af43fc24d3",
+      "progressDigest": "99c49f2d8e305898909642bbac4a1ea6598a2fd1106048678330439febbe4d62",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7109,
+      "id": "TERMINAL-TOOL-BUDGET-UNITS-001",
+      "program": "TERMINAL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-09-09",
+      "definitionDigest": "057aa8a82952fc03ceddfc83905b84b11180216e063f5d83ef3e1cca74392738",
+      "progressDigest": "dac324dfe2022755295b272ed38da246a7792e30e436e84520a6123b3469fc28",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 7110,
       "id": "A2A-INTEROP-001",
       "program": "ECOSYSTEM",
@@ -5628,6 +5661,39 @@
       "updated": "2026-08-04",
       "definitionDigest": "fe481488f31d7e6a25bc93d431bad90403df0d161b8de9860b65442bd88c55e7",
       "progressDigest": "3d9678d87540514c3843f99a24351e060618408d1e04c163ac561e1a0adb1dd0",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7111,
+      "id": "TERMINAL-READONLY-APPROVAL-001",
+      "program": "TERMINAL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-09-09",
+      "definitionDigest": "89d419a60213350ef0a764e81a0742f63558710268ca8a8ce39a04b0be6de5cd",
+      "progressDigest": "00426e367f74559a8bc3b270bf22ef9483ae03f23a076335de5189cfb55b5628",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7112,
+      "id": "TERMINAL-CHECKPOINT-CONTINUITY-001",
+      "program": "TERMINAL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-09-09",
+      "definitionDigest": "37e6bcb99c1d615679dbc0a7fc344c8cf57d449bd1389c0cf9bba80facabf12d",
+      "progressDigest": "698c4efba2d15ac1a2a422127a50ceae37f943f29a3424067e8be0593086e326",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7113,
+      "id": "TERMINAL-LARGE-REFERENCE-DIGEST-001",
+      "program": "TERMINAL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-09-09",
+      "definitionDigest": "aaf443c722f064cf4eb9d713bcc40dc1d178101ebd84110eeca43797b7c69580",
+      "progressDigest": "30856410b42251c7ba04bb2ba9ec12c6d5f1f4b115eb0c6c40d67ffe2207adf5",
       "terminalClosureDigest": null
     },
     {
@@ -25000,7 +25066,13 @@
         "SYNC-PROVENANCE-TRUTH-001",
         "TERMINAL-CONTEXT-CONTINUITY-001",
         "TERMINAL-PREAMBLE-BUDGET-001",
+        "TERMINAL-FLUENCY-PROGRAM-001",
+        "TERMINAL-REASONING-CONTROL-001",
+        "TERMINAL-TOOL-BUDGET-UNITS-001",
         "A2A-INTEROP-001",
+        "TERMINAL-READONLY-APPROVAL-001",
+        "TERMINAL-CHECKPOINT-CONTINUITY-001",
+        "TERMINAL-LARGE-REFERENCE-DIGEST-001",
         "SKILLMD-V3-RECONCILIATION-001",
         "AGENT-RUNTIME-ADAPTER-001",
         "RUN-POLICY-DELIVERY-001",
@@ -25069,7 +25141,13 @@
         "SYNC-PROVENANCE-TRUTH-001",
         "TERMINAL-CONTEXT-CONTINUITY-001",
         "TERMINAL-PREAMBLE-BUDGET-001",
+        "TERMINAL-FLUENCY-PROGRAM-001",
+        "TERMINAL-REASONING-CONTROL-001",
+        "TERMINAL-TOOL-BUDGET-UNITS-001",
         "A2A-INTEROP-001",
+        "TERMINAL-READONLY-APPROVAL-001",
+        "TERMINAL-CHECKPOINT-CONTINUITY-001",
+        "TERMINAL-LARGE-REFERENCE-DIGEST-001",
         "SKILLMD-V3-RECONCILIATION-001",
         "AGENT-RUNTIME-ADAPTER-001",
         "ERROR-REGISTRY-THROW-CONVERSION-001",
@@ -26695,7 +26773,12 @@
         "TERMINAL-OPERATOR-SURFACE-CLOSURE-001"
       ],
       "dependents": [
-        "TERMINAL-PREAMBLE-BUDGET-001"
+        "TERMINAL-CHECKPOINT-CONTINUITY-001",
+        "TERMINAL-FLUENCY-PROGRAM-001",
+        "TERMINAL-PREAMBLE-BUDGET-001",
+        "TERMINAL-READONLY-APPROVAL-001",
+        "TERMINAL-REASONING-CONTROL-001",
+        "TERMINAL-TOOL-BUDGET-UNITS-001"
       ],
       "children": [],
       "gates": [
@@ -26732,7 +26815,10 @@
       "dependsOn": [
         "TERMINAL-CONTEXT-CONTINUITY-001"
       ],
-      "dependents": [],
+      "dependents": [
+        "TERMINAL-FLUENCY-PROGRAM-001",
+        "TERMINAL-LARGE-REFERENCE-DIGEST-001"
+      ],
       "children": [],
       "gates": [
         "G1",
@@ -26756,6 +26842,118 @@
       "evidenceReceipts": [],
       "acceptance": "Qwen3.8/131072 pencerede ilk tur ölçülü preamble ≤ config payı (default ≤ %15) ve aynı tool yetkinliği korunur (tool çağrıları keşif+lazy şema ile çalışır, gerçek transcript kanıtı); Claude/Codex pencerelerinde davranış değişmez veya config ile ölçeklenir; hardcode yok, i18n en+tr; regresyon testleri",
       "evidence": "Vaka: /context ilk tur ~48k/131072 (owner 2026-09-09 10:2xZ), aynı oturumda 1.25 MB MASTER-PLAN okuma 285691 token (%218) — ikincisi 7105 tavanlarıyla kapanır, preamble payı 7106'nındır; preamble bileşenleri: tool şemaları (src/agent/tools, mcp-tool-catalog), DECKENT.md referansı, identity (src/agent/identity.ts), permission kuralları (src/agent/permission*.ts)",
+      "updated": "2026-09-09"
+    },
+    {
+      "order": 7107,
+      "id": "TERMINAL-FLUENCY-PROGRAM-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TERMINAL",
+      "outcome": "**Owner-admitted 2026-09-09 (Alperen canlı talimat 12:40Z: \"deckent terminali claude code / codex / cursor terminalleri gibi akıcı çalışmak zorunda; akış kesintilenemez, kullanıcı yorulamaz; uzun/sonsuz bağlam, iş akışı, tool yüzeyi, onay akışı bir bütün\"):** Native terminalin uçtan uca akıcılık programı (şemsiye). Ölçülen vaka (session chat-2026-09-09T12-21-46, local Qwen3.8/131072): \"@docs/MASTER-PLAN.md oku ve analiz et\" 30 dk, ~25 onay, 0 görünür cevap. Kök nedenler ayrı satırlarda: 7108 gizli düşünme çıktı tavanını yiyor (4×4096 token), 7109 tool-sonucu tavanı bayt/token karışımı (sahte checkpoint her 4-5 çağrıda), 7110 checkpoint sonrası iş kaybı (boş findings, okunamayan içerik yolu, tekrar döngüsü), 7111 salt-okunur shell komutları onay istiyor. Kanıt: docs/execution/active/TERMINAL-FLUENCY-PROGRAM-001.md.",
+      "priority": "P0",
+      "dependsOn": [
+        "TERMINAL-CONTEXT-CONTINUITY-001",
+        "TERMINAL-PREAMBLE-BUDGET-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TERMINAL-CONTEXT-CONTINUITY-001",
+        "TERMINAL-PREAMBLE-BUDGET-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Gerçek binary + local Qwen 131072 ve 32768 pencerede, standart ve full-auto modda kabul bataryası: (1) MASTER-PLAN analiz senaryosu ≤10 dk içinde görünür analiz üretir; (2) ilk 20 tool çağrısında sahte bağlam checkpoint 0; (3) salt-okunur okumalar standart modda onay istemez (yazma/exec ister); (4) checkpoint sonrası aynı okuma tekrarı 0, iş kaybı 0; (5) provider transport hatası typed + bir bounded retry; (6) her adım /context ve transcript ile ölçülü; (7) aynı batarya Claude/Codex provider ile byte-farksız akış. Astra XVerify + owner canlı test.",
+      "evidence": "Vaka transcript: iki oturum (10:43 standart, 12:21 full-auto), owner 12:3xZ; session checkpoints 4/9/13/19; llama.cpp log 4×4096 üretim; trace istekleri 13-17k token.",
+      "updated": "2026-09-09"
+    },
+    {
+      "order": 7108,
+      "id": "TERMINAL-REASONING-CONTROL-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TERMINAL",
+      "outcome": "**Owner-admitted 2026-09-09 (Alperen canlı talimat 12:40Z: \"deckent terminali claude code / codex / cursor terminalleri gibi akıcı çalışmak zorunda; akış kesintilenemez, kullanıcı yorulamaz; uzun/sonsuz bağlam, iş akışı, tool yüzeyi, onay akışı bir bütün\"):** Reasoning/thinking kontrolü ve transport dayanıklılığı. Kanıt: local Qwen3 thinking modunda (`reasoning_content` gizli akıyor, adapter yalnız aktivite sayıyor, kontrol yok); wire max_tokens = outputReserve 4096 hem düşünme hem görünür metni kapsıyor; llama.cpp log dört istekte tam 4096 token üretim + görünür metin boş → CHECKPOINT_RESPONSE_MISSING ve kayıp final cevaplar; `openai-compatible connect failed — fetch failed` undici cause zincirini gizliyor, transient retry yok (sunucu: \"Connection handling canceled\"). İş: registry capability descriptor (enable_thinking / reasoning_effort / none), config `execution_budget.native_agent.reasoning` {auto / off / on, budgetTokens},yapılandırılmış isteklerde (checkpoint) thinking kapalı,tavan aritmetiği = görünür rezerv + reasoning bütçesi,tükenmede typed notice + bir bounded retry,transport sınıfı + cause + bir bounded retry,\"düşünüyor… N token\" göstergesi.",
+      "priority": "P0",
+      "dependsOn": [
+        "TERMINAL-CONTEXT-CONTINUITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TERMINAL-CONTEXT-CONTINUITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Gerçek Qwen: checkpoint JSON ilk denemede gelir (RESPONSE_MISSING 0); 4096 tavanına gizli düşünmeyle çarpan istek 0 veya typed notice + retry ile kurtarılır; ECONNRESET sentetik → tek retry + dürüst mesaj; EN/TR; no-model-literal temiz.",
+      "evidence": "llama.cpp eval satırları 4096×4 (12:20-12:36Z); probe: reasoning_content var; openai.ts:193, session.ts:750.",
+      "updated": "2026-09-09"
+    },
+    {
+      "order": 7109,
+      "id": "TERMINAL-TOOL-BUDGET-UNITS-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TERMINAL",
+      "outcome": "**Owner-admitted 2026-09-09 (Alperen canlı talimat 12:40Z: \"deckent terminali claude code / codex / cursor terminalleri gibi akıcı çalışmak zorunda; akış kesintilenemez, kullanıcı yorulamaz; uzun/sonsuz bağlam, iş akışı, tool yüzeyi, onay akışı bir bütün\"):** Tool-sonucu bağlam tavanları token cinsinden tek ölçüm otoritesiyle. Kanıt: src/agent/loop.ts:505-514 ve :765-770 tool-sonucu BAYT toplamını rawBudget(131072 token)×0.20×0.75 = 19.660 \"bayt\" tavanıyla karşılaştırıyor; gerçek istekler 13-17k token iken toolCalls 4/9/13/19da \"token-pressure\" checkpoint; Astra 32k provasında 6 çağrıda 2 epoch. İş: retained tool tokenları measureMessages/measureProviderRequest ile ölçülür (veya ölçülmüş bytes→token oranı), tool-result-broker preview cap aynı türetim, checkpoint isteğine typed pressure gerekçesi (retainedTokens/capTokens/windowTokens) + /context görünürlüğü. Cursor lane.",
+      "priority": "P0",
+      "dependsOn": [
+        "TERMINAL-CONTEXT-CONTINUITY-001"
+      ],
+      "dependents": [
+        "TERMINAL-LARGE-REFERENCE-DIGEST-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TERMINAL-CONTEXT-CONTINUITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "131072 pencerede 18 KB tool çıktısı checkpoint tetiklemez; gerçek %75 token doluluğu tetikler; 32768de oranlı; bayt/token regresyon pini; gerçek binary MASTER-PLAN senaryosunda ilk 10 çağrıda sahte checkpoint 0.",
+      "evidence": "session checkpoints toolCalls 4/9/13/19; trace tool sonuçları 7.2 KB+7.2 KB+2 KB…; rawBudget=131072 (native-transport.ts:791).",
       "updated": "2026-09-09"
     },
     {
@@ -26788,6 +26986,120 @@
       "acceptance": "Owner G2 kararı yönü tipler (inbound/outbound/ikisi), binding seçimi ve ADR sınırı (\"execution identity hiçbir zaman A2A task/context ID'sinden türetilmez\") kayda girer; implementation admission MCPV2 P3 HTTP-transport kararıyla koordine edilir; taslak iş paketleri A0-A3 `a2aplan.md` içindedir",
       "evidence": "Açılış: Alperen 2026-08-04 talebi (\"iş planımıza alalım\"). Kaynak: a2a-protocol.org spec v1.0.0; Linux Foundation 2026-04 bir-yıl raporu 150+ kuruluş + Google/Microsoft/AWS platform entegrasyonu + production kullanım; 2026-08-04 rekabet günlüğü Hermes v0.20 çift-yönlü A2A sinyali. Mevcut kodda A2A yok — greenfield, kırılma riski yok. Owner G2 yön kararı 2026-08-04: İKİSİ (inbound + outbound) onaylandı; binding seçimi ve ADR sınırı A0 kapsamında açık",
       "updated": "2026-08-04"
+    },
+    {
+      "order": 7111,
+      "id": "TERMINAL-READONLY-APPROVAL-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TERMINAL",
+      "outcome": "**Owner-admitted 2026-09-09 (Alperen canlı talimat 12:40Z: \"deckent terminali claude code / codex / cursor terminalleri gibi akıcı çalışmak zorunda; akış kesintilenemez, kullanıcı yorulamaz; uzun/sonsuz bağlam, iş akışı, tool yüzeyi, onay akışı bir bütün\"):** Salt-okunur onay akışı ve büyük dosya okuma. Kanıt: approval-command-classification.ts:64 varsayılan shell-exec/medium, salt-okunur tanıma yok → her `sed -n`/grep/awk standart modda onay; model 1.25 MB / 10 KB satırlı dosyayı read_file ile okuyamadığı için 13 çağrının 11i deckent_bash; ~25 onay, 0 cevap. İş: allowlist tabanlı deterministik read-only shell sınıflandırıcı (pipeline aşamaları, redirection/exec/in-place reddi, cross-platform) → file-read/silent; deckent_read_file outline/byte-sınırlı aralık/search modları (elided işaretli, sessiz kesme yok); çok-çağrılı turda tek gruplu onay kartı.",
+      "priority": "P0",
+      "dependsOn": [
+        "TERMINAL-CONTEXT-CONTINUITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TERMINAL-CONTEXT-CONTINUITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Adversarial sınıflandırma matrisi (≥40) fail-closed; standart modda salt-okunur bash sessiz + audit izinde görünür; 20 KB satırlı fixture outline/range/search broker tavanına sığar; gerçek binary standart modda MASTER-PLAN senaryosu yalnız yazma/exec için onay ister.",
+      "evidence": "approval-command-classification.ts:64; native-tool-approval.ts:22; trace: 11/13 deckent_bash.",
+      "updated": "2026-09-09"
+    },
+    {
+      "order": 7112,
+      "id": "TERMINAL-CHECKPOINT-CONTINUITY-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TERMINAL",
+      "outcome": "**Owner-admitted 2026-09-09 (Alperen canlı talimat 12:40Z: \"deckent terminali claude code / codex / cursor terminalleri gibi akıcı çalışmak zorunda; akış kesintilenemez, kullanıcı yorulamaz; uzun/sonsuz bağlam, iş akışı, tool yüzeyi, onay akışı bir bütün\"):** Checkpoint sonrası iş sürekliliği. Kanıt: deterministicCheckpoint (session.ts ~:915) findings/decisions/nextActions BOŞ, evidenceRefs = ham transcript content-store yolu; model bu yolu deckent_read_file ile okuyunca DECKENT_E005 (checkpoint #3 kaydı); yeni epoch objective + CHECKPOINT_RESPONSE_MISSING ile açılıyor → model sıfırdan aynı aralıkları okuyor → yeni checkpoint (döngü). Model-yazımlı checkpoint createdAt \"2026-09-06\" (halüsinasyon) host tarafından kabul edilmiş. İş: deterministik checkpoint tool-trail (tool, args digest/özet, sonuç content-ref digest/boyut/ilk satır, ok) + son görünür metin taşır; content-ref okuma tool'u (digest ile, scope içi, read-only silent); host-stamped createdAt; aynı çağrının tekrarında trail'den servis (replay cache, config-resolved).",
+      "priority": "P0",
+      "dependsOn": [
+        "TERMINAL-CONTEXT-CONTINUITY-001"
+      ],
+      "dependents": [
+        "TERMINAL-LARGE-REFERENCE-DIGEST-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TERMINAL-CONTEXT-CONTINUITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Checkpoint sonrası aynı tool+args tekrarı 0 (cache servis + typed not); DECKENT_E005 checkpoint referansından erişilemez; epoch açılış mesajı trail'i EN/TR label ile render eder; createdAt host; gerçek Qwen senaryosunda checkpoint sonrası ilerleme devam eder.",
+      "evidence": "checkpoint-00000002/4 deterministicFallback findings=[]; #3 DECKENT_E005 notu; #1 createdAt 2026-09-06.",
+      "updated": "2026-09-09"
+    },
+    {
+      "order": 7113,
+      "id": "TERMINAL-LARGE-REFERENCE-DIGEST-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "TERMINAL",
+      "outcome": "**Owner-admitted 2026-09-09 (Alperen canlı talimat 12:40Z: \"deckent terminali claude code / codex / cursor terminalleri gibi akıcı çalışmak zorunda; akış kesintilenemez, kullanıcı yorulamaz; uzun/sonsuz bağlam, iş akışı, tool yüzeyi, onay akışı bir bütün\"):** Pencereye sığmayan @referans için deterministik map-reduce özet hattı: outline + bölüm başına sınırlı LLM digest (thinking kapalı, structured) scratch'e yazılır, cevap digest üzerinden verilir; model tool-okuma döngüsüne düşmez. 7106 sonrası; tasarım Astra, uygulama lane.",
+      "priority": "P1",
+      "dependsOn": [
+        "TERMINAL-PREAMBLE-BUDGET-001",
+        "TERMINAL-TOOL-BUDGET-UNITS-001",
+        "TERMINAL-CHECKPOINT-CONTINUITY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "TERMINAL-PREAMBLE-BUDGET-001",
+        "TERMINAL-TOOL-BUDGET-UNITS-001",
+        "TERMINAL-CHECKPOINT-CONTINUITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "1.25 MB MASTER-PLAN @ref ile tek turda yapılandırılmış analiz ≤N dk, checkpoint 0, digest scratch'te kalıcı ve /context görünür; 32k pencerede aynı.",
+      "evidence": "Vaka: \"[1 referans ölçülen bütçeye sığmadı; araçlı parçalı okumaya geçildi.]\" sonrası 19 tool çağrısı, cevap yok.",
+      "updated": "2026-09-09"
     },
     {
       "order": 7120,
@@ -30030,6 +30342,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "6de3f2240da5b8160e089ce8064a9df7a30606a4ed3698231c8aa33ee7a465e4"
+    "value": "d9b2e341b22420d79f104bad54fa78868be8955850ef922414c073ec3c8cd712"
   }
 }

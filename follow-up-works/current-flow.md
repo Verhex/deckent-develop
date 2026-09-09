@@ -222,6 +222,14 @@ duration performans kanıtı sayılmadı. WholeCLI/7099 veya platform closure de
    (contain modunda daemon probe: absent→absence; present/unknown→typed hold). Kalıntı: run-status ACTIVE/FIX,
    coordinator yok → run-6 öncesi recover. 7106 (Astra) REVISE (default .15 küçük pencereyi kapatıyor; 560-006
    proof silinmiş). 7105-b (Cursor) GO + 3 rötuş; L5 ACCEPTED; ikisi run-6 öncesi landing kuyruğunda.
+0a8. 12:40Z OWNER PIVOT — terminal program (MASTER 7107 şemsiye; 7108/7109/7111/7112/7113): owner iki
+   oturumda 30 dk / ~25 onay / 0 cevap bildirdi ("kabul edilemez teslimat; claude code / codex / cursor gibi
+   akıcı"). Kök nedenler kanıtla: RC1 Qwen thinking + 4096 tavanı (4×4096 üretim, RESPONSE_MISSING),
+   RC2 bayt/token tavan karışımı (checkpoint 4/9/13/19), RC3 fetch failed cause gizli, RC4 checkpoint
+   sonrası iş kaybı (DECKENT_E005, boş findings), RC5 bash salt-okunur onay, RC6 büyük referans stratejisi.
+   Doküman docs/execution/active/TERMINAL-FLUENCY-PROGRAM-001.md. Lane'ler: 7108 (ajan), 7109 (Cursor
+   ENTRY 64), 7111 (ajan), 7112 (ajan, worktree deckent-lane-7110), 7106 revize (Astra READY, review
+   ajanı). Landing #2 e7b32aaf8 (A4+L5+7105-b) main'de; run-6 terminal programından SONRA.
 0a4. MASTER 7106 TERMINAL-PREAMBLE-BUDGET-001 (owner-admitted 10:31Z, P0): "Selam" turu ~48k/131k preamble;
    Astra İŞ D (ölçüm → progressive tool şeması, contentRef referans metin, config-resolved pay, /context).
 0a2. Canary run-3 (sprint-729, 09:03Z) worker gönderimi kabul edilmedi: kök neden = exact Docker
