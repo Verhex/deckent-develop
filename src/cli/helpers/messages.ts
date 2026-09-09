@@ -3752,6 +3752,69 @@ const BASE_MESSAGES: MessageMap = {
     en: 'Scratch checkpoint could not be saved; the session continues without checkpoint recovery.',
     tr: 'Scratch checkpoint kaydedilemedi; oturum checkpoint kurtarması olmadan sürüyor.',
   },
+  // ─── 7110 TERMINAL-CHECKPOINT-CONTINUITY-001 ─────────────────────────────
+  // The deterministic tool trail a fresh context epoch opens on (rendered by
+  // session.ts / checkpoint-trail.ts; the words come from here), plus the
+  // post-checkpoint replay guard's notice.
+  'native.checkpoint.replay-served': {
+    en: 'Identical tool call served from the checkpoint trail — it already ran this turn and was not executed again.',
+    tr: 'Birebir aynı araç çağrısı checkpoint izinden sunuldu — bu turda zaten çalışmıştı, yeniden yürütülmedi.',
+  },
+  'native.checkpoint.trail.heading': {
+    en: 'Tool calls already executed this turn — an identical call is served from this trail, not re-run:',
+    tr: 'Bu turda zaten yürütülen araç çağrıları — birebir aynı çağrı yeniden çalıştırılmaz, bu izden sunulur:',
+  },
+  'native.checkpoint.trail.read_hint': {
+    en: 'Bytes are addressed by sha256 digest only: read them with {tool} (ref = digest, offset/limit in bytes). Never read them by path.',
+    tr: 'Baytlar yalnızca sha256 özetiyle adreslenir: {tool} ile okuyun (ref = özet, offset/limit bayt cinsinden). Asla yol ile okumayın.',
+  },
+  'native.checkpoint.trail.status_ok': { en: 'ok', tr: 'başarılı' },
+  'native.checkpoint.trail.status_failed': { en: 'failed', tr: 'başarısız' },
+  'native.checkpoint.trail.last_assistant': {
+    en: 'Last visible assistant text before the checkpoint:',
+    tr: 'Checkpoint öncesi son görünür asistan metni:',
+  },
+  'native.checkpoint.trail.replay_note': {
+    en: 'served from checkpoint trail — this exact call already ran this turn; use the result above or call something different',
+    tr: 'checkpoint izinden sunuldu — bu çağrı bu turda zaten çalıştı; yukarıdaki sonucu kullanın ya da farklı bir çağrı yapın',
+  },
+  'native.checkpoint.trail.omitted': {
+    en: '{count} earlier entries omitted; the full trail is sha256:{digest}, readable with {tool}.',
+    tr: '{count} önceki kayıt atlandı; tam iz sha256:{digest}, {tool} ile okunabilir.',
+  },
+  'native.checkpoint.pressure-suppressed': {
+    en: 'Context pressure reported again with nothing new since the last checkpoint — the current epoch is kept instead of re-checkpointing the same opening.',
+    tr: 'Son checkpoint\'ten bu yana yeni bir şey yokken bağlam baskısı yeniden bildirildi — aynı açılışı yeniden checkpoint\'lemek yerine mevcut dönem korunuyor.',
+  },
+  // deckent_read_content_ref typed refusals (tool-result `code`, localized by the bridge).
+  'native.content-ref.CONTENT_REF_DENIED': {
+    en: 'Content reference refused: only a 64-hex sha256 digest produced in this session is readable — never a path.',
+    tr: 'İçerik referansı reddedildi: yalnızca bu oturumda üretilmiş 64-hex sha256 özeti okunabilir — asla bir yol değil.',
+  },
+  'native.content-ref.CONTENT_REF_UNKNOWN': {
+    en: 'Content reference unknown: this digest was not produced by the session content store.',
+    tr: 'İçerik referansı bilinmiyor: bu özet, oturum içerik deposu tarafından üretilmedi.',
+  },
+  'native.content-ref.CONTENT_REF_EXPIRED': {
+    en: 'Content reference expired: the session content store is closed.',
+    tr: 'İçerik referansının süresi doldu: oturum içerik deposu kapalı.',
+  },
+  'native.content-ref.CONTENT_DIGEST_MISMATCH': {
+    en: 'Content reference refused: the stored bytes no longer match their digest.',
+    tr: 'İçerik referansı reddedildi: saklanan baytlar artık özetleriyle eşleşmiyor.',
+  },
+  'native.content-ref.CONTENT_RANGE_INVALID': {
+    en: 'Content reference range invalid: offset must be ≥ 0 and limit between 1 and the byte cap.',
+    tr: 'İçerik referansı aralığı geçersiz: offset ≥ 0 ve limit 1 ile bayt tavanı arasında olmalı.',
+  },
+  'native.content-ref.CONTENT_READ_FAILED': {
+    en: 'Content reference read failed: the stored file could not be read safely.',
+    tr: 'İçerik referansı okunamadı: saklanan dosya güvenli biçimde okunamadı.',
+  },
+  'native.content-ref.CONTENT_READ_UNSUPPORTED': {
+    en: 'Content reference read unsupported on this platform or store.',
+    tr: 'İçerik referansı okuma bu platformda veya depoda desteklenmiyor.',
+  },
   // ─── Context-lifecycle UX (560-005, RCA §7) ──────────────────────────────
   // Five typed states, each with its own wording — a terminal OUTPUT exhaustion
   // must never read like a context-window overflow, and vice versa. Only the

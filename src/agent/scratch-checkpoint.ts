@@ -19,8 +19,43 @@ export interface CheckpointCounters {
   readonly [name: string]: number;
 }
 
+/**
+ * 7110 (TERMINAL-CHECKPOINT-CONTINUITY-001) — one HOST-derived record of a tool
+ * call the model already made in this turn. Derived from the event stream, never
+ * from a model summary, so a fresh epoch opens on what was actually inspected.
+ * Bytes are referenced by digest only (`resultRef` / `fullContentRef` are sha256
+ * hex identities readable through the session's content-ref tool), never by a
+ * raw content-store path — a path the model cannot open is not evidence.
+ */
+export interface CheckpointToolTrailEntry {
+  /** Tool name exactly as invoked. */
+  tool: string;
+  /** sha256 over `tool\0canonicalJson(args)` — the replay-guard identity. */
+  argsDigest: string;
+  /** Bounded canonical-JSON excerpt of the args (never the whole payload). */
+  argsExcerpt: string;
+  /** sha256 of the rendered result envelope as the model saw it; null when the
+   *  result could not be persisted (the entry is still recorded honestly). */
+  resultRef: string | null;
+  /** Byte length of the rendered result envelope. */
+  resultBytes: number;
+  /** First non-empty line of the result, bounded. */
+  resultExcerpt: string;
+  /** Result truth as the loop reported it (never fabricated). */
+  ok: boolean;
+  /** sha256 of the FULL tool output when the broker spilled it (the digest the
+   *  `[deckent] tool-result truncated` marker names); null when nothing spilled. */
+  fullContentRef: string | null;
+}
+
+/** Schema history: v1 = model-summary fields only; v2 adds the host-derived
+ *  `toolTrail` + `lastAssistantText`. The reader accepts both; the writer emits
+ *  whatever the caller validated. */
+export type ScratchCheckpointSchemaVersion = 1 | 2;
+export const SCRATCH_CHECKPOINT_SCHEMA_VERSION: ScratchCheckpointSchemaVersion = 2;
+
 export interface ScratchCheckpointPayload {
-  schemaVersion: 1;
+  schemaVersion: ScratchCheckpointSchemaVersion;
   objective: string;
   findings: string[];
   evidenceRefs: string[];
@@ -30,7 +65,17 @@ export interface ScratchCheckpointPayload {
   inspectedAreas: string[];
   toolResultDigests: string[];
   cumulativeCounters: CheckpointCounters;
+  /** Host-stamped ISO-8601 instant. NEVER model-authored (7110): a model-written
+   *  checkpoint's own value is discarded and re-stamped by the host. */
   createdAt: string;
+  /** v2 — ordered host-derived tool trail of the turn (bounded, newest last).
+   *  ON DISK ONLY: the transcript carries a window-bounded rendering, never this array. */
+  toolTrail?: CheckpointToolTrailEntry[];
+  /** v2 — the last visible assistant text before the checkpoint (bounded). */
+  lastAssistantText?: string;
+  /** v2 — sha256 of the full trail JSON in the session content store (readable
+   *  through the content-ref tool); null when it could not be persisted. */
+  toolTrailRef?: string | null;
 }
 
 export interface CheckpointReceipt { path: string; digest: string }
@@ -152,15 +197,55 @@ function assertNoSymlinkAncestry(root: string, candidate: string): void {
   }
 }
 
-function parsePayload(value: unknown): ScratchCheckpointPayload | undefined {
-  if (!value || typeof value !== 'object') return undefined;
+const SHA256_HEX_RE = /^[a-f0-9]{64}$/;
+
+function isSha256Hex(value: unknown): value is string {
+  return typeof value === 'string' && SHA256_HEX_RE.test(value);
+}
+
+/** Structural validation of one v2 trail entry — every field typed, digests hex. */
+export function isCheckpointToolTrailEntry(value: unknown): value is CheckpointToolTrailEntry {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.tool === 'string' && v.tool.length > 0
+    && isSha256Hex(v.argsDigest)
+    && typeof v.argsExcerpt === 'string'
+    && (v.resultRef === null || isSha256Hex(v.resultRef))
+    && typeof v.resultBytes === 'number' && Number.isSafeInteger(v.resultBytes) && v.resultBytes >= 0
+    && typeof v.resultExcerpt === 'string'
+    && typeof v.ok === 'boolean'
+    && (v.fullContentRef === null || isSha256Hex(v.fullContentRef));
+}
+
+/**
+ * Shape validation for a checkpoint payload. Backward-compatible reader: a v1
+ * payload (pre-7110, model-summary fields only) stays readable and writable; a
+ * v2 payload must additionally carry a well-formed `toolTrail` and a string
+ * `lastAssistantText`. Exported so the session's host-stamping merge and the
+ * store's writer share ONE definition of "valid".
+ */
+export function parseScratchCheckpointPayload(value: unknown): ScratchCheckpointPayload | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
   const v = value as Record<string, unknown>;
   const arrays = ['findings', 'evidenceRefs', 'decisions', 'unresolved', 'nextActions', 'inspectedAreas', 'toolResultDigests'];
-  if (v.schemaVersion !== 1 || typeof v.objective !== 'string' || typeof v.createdAt !== 'string') return undefined;
+  if (v.schemaVersion !== 1 && v.schemaVersion !== 2) return undefined;
+  if (typeof v.objective !== 'string' || typeof v.createdAt !== 'string') return undefined;
   if (!arrays.every((key) => Array.isArray(v[key]) && (v[key] as unknown[]).every((item) => typeof item === 'string'))) return undefined;
   if (!v.cumulativeCounters || typeof v.cumulativeCounters !== 'object' || Array.isArray(v.cumulativeCounters)) return undefined;
   if (!Object.values(v.cumulativeCounters as object).every((n) => typeof n === 'number' && Number.isFinite(n) && n >= 0)) return undefined;
+  if (v.schemaVersion === 2) {
+    if (!Array.isArray(v.toolTrail) || !v.toolTrail.every(isCheckpointToolTrailEntry)) return undefined;
+    if (typeof v.lastAssistantText !== 'string') return undefined;
+    if (v.toolTrailRef !== undefined && v.toolTrailRef !== null && !isSha256Hex(v.toolTrailRef)) return undefined;
+  } else if (v.toolTrail !== undefined || v.lastAssistantText !== undefined || v.toolTrailRef !== undefined) {
+    // A v1 payload never carries v2 fields — a half-migrated shape is corrupt, not lenient.
+    return undefined;
+  }
   return v as unknown as ScratchCheckpointPayload;
+}
+
+function parsePayload(value: unknown): ScratchCheckpointPayload | undefined {
+  return parseScratchCheckpointPayload(value);
 }
 
 /**

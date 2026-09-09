@@ -41,6 +41,17 @@ export interface ToolDefinition {
   source: ToolSource;
   /** Producer-owned approval metadata. null means the invocation is unsupported/HOLD. */
   approval?: NativeToolApprovalClassifier;
+  /**
+   * 7110 — explicit replayability: `true` ONLY for a genuinely read-only,
+   * side-effect-free tool whose result depends on nothing but its args and the
+   * files it reads (native file/git reads, the content-ref read). The
+   * post-checkpoint replay guard serves a byte-identical call from the trail
+   * only when this is true; anything else (routers such as `deckent_call_tool`,
+   * CLI-bridge lifecycle tools, MCP tools, writes, shell) is never replayed and
+   * ALSO invalidates earlier replayable results. `tier` is an approval concept,
+   * not a purity claim — never infer replayability from it. Absent → false.
+   */
+  replayable?: boolean;
   /** Executes the tool. Pure of the view; returns a structured result. */
   handler: (args: Record<string, unknown>) => Promise<ToolResult>;
 }
@@ -59,6 +70,7 @@ export function validateToolDefinition(def: unknown): string | null {
   if (typeof d.tier !== 'string' || !TIERS.has(d.tier)) return `tier must be one of ${[...TIERS].join('|')}`;
   if (typeof d.source !== 'string' || !SOURCES.has(d.source)) return `source must be one of ${[...SOURCES].join('|')}`;
   if (d.approval !== undefined && typeof d.approval !== 'function') return 'approval must be a function';
+  if (d.replayable !== undefined && typeof d.replayable !== 'boolean') return 'replayable must be a boolean';
   if (typeof d.handler !== 'function') return 'handler must be a function';
   return null;
 }

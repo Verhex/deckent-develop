@@ -12,7 +12,8 @@
 import { createHash } from 'node:crypto';
 import { z, type ZodTypeAny } from 'zod';
 import { ToolRegistry } from '../../agent/tools/registry.js';
-import type { ContentWriter } from '../../agent/tool-result-broker.js';
+import { isContentRefReader, type ContentWriter } from '../../agent/tool-result-broker.js';
+import { defineContentRefTool } from '../../agent/tools/content-ref-tool.js';
 import type { ToolDefinition, ToolPermissionTier, ToolResult } from '../../agent/tools/types.js';
 import { nativeBuiltinApprovalClassifier } from '../../agent/native-tool-approval.js';
 import type { NativeToolApprovalClassifier } from '../../agent/tools/types.js';
@@ -181,6 +182,19 @@ const EXEC_SIDE_EFFECTING: ReadonlySet<string> = new Set([
   'deckent_bash',
   'deckent_git_add',
   'deckent_git_commit',
+]);
+
+/** 7110 — exec tools whose result is a pure function of args + the files they
+ *  read: the ONLY registry-owned tools the post-checkpoint replay guard may
+ *  serve from the trail. Explicit allow-list, never derived from tier. */
+const EXEC_REPLAYABLE: ReadonlySet<string> = new Set([
+  'deckent_read_file',
+  'deckent_list_dir',
+  'deckent_grep',
+  'deckent_glob',
+  'deckent_git_status',
+  'deckent_git_log',
+  'deckent_git_diff',
 ]);
 
 /** A minimal JSON-schema for each tool's args (provider tool_use input_schema). */
@@ -816,13 +830,22 @@ export function buildNativeToolRegistry(opts: NativeToolRegistryOptions): ToolRe
     ...(opts.contentStore ? { contentStore: opts.contentStore } : {}),
   });
   for (const name of ['deckent_read_file', 'deckent_list_dir', 'deckent_grep', 'deckent_glob', 'deckent_write_file', 'deckent_edit_file', 'deckent_bash', 'deckent_git_status', 'deckent_git_log', 'deckent_git_diff', 'deckent_git_add', 'deckent_git_commit'] as const) {
-    const def = defineFromDispatcher(name, DESCRIPTIONS[name]!, SCHEMAS[name]!, execToolTier(name), exec, 'core');
+    const def = { ...defineFromDispatcher(name, DESCRIPTIONS[name]!, SCHEMAS[name]!, execToolTier(name), exec, 'core'), replayable: EXEC_REPLAYABLE.has(name) };
     // 562-002: read_file keeps its tier/exposure/definition and only swaps the
     // handler in — the ranged form needs the broker's full bytes, which the plain
     // dispatcher passthrough cannot expose (see dispatchReadFile).
     registry.register(name === 'deckent_read_file'
       ? { ...def, handler: (args) => dispatchReadFile(opts.cwd, exec, args) }
       : def);
+  }
+
+  // 7110 — `deckent_read_content_ref`: digest-addressed, silent-tier read of the
+  // session content store (checkpoint trail refs, spilled tool results). Only a
+  // store that can READ its own refs registers it — a write-only injected
+  // writer (tests, embedders) honestly leaves the tool absent rather than
+  // registering a handler that can only fail.
+  if (opts.contentStore && isContentRefReader(opts.contentStore)) {
+    registry.register(defineContentRefTool(opts.contentStore));
   }
 
   // CLI-bridge tools — the FULL dispatchable surface (born-596 TERM-TOOL-PARITY:

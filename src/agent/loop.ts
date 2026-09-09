@@ -189,6 +189,15 @@ export interface LoopDeps {
    *  and crossed, the turn aborts mid-stream (not advisory-only). Undefined → no
    *  cost gating at the loop level. */
   costGuard?: CostGuardState;
+  /**
+   * 7110 — post-checkpoint restart-loop guard (session-owned). Consulted at the
+   * single execution point, AFTER every permission/policy check has passed for
+   * this exact call: a non-undefined result is delivered as the tool result
+   * (already a rendered envelope, so it bypasses the broker) and the handler is
+   * NOT run. `undefined` → ordinary execution. The seam never widens authority:
+   * a denied/held call never reaches it.
+   */
+  interceptToolCall?: (call: { readonly id: string; readonly name: string; readonly args: Record<string, unknown> }) => ToolResult | undefined;
 }
 
 /** Best-effort primary resource for permission glob matching. Exported for the
@@ -973,13 +982,23 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         if (deps.isCancelled?.()) { cancelledAt = callIndex + 1; break; }
         continue;
       }
-      const leaveToolExecution = deps.enterToolExecution?.(call.id);
+      // 7110 replay guard: a byte-identical read-only call already in the
+      // checkpoint trail of this turn is served from the trail, not re-run.
+      const replayed = deps.interceptToolCall?.({ id: call.id, name: call.name, args: call.args });
       let result: ToolResult;
-      try { result = await def.handler(call.args); }
-      catch (e) { result = { ok: false, output: e instanceof Error ? e.message : String(e) }; }
-      finally { leaveToolExecution?.(); }
+      if (replayed !== undefined) {
+        result = replayed;
+      } else {
+        const leaveToolExecution = deps.enterToolExecution?.(call.id);
+        try { result = await def.handler(call.args); }
+        catch (e) { result = { ok: false, output: e instanceof Error ? e.message : String(e) }; }
+        finally { leaveToolExecution?.(); }
+      }
+      // 7106 preamble budgeter observes EVERY result the model will see —
+      // a replayed envelope occupies context exactly like an executed one.
       deps.preambleBudgeter?.observeToolResult(call.name, call.args, result);
-      if (deps.nativeBudget && rawBudget !== undefined && rawBudget > 0) {
+      // 7110: a replayed envelope is already brokered/bounded — never re-capped.
+      if (replayed === undefined && deps.nativeBudget && rawBudget !== undefined && rawBudget > 0) {
         const singleShare = deps.nativeBudget.maxToolResultShareOfContext ?? DEFAULT_NATIVE_AGENT_BUDGET.maxToolResultShareOfContext;
         const turnShare = deps.nativeBudget.maxTurnToolResultShareOfContext ?? DEFAULT_NATIVE_AGENT_BUDGET.maxTurnToolResultShareOfContext;
         const turnCapTokens = Math.floor(rawBudget * turnShare);
@@ -1008,7 +1027,10 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
           return;
         }
       }
-      yield { type: 'tool-result', id: call.id, tool: call.name, ok: result.ok, output: result.output };
+      // A handler may attach a typed `meta.code` (7110: replay-served, content-ref
+      // refusals) — surfaced on the event so the view localizes it; never on the wire.
+      const resultCode = typeof result.meta?.['code'] === 'string' ? result.meta['code'] : undefined;
+      yield { type: 'tool-result', id: call.id, tool: call.name, ok: result.ok, output: result.output, ...(resultCode ? { code: resultCode } : {}) };
       transcript.appendToolResult(call.id, result.output);
     }
 

@@ -34,7 +34,20 @@ import type {
 import { InputContextOverflowError } from './provider-tooluse/context-errors.js';
 import { providerContextErrorCode } from './provider-tooluse/context-errors.js';
 import { decideProviderAdmission, estimateTokens, measureProviderRequest } from './context-budget.js';
-import { openScratchStore, type CheckpointReadResult, type ScratchCheckpointPayload, type ScratchStore } from './scratch-checkpoint.js';
+import { openScratchStore, type CheckpointReadResult, type ScratchCheckpointPayload, type ScratchStore, SCRATCH_CHECKPOINT_SCHEMA_VERSION } from './scratch-checkpoint.js';
+import {
+  boundLastAssistantText,
+  checkpointCompactionText,
+  DEFAULT_CHECKPOINT_TRAIL_LABELS,
+  hostStampCheckpoint,
+  renderToolTrail,
+  resolveTrailOpeningBudget,
+  toolCallDigest,
+  ToolTrailRecorder,
+  type CheckpointTrailLabels,
+  type HostCheckpointState,
+} from './checkpoint-trail.js';
+import { CONTENT_REF_TOOL_NAME } from './tools/content-ref-tool.js';
 import { createNativeBudgetState, evaluateNativeBudget, type NativeBudgetState } from './guards/recursion.js';
 import { containToolResult, renderToolResultEnvelope, type ContentWriter } from './tool-result-broker.js';
 import { createPreambleBudgeter, PreambleBudgetError, type PreambleSnapshot } from './preamble-budget.js';
@@ -253,6 +266,12 @@ export interface AgentSessionDeps {
    *  registry, before the session exists — see `resolveScratchRoot`), but
    *  CLOSED here so scratch teardown sweeps one namespace, not two. */
   contentStore?: ContentWriter;
+  /** 7110 — labels of the deterministic checkpoint trail rendered into the
+   *  epoch-opening message (caller injects `getMessage` EN/TR text; absent →
+   *  the mechanism module's English defaults). */
+  checkpointLabels?: CheckpointTrailLabels;
+  /** 7110 — host clock for `createdAt` stamping (tests inject; absent → wall clock). */
+  now?: () => Date;
 }
 
 export interface AgentSession {
@@ -394,6 +413,21 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   /** Reference identity accumulated across the session, keyed path\0digest. */
   const references = new Map<string, TurnReference>();
   let lastRawIntent = '';
+  // ═══ 7110 — host-derived checkpoint continuity ═══════════════════════════
+  /** Per-turn tool trail derived from the loop's own events (no model call). */
+  const trail = new ToolTrailRecorder(contextBudget.checkpointReplayCacheEntries, deps.contentStore);
+  const trailLabels: CheckpointTrailLabels = deps.checkpointLabels ?? DEFAULT_CHECKPOINT_TRAIL_LABELS;
+  /** Visible assistant text of the round in flight / the last completed round. */
+  let assistantTextBuffer = '';
+  let lastAssistantText = '';
+  /** Armed by a completed context epoch; a byte-identical read-only call made
+   *  afterwards in the SAME turn is served from the trail instead of re-run. */
+  let replayArmed = false;
+  /** Digest of the last persisted full trail (cited by the opening's omission line). */
+  let lastTrailRef: string | null = null;
+  const REPLAY_SERVED_CODE = 'native.checkpoint.replay-served';
+  const PRESSURE_SUPPRESSED_CODE = 'native.checkpoint.pressure-suppressed';
+  const hostNow = (): string => (deps.now?.() ?? new Date()).toISOString();
 
   const hold = (reasonCode: string): PermissionResponse => Object.freeze({ decision: 'hold', reasonCode });
 
@@ -628,6 +662,38 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     return `${lastRawIntent}${renderReferenceLineage([...references.values()])}`;
   }
 
+  /** What the visible last-assistant text is RIGHT NOW (bounded). */
+  function currentLastAssistantText(): string {
+    return boundLastAssistantText(assistantTextBuffer.length > 0 ? assistantTextBuffer : lastAssistantText);
+  }
+
+  /** 7110 — the message a fresh epoch actually opens on: the objective PLUS the
+   *  deterministic tool trail (what was already inspected, where the bytes are,
+   *  by digest) and the last visible assistant text. Empty trail → byte-identical
+   *  to `epochObjective()`. */
+  function epochOpening(trailRef: string | null): string {
+    const budgetTokens = resolveTrailOpeningBudget({
+      windowTokens: deps.getContextBudgetTokens?.(),
+      trailShare: contextBudget.checkpointTrailShareOfContext,
+      transcriptReserveShare: contextBudget.minTranscriptShareOfContext,
+    });
+    return `${epochObjective()}${renderToolTrail(trail.entries(), currentLastAssistantText(), trailLabels, CONTENT_REF_TOOL_NAME, { budgetTokens, trailRef })}`;
+  }
+
+  /** Host truth every checkpoint is stamped with — model-written or deterministic.
+   *  Persists the full trail to the content store so the payload (on disk) and
+   *  the opening (omission line) can both cite it by digest. */
+  function hostCheckpointState(): HostCheckpointState {
+    return {
+      objective: epochObjective(),
+      toolTrail: trail.entries(),
+      toolTrailRef: trail.persistTrail(),
+      lastAssistantText: currentLastAssistantText(),
+      createdAt: hostNow(),
+      counters: { modelRounds: nativeBudgetState?.rounds ?? 0, toolCalls: nativeBudgetState?.toolCalls ?? 0, trailEntries: trail.size },
+    };
+  }
+
   /** Ceiling on one checkpoint request's delta. Derived from the known context
    *  when there is one; otherwise the fixed CAP — either way a bound on what we
    *  send, never an assumed window size. */
@@ -664,12 +730,14 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     constructor(readonly code: CheckpointFailureCode) { super(code); }
   }
 
-  /** Accept raw JSON or one complete outer Markdown JSON fence; never prose or partial fences. */
-  function parseCheckpointPayloadText(text: string): ScratchCheckpointPayload {
+  /** Accept raw JSON or one complete outer Markdown JSON fence; never prose or
+   *  partial fences. Returns the UNTRUSTED candidate — `hostStampCheckpoint`
+   *  decides its shape and stamps host truth (7110). */
+  function parseCheckpointPayloadText(text: string): unknown {
     if (text.length > CHECKPOINT_JSON_RESPONSE_CHAR_CAP) throw new CheckpointFailure('CHECKPOINT_RESPONSE_TOO_LARGE');
     const trimmed = text.trim();
     const fenced = trimmed.match(/^```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n```[ \t]*$/i);
-    try { return JSON.parse(fenced?.[1]?.trim() ?? trimmed) as ScratchCheckpointPayload; }
+    try { return JSON.parse(fenced?.[1]?.trim() ?? trimmed) as unknown; }
     catch { throw new CheckpointFailure('CHECKPOINT_RESPONSE_INVALID_JSON'); }
   }
 
@@ -806,16 +874,25 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       const digest = createHash('sha256').update(bytes).digest('hex');
       const receipt = deps.contentStore.write(bytes);
       if (receipt.sha256 !== digest || receipt.path.length === 0) return undefined;
+      // 7110: the payload carries REAL working state — the host-derived tool
+      // trail, the last visible assistant text — and cites the raw transcript
+      // by digest (readable through the content-ref tool), never by path.
+      const host = hostCheckpointState();
       const payload: ScratchCheckpointPayload = {
-        schemaVersion: 1, objective: epochObjective(), findings: [],
-        evidenceRefs: [receipt.path], decisions: [], unresolved: [reasonCode],
+        schemaVersion: SCRATCH_CHECKPOINT_SCHEMA_VERSION, objective: host.objective, findings: [],
+        evidenceRefs: [`sha256:${digest}`], decisions: [], unresolved: [reasonCode],
         nextActions: [], inspectedAreas: [], toolResultDigests: [digest],
-        cumulativeCounters: { deterministicFallback: 1,
-          modelRounds: nativeBudgetState?.rounds ?? 0, toolCalls: nativeBudgetState?.toolCalls ?? 0 },
-        createdAt: new Date().toISOString(),
+        cumulativeCounters: { deterministicFallback: 1, ...host.counters },
+        createdAt: host.createdAt,
+        toolTrail: host.toolTrail,
+        lastAssistantText: host.lastAssistantText,
+        toolTrailRef: host.toolTrailRef,
       };
       scratch.writeCheckpoint(payload);
-      return JSON.stringify(payload);
+      lastTrailRef = host.toolTrailRef;
+      // The transcript gets the summary projection only (B3) — the full trail
+      // is on disk and cited by digest.
+      return checkpointCompactionText(payload);
     } catch { return undefined; }
   }
 
@@ -966,14 +1043,20 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     if (closed) return;
     if (text !== undefined) {
       try {
-        const payload = parseCheckpointPayloadText(text);
-        try { scratch.writeCheckpoint(payload); }
-        catch (error) {
-          failureCode = error instanceof Error && error.message === 'invalid checkpoint payload'
-            ? 'CHECKPOINT_PAYLOAD_INVALID'
-            : 'CHECKPOINT_WRITE_FAILED';
+        // 7110: the model's summary fields are merged with HOST truth —
+        // `createdAt` is host-stamped (a model-authored instant is discarded)
+        // and the tool trail is the host's, never shrinkable by the model.
+        const payload = hostStampCheckpoint(parseCheckpointPayloadText(text), hostCheckpointState());
+        if (payload === undefined) failureCode = 'CHECKPOINT_PAYLOAD_INVALID';
+        else {
+          try { scratch.writeCheckpoint(payload); }
+          catch (error) {
+            failureCode = error instanceof Error && error.message === 'invalid checkpoint payload'
+              ? 'CHECKPOINT_PAYLOAD_INVALID'
+              : 'CHECKPOINT_WRITE_FAILED';
+          }
+          if (failureCode === undefined) { text = checkpointCompactionText(payload); lastTrailRef = payload.toolTrailRef ?? null; }
         }
-        if (failureCode === undefined) text = JSON.stringify(payload);
       } catch (error) {
         failureCode = error instanceof CheckpointFailure ? error.code : 'CHECKPOINT_WRITE_FAILED';
       }
@@ -1010,11 +1093,14 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
         break;
       }
     }
-    transcript.compactForContextEpoch(epochObjective(), text, turnId, lineageLimit);
+    transcript.compactForContextEpoch(epochOpening(lastTrailRef), text, turnId, lineageLimit);
     epochPreambleLength = transcript.toProviderMessages().length;
     contextEpoch++;
     epochAdvancedThisTurn = true;
     checkpointDegradation = undefined;
+    // 7110: from here on, a byte-identical read-only call this turn is a
+    // restart loop, not new work — the trail answers it.
+    replayArmed = true;
     yield { type: 'notice', code: 'native.checkpoint.saved', message: `context epoch ${contextEpoch} — checkpointed from a bounded delta` };
   }
 
@@ -1055,6 +1141,11 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     }
     lastRawIntent = input.rawIntent;
     for (const reference of input.references) rememberReference(reference);
+    // 7110: the trail and the replay guard are per turn.
+    trail.reset();
+    assistantTextBuffer = '';
+    lastAssistantText = '';
+    replayArmed = false;
     try { yield* maybeRefreshBeforeTurn(turnId, attributionGeneration); }
     catch (error) {
       if (!(error instanceof PreambleBudgetError)) throw error;
@@ -1080,6 +1171,23 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
           providerReportedUsage.outputTokens += event.outputTokens;
           providerReportedUsage.reports++;
         }
+        // 7110: derive the host trail from the loop's own events.
+        if (event.type === 'text-delta') assistantTextBuffer += event.text;
+        else if (event.type === 'tool-proposed') trail.propose(event.id, event.tool, event.args);
+        else if (event.type === 'tool-result') {
+          if (assistantTextBuffer.length > 0) { lastAssistantText = assistantTextBuffer; assistantTextBuffer = ''; }
+          if (event.code === REPLAY_SERVED_CODE) {
+            // A served replay is not a new observation — never re-recorded.
+            trail.discard(event.id);
+          } else {
+            trail.complete(event.id, event.ok, event.output);
+            // Anything that is not an explicitly replayable (pure read) tool may
+            // have changed what a read returns — including `deckent_call_tool`,
+            // which routes writes/shell behind a silent tier: earlier results stay
+            // in the trail as history but can no longer be served.
+            if (deps.registry.get(event.tool)?.replayable !== true) trail.invalidateReplay();
+          }
+        }
         if (event.type === 'error' && isNativeBudgetTerminalCode(event.code)) {
           exhausted = { code: event.code, at: Date.now(), epoch: budgetEpoch };
         }
@@ -1101,7 +1209,20 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
           }
         }
         yield event;
+        if (event.type === 'tool-result' && event.code === REPLAY_SERVED_CODE) {
+          yield { type: 'notice', code: REPLAY_SERVED_CODE, message: REPLAY_SERVED_CODE };
+        }
         if (event.type !== 'budget-checkpoint-request') continue;
+        // 7110 B3 once-per-turn guard: a pressure request that arrives when the
+        // transcript holds NOTHING beyond the preamble the last epoch installed
+        // has nothing new to summarize — taking another epoch would only re-render
+        // the same opening (host createdAt changes defeat the loop's own digest
+        // dedupe) and loop. Typed notice, epoch kept.
+        if (event.reason === 'token-pressure' && epochAdvancedThisTurn
+          && transcript.toProviderMessages().length <= epochPreambleLength) {
+          yield { type: 'notice', code: PRESSURE_SUPPRESSED_CODE, message: PRESSURE_SUPPRESSED_CODE };
+          continue;
+        }
         lastContextTrigger = event.reason === 'token-pressure' ? 'token-pressure' : 'cadence';
         if (event.reason !== 'token-pressure') lastCheckpointPressure = undefined;
         yield* takeContextEpoch(turnId, attributionGeneration);
@@ -1145,6 +1266,23 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       requestPermission: (request) => awaitPermission(turn, request),
       validatePermission,
       claimPermissionEffect,
+      // 7110 restart-loop guard — consulted only after the loop's own
+      // permission/policy chain admitted this exact call.
+      interceptToolCall(call) {
+        if (!replayArmed) return undefined;
+        // Explicit purity predicate, never tier: `deckent_call_tool` is silent
+        // yet routes writes; CLI/MCP tools read live state.
+        if (deps.registry.get(call.name)?.replayable !== true) return undefined;
+        const record = trail.find(toolCallDigest(call.name, call.args));
+        // Only a result that actually succeeded is evidence; a denial/hold/error
+        // recorded before is never served after the permission chain accepted a call.
+        if (!record || record.output === null || record.ok !== true) return undefined;
+        return {
+          ok: record.ok,
+          output: `${record.output}\n[deckent] ${trailLabels.replayNote}`,
+          meta: { code: REPLAY_SERVED_CODE, ...(record.resultRef ? { resultRef: record.resultRef } : {}) },
+        };
+      },
       enterToolExecution(callId: string): () => void {
         if (turn.retired || turn.controller.signal.aborted || activePermissionTurn !== turn) return () => {};
         const token = Symbol(callId);

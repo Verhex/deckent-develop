@@ -474,6 +474,8 @@ export function createMemoryPreviewContentStore(maxPreviewBytes = 64 * 1024): Se
       };
     },
     async readDetailRange() { return { kind: 'hold', reasonCode: 'CONTENT_READ_UNSUPPORTED' }; },
+    // A preview-only store never wrote a content ref, so none can be read back (7110).
+    async readContentRef() { return { kind: 'hold', reasonCode: 'CONTENT_READ_UNSUPPORTED' }; },
     close() { closed = true; },
   };
 }

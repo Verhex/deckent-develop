@@ -54,6 +54,15 @@ export interface ResolvedNativeAgentBudget {
   readonly transportRetryBackoffMs: number;
   /** 7108-b: overall deadline of the live reasoning-control probe, milliseconds. */
   readonly reasoningProbeTimeoutMs: number;
+  /** 7110 — most tool-trail entries a checkpoint retains for the epoch opening
+   *  message AND the post-checkpoint replay guard (byte-identical read-only
+   *  call → served from the trail, never re-executed). */
+  readonly checkpointReplayCacheEntries: number;
+  /** 7110 — share of the context window (tokens) the RENDERED checkpoint
+   *  trail may occupy in the epoch-opening message (additionally capped at
+   *  half of `minTranscriptShareOfContext`); the full trail lives only on disk
+   *  / in the content store. Strictly between 0 and 1. */
+  readonly checkpointTrailShareOfContext: number;
 }
 
 export type NativeReasoningMode = 'auto' | 'off' | 'on';
@@ -108,11 +117,15 @@ export const DEFAULT_NATIVE_AGENT_BUDGET: ResolvedNativeAgentBudget = Object.fre
   // 7108-b: the first descriptor await must never hang a turn — same bound as
   // the request-measurement capability (agent/context-budget.ts).
   reasoningProbeTimeoutMs: 2_000,
+  checkpointReplayCacheEntries: 64,
+  checkpointTrailShareOfContext: 0.03,
 });
 
 const NATIVE_AGENT_BUDGET_FIELDS = Object.keys(DEFAULT_NATIVE_AGENT_BUDGET) as
   ReadonlyArray<keyof ResolvedNativeAgentBudget>;
 const NATIVE_AGENT_RATIO_FIELDS: ReadonlySet<string> = new Set([
+  // 7110 — rendered checkpoint-trail share of the window.
+  'checkpointTrailShareOfContext',
   'minTranscriptShareOfContext', 'maxPreambleShareOfContext',
   'contextHighWaterRatio', 'maxToolResultShareOfContext', 'maxTurnToolResultShareOfContext',
 ]);

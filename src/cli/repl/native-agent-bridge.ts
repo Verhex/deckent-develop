@@ -18,6 +18,8 @@ import {
   type NativePermissionDecisionCallback,
 } from '../../agent/session.js';
 import { approximateReasoningTokens } from '../../agent/reasoning-control.js';
+import type { CheckpointTrailLabels } from '../../agent/checkpoint-trail.js';
+import { CONTENT_REF_CODE_PREFIX, CONTENT_REF_REASON_CODES } from '../../agent/tools/content-ref-tool.js';
 import type { RequestMeasurementEvent } from '../../agent/events.js';
 import type { PermissionRequestEvent } from '../../agent/events.js';
 import { permittedNativePermissionLifetimes } from '../../agent/native-permission-binding.js';
@@ -329,9 +331,24 @@ const CHECKPOINT_INSTRUCTION =
   'Summarize this session\'s progress as a single JSON object (no prose, no markdown fences) ' +
   'matching exactly this shape: {"schemaVersion":1,"objective":string,"findings":string[],' +
   '"evidenceRefs":string[],"decisions":string[],"unresolved":string[],"nextActions":string[],' +
-  '"inspectedAreas":string[],"toolResultDigests":string[],"cumulativeCounters":{[name: string]: number},' +
-  '"createdAt": ISO-8601 string}. Every array must contain short, concrete strings drawn from the ' +
-  'actual conversation so far. Return ONLY the JSON object.';
+  '"inspectedAreas":string[],"toolResultDigests":string[],"cumulativeCounters":{[name: string]: number}}. ' +
+  'Every array must contain short, concrete strings drawn from the actual conversation so far. ' +
+  'Do not include timestamps or a tool trail: the host stamps createdAt and records the tool trail itself. ' +
+  'Return ONLY the JSON object.';
+
+/** 7110 — labels of the deterministic checkpoint trail (session.ts renders the
+ *  mechanism; the words come from the catalog, EN/TR). */
+function buildCheckpointTrailLabels(t: (key: string) => string): CheckpointTrailLabels {
+  return {
+    heading: t('native.checkpoint.trail.heading'),
+    readHint: t('native.checkpoint.trail.read_hint'),
+    statusOk: t('native.checkpoint.trail.status_ok'),
+    statusFailed: t('native.checkpoint.trail.status_failed'),
+    lastAssistantHeading: t('native.checkpoint.trail.last_assistant'),
+    replayNote: t('native.checkpoint.trail.replay_note'),
+    omitted: t('native.checkpoint.trail.omitted'),
+  };
+}
 
 /** NT-12 (553-002) — writeAuditEvent's partition for REPL-originated audit events;
  *  mirrors process-runtime.ts's own 'process' partition for non-sprint-bound events. */
@@ -532,6 +549,9 @@ const NATIVE_AGENT_SIGNAL_KEYS = new Set([
   'native.checkpoint.deterministic',
   'native.checkpoint.epoch-advanced',
   'native.checkpoint.degraded',
+  'native.checkpoint.replay-served',
+  'native.checkpoint.pressure-suppressed',
+  ...CONTENT_REF_REASON_CODES.map((reason) => `${CONTENT_REF_CODE_PREFIX}${reason}`),
   'native.permission.classification-unavailable',
   'native.permission.binding-invalid',
   'native.permission.hold',
@@ -804,6 +824,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
       : {}),
     ...(deps.scratch ? { scratch: { ...deps.scratch, checkpointInstruction: CHECKPOINT_INSTRUCTION } } : {}),
     ...(deps.contentStore ? { contentStore: deps.contentStore } : {}),
+    checkpointLabels: buildCheckpointTrailLabels(t),
   });
 
   // born-607 CALLTOOL-EXEC-WIRE: arm `deckent_call_tool` with the engine-parity

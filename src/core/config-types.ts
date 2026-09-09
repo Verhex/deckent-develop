@@ -979,6 +979,10 @@ export interface NativeAgentBudgetConfig {
    *  a native turn may wait on before planning with `unknown`. Positive
    *  integer milliseconds; default 2000. */
   reasoningProbeTimeoutMs?: number;
+  /** 7110 — checkpoint tool-trail retention + post-checkpoint replay-guard bound. */
+  checkpointReplayCacheEntries?: number;
+  /** 7110 — window share the rendered checkpoint trail may occupy in the epoch opening; ratio in (0,1). */
+  checkpointTrailShareOfContext?: number;
 }
 
 /**

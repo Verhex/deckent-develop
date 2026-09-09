@@ -34,7 +34,9 @@ it('prices the real registry and repository across the supported context matrix'
   }
   expect(rows.map(row => [row.window,row.status,row.toolCount])).toEqual([
    [8192,'exhausted',3], [16384,'floor-admitted',3], [32768,'within-target',3],
-   [65536,'within-target',15], [131072,'within-target',15],
+   // 7110: `deckent_read_content_ref` joined the core read set (15 → 16); the
+   // 8k/16k/32k meta rows stay at 3 because the reduction keeps only search/describe/call.
+   [65536,'within-target',16], [131072,'within-target',16],
   ]);
   // An 8k model can run with smaller, explicitly resolved output/safety reserves.
   const small=resolveNativeAgentBudget({policy:{native_agent:{outputReserveTokens:512,contextSafetyReserveTokens:256}}});

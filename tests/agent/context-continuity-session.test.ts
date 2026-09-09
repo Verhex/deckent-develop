@@ -16,6 +16,22 @@ const checkpoint = JSON.stringify({ schemaVersion: 1, objective: 'continue', fin
   decisions: [], unresolved: [], nextActions: [], inspectedAreas: [], toolResultDigests: [],
   cumulativeCounters: {}, createdAt: '2026-09-09T00:00:00.000Z' });
 const drain = async (input: AsyncIterable<AgentSessionEvent>) => { const out: AgentSessionEvent[] = []; for await (const e of input) out.push(e); return out; };
+/** 7110 — a MODEL-written checkpoint lands host-stamped: schema v2, host `createdAt`
+ *  (the fixture's instant is discarded), host trail + last assistant text, host counters. */
+const hostStamped = (model: Record<string, unknown>) => ({
+  ...model, schemaVersion: 2, createdAt: expect.any(String), toolTrail: expect.any(Array), lastAssistantText: expect.any(String),
+  cumulativeCounters: expect.objectContaining(model.cumulativeCounters as Record<string, number>),
+});
+/** Every v2 payload carries `toolTrailRef` (null when the trail was empty). */
+const isTrailRef = (value: unknown): boolean => value === null || (typeof value === 'string' && /^[a-f0-9]{64}$/.test(value));
+/** Resolve a `sha256:<digest>` evidence ref through the session store (never a path). */
+const readEvidence = async (store: ReturnType<typeof createSessionContentStore>, ref: string): Promise<Buffer> => {
+  expect(ref).toMatch(/^sha256:[a-f0-9]{64}$/);
+  const read = await store.readContentRef({ sha256: ref.slice('sha256:'.length), offset: 0, limit: 256 * 1024 });
+  if (read.kind !== 'loaded') throw new Error(`evidence ref unreadable: ${read.reasonCode}`);
+  expect(read.nextOffset).toBeNull();
+  return Buffer.from(read.bytes);
+};
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 function cwd() { const root = mkdtempSync(join(tmpdir(), 'context-continuity-')); roots.push(root); return root; }
 function wireScaledMeasurement(adapter: ProviderAdapter): ProviderAdapter {
@@ -131,9 +147,11 @@ describe('checkpoint output continuation contract', () => {
       const latest = session.latestCheckpoint();
       expect(latest.status).toBe('ok');
       if (latest.status !== 'ok') throw new Error('checkpoint did not persist');
-      expect(latest.payload).toEqual(payload);
-      expect(latest.receipt.digest).toBe(createHash('sha256').update(serialized).digest('hex'));
-      expect(JSON.parse(readFileSync(latest.receipt.path, 'utf8')).payload).toEqual(payload);
+      expect(latest.payload).toMatchObject(hostStamped(payload));
+      expect(isTrailRef(latest.payload.toolTrailRef)).toBe(true);
+      expect(latest.payload.createdAt).not.toBe(payload.createdAt);
+      expect(latest.receipt.digest).toBe(createHash('sha256').update(JSON.stringify(latest.payload)).digest('hex'));
+      expect(JSON.parse(readFileSync(latest.receipt.path, 'utf8')).payload).toMatchObject(hostStamped(payload));
       const snapshot = await session.contextSnapshot();
       expect(snapshot.epoch).toBe(2);
       expect(snapshot.providerReportedUsage).toEqual({ inputTokens: 30, outputTokens: 18, reports: 2 });
@@ -150,7 +168,7 @@ describe('checkpoint output continuation contract', () => {
       const events = await drain(session.compactContext());
       expect(requests).toHaveLength(2);
       expect(requests[1]?.messages.some(message => message.role === 'assistant' && message.content === '')).toBe(false);
-      expect(session.latestCheckpoint()).toMatchObject({ status: 'ok', payload: JSON.parse(checkpoint) });
+      expect(session.latestCheckpoint()).toMatchObject({ status: 'ok', payload: hostStamped(JSON.parse(checkpoint)) });
       expect((await session.contextSnapshot()).epoch).toBe(2);
       expect(usageEvents(events)).toEqual([{ type: 'usage', inputTokens: 22, outputTokens: 180 }]);
     } finally { session.close(); }
@@ -243,7 +261,7 @@ describe('durable deterministic checkpoint and compacted tool lineage', () => {
       expect(latest.payload.unresolved).toContain('CHECKPOINT_RESPONSE_INVALID_JSON');
       expect(latest.payload.cumulativeCounters.deterministicFallback).toBe(1);
       expect(latest.payload.evidenceRefs).toHaveLength(1);
-      const persisted = readFileSync(latest.payload.evidenceRefs[0]!);
+      const persisted = await readEvidence(store, latest.payload.evidenceRefs[0]!);
       expect(createHash('sha256').update(persisted).digest('hex')).toBe(latest.payload.toolResultDigests[0]);
       expect(JSON.parse(persisted.toString()).map((entry: { message: unknown }) => entry.message)).toEqual(original);
       expect((await session.contextSnapshot()).epoch).toBe(2);
@@ -307,7 +325,7 @@ describe('durable deterministic checkpoint and compacted tool lineage', () => {
         expect(readFileSync(ref!, 'utf8')).toBe(outputs.get(message.toolCallId!));
         expect(messages.some(candidate => candidate.role === 'assistant' && candidate.toolCalls?.some(call => call.id === message.toolCallId))).toBe(true);
       }
-      expect(session.latestCheckpoint()).toMatchObject({ status: 'ok', payload: JSON.parse(checkpoint) });
+      expect(session.latestCheckpoint()).toMatchObject({ status: 'ok', payload: hostStamped(JSON.parse(checkpoint)) });
     } finally { session.close(); }
   });
 });
@@ -343,7 +361,7 @@ describe('empty-visible checkpoint uses durable fallback without another provide
       expect(latest.status).toBe('ok');
       if (latest.status !== 'ok') throw new Error('durable fallback checkpoint missing');
       expect(latest.payload.unresolved).toContain('CHECKPOINT_RESPONSE_MISSING');
-      const bytes = readFileSync(latest.payload.evidenceRefs[0]!);
+      const bytes = await readEvidence(store, latest.payload.evidenceRefs[0]!);
       expect(createHash('sha256').update(bytes).digest('hex')).toBe(latest.payload.toolResultDigests[0]);
       expect(JSON.parse(bytes.toString()).map((entry: { message: unknown }) => entry.message)).toEqual(original);
       const snapshot = await session.contextSnapshot();
@@ -417,7 +435,7 @@ describe('large completed batch survives an automatic context epoch', () => {
         expect(ref).toBeDefined();
         expect(readFileSync(ref!, 'utf8')).toBe(outputs.get(result.toolCallId!));
       }
-      expect(session.latestCheckpoint()).toMatchObject({ status: 'ok', payload: JSON.parse(completedCheckpoint) });
+      expect(session.latestCheckpoint()).toMatchObject({ status: 'ok', payload: hostStamped(JSON.parse(completedCheckpoint)) });
     } finally { session.close(); }
   });
 });

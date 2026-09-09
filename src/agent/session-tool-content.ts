@@ -73,7 +73,120 @@ export type ToolDetailRead =
         | 'CONTENT_READ_FAILED'
         | 'CONTENT_READ_UNSUPPORTED';
     };
-export interface SessionToolContentStore extends ContentWriter {
+/**
+ * 7110 — typed, digest-addressed read of bytes this store itself wrote through
+ * `write()` (the broker's spill path and the checkpoint trail). The caller
+ * names a sha256 digest, never a path: a digest this store did not produce is
+ * refused as `CONTENT_REF_UNKNOWN`, so a checkpoint-provided reference can never
+ * turn into a scope escape (`DECKENT_E005`) or an arbitrary-file read.
+ */
+export type ContentRefReadReason =
+  | 'CONTENT_REF_DENIED'
+  | 'CONTENT_REF_UNKNOWN'
+  | 'CONTENT_REF_EXPIRED'
+  | 'CONTENT_DIGEST_MISMATCH'
+  | 'CONTENT_RANGE_INVALID'
+  | 'CONTENT_READ_FAILED'
+  | 'CONTENT_READ_UNSUPPORTED';
+export type ContentRefRead =
+  | {
+      kind: 'loaded';
+      /** The bytes actually returned — a UTF-8-aligned slice (see {@link alignUtf8Slice}). */
+      bytes: Uint8Array;
+      /** Effective start offset: equals the requested offset unless it landed
+       *  inside a UTF-8 sequence, in which case it was snapped forward to the
+       *  next code-point boundary (`snappedFrom` names the requested value). */
+      offset: number;
+      snappedFrom?: number;
+      /** Byte right after the last complete character returned; null at EOF. */
+      nextOffset: number | null;
+      totalBytes: number;
+      sha256: string;
+    }
+  | { kind: 'hold'; reasonCode: ContentRefReadReason };
+export interface ContentRefReader {
+  readContentRef(
+    input: { sha256: string; offset: number; limit: number },
+    signal?: AbortSignal,
+  ): Promise<ContentRefRead>;
+}
+/** Longest UTF-8 sequence — the lookahead a boundary-safe slice may need. */
+const UTF8_MAX_SEQUENCE = 4;
+const isUtf8Continuation = (byte: number): boolean => (byte & 0xc0) === 0x80;
+/** Expected sequence length for a lead byte; 0 when the byte is not a valid lead. */
+function utf8SequenceLength(lead: number): number {
+  if (lead < 0x80) return 1;
+  if ((lead & 0xe0) === 0xc0) return 2;
+  if ((lead & 0xf0) === 0xe0) return 3;
+  if ((lead & 0xf8) === 0xf0) return 4;
+  return 0;
+}
+
+/**
+ * 7110 B4 — boundary-safe UTF-8 slicing over a byte window that starts up to
+ * 3 bytes BEFORE the requested offset (`lookbehind`) and extends up to
+ * `limit + 3` bytes past it (the lookahead). Rules, all byte-exact and
+ * documented on the tool:
+ *   • START: the offset snaps FORWARD to the next boundary ONLY when the
+ *     lookbehind proves it sits inside a WELL-FORMED sequence (a valid lead
+ *     before the offset whose complete continuation run spans it); reported
+ *     via `snappedFrom`. A continuation-looking byte with no such lead (binary
+ *     data, a chunk boundary chosen by this very function) never snaps, so
+ *     following `nextOffset` reproduces any content byte-for-byte.
+ *   • END: the slice never ends inside a well-formed sequence. When the
+ *     requested limit cuts a sequence whose completion is present in the
+ *     lookahead, the end backs off to the sequence's lead byte — unless that
+ *     would leave the slice EMPTY (limit < sequence length), in which case the
+ *     whole sequence is returned (over-return ≤ 3 bytes, never a lost char).
+ *   • EOF: nothing follows, so the tail is returned exactly as stored.
+ *   • MALFORMED bytes (invalid lead, truncated sequence even with lookahead)
+ *     are never "repaired": the slice cuts at the byte, so binary content
+ *     round-trips exactly by following `nextOffset`.
+ * Returns the window-relative `[start, end)` plus the snap, so `nextOffset`
+ * (offset + end) always points at the byte after the last complete character.
+ */
+export function alignUtf8Slice(
+  window: Uint8Array,
+  input: { offset: number; lookbehind: number; limit: number; eofInWindow: boolean },
+): { start: number; end: number; snappedFrom?: number } {
+  let start = input.lookbehind;
+  for (let lead = start - 1; lead >= Math.max(0, start - (UTF8_MAX_SEQUENCE - 1)); lead--) {
+    const byte = window[lead]!;
+    if (isUtf8Continuation(byte)) continue;
+    const length = utf8SequenceLength(byte);
+    if (length > 1 && lead + length > start && lead + length <= window.length) {
+      let complete = true;
+      for (let i = lead + 1; i < lead + length; i++) if (!isUtf8Continuation(window[i]!)) { complete = false; break; }
+      if (complete) start = lead + length;
+    }
+    break;
+  }
+  const available = window.length - start;
+  let end = start + Math.min(input.limit, available);
+  const cutsInsideWindow = end < window.length && !(input.eofInWindow && end === window.length);
+  if (cutsInsideWindow) {
+    for (let lead = end - 1; lead >= start && lead >= end - (UTF8_MAX_SEQUENCE - 1); lead--) {
+      const byte = window[lead]!;
+      if (isUtf8Continuation(byte)) continue;
+      const length = utf8SequenceLength(byte);
+      if (length <= 1 || lead + length <= end) break; // ends on a boundary (or malformed lead) — nothing to do
+      if (lead + length > window.length) break; // truncated even with lookahead → malformed, cut at the byte
+      let complete = true;
+      for (let i = lead + 1; i < lead + length; i++) if (!isUtf8Continuation(window[i]!)) { complete = false; break; }
+      if (!complete) break;
+      end = lead === start ? lead + length : lead;
+      break;
+    }
+  }
+  return { start, end, ...(start > input.lookbehind ? { snappedFrom: input.offset } : {}) };
+}
+
+/** Structural guard — the registry/session only receive a `ContentWriter`. */
+export function isContentRefReader(value: unknown): value is ContentRefReader {
+  return !!value && typeof value === 'object'
+    && typeof (value as { readContentRef?: unknown }).readContentRef === 'function';
+}
+export interface SessionToolContentStore extends ContentWriter, ContentRefReader {
   beginCapture(input: {
     channel: ToolContentChannel;
     maxStoredBytes?: number;
@@ -123,6 +236,8 @@ export function createSessionToolContentStore(
     retained = 0,
     sessionBytes = 0;
   const refs = new Map<string, StoredRow>();
+  /** sha256 → row for bytes written through `write()` (content-<sha>.bin). */
+  const contentRefs = new Map<string, StoredRow>();
   const captureHandles = new Set<number>();
   const rootMatches = (): boolean => {
     if (root === null) return false;
@@ -186,7 +301,98 @@ export function createSessionToolContentStore(
       rmSync(temporary, { force: true });
       throw error;
     }
+    // Digest-addressed read identity (7110): the published inode is what a
+    // later `readContentRef` must still find — a replaced file is a mismatch.
+    try {
+      const identity = lstatSync(target);
+      if (identity.isFile() && !identity.isSymbolicLink() && identity.size === bytes.length) {
+        contentRefs.set(sha, { path: target, sha, bytes: bytes.length, complete: true, dev: identity.dev, ino: identity.ino });
+      } else {
+        contentRefs.delete(sha);
+      }
+    } catch {
+      contentRefs.delete(sha);
+    }
     return { path: target, sha256: sha };
+  };
+  /**
+   * Verified range read of one stored row: O_NOFOLLOW open, identity pinned
+   * before and after, the WHOLE file re-hashed against the row's digest while
+   * the range is copied out. Shared by the capture (`readDetailRange`) and the
+   * content-ref (`readContentRef`) paths so both carry identical guarantees.
+   */
+  const readVerifiedRange = async (
+    row: StoredRow,
+    offset: number,
+    limit: number,
+    stillCurrent: () => boolean,
+    signal?: AbortSignal,
+  ): Promise<
+    | { kind: 'loaded'; bytes: Buffer; offset: number; nextOffset: number | null; totalBytes: number }
+    | { kind: 'hold'; reasonCode: ContentRefReadReason }
+  > => {
+    let file: Awaited<ReturnType<typeof open>> | null = null;
+    try {
+      const noFollow =
+        typeof constants.O_NOFOLLOW === 'number' ? constants.O_NOFOLLOW : 0;
+      // A platform without this primitive is not silently treated as safe.
+      // Its direct file reader requires a separately verified platform adapter.
+      if (noFollow === 0)
+        return { kind: 'hold', reasonCode: 'CONTENT_READ_UNSUPPORTED' };
+      if (!rootMatches())
+        return { kind: 'hold', reasonCode: 'CONTENT_READ_FAILED' };
+      const published = lstatSync(row.path);
+      if (!sameIdentity(published, row))
+        return { kind: 'hold', reasonCode: 'CONTENT_READ_FAILED' };
+      file = await open(row.path, constants.O_RDONLY | noFollow);
+      const before = await file.stat();
+      if (!sameIdentity(before, row))
+        return { kind: 'hold', reasonCode: 'CONTENT_DIGEST_MISMATCH' };
+      const requested = Math.min(limit, Math.max(0, row.bytes - offset)),
+        range = Buffer.allocUnsafe(requested),
+        chunk = Buffer.allocUnsafe(HASH_CHUNK_BYTES),
+        hash = createHash('sha256');
+      let cursor = 0,
+        rangeWritten = 0;
+      while (cursor < row.bytes) {
+        if (signal?.aborted)
+          return { kind: 'hold', reasonCode: 'CONTENT_READ_FAILED' };
+        const wanted = Math.min(chunk.length, row.bytes - cursor),
+          { bytesRead } = await file.read(chunk, 0, wanted, cursor);
+        if (bytesRead !== wanted)
+          return { kind: 'hold', reasonCode: 'CONTENT_DIGEST_MISMATCH' };
+        const part = chunk.subarray(0, bytesRead);
+        hash.update(part);
+        const start = Math.max(cursor, offset),
+          end = Math.min(cursor + bytesRead, offset + requested);
+        if (end > start) {
+          const sourceOffset = start - cursor;
+          part.copy(range, rangeWritten, sourceOffset, sourceOffset + end - start);
+          rangeWritten += end - start;
+        }
+        cursor += bytesRead;
+      }
+      const after = await file.stat();
+      if (closed || !rootMatches() || !stillCurrent() || signal?.aborted)
+        return { kind: 'hold', reasonCode: 'CONTENT_READ_FAILED' };
+      if (
+        !sameIdentity(after, row) ||
+        rangeWritten !== requested ||
+        hash.digest('hex') !== row.sha
+      )
+        return { kind: 'hold', reasonCode: 'CONTENT_DIGEST_MISMATCH' };
+      return {
+        kind: 'loaded',
+        bytes: range,
+        offset,
+        nextOffset: offset + requested < row.bytes ? offset + requested : null,
+        totalBytes: row.bytes,
+      };
+    } catch {
+      return { kind: 'hold', reasonCode: 'CONTENT_READ_FAILED' };
+    } finally {
+      await file?.close().catch(() => undefined);
+    }
   };
   return {
     write: legacyWrite,
@@ -463,91 +669,68 @@ export function createSessionToolContentStore(
         !row.path.startsWith(`${dir}${sep}`)
       )
         return { kind: 'hold', reasonCode: 'CONTENT_REF_DENIED' };
-      let file: Awaited<ReturnType<typeof open>> | null = null;
-      try {
-        const noFollow =
-          typeof constants.O_NOFOLLOW === 'number' ? constants.O_NOFOLLOW : 0;
-        // A platform without this primitive is not silently treated as safe.
-        // Its direct file reader requires a separately verified platform adapter.
-        if (noFollow === 0)
-          return { kind: 'hold', reasonCode: 'CONTENT_READ_UNSUPPORTED' };
-        if (!rootMatches())
-          return { kind: 'hold', reasonCode: 'CONTENT_READ_FAILED' };
-        const published = lstatSync(row.path);
-        if (!sameIdentity(published, row))
-          return { kind: 'hold', reasonCode: 'CONTENT_READ_FAILED' };
-        file = await open(row.path, constants.O_RDONLY | noFollow);
-        const before = await file.stat();
-        if (!sameIdentity(before, row))
-          return { kind: 'hold', reasonCode: 'CONTENT_DIGEST_MISMATCH' };
-        const requested = Math.min(
-            input.limit,
-            Math.max(0, row.bytes - input.offset),
-          ),
-          range = Buffer.allocUnsafe(requested),
-          chunk = Buffer.allocUnsafe(HASH_CHUNK_BYTES),
-          hash = createHash('sha256');
-        let cursor = 0,
-          rangeWritten = 0;
-        while (cursor < row.bytes) {
-          if (signal?.aborted)
-            return { kind: 'hold', reasonCode: 'CONTENT_READ_FAILED' };
-          const wanted = Math.min(chunk.length, row.bytes - cursor),
-            { bytesRead } = await file.read(chunk, 0, wanted, cursor);
-          if (bytesRead !== wanted)
-            return { kind: 'hold', reasonCode: 'CONTENT_DIGEST_MISMATCH' };
-          const part = chunk.subarray(0, bytesRead);
-          hash.update(part);
-          const start = Math.max(cursor, input.offset),
-            end = Math.min(cursor + bytesRead, input.offset + requested);
-          if (end > start) {
-            const sourceOffset = start - cursor;
-            part.copy(
-              range,
-              rangeWritten,
-              sourceOffset,
-              sourceOffset + end - start,
-            );
-            rangeWritten += end - start;
-          }
-          cursor += bytesRead;
-        }
-        const after = await file.stat();
-        if (
-          closed ||
-          !rootMatches() ||
-          refs.get(input.detailRef) !== row ||
-          signal?.aborted
-        )
-          return { kind: 'hold', reasonCode: 'CONTENT_READ_FAILED' };
-        if (
-          !sameIdentity(after, row) ||
-          rangeWritten !== requested ||
-          hash.digest('hex') !== row.sha
-        )
-          return { kind: 'hold', reasonCode: 'CONTENT_DIGEST_MISMATCH' };
-        return {
-          kind: 'loaded',
-          bytes: range,
-          offset: input.offset,
-          nextOffset:
-            input.offset + requested < row.bytes
-              ? input.offset + requested
-              : null,
-          totalBytes: row.bytes,
-          storedSha256: row.sha,
-          completeCapture: row.complete,
-        };
-      } catch {
-        return { kind: 'hold', reasonCode: 'CONTENT_READ_FAILED' };
-      } finally {
-        await file?.close().catch(() => undefined);
+      const read = await readVerifiedRange(
+        row, input.offset, input.limit, () => refs.get(input.detailRef) === row, signal);
+      if (read.kind === 'hold') {
+        // The capture surface never had an "unknown ref" class — keep its contract.
+        return { kind: 'hold', reasonCode: read.reasonCode === 'CONTENT_REF_UNKNOWN' ? 'CONTENT_REF_DENIED' : read.reasonCode };
       }
+      return {
+        kind: 'loaded',
+        bytes: read.bytes,
+        offset: read.offset,
+        nextOffset: read.nextOffset,
+        totalBytes: read.totalBytes,
+        storedSha256: row.sha,
+        completeCapture: row.complete,
+      };
+    },
+    async readContentRef(input, signal) {
+      if (closed) return { kind: 'hold', reasonCode: 'CONTENT_REF_EXPIRED' };
+      if (typeof input.sha256 !== 'string' || !isDigest(input.sha256))
+        return { kind: 'hold', reasonCode: 'CONTENT_REF_DENIED' };
+      if (
+        !Number.isSafeInteger(input.offset) ||
+        input.offset < 0 ||
+        !Number.isSafeInteger(input.limit) ||
+        input.limit < 1 ||
+        input.limit > TOOL_DETAIL_RANGE_MAX_BYTES
+      )
+        return { kind: 'hold', reasonCode: 'CONTENT_RANGE_INVALID' };
+      const row = contentRefs.get(input.sha256);
+      if (!row) return { kind: 'hold', reasonCode: 'CONTENT_REF_UNKNOWN' };
+      if (signal?.aborted)
+        return { kind: 'hold', reasonCode: 'CONTENT_READ_FAILED' };
+      const dir = root;
+      if (
+        !dir ||
+        row.path !== join(dir, `content-${input.sha256}.bin`) ||
+        !row.path.startsWith(`${dir}${sep}`)
+      )
+        return { kind: 'hold', reasonCode: 'CONTENT_REF_DENIED' };
+      // Read 3 bytes before the offset (lookbehind) and `limit + 3` past it
+      // (lookahead): what a boundary-safe cut needs on both sides (B4).
+      const lookbehind = Math.min(input.offset, UTF8_MAX_SEQUENCE - 1);
+      const read = await readVerifiedRange(
+        row, input.offset - lookbehind, lookbehind + input.limit + (UTF8_MAX_SEQUENCE - 1), () => contentRefs.get(input.sha256) === row, signal);
+      if (read.kind === 'hold') return read;
+      const aligned = alignUtf8Slice(read.bytes, { offset: input.offset, lookbehind, limit: input.limit, eofInWindow: read.nextOffset === null });
+      const nextOffset = input.offset + (aligned.end - lookbehind);
+      return {
+        kind: 'loaded',
+        bytes: read.bytes.subarray(aligned.start, aligned.end),
+        offset: input.offset + (aligned.start - lookbehind),
+        ...(aligned.snappedFrom !== undefined ? { snappedFrom: aligned.snappedFrom } : {}),
+        nextOffset: nextOffset < read.totalBytes ? nextOffset : null,
+        totalBytes: read.totalBytes,
+        sha256: row.sha,
+      };
     },
     close() {
       if (closed) return;
       closed = true;
       refs.clear();
+      contentRefs.clear();
       for (const handle of captureHandles) {
         try {
           closeSync(handle);

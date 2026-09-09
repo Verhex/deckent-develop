@@ -407,11 +407,15 @@ export const CONTENT_STORE_DIR = "tool-content";
  */
 export { TOOL_DETAIL_RANGE_MAX_BYTES } from "./session-tool-content.js";
 export type {
+  ContentRefRead,
+  ContentRefReadReason,
+  ContentRefReader,
   SessionToolContentStore,
   ToolCapture,
   ToolCaptureReceipt,
   ToolDetailRead,
 } from "./session-tool-content.js";
+export { isContentRefReader } from "./session-tool-content.js";
 export function createSessionContentStore(
   opts: { dir?: string; prefix?: string } = {},
 ): import("./session-tool-content.js").SessionToolContentStore {
