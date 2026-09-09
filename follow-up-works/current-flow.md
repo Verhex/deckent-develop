@@ -192,6 +192,36 @@ duration performans kanıtı sayılmadı. WholeCLI/7099 veya platform closure de
    sprint-controller.ts:4063 koşulsuz FIX-öncesi contain reconcile; EXECUTE admission hold yok, redispatch
    hiç olmadı (ikinci defekt yok). Fix lane deckent-lane-contain-hold (Astra A3 doğrulaması bekleniyor).
    sprint-730 kalıntısı recover ile arşivlendi. Build c842a396 (7105 dahil) bot 584802.
+0a5. 11:02Z durum: contain-hold A3 düzeltmesi hazır (predicate yalnız DAHA ÖNCEKİ ordinal;
+   E077 retirement yolu candidate varken `<`, candidate yokken önceki davranış; +6 test, fan-in 37/37;
+   6 pre-existing kırık ayrık) → Astra sınırlı re-verify (ENTRY 1128). Populate-race parser düzeltmesi
+   (tam-satır sentinel, 24/24) → Astra A2 re-verify sürüyor. Cursor L5 ACCEPTED + alan-sırası rötuşu;
+   7105-b REVISE (ENTRY 57): battery suite 2 kırık, 'reference-expansion' reason emitter'sız (sil),
+   no-progress CADENCE değil (undefined). Kuru-prova: populate+contain patch'leri main ef54d66f7 üstüne
+   çakışmasız uygulandı (scratch worktree), birleşik tsc/vitest koşuyor. Astra İŞ D uygulamada.
+   Sıra: CONFIRMED×2 + Cursor READY×2 → fan-in → gate'ler → owner commit gate → bot stop → build:all →
+   bot start → canary run-5 (hedef: FIX turu tamamlanır, DONE settlement). Ana ağaç run sırasında sessiz.
+0a6. 11:20Z: engine lane'leri fan-in DOĞRULANDI ve main'de STAGED (13 dosya; commit owner gate).
+   Kuru-prova iki regresyon yakaladı, düzeltildi: (1) mounts :3249 yeni daemon probe'u hermetik
+   runner'sız 10 s timeout → test-only enjeksiyon (96/96); (2) sprint-lifecycle/spawn-failure-authority
+   `reconcileExactLifecycle(mode, undefined)` çağrı-şekli → options yokken tek argüman (125/125).
+   Birleşik ağaç: tsc0; 95 dosya 1762 test → 25 kırık = 24 main-baseline pre-existing (sprint-controller 12,
+   docker-restart-reconcile 5, spawn-throw-lifecycle 5, cascade 1, scheduler-effects 1) + constants.test
+   (committed HEAD'de kırık; main'deki uncommitted 4-satır silme düzeltiyor — owner bulgusu). Ortam:
+   planning-preflight gitignored native prebuilds KOPYASI ister (symlink reddedilir). Gate'ler: i18n,
+   config-writers, no-model-literal temiz; cli-mcp-parity main'de de kırmızı (pre-existing; description-catalog
+   key drift — owner bulgusu). Astra A2/A3 CONFIRMED (ENTRY 1129). 7106 (Astra) READY_FOR_REVIEW, bağımsız
+   review ajanı sürüyor. Cursor ENTRY 57 (L5 rötuş + 7105-b REVISE) bekleniyor.
+0a7. 11:19Z LANDED (owner onayı): 99d94a929 populate-race + contain-hold. Bot 692938, build:all exit0.
+   Canary run-5 (sprint-731, flow fd218d1c, 11:25Z): dispatch KABUL, worker etkisi landed (CANARY-NOTE run-5),
+   custody 01→06-archive 11:35:32Z tam, evaluation decision DONE (bir kriter UNDECIDABLE/CONFIRMATION_MISSING
+   → FIX), FIX-öncesi contain reconcile: 728-001 DOĞRU emekli edildi (ERRORS.md 11:46:32Z daemon absent —
+   run-4 sınıfı KAPANDI); 11:46:33Z RUN_FAILED EXACT_CONTAINMENT_INCOMPLETE = YENİ sınıf: arşiv-atlama dalı
+   (spawn-backend-docker.ts:19505, E077 #1) absence kaydetmiyor, tamamlık kontrolü (scheduler-effects.ts:1265)
+   bu run'ın settle+arşiv olmuş 731-001'ini 'unknown' görüyor. Düzeltme lane'i deckent-lane-archived-absence
+   (contain modunda daemon probe: absent→absence; present/unknown→typed hold). Kalıntı: run-status ACTIVE/FIX,
+   coordinator yok → run-6 öncesi recover. 7106 (Astra) REVISE (default .15 küçük pencereyi kapatıyor; 560-006
+   proof silinmiş). 7105-b (Cursor) GO + 3 rötuş; L5 ACCEPTED; ikisi run-6 öncesi landing kuyruğunda.
 0a4. MASTER 7106 TERMINAL-PREAMBLE-BUDGET-001 (owner-admitted 10:31Z, P0): "Selam" turu ~48k/131k preamble;
    Astra İŞ D (ölçüm → progressive tool şeması, contentRef referans metin, config-resolved pay, /context).
 0a2. Canary run-3 (sprint-729, 09:03Z) worker gönderimi kabul edilmedi: kök neden = exact Docker

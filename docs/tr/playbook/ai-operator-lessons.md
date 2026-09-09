@@ -473,8 +473,33 @@ taze CLI/MCP/Terminal süreci için yeterli authority değildir. Kanıttan önce
 edilir. Katalog, unit test ve host'taki başarılı tek çağrı destekleyici kanıttır; bu zincirin yerine
 geçmez.
 
+## 34. Lane doğrulaması davranışın sahibi olan test dosyalarını kapsar; fan-in kuru-provası şarttır
+
+Canary run-4/5 düzeltme lane'leri (populate-race, contain-hold) kendi yeni testleriyle ve ajan +
+bağımsız doğrulayıcı CONFIRMED ile yeşildi; main üstüne kuru-prova fan-in'i iki gerçek regresyon
+çıkardı: yeni daemon probe'u, lane'in koşmadığı mounts testinde hermetik olmayan runner'a düşüp
+10 s timeout aldı; opsiyonel ikinci argüman geçiren çağrı `(mode)` çağrı-şeklini bekleyen iki
+pause/custody testini kırdı. İkisi de değişen fonksiyonun davranışına sahip başka dosyalardaydı.
+Aynı gün gerçek run-5, FIX-öncesi containment sweep'inin arşivlenmiş attempt'ı `unknown`
+inventory ile bulup run'ı düşürdüğünü gösterdi: arşiv-atlama dalı absence'ı hiç kaydetmiyordu.
+
+Kural: (1) Bir lane'in scoped seti, değişen fonksiyonu çağıran/mock'layan HER test dosyasını
+içerir (`grep -l` ile bulunur, tahminle değil); bağımsız doğrulayıcı da aynı seti koşar. (2) Main'e
+landing öncesi patch scratch worktree'de main'in güncel HEAD'ine uygulanır, tsc + geniş scoped set
+koşulur, kırıklar main baseline'ıyla ayrıştırılır (pre-existing / ortam / regresyon); "lane'de
+yeşil" landing kanıtı değildir. (3) Bir tamamlık kontrolü (containment sweep gibi) her registry
+girişi için pozitif gözlem istiyorsa, o girişleri atlayan HER dal ya gözlemi açıkça kaydeder ya da
+typed hold üretir; sessiz `continue` çıkarımdır, gözlem değil. (4) Ortam kaynaklı kırıklar
+(gitignored native prebuilds: kopya gerekir, symlink reddedilir) landing öncesi ayrı sınıfa yazılır.
+
 ## Değişiklik günlüğü (her sprint deneyiminden sonra güncelle)
 
+- **2026-09-09 — Canary run-4/5 fan-in ve containment sweep dersleri**: Ders 34 eklendi. İki lane
+  kendi testlerinde ve bağımsız doğrulamada yeşilken kuru-prova fan-in'i iki regresyon yakaladı
+  (hermetik olmayan probe, `(mode, undefined)` çağrı-şekli); gerçek run-5 arşiv-atlama dalının
+  absence kaydetmemesiyle `EXACT_CONTAINMENT_INCOMPLETE` üretti. Kural: davranışın sahibi test
+  dosyaları scoped sete girer, landing öncesi main HEAD üstünde kuru-prova + baseline ayrımı, atlama
+  dalları gözlemi açıkça kaydeder.
 - **2026-09-03 — Terminal yüzeyi ve Fable 5.1 gerçek yürütme kapanışı**: Exact verifier kimliği,
   worker-image capability, sonuç şeması ve kanıt sınırı kusurları onarıldıktan; farklı-provider
   XVerify gerçek kullanım, settlement ve durable receipt ile kapandıktan sonra Ders 33 eklendi.

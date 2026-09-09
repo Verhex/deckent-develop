@@ -494,8 +494,35 @@ a process-global cache is not sufficient authority for a fresh CLI/MCP/Terminal 
 changes are rebuilt before the proof. Catalog, unit tests and a successful host-only call are
 supporting evidence, never substitutes for that chain.
 
+## 34. Lane verification covers the test files that own the behaviour; a fan-in dry run is mandatory
+
+The canary run-4/5 fix lanes (populate-race, contain-hold) were green on their own new tests, with
+agent and independent verifier CONFIRMED; the dry-run fan-in onto main surfaced two real
+regressions: the new daemon probe fell through to a non-hermetic runner in the mounts test the lane
+never ran and timed out at 10 s; passing an optional second argument broke two pause/custody tests
+that assert the `(mode)` call shape. Both lived in other files that own the changed function's
+behaviour. The same day, real run-5 showed the pre-FIX containment sweep finding the archived
+attempt with `unknown` inventory and crashing the run: the archived-skip branch never recorded
+absence.
+
+Rule: (1) A lane's scoped set includes EVERY test file that calls or mocks the changed function
+(found with `grep -l`, not guessed); the independent verifier runs the same set. (2) Before landing,
+the patch is applied to main's current HEAD in a scratch worktree, tsc plus a broad scoped set is
+run, and failures are separated against the main baseline (pre-existing / environment /
+regression); "green in the lane" is not landing evidence. (3) When a completeness check (such as
+the containment sweep) demands a positive observation per registry entry, EVERY branch that skips
+those entries either records the observation explicitly or raises a typed hold; a silent `continue`
+is inference, not observation. (4) Environment-caused failures (gitignored native prebuilds: copy
+required, symlink rejected) are written down as their own class before landing.
+
 ## Changelog (update after every sprint experience)
 
+- **2026-09-09 — Canary run-4/5 fan-in and containment-sweep lessons**: Added Lesson 34. Two lanes
+  were green on their own tests and independently confirmed, yet the dry-run fan-in caught two
+  regressions (non-hermetic probe, `(mode, undefined)` call shape); real run-5 then produced
+  `EXACT_CONTAINMENT_INCOMPLETE` because the archived-skip branch recorded no absence. Rule: the
+  test files that own the behaviour join the scoped set, a dry run on main HEAD with baseline
+  separation precedes landing, and skip branches record the observation explicitly.
 - **2026-09-03 — Terminal surface and Fable 5.1 executable-reachability closure**: Added Lesson 33
   after the exact verifier identity, worker-image capability, result-schema and evidence-boundary
   failures were repaired and a different-provider XVerify completed with reported usage,
