@@ -257,6 +257,18 @@ describe('MCP annotation parity — row 490 regressions', () => {
     });
   });
 
+  it('deckent_checkpoint is read-only: approve/reject are typed CLI-only refusals', () => {
+    expect(catalogByName.get('deckent_checkpoint')!.sideEffect).toBe('read-only');
+    expect(effective.annotations.get('deckent_checkpoint')).toMatchObject({
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+    });
+    const literal = moduleLiterals.find((entry) => entry.module === 'checkpoint.ts')!
+      .captured.annotations.get('deckent_checkpoint');
+    expect(literal).toMatchObject({ readOnlyHint: true, destructiveHint: false, idempotentHint: true });
+  });
+
   it('the catalog overrides a stale module literal without touching behaviour', () => {
     const captured = capture((server) => {
       const handler = () => ({ content: [] });

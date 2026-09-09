@@ -9053,8 +9053,12 @@ const BASE_MESSAGES: MessageMap = {
     tr: 'Her skill için id, ad, kategori ve tetikleyici anahtar kelimeleri .deckent/skills/ dizininden okuyarak döndürür. Görev yönlendirmesi için hangi skill\'lerin kullanılabilir olduğunu görmek, skill kapsamını denetlemek veya run planlamadan önce skill atamalarını gözden geçirmek için kullanın.',
   },
   'mcp.checkpoint.detail': {
-    en: 'Checkpoints pause run execution at configured phases (plan/evaluate/fix) until a human approves or rejects. Use action=list to see what is pending, and action=approve or action=reject with sprintId and phase to respond.',
-    tr: 'Checkpoint\'ler run yürütmesini yapılandırılmış fazlarda (plan/evaluate/fix) bir insan onaylayana veya reddedene dek duraklatır. Bekleyenleri görmek için action=list, yanıt vermek için sprintId ve phase ile action=approve veya action=reject kullanın.',
+    en: 'Lists checkpoint gates (read-only). Approve and reject stay on the CLI behind interactive live-auth; MCP returns NOT_A_DECISION_SURFACE for those actions.',
+    tr: 'Checkpoint kapılarını listeler (salt okunur). Onay ve red CLI\'da interaktif live-auth arkasında kalır; MCP bu eylemler için NOT_A_DECISION_SURFACE döndürür.',
+  },
+  'mcp.checkpoint.not_a_decision_surface': {
+    en: 'Checkpoint approve/reject is not available on MCP. Use an interactive terminal: {command}',
+    tr: 'Checkpoint onay/red MCP üzerinden kullanılamaz. İnteraktif terminalde şunu kullanın: {command}',
   },
   'mcp.docs.detail': {
     en: 'Actions: "add" registers a file, "remove" unregisters it, "list" shows all, "update" modifies section rules, "run" triggers doc updates without a run, "track-scan" performs a DB-only doc-tracking scan (hash + DCR + stale) and "track-status" lists tracked doc health. Auto sections receive generated content (metrics, debt, history); protected sections are never touched.',
@@ -9362,16 +9366,16 @@ const BASE_MESSAGES: MessageMap = {
   },
   // deckent_checkpoint
   'mcp.checkpoint.action_desc': {
-    en: 'Action to perform: list all checkpoints, approve a pending checkpoint, or reject a pending checkpoint.',
-    tr: 'Gerçekleştirilecek eylem: tüm checkpoint’leri listele, bekleyen bir checkpoint’i onayla veya reddet.',
+    en: 'Action to perform: list checkpoints, or request approve/reject (approve/reject are refused on MCP with NOT_A_DECISION_SURFACE).',
+    tr: 'Gerçekleştirilecek eylem: checkpoint\'leri listele veya approve/reject iste (approve/reject MCP\'de NOT_A_DECISION_SURFACE ile reddedilir).',
   },
   'mcp.checkpoint.sprint_id_desc': {
-    en: 'Sprint ID (e.g. "sprint-089"). Required for approve/reject actions.',
-    tr: 'Sprint ID (örn. "sprint-089"). approve/reject eylemleri için zorunludur.',
+    en: 'Sprint ID (e.g. "s1") echoed in approve/reject refusal payloads; decisions stay CLI-only.',
+    tr: 'Sprint ID (örn. "s1"); approve/reject ret yanıtlarında yankılanır, karar yalnız CLI\'dadır.',
   },
   'mcp.checkpoint.phase_desc': {
-    en: 'Phase name (e.g. "plan", "evaluate", "fix"). Required for approve/reject actions.',
-    tr: 'Faz adı (örn. "plan", "evaluate", "fix"). approve/reject eylemleri için zorunludur.',
+    en: 'Phase name (e.g. "plan") echoed in approve/reject refusal payloads; decisions stay CLI-only.',
+    tr: 'Faz adı (örn. "plan"); approve/reject ret yanıtlarında yankılanır, karar yalnız CLI\'dadır.',
   },
   'mcp.checkpoint.root_desc': {
     en: 'Project root directory. Defaults to current working directory.',

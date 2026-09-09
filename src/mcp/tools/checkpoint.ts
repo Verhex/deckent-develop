@@ -1,12 +1,10 @@
-import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { enrichResponse } from '../helpers/enrich.js';
-import { validateSprintId, validatePhase, validatePath } from '../../core/validators.js';
-import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
-
-// ─── Types ──────────────────────────────────────────────────────────
+import { getMessage } from '../../cli/helpers/messages.js';
+import { mcpToolDescription, mcpFieldDescription, getMcpToolDescriptionLanguage } from './description-catalog.js';
 
 interface CheckpointFile {
   phase: string;
@@ -14,8 +12,6 @@ interface CheckpointFile {
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
 }
-
-// ─── Helpers ────────────────────────────────────────────────────────
 
 function getCheckpointsDir(root: string): string {
   return join(root, '.deckent', 'checkpoints');
@@ -25,7 +21,7 @@ function listCheckpoints(root: string): Array<{ sprintId: string; phase: string;
   const dir = getCheckpointsDir(root);
   if (!existsSync(dir)) return [];
 
-  const files = readdirSync(dir).filter(f => f.startsWith('checkpoint-') && f.endsWith('.json'));
+  const files = readdirSync(dir).filter((file) => file.startsWith('checkpoint-') && file.endsWith('.json'));
   const results: Array<{ sprintId: string; phase: string; status: string; summary: string; createdAt: string }> = [];
 
   for (const file of files) {
@@ -49,31 +45,30 @@ function listCheckpoints(root: string): Array<{ sprintId: string; phase: string;
   return results;
 }
 
-function updateCheckpointStatus(root: string, sprintId: string, phase: string, status: 'approved' | 'rejected'): { success: boolean; message: string } {
-  validateSprintId(sprintId);
-  validatePhase(phase);
-  const dir = getCheckpointsDir(root);
-  const filePath = join(dir, `checkpoint-${sprintId}-${phase}.json`);
-  validatePath(dir, `checkpoint-${sprintId}-${phase}.json`);
-
-  if (!existsSync(filePath)) {
-    return { success: false, message: `Checkpoint not found: ${sprintId}/${phase}` };
-  }
-
-  try {
-    const checkpoint = JSON.parse(readFileSync(filePath, 'utf-8')) as CheckpointFile;
-    if (checkpoint.status !== 'pending') {
-      return { success: false, message: `Checkpoint already ${checkpoint.status}: ${sprintId}/${phase}` };
-    }
-    checkpoint.status = status;
-    writeFileSync(filePath, JSON.stringify(checkpoint, null, 2), 'utf-8');
-    return { success: true, message: `Checkpoint ${sprintId}/${phase} ${status}.` };
-  } catch (err) {
-    return { success: false, message: err instanceof Error ? err.message : String(err) };
-  }
+function decisionSurfaceRefusal(
+  action: 'approve' | 'reject',
+  sprintId: string | undefined,
+  phase: string | undefined,
+  lang: string,
+) {
+  const commandParts = ['deckent', 'checkpoint', action];
+  if (sprintId) commandParts.push(sprintId);
+  if (phase) commandParts.push(phase);
+  const payload = {
+    error: true,
+    reasonCode: 'NOT_A_DECISION_SURFACE' as const,
+    action,
+    ...(sprintId !== undefined ? { sprintId } : {}),
+    ...(phase !== undefined ? { phase } : {}),
+    decideCommand: getMessage('approvals.federated.hint_checkpoint', lang),
+    message: getMessage('mcp.checkpoint.not_a_decision_surface', lang, { command: commandParts.join(' ') }),
+  };
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify(payload) }],
+    structuredContent: payload,
+    isError: true as const,
+  };
 }
-
-// ─── Registration ───────────────────────────────────────────────────
 
 export function registerCheckpointTool(server: McpServer): void {
   server.registerTool(
@@ -81,7 +76,7 @@ export function registerCheckpointTool(server: McpServer): void {
     {
       title: 'Checkpoint Management',
       description: mcpToolDescription('deckent_checkpoint'),
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
       inputSchema: z.object({
         action: z.enum(['list', 'approve', 'reject']).describe(mcpFieldDescription('deckent_checkpoint', 'action')),
         sprintId: z.string().optional().describe(mcpFieldDescription('deckent_checkpoint', 'sprintId')),
@@ -91,6 +86,7 @@ export function registerCheckpointTool(server: McpServer): void {
     },
     async ({ action, sprintId, phase, root: rootArg }) => {
       const root = rootArg ?? process.cwd();
+      const lang = getMcpToolDescriptionLanguage();
 
       try {
         if (action === 'list') {
@@ -99,44 +95,14 @@ export function registerCheckpointTool(server: McpServer): void {
             action: 'list',
             checkpoints,
             total: checkpoints.length,
-            pending: checkpoints.filter(c => c.status === 'pending').length,
+            pending: checkpoints.filter((checkpoint) => checkpoint.status === 'pending').length,
           });
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(enriched) }],
           };
         }
 
-        if (!sprintId || !phase) {
-          return {
-            content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: 'sprintId and phase are required for approve/reject actions.' }) }],
-            isError: true,
-          };
-        }
-
-        validateSprintId(sprintId);
-        validatePhase(phase);
-
-        const status = action === 'approve' ? 'approved' as const : 'rejected' as const;
-        const result = updateCheckpointStatus(root, sprintId, phase, status);
-
-        if (!result.success) {
-          return {
-            content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message: result.message }) }],
-            isError: true,
-          };
-        }
-
-        const enriched = enrichResponse('checkpoint', {
-          action,
-          sprintId,
-          phase,
-          status,
-          message: result.message,
-        });
-
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(enriched) }],
-        };
+        return decisionSurfaceRefusal(action, sprintId, phase, lang);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         return {

@@ -50,7 +50,7 @@ const TOOL_CATALOG_SOURCE: readonly McpToolCatalogSource[] = [
   { name: 'deckent_help', description: 'Get runtime capabilities, project state, and next-step recommendation', sideEffect: 'read-only' },
   { name: 'deckent_agent_list', description: 'List registered agents (built-in and project-specific)', sideEffect: 'read-only' },
   { name: 'deckent_skill_list', description: 'List registered skills with manifest and sandbox info', sideEffect: 'read-only' },
-  { name: 'deckent_checkpoint', description: 'Approve or reject a checkpoint gate during run execution', sideEffect: 'mutating' },
+  { name: 'deckent_checkpoint', description: 'List checkpoint gates (read-only); approve/reject stay CLI-only behind interactive live-auth', sideEffect: 'read-only' },
   { name: 'deckent_docs', description: 'Run lifecycle document management (add/remove/list)', sideEffect: 'mutating', idempotent: true },
   { name: 'deckent_explain', description: 'Explain run history and results in natural language', sideEffect: 'read-only' },
   { name: 'deckent_memory_query', description: 'Search project memory across all sources (ADR, run, debt, pattern)', sideEffect: 'read-only' },
