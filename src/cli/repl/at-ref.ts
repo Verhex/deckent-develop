@@ -15,6 +15,7 @@
 // localization surface. The only user-facing string this feature adds is the
 // @-menu hint, injected via labels (tui.atref_menu_hint, run.tsx).
 
+import type { ReferenceAttachment } from '../../agent/reference-digest-types.js';
 import { createHash } from 'node:crypto';
 import { relative, sep, isAbsolute } from 'node:path';
 
@@ -281,4 +282,15 @@ export function createCachedPathLister(
     cache = { at, root, entries };
     return entries;
   };
+}
+
+/** 7113 typed seam. Legacy prompt bytes stay identical; no parsing of model-written markers. */
+export function expandAtRefsWithAttachments(
+  text: string, readFile: (rel: string) => string | null, options: AtRefExpansionOptions = {},
+): { prompt: string; refs: AtRefExpansion[]; referenceAttachments: ReferenceAttachment[] } {
+  const expanded = expandAtRefs(text, readFile, options);
+  return { ...expanded, referenceAttachments: expanded.refs.filter(ref => ref.ok).map(ref => ({
+    path: ref.path, sourceDigest: ref.digest, bytes: ref.bytes,
+    disposition: ref.mode === 'descriptor' || ref.truncated ? 'digest-required' : 'inline',
+  })) };
 }

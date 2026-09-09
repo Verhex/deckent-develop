@@ -245,7 +245,7 @@ import { createNativePermissionIntentController } from './native-permission-appr
 import { createNativePermissionApprovalService } from './native-permission-approval.js';
 import { resolveLocalOsActorId } from '../../core/principal.js';
 import type { ApprovalRequest } from '../../core/approval-contract.js';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { MemoryStore } from '../../core/memory-store.js';
 import { BRAIN_DIR, MEMORY_DB_FILE, DECKENT_DIR, JOBS_DIR } from '../../core/constants.js';
 import type { ChatTurnBgEvent } from './chat-turn-queue.js';
@@ -256,7 +256,10 @@ import {
   type RunTaskEvidence,
 } from './run-completion-watch.js';
 import { join, resolve, relative, isAbsolute } from 'node:path';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, constants } from 'node:fs';
+import { open, realpath, stat } from 'node:fs/promises';
+import { ReferenceDigestError, assertReferenceActive, type ReferenceScope, type ReferenceSnapshot } from '../../agent/reference-digest-types.js';
+import type { SessionToolContentStore, ToolCapture } from '../../agent/session-tool-content.js';
 import { createLocalRpcTransport, buildReplRpcHandlers, runRpcDebugCommand } from './rpc-client.js';
 import { probeSubscriptionLimits } from '../../core/limit-preflight.js';
 import { resolveNativeAgentBudget } from '../../core/execution-budget-policy.js';
@@ -2545,4 +2548,121 @@ export async function runInkRepl(
   await Promise.race([teardown(), new Promise((r) => setTimeout(r, REPL_TEARDOWN_TIMEOUT_MS))]);
   sessionContentStore.close();
   process.exit(0);
+}
+
+/**
+ * 7113 A host capability. The caller supplies an already scoped read policy
+ * and its session-owned store; source text/markers cannot grant access.
+ * C will inject this into the session. No UI/default-on wiring in foundation A.
+ */
+export async function openScopedReferenceSnapshot(input: {
+  resolveCwd: () => string;
+  path: string;
+  scope: ReferenceScope;
+  store: SessionToolContentStore;
+  maxBytes: number;
+  maxWallTimeMs: number;
+  expectedDigest?: string;
+  signal?: AbortSignal;
+  /** Both lexical and canonical relative paths must be permitted by the host policy. */
+  authorizeRead: (relativePath: string) => boolean;
+}): Promise<ReferenceSnapshot> {
+  if (![input.maxBytes, input.maxWallTimeMs].every(n => Number.isSafeInteger(n) && n > 0)
+    || !/^[a-f0-9]{64}$/.test(input.scope.policyDigest)
+    || ![input.scope.tenantId, input.scope.projectId, input.scope.sessionId].every(v => typeof v === 'string' && v.length > 0)) {
+    throw new ReferenceDigestError('REFERENCE_BUDGET_INVALID');
+  }
+  const start = Date.now();
+  const active = (): void => {
+    assertReferenceActive(input.signal);
+    if (Date.now() - start >= input.maxWallTimeMs) throw new ReferenceDigestError('REFERENCE_DEADLINE');
+  };
+  active();
+  if (process.platform === 'win32' || typeof constants.O_NOFOLLOW !== 'number') {
+    // Native reparse-point custody requires a verified adapter, never a weaker open.
+    throw new ReferenceDigestError('REFERENCE_SOURCE_UNSUPPORTED');
+  }
+  if (!isScopedRelPath(input.path) || !input.authorizeRead(input.path)) throw new ReferenceDigestError('REFERENCE_SCOPE_REFUSED');
+  const resolveSourcePath = async (path: string): Promise<string> => {
+    try { return await realpath(path); } catch { throw new ReferenceDigestError('REFERENCE_SCOPE_REFUSED'); }
+  };
+  const root = await resolveSourcePath(resolve(input.resolveCwd()));
+  const absolute = resolve(root, input.path);
+  const canonical = await resolveSourcePath(absolute);
+  const relativeCanonical = relative(root, canonical);
+  if (!isScopedRelPath(relativeCanonical) || !input.authorizeRead(relativeCanonical)) throw new ReferenceDigestError('REFERENCE_SCOPE_REFUSED');
+  const sourceStat = async (path: string) => {
+    try { return await stat(path, { bigint: true }); } catch { throw new ReferenceDigestError('REFERENCE_SOURCE_CHANGED'); }
+  };
+  const rootIdentity = await sourceStat(root);
+  const identity = await sourceStat(canonical);
+  if (!identity.isFile()) throw new ReferenceDigestError('REFERENCE_SOURCE_UNSUPPORTED');
+  if (identity.size > BigInt(input.maxBytes)) throw new ReferenceDigestError('REFERENCE_SOURCE_TOO_LARGE');
+  const sameFile = (value: typeof identity): boolean => value.isFile() && value.dev === identity.dev && value.ino === identity.ino
+    && value.size === identity.size && value.mtimeNs === identity.mtimeNs && value.ctimeNs === identity.ctimeNs;
+  let file: Awaited<ReturnType<typeof open>> | undefined;
+  let capture: ToolCapture | undefined;
+  let finished = false;
+  try {
+    active();
+    file = await open(canonical, constants.O_RDONLY | constants.O_NOFOLLOW);
+    if (!sameFile(await file.stat({ bigint: true }))) throw new ReferenceDigestError('REFERENCE_SOURCE_CHANGED');
+    capture = input.store.beginCapture({ channel: 'stdout', maxStoredBytes: input.maxBytes, previewBytes: 1 });
+    const hash = createHash('sha256');
+    const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+    const chunk = Buffer.allocUnsafe(64 * 1024);
+    let bytes = 0;
+    for (;;) {
+      active();
+      const read = await file.read(chunk, 0, chunk.length, bytes);
+      active();
+      if (!read.bytesRead) break;
+      bytes += read.bytesRead;
+      if (bytes > input.maxBytes) throw new ReferenceDigestError('REFERENCE_SOURCE_TOO_LARGE');
+      const part = chunk.subarray(0, read.bytesRead);
+      if (part.includes(0)) throw new ReferenceDigestError('REFERENCE_ENCODING_INVALID');
+      try { decoder.decode(part, { stream: true }); } catch { throw new ReferenceDigestError('REFERENCE_ENCODING_INVALID'); }
+      hash.update(part); capture.append(part);
+    }
+    try { decoder.decode(); } catch { throw new ReferenceDigestError('REFERENCE_ENCODING_INVALID'); }
+    const finalRoot = await stat(root, { bigint: true });
+    if (await realpath(resolve(input.resolveCwd())) !== root || await realpath(absolute) !== canonical
+      || finalRoot.dev !== rootIdentity.dev || finalRoot.ino !== rootIdentity.ino
+      || !sameFile(await file.stat({ bigint: true })) || !sameFile(await stat(canonical, { bigint: true }))) {
+      throw new ReferenceDigestError('REFERENCE_SOURCE_CHANGED');
+    }
+    if (!input.authorizeRead(input.path) || !input.authorizeRead(relativeCanonical)) throw new ReferenceDigestError('REFERENCE_SCOPE_REFUSED');
+    active();
+    const sourceDigest = hash.digest('hex');
+    if (input.expectedDigest !== undefined && sourceDigest !== input.expectedDigest) throw new ReferenceDigestError('REFERENCE_SOURCE_CHANGED');
+    const receipt = capture.finish(); finished = true;
+    if (!receipt.complete || receipt.storedSha256 !== sourceDigest || receipt.storedBytes !== bytes || !receipt.detailRef) {
+      throw new ReferenceDigestError('REFERENCE_STORE_FAILED');
+    }
+    const snapshotRef = receipt.detailRef;
+    return {
+      metadata: Object.freeze({ schemaVersion: 1, scope: Object.freeze({ ...input.scope }), sourceAuthority: 'reference-data',
+        sourceDigest, bytes, encoding: 'utf-8', createdAt: new Date().toISOString(), snapshotRef }),
+      async *stream(signal) {
+        // The immutable capture is retained by its existing session store policy.
+        // Source pathname changes after publication cannot replace these bytes.
+        let offset = 0;
+        while (offset < bytes) {
+          assertReferenceActive(signal);
+          if (!input.authorizeRead(input.path) || !input.authorizeRead(relativeCanonical)) throw new ReferenceDigestError('REFERENCE_SCOPE_REFUSED');
+          const read = await input.store.readDetailRange({ detailRef: snapshotRef, offset, limit: 64 * 1024, expectedStoredSha256: sourceDigest }, signal);
+          assertReferenceActive(signal);
+          if (read.kind !== 'loaded' || !read.completeCapture || read.offset !== offset || !read.bytes.length) throw new ReferenceDigestError('REFERENCE_STORE_FAILED');
+          offset += read.bytes.length;
+          yield read.bytes;
+        }
+      },
+    };
+  } catch (error) {
+    if (error instanceof ReferenceDigestError) throw error;
+    throw new ReferenceDigestError('REFERENCE_STORE_FAILED');
+  } finally {
+    if (capture && !finished) capture.abort();
+    await file?.close();
+  }
 }
