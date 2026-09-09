@@ -1,5 +1,9 @@
 # TERMINAL-FLUENCY-PROGRAM-001 — Native terminal uçtan uca akıcılık (MASTER 7107)
 
+OUTCOME_ID: TERMINAL-FLUENCY-PROGRAM-001
+DOGFOOD_MODE: ON
+BASE_SHA: 5767c83e6
+
 **Owner talimatı (Alperen, 2026-09-09 12:40Z):** "deckent terminali claude code / codex / cursor
 terminalleri gibi akıcı çalışmak zorunda; local-llm veya başka provider fark etmez; akış
 kesintilenemez, kullanıcı yorulamaz; uzun ve sonsuz bağlam yönetimi, iş akışları uçtan uca,
@@ -69,3 +73,7 @@ yanlış attribution'du; gerçek tetik RC2.
 Landing sırası: 7106 → 7109 → 7108 → 7111 → 7112 (aynı dosyalara dokunanlar sıralı fan-in,
 her biri main HEAD üstünde kuru-prova + baseline ayrımı, ders 34) → build → owner canlı test →
 Astra XVerify → 7107 kabul.
+
+## DONE
+- §3 kabul bataryası gerçek binary (Qwen 131k + 32k, standart + full-auto) ile PASS; owner canlı test kabulü + farklı-provider XVerify receipt.
+- MASTER 7107 DONE; bu dosya silinme tetiğiyle silinmiş.
