@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   ExecutionTerminationLedger,
+  EXECUTION_TERMINATION_LEDGER_DB_VERSION,
   ExecutionTerminationLedgerError,
   createDockerExecutionTerminationBindingInput,
   createNonReservableDockerExecutionTerminationBindingInput,
@@ -375,7 +376,7 @@ describe('execution termination ledger — legacy v1 → v2 migration', () => {
     rawAfter.close();
     migrated.close();
 
-    expect(version).toBe(2);
+    expect(version).toBe(EXECUTION_TERMINATION_LEDGER_DB_VERSION);
     expect(rowAfter['admission_mode']).toBe('reserved');
     // Hash preservation — payload + MAC are copied verbatim, never re-signed.
     expect(rowAfter['payload_json']).toBe(payloadJsonBefore);

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,6 +15,24 @@ import { TaskEvaluation, TaskStatus } from '../../src/core/types.js';
 import { promptDeliveryReceiptPath } from '../../src/core/prompt-delivery-receipt.js';
 
 import {
+  assertGoalResultSettlementRef,
+  createGoalResultSettlementRefForAttempt,
+  createTaskResultSettlementRefForAttempt,
+  dockerAttemptLabels,
+  dockerContainerNameForTask,
+  settlementCustodyKey,
+  taskResultSettlementAttemptPath,
+  taskResultSettlementPreparedPath,
+  taskResultSettlementPromptPath,
+  taskResultSettlementClaimPath,
+  parseTaskResultSettlementAttempt,
+  parseTaskResultSettlementPrepared,
+  readTaskResultSettlementPrepared,
+  readTaskResultSettlementDispatch,
+  readTaskResultSettlementActiveClaim,
+  readTaskResultSettlementPrompt,
+  taskResultSettlementDurableClaimFence,
+  writeTaskResultSettlementPromptAtomic,
   claimTaskResultSettlementAttemptAtomic,
   createTaskResultSettlementRef,
   listPendingTaskResultSettlementAttempts,
@@ -395,5 +414,157 @@ describe('reconcileDockerHostTerminalResultFile', () => {
       selfAssessment: 'NO_GO',
       notes: 'genuine worker failure',
     });
+  });
+});
+
+
+describe('goal settlement custody reference', () => {
+  const subject = {
+    kind: 'goal' as const,
+    goalId: 'goal-7099',
+    missionId: 'mission-7099',
+    purpose: 'goal-authoring' as const,
+    round: 1,
+    invocationId: 'invocation-7099',
+    attemptId: 'a1234567-1234-8123-8123-123456789abc',
+  };
+  const digest = (text: string): string => createHash('sha256').update(text).digest('hex');
+
+  it('binds prepared, dispatch, prompt and claim custody to goal identity without a taskId', () => {
+    const { root } = fixture();
+    const ref = createGoalResultSettlementRefForAttempt(root, subject);
+    expect(ref).not.toHaveProperty('taskId');
+    expect(Object.isFrozen(ref.subject)).toBe(true);
+    expect(settlementCustodyKey(ref)).toBe('\u0000goal-invocation:invocation-7099');
+    const custodyHash = digest('\u0000goal-invocation:invocation-7099');
+    expect(taskResultSettlementAttemptPath(ref)).toBe(join(
+      process.env.DECKENT_HOME!, 'runtime', 'task-result-settlements',
+      ref.projectRootSha256, 'goals', custodyHash, subject.attemptId, 'attempt.json',
+    ));
+    expect(dockerAttemptLabels(ref)).toEqual({
+      'io.deckent.managed': 'true',
+      'io.deckent.project': ref.projectRootSha256,
+      'io.deckent.subject': custodyHash,
+      'io.deckent.attempt': subject.attemptId,
+    });
+    writeTaskResultSettlementAttemptAtomic(ref);
+    expect(claimTaskResultSettlementAttemptAtomic(ref)).toBe('claimed');
+    expect(claimTaskResultSettlementAttemptAtomic(ref)).toBe('adopted');
+    const prepared = writeTaskResultSettlementPreparedAtomic(ref, 'fixture-model');
+    expect(prepared.containerName).toBe(`deckent-g-${ref.projectRootSha256.slice(0, 12)}-${custodyHash.slice(0, 16)}`);
+    expect(readTaskResultSettlementPrepared(ref)).toEqual(prepared);
+    const dispatch = writeTaskResultSettlementDispatchAtomic(ref, 'c'.repeat(64));
+    expect(readTaskResultSettlementDispatch(ref)).toEqual(dispatch);
+    expect(dispatch.preparedSha256).toBe(digest(JSON.stringify(prepared)));
+    const prompt = writeTaskResultSettlementPromptAtomic(ref, 'Goal authoring prompt');
+    expect(readTaskResultSettlementPrompt(ref)).toEqual(prompt);
+    expect(readTaskResultSettlementActiveClaim(ref)).toMatchObject({ subject });
+    expect(taskResultSettlementDurableClaimFence(ref)?.fenceTokenHash).toBe(
+      digest(JSON.stringify(JSON.parse(readFileSync(taskResultSettlementClaimPath(ref), 'utf-8')))),
+    );
+    // Legacy result collectors must not reclassify a goal as a task.
+    expect(parseTaskResultSettlementAttempt(JSON.parse(readFileSync(taskResultSettlementAttemptPath(ref), 'utf-8')))).toBeNull();
+    expect(parseTaskResultSettlementPrepared(prepared)).toBeNull();
+    writeFileSync(taskResultSettlementPromptPath(ref), 'tampered prompt');
+    expect(readTaskResultSettlementPrompt(ref)).toBeNull();
+  });
+
+  it.each(['goalId', 'missionId', 'purpose', 'round', 'attemptId'] as const)(
+    'rejects a changed %s behind the same invocation key', (field) => {
+      const { root } = fixture();
+      const ref = createGoalResultSettlementRefForAttempt(root, subject);
+      writeTaskResultSettlementAttemptAtomic(ref);
+      claimTaskResultSettlementAttemptAtomic(ref);
+      writeTaskResultSettlementPreparedAtomic(ref, 'fixture-model');
+      const changed = { ...subject, [field]: field === 'round' ? 2
+        : field === 'purpose' ? 'goal-acceptance'
+        : field === 'attemptId' ? 'b1234567-1234-8123-8123-123456789abc' : 'other' };
+      expect(() => assertGoalResultSettlementRef(root, changed, ref)).toThrow();
+      const wrongRef = createGoalResultSettlementRefForAttempt(root, changed);
+      expect(readTaskResultSettlementPrepared(wrongRef)).toBeNull();
+      expect(() => readTaskResultSettlementActiveClaim(wrongRef)).toThrow();
+    },
+  );
+
+  it('rejects malformed UUIDs, mixed task/goal refs and project mismatch', () => {
+    const { root } = fixture();
+    expect(() => createGoalResultSettlementRefForAttempt(root, { ...subject, attemptId: '-'.repeat(36) })).toThrow();
+    const ref = createGoalResultSettlementRefForAttempt(root, subject);
+    expect(() => dockerAttemptLabels({ ...ref, taskId: 'synthetic-task' })).toThrow();
+    expect(() => taskResultSettlementAttemptPath({ ...ref, attemptId: 'b1234567-1234-8123-8123-123456789abc' })).toThrow();
+    expect(() => assertGoalResultSettlementRef(join(root, 'other'), subject, ref)).toThrow();
+  });
+
+  it('keeps task reference, labels and persisted prepared bytes unchanged', () => {
+    const { root } = fixture();
+    const ref = createTaskResultSettlementRefForAttempt(root, 'legacy-task', subject.attemptId);
+    const timestamp = '2026-09-09T08:00:00.000Z';
+    expect(JSON.stringify(ref)).toBe(JSON.stringify({
+      schemaVersion: 1, taskId: 'legacy-task', backend: 'docker',
+      projectRootSha256: ref.projectRootSha256, attemptId: subject.attemptId,
+    }));
+    const labels = {
+      'io.deckent.managed': 'true', 'io.deckent.project': ref.projectRootSha256,
+      'io.deckent.task': digest('legacy-task'), 'io.deckent.attempt': subject.attemptId,
+    };
+    expect(JSON.stringify(dockerAttemptLabels(ref))).toBe(JSON.stringify(labels));
+    writeTaskResultSettlementAttemptAtomic(ref, timestamp);
+    claimTaskResultSettlementAttemptAtomic(ref, timestamp);
+    const prepared = writeTaskResultSettlementPreparedAtomic(ref, 'fixture-model', timestamp);
+    const expected = {
+      ...ref, lifecycleVersion: 1, state: 'prepared', preparedAt: timestamp,
+      containerName: dockerContainerNameForTask(root, 'legacy-task'), model: 'fixture-model', labels,
+    };
+    expect(JSON.stringify(prepared)).toBe(JSON.stringify(expected));
+    expect(readFileSync(taskResultSettlementPreparedPath(ref), 'utf-8')).toBe(`${JSON.stringify(expected, null, 2)}\n`);
+    expect(taskResultSettlementAttemptPath(ref)).toContain(join(digest('legacy-task'), subject.attemptId));
+  });
+});
+
+
+describe('goal and task settlement namespace isolation', () => {
+  const goalSubject = {
+    kind: 'goal' as const, goalId: 'g', missionId: 'm', purpose: 'goal-authoring' as const,
+    round: 1, invocationId: 'x', attemptId: '11111111-1111-4111-8111-111111111111',
+  };
+
+  it('lists pending tasks beside goal attempts without treating goals as corrupt task records', () => {
+    const { root } = fixture();
+    const goal = createGoalResultSettlementRefForAttempt(root, goalSubject);
+    const task = createTaskResultSettlementRefForAttempt(root, 'real-task', goalSubject.attemptId);
+    writeTaskResultSettlementAttemptAtomic(goal);
+    claimTaskResultSettlementAttemptAtomic(goal);
+    writeTaskResultSettlementAttemptAtomic(task);
+    const pending = listPendingTaskResultSettlementAttempts(root);
+    expect(pending.map(record => record.attempt.taskId)).toEqual(['real-task']);
+    expect(readTaskResultSettlementActiveClaim(goal)).toMatchObject({ subject: goalSubject });
+  });
+
+  it('still throws on a corrupt real task UUID attempt when goal records coexist', () => {
+    const { root } = fixture();
+    const goal = createGoalResultSettlementRefForAttempt(root, goalSubject);
+    const task = createTaskResultSettlementRefForAttempt(root, 'real-task', goalSubject.attemptId);
+    writeTaskResultSettlementAttemptAtomic(goal);
+    writeTaskResultSettlementAttemptAtomic(task);
+    writeFileSync(taskResultSettlementAttemptPath(task), '{corrupt-task');
+    expect(() => listPendingTaskResultSettlementAttempts(root)).toThrow(/Corrupt Docker result settlement attempt/);
+  });
+
+  it.each(['goal-invocation:x', '\u0000goal-invocation:x'])('keeps legacy raw task ID %j separate from the goal runtime identity', taskId => {
+    const { root } = fixture();
+    const goal = createGoalResultSettlementRefForAttempt(root, goalSubject);
+    const task = createTaskResultSettlementRefForAttempt(root, taskId, goalSubject.attemptId);
+    expect(taskResultSettlementAttemptPath(goal)).not.toBe(taskResultSettlementAttemptPath(task));
+    for (const ref of [goal, task]) {
+      writeTaskResultSettlementAttemptAtomic(ref);
+      expect(claimTaskResultSettlementAttemptAtomic(ref)).toBe('claimed');
+    }
+    const goalPrepared = writeTaskResultSettlementPreparedAtomic(goal, 'fixture-model');
+    const taskPrepared = writeTaskResultSettlementPreparedAtomic(task, 'fixture-model');
+    expect(goalPrepared.containerName).not.toBe(taskPrepared.containerName);
+    expect(goalPrepared.labels).not.toEqual(taskPrepared.labels);
+    expect(taskPrepared.containerName).toBe(dockerContainerNameForTask(root, taskId));
+    expect(listPendingTaskResultSettlementAttempts(root).map(record => record.attempt.taskId)).toEqual([taskId]);
+    if (!taskId.includes('\u0000')) expect(settlementCustodyKey(goal)).not.toBe(settlementCustodyKey(task));
   });
 });

@@ -27,6 +27,11 @@ import {
   sameCrossVerifyExecutionContract,
   type CrossVerifyEnforcedAttemptContract,
 } from './cross-verify-execution-contract.js';
+import {
+  assertExecutionCustodySubject,
+  custodySubjectKey,
+  type GoalExecutionCustodySubjectV1,
+} from './execution-custody-subject.js';
 import type { ExecutionAdmissionMode } from './execution-admission.js';
 import { assertExecutionLandingPolicyConfig } from './execution-budget-policy.js';
 import { createDockerLifecycleError, createExecutionAuthorityError } from './errors.js';
@@ -79,6 +84,31 @@ export interface TaskResultSettlementRefV1 {
   backend: 'docker';
   projectRootSha256: string;
   attemptId: string;
+}
+
+export interface GoalResultSettlementRefV1 {
+  schemaVersion: typeof TASK_RESULT_SETTLEMENT_SCHEMA_VERSION;
+  backend: 'docker';
+  projectRootSha256: string;
+  attemptId: string;
+  subject: GoalExecutionCustodySubjectV1;
+}
+
+export type ExecutionResultSettlementRef = TaskResultSettlementRefV1 | GoalResultSettlementRefV1;
+
+export function settlementCustodyKey(ref: ExecutionResultSettlementRef): string {
+  return 'subject' in ref ? custodySubjectKey(ref.subject) : ref.taskId;
+}
+
+function sameSettlementSubject(left: ExecutionResultSettlementRef, right: ExecutionResultSettlementRef): boolean {
+  if (!('subject' in left)) return !('subject' in right) && left.taskId === right.taskId;
+  if (!('subject' in right)) return false;
+  return left.subject.goalId === right.subject.goalId
+    && left.subject.missionId === right.subject.missionId
+    && left.subject.purpose === right.subject.purpose
+    && left.subject.round === right.subject.round
+    && left.subject.invocationId === right.subject.invocationId
+    && left.subject.attemptId === right.subject.attemptId;
 }
 
 export interface TaskResultSettlementAttemptV1 extends TaskResultSettlementRefV1 {
@@ -144,6 +174,26 @@ export interface TaskResultSettlementDispatchV1 extends TaskResultSettlementRefV
   labels: Readonly<Record<string, string>>;
   preparedSha256: string;
 }
+
+export type ExecutionResultSettlementAttemptV1 =
+  | TaskResultSettlementAttemptV1
+  | (GoalResultSettlementRefV1 & Omit<TaskResultSettlementAttemptV1, keyof TaskResultSettlementRefV1>);
+export type ExecutionResultSettlementActiveClaimV1 =
+  | TaskResultSettlementActiveClaimV1
+  | (GoalResultSettlementRefV1 & Omit<TaskResultSettlementActiveClaimV1, keyof TaskResultSettlementRefV1>);
+export type ExecutionResultSettlementActiveClaimV2 =
+  | TaskResultSettlementActiveClaimV2
+  | (GoalResultSettlementRefV1 & Omit<TaskResultSettlementActiveClaimV2, keyof TaskResultSettlementRefV1>);
+export type ExecutionResultSettlementPreparedV1 =
+  | TaskResultSettlementPreparedV1
+  | (GoalResultSettlementRefV1 & Omit<TaskResultSettlementPreparedV1, keyof TaskResultSettlementRefV1>);
+export type ExecutionResultSettlementPromptArtifactV1 =
+  | TaskResultSettlementPromptArtifactV1
+  | (GoalResultSettlementRefV1 & Omit<TaskResultSettlementPromptArtifactV1, keyof TaskResultSettlementRefV1>);
+export type ExecutionResultSettlementDispatchV1 =
+  | TaskResultSettlementDispatchV1
+  | (GoalResultSettlementRefV1 & Omit<TaskResultSettlementDispatchV1, keyof TaskResultSettlementRefV1>);
+export type ExecutionResultSettlementActiveClaim = ExecutionResultSettlementActiveClaimV1 | ExecutionResultSettlementActiveClaimV2;
 
 export interface TaskProviderTerminalBillingReceiptV1 extends TaskResultSettlementRefV1 {
   lifecycleVersion: typeof TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION;
@@ -551,10 +601,13 @@ export function settleRunPolicyResultEvidence(input: {
 }
 
 const DOCKER_CONTAINER_PREFIX = 'deckent-w-';
+const DOCKER_GOAL_CONTAINER_PREFIX = 'deckent-g-';
+const GOAL_SETTLEMENT_NAMESPACE = 'goals';
 export const DOCKER_ATTEMPT_LABELS = Object.freeze({
   managed: 'io.deckent.managed',
   project: 'io.deckent.project',
   task: 'io.deckent.task',
+  subject: 'io.deckent.subject',
   attempt: 'io.deckent.attempt',
 } as const);
 
@@ -562,8 +615,13 @@ export function canonicalProjectRoot(projectRoot: string): string {
   try { return realpathSync.native(projectRoot); } catch { return resolve(projectRoot); }
 }
 
-function dockerContainerNameFromAuthority(projectRootSha256: string, taskId: string): string {
-  return `${DOCKER_CONTAINER_PREFIX}${projectRootSha256.slice(0, 12)}-${sha256(taskId).slice(0, 16)}`;
+function dockerContainerNameFromAuthority(projectRootSha256: string, taskId: string, prefix = DOCKER_CONTAINER_PREFIX): string {
+  return `${prefix}${projectRootSha256.slice(0, 12)}-${sha256(taskId).slice(0, 16)}`;
+}
+
+function dockerContainerNameFromSettlement(ref: ExecutionResultSettlementRef): string {
+  return dockerContainerNameFromAuthority(ref.projectRootSha256, settlementCustodyKey(ref),
+    'subject' in ref ? DOCKER_GOAL_CONTAINER_PREFIX : DOCKER_CONTAINER_PREFIX);
 }
 
 /** Docker names are daemon-global, so project and task authority both participate. */
@@ -575,7 +633,7 @@ export function dockerContainerNameForTask(projectRoot: string, taskId: string):
 }
 
 export function dockerAttemptLabels(
-  ref: TaskResultSettlementRefV1,
+  ref: ExecutionResultSettlementRef,
 ): Readonly<Record<string, string>> {
   if (!hasValidRefShape(ref as unknown as Record<string, unknown>)) {
     throw createExecutionAuthorityError('Invalid Docker result settlement reference');
@@ -583,7 +641,7 @@ export function dockerAttemptLabels(
   return Object.freeze({
     [DOCKER_ATTEMPT_LABELS.managed]: 'true',
     [DOCKER_ATTEMPT_LABELS.project]: ref.projectRootSha256,
-    [DOCKER_ATTEMPT_LABELS.task]: sha256(ref.taskId),
+    ['subject' in ref ? DOCKER_ATTEMPT_LABELS.subject : DOCKER_ATTEMPT_LABELS.task]: sha256(settlementCustodyKey(ref)),
     [DOCKER_ATTEMPT_LABELS.attempt]: ref.attemptId,
   });
 }
@@ -592,11 +650,13 @@ function settlementProjectDir(projectRootSha256: string): string {
   return deckentPath(undefined, 'runtime', 'task-result-settlements', projectRootSha256);
 }
 
-function settlementTaskDir(ref: TaskResultSettlementRefV1): string {
-  return resolve(settlementProjectDir(ref.projectRootSha256), sha256(ref.taskId));
+function settlementTaskDir(ref: ExecutionResultSettlementRef): string {
+  const projectDir = settlementProjectDir(ref.projectRootSha256);
+  return resolve('subject' in ref ? resolve(projectDir, GOAL_SETTLEMENT_NAMESPACE) : projectDir,
+    sha256(settlementCustodyKey(ref)));
 }
 
-function settlementAttemptDir(ref: TaskResultSettlementRefV1): string {
+function settlementAttemptDir(ref: ExecutionResultSettlementRef): string {
   if (!hasValidRefShape(ref as unknown as Record<string, unknown>)) {
     throw createExecutionAuthorityError('Invalid Docker result settlement reference');
   }
@@ -617,7 +677,7 @@ function canonicalPathWithMissingLeaf(path: string): string {
   return resolve(canonicalExisting, ...suffix);
 }
 
-function assertHostAuthorityOutsideProject(projectRoot: string, ref: TaskResultSettlementRefV1): void {
+function assertHostAuthorityOutsideProject(projectRoot: string, ref: ExecutionResultSettlementRef): void {
   const root = canonicalProjectRoot(projectRoot);
   const attemptDir = canonicalPathWithMissingLeaf(settlementAttemptDir(ref));
   const rel = relative(root, attemptDir);
@@ -669,7 +729,39 @@ export function assertTaskResultSettlementRef(
   assertHostAuthorityOutsideProject(projectRoot, ref);
 }
 
-export function taskResultSettlementAttemptPath(ref: TaskResultSettlementRefV1): string {
+export function createGoalResultSettlementRefForAttempt(
+  projectRoot: string,
+  subject: GoalExecutionCustodySubjectV1,
+): GoalResultSettlementRefV1 {
+  assertExecutionCustodySubject(subject);
+  const ref: GoalResultSettlementRefV1 = Object.freeze({
+    schemaVersion: TASK_RESULT_SETTLEMENT_SCHEMA_VERSION,
+    backend: 'docker',
+    projectRootSha256: sha256(canonicalProjectRoot(projectRoot)),
+    attemptId: subject.attemptId,
+    subject: Object.freeze({ ...subject }),
+  });
+  assertGoalResultSettlementRef(projectRoot, subject, ref);
+  return ref;
+}
+
+export function assertGoalResultSettlementRef(
+  projectRoot: string,
+  subject: GoalExecutionCustodySubjectV1,
+  ref: GoalResultSettlementRefV1,
+): void {
+  assertExecutionCustodySubject(subject);
+  if (!hasValidRefShape(ref as unknown as Record<string, unknown>)
+    || !('subject' in ref)
+    || subject.kind !== 'goal'
+    || !sameSettlementSubject(ref, { ...ref, subject })
+    || ref.projectRootSha256 !== sha256(canonicalProjectRoot(projectRoot))) {
+    throw createExecutionAuthorityError('Docker result settlement reference does not match project/goal authority');
+  }
+  assertHostAuthorityOutsideProject(projectRoot, ref);
+}
+
+export function taskResultSettlementAttemptPath(ref: ExecutionResultSettlementRef): string {
   return resolve(settlementAttemptDir(ref), 'attempt.json');
 }
 
@@ -677,11 +769,11 @@ export function taskResultSettlementPath(ref: TaskResultSettlementRefV1): string
   return resolve(settlementAttemptDir(ref), 'settled.json');
 }
 
-export function taskResultSettlementPreparedPath(ref: TaskResultSettlementRefV1): string {
+export function taskResultSettlementPreparedPath(ref: ExecutionResultSettlementRef): string {
   return resolve(settlementAttemptDir(ref), 'prepared.json');
 }
 
-export function taskResultSettlementPromptPath(ref: TaskResultSettlementRefV1): string {
+export function taskResultSettlementPromptPath(ref: ExecutionResultSettlementRef): string {
   return resolve(settlementAttemptDir(ref), 'prompt.txt');
 }
 
@@ -720,13 +812,13 @@ export function writeTaskResultSettlementWorkAttributionBaselineAtomic(
 }
 
 export function taskResultSettlementPromptMetadataPath(
-  ref: TaskResultSettlementRefV1,
+  ref: ExecutionResultSettlementRef,
 ): string {
   return resolve(settlementAttemptDir(ref), 'prompt.json');
 }
 
 export function taskResultSettlementExecutionContractPath(
-  ref: TaskResultSettlementRefV1,
+  ref: ExecutionResultSettlementRef,
 ): string {
   return resolve(settlementAttemptDir(ref), 'execution-contract.json');
 }
@@ -737,7 +829,7 @@ export function taskResultSettlementExecutionBudgetAuthorityPath(
   return resolve(settlementAttemptDir(ref), 'execution-budget-authority.json');
 }
 
-export function taskResultSettlementDispatchPath(ref: TaskResultSettlementRefV1): string {
+export function taskResultSettlementDispatchPath(ref: ExecutionResultSettlementRef): string {
   return resolve(settlementAttemptDir(ref), 'dispatch.json');
 }
 
@@ -759,20 +851,20 @@ export function taskProviderTerminalUsageReceiptPath(
   return resolve(settlementAttemptDir(ref), 'provider-terminal-usage.json');
 }
 
-export function taskResultSettlementClosurePath(ref: TaskResultSettlementRefV1): string {
+export function taskResultSettlementClosurePath(ref: ExecutionResultSettlementRef): string {
   return resolve(settlementAttemptDir(ref), 'closure.json');
 }
 
-export function taskResultSettlementLandedRetirementPath(ref: TaskResultSettlementRefV1): string {
+export function taskResultSettlementLandedRetirementPath(ref: ExecutionResultSettlementRef): string {
   return resolve(settlementAttemptDir(ref), 'landed-retirement.json');
 }
 
-function taskResultSettlementClaimsDir(ref: TaskResultSettlementRefV1): string {
+function taskResultSettlementClaimsDir(ref: ExecutionResultSettlementRef): string {
   return resolve(settlementTaskDir(ref), 'claims');
 }
 
 export function taskResultSettlementClaimPath(
-  ref: TaskResultSettlementRefV1,
+  ref: ExecutionResultSettlementRef,
   previousAuthoritySha256: string | null = null,
 ): string {
   if (previousAuthoritySha256 !== null && !/^[a-f0-9]{64}$/.test(previousAuthoritySha256)) {
@@ -798,28 +890,36 @@ function providerBillingDigest(billing: ProviderBillingEvidence): string {
   }));
 }
 
-function sameRef(record: TaskResultSettlementRefV1, ref: TaskResultSettlementRefV1): boolean {
+function sameRef(record: ExecutionResultSettlementRef, ref: ExecutionResultSettlementRef): boolean {
   return record.schemaVersion === ref.schemaVersion
-    && record.taskId === ref.taskId
+    && sameSettlementSubject(record, ref)
     && record.backend === ref.backend
     && record.projectRootSha256 === ref.projectRootSha256
     && record.attemptId === ref.attemptId;
 }
 
 function hasValidRefShape(record: Record<string, unknown>): boolean {
-  return record.schemaVersion === TASK_RESULT_SETTLEMENT_SCHEMA_VERSION
-    && typeof record.taskId === 'string'
-    && record.taskId.length > 0
-    && record.backend === 'docker'
-    && typeof record.projectRootSha256 === 'string'
-    && /^[a-f0-9]{64}$/.test(record.projectRootSha256)
-    && typeof record.attemptId === 'string'
-    && /^[0-9a-f-]{36}$/i.test(record.attemptId);
+  if (record.schemaVersion !== TASK_RESULT_SETTLEMENT_SCHEMA_VERSION
+    || record.backend !== 'docker'
+    || typeof record.projectRootSha256 !== 'string'
+    || !/^[a-f0-9]{64}$/.test(record.projectRootSha256)
+    || typeof record.attemptId !== 'string'
+    || !/^[0-9a-f-]{36}$/i.test(record.attemptId)) return false;
+  if (!('subject' in record)) return typeof record.taskId === 'string' && record.taskId.length > 0;
+  if ('taskId' in record) return false;
+  try {
+    assertExecutionCustodySubject(record.subject);
+    return record.subject.kind === 'goal'
+      && record.subject.attemptId === record.attemptId
+      && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(record.attemptId);
+  } catch {
+    return false;
+  }
 }
 
 function hasExactAttemptLabels(
   value: unknown,
-  ref: TaskResultSettlementRefV1,
+  ref: ExecutionResultSettlementRef,
 ): value is Readonly<Record<string, string>> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const labels = value as Record<string, unknown>;
@@ -830,9 +930,9 @@ function hasExactAttemptLabels(
 
 function hasValidContainerIdentity(
   record: Record<string, unknown>,
-  ref: TaskResultSettlementRefV1,
+  ref: ExecutionResultSettlementRef,
 ): boolean {
-  return record.containerName === dockerContainerNameFromAuthority(ref.projectRootSha256, ref.taskId)
+  return record.containerName === dockerContainerNameFromSettlement(ref)
     && typeof record.model === 'string'
     && record.model.length > 0
     && hasExactAttemptLabels(record.labels, ref);
@@ -857,9 +957,9 @@ export function createTaskResultSettlement(input: {
   };
 }
 
-export function parseTaskResultSettlementAttempt(
+function parseExecutionResultSettlementAttempt(
   value: unknown,
-): TaskResultSettlementAttemptV1 | null {
+): ExecutionResultSettlementAttemptV1 | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   if (
@@ -867,12 +967,17 @@ export function parseTaskResultSettlementAttempt(
     || record.state !== 'pending'
     || typeof record.createdAt !== 'string'
   ) return null;
-  return record as unknown as TaskResultSettlementAttemptV1;
+  return record as unknown as ExecutionResultSettlementAttemptV1;
 }
 
-export function parseTaskResultSettlementActiveClaim(
+export function parseTaskResultSettlementAttempt(value: unknown): TaskResultSettlementAttemptV1 | null {
+  const parsed = parseExecutionResultSettlementAttempt(value);
+  return parsed && !('subject' in parsed) ? parsed : null;
+}
+
+function parseExecutionResultSettlementActiveClaim(
   value: unknown,
-): TaskResultSettlementActiveClaim | null {
+): ExecutionResultSettlementActiveClaim | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   const predecessorValid = typeof record.previousAuthoritySha256 === 'string'
@@ -884,7 +989,7 @@ export function parseTaskResultSettlementActiveClaim(
     && typeof record.claimedAt === 'string'
     && predecessorValid
   ) {
-    return record as unknown as TaskResultSettlementActiveClaimV2;
+    return record as unknown as ExecutionResultSettlementActiveClaimV2;
   }
   if (
     !hasValidRefShape(record)
@@ -895,7 +1000,12 @@ export function parseTaskResultSettlementActiveClaim(
       && (typeof record.previousClosureSha256 !== 'string'
         || !/^[a-f0-9]{64}$/.test(record.previousClosureSha256)))
   ) return null;
-  return record as unknown as TaskResultSettlementActiveClaimV1;
+  return record as unknown as ExecutionResultSettlementActiveClaimV1;
+}
+
+export function parseTaskResultSettlementActiveClaim(value: unknown): TaskResultSettlementActiveClaim | null {
+  const parsed = parseExecutionResultSettlementActiveClaim(value);
+  return parsed && !('subject' in parsed) ? parsed : null;
 }
 
 export function parseTaskResultSettlementLandedRetirement(
@@ -904,7 +1014,7 @@ export function parseTaskResultSettlementLandedRetirement(
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   if (
-    !hasValidRefShape(record)
+    ('subject' in record) || !hasValidRefShape(record)
     || record.lifecycleVersion !== TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION_V2
     || record.state !== 'retired-landed'
     || typeof record.retiredAt !== 'string'
@@ -917,12 +1027,12 @@ export function parseTaskResultSettlementLandedRetirement(
   return record as unknown as TaskResultSettlementLandedRetirementV1;
 }
 
-export function parseTaskResultSettlementPrepared(
+function parseExecutionResultSettlementPrepared(
   value: unknown,
-): TaskResultSettlementPreparedV1 | null {
+): ExecutionResultSettlementPreparedV1 | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
-  const ref = record as unknown as TaskResultSettlementRefV1;
+  const ref = record as unknown as ExecutionResultSettlementRef;
   if (
     !hasValidRefShape(record)
     || record.lifecycleVersion !== TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION
@@ -930,15 +1040,20 @@ export function parseTaskResultSettlementPrepared(
     || typeof record.preparedAt !== 'string'
     || !hasValidContainerIdentity(record, ref)
   ) return null;
-  return record as unknown as TaskResultSettlementPreparedV1;
+  return record as unknown as ExecutionResultSettlementPreparedV1;
 }
 
-export function parseTaskResultSettlementDispatch(
+export function parseTaskResultSettlementPrepared(value: unknown): TaskResultSettlementPreparedV1 | null {
+  const parsed = parseExecutionResultSettlementPrepared(value);
+  return parsed && !('subject' in parsed) ? parsed : null;
+}
+
+function parseExecutionResultSettlementDispatch(
   value: unknown,
-): TaskResultSettlementDispatchV1 | null {
+): ExecutionResultSettlementDispatchV1 | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
-  const ref = record as unknown as TaskResultSettlementRefV1;
+  const ref = record as unknown as ExecutionResultSettlementRef;
   if (
     !hasValidRefShape(record)
     || record.lifecycleVersion !== TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION
@@ -950,7 +1065,12 @@ export function parseTaskResultSettlementDispatch(
     || !/^[a-f0-9]{64}$/.test(record.preparedSha256)
     || !hasValidContainerIdentity(record, ref)
   ) return null;
-  return record as unknown as TaskResultSettlementDispatchV1;
+  return record as unknown as ExecutionResultSettlementDispatchV1;
+}
+
+export function parseTaskResultSettlementDispatch(value: unknown): TaskResultSettlementDispatchV1 | null {
+  const parsed = parseExecutionResultSettlementDispatch(value);
+  return parsed && !('subject' in parsed) ? parsed : null;
 }
 
 export function parseTaskProviderTerminalBillingReceipt(
@@ -962,7 +1082,7 @@ export function parseTaskProviderTerminalBillingReceipt(
   if (!billing || typeof billing !== 'object' || Array.isArray(billing)) return null;
   const evidence = billing as Record<string, unknown>;
   if (
-    !hasValidRefShape(record)
+    ('subject' in record) || !hasValidRefShape(record)
     || record.lifecycleVersion !== TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION
     || record.state !== 'provider-terminal-billing'
     || typeof record.observedAt !== 'string'
@@ -1024,7 +1144,7 @@ function isNonNegativeSafeInt(value: unknown): boolean {
 }
 
 function actualCallCommonShapeInvalid(record: Record<string, unknown>): boolean {
-  return !hasValidRefShape(record)
+  return ('subject' in record) || !hasValidRefShape(record)
     || record.lifecycleVersion !== TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION
     || record.state !== 'provider-actual-call'
     || typeof record.observedAt !== 'string'
@@ -1076,7 +1196,7 @@ export function parseTaskProviderTerminalUsageReceipt(
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   if (
-    !hasValidRefShape(record)
+    ('subject' in record) || !hasValidRefShape(record)
     || record.lifecycleVersion !== TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION
     || record.state !== 'provider-terminal-usage'
     || typeof record.observedAt !== 'string'
@@ -1099,7 +1219,7 @@ export function parseTaskResultSettlementClosure(
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   if (
-    !hasValidRefShape(record)
+    ('subject' in record) || !hasValidRefShape(record)
     || record.lifecycleVersion !== TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION
     || record.state !== 'closed'
     || typeof record.closedAt !== 'string'
@@ -1116,7 +1236,7 @@ export function parseTaskResultSettlement(value: unknown): TaskResultSettlementV
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   if (
-    !hasValidRefShape(record)
+    ('subject' in record) || !hasValidRefShape(record)
     || record.state !== 'settled'
     || typeof record.settledAt !== 'string'
     || (record.exitCode !== null && (typeof record.exitCode !== 'number' || !Number.isInteger(record.exitCode)))
@@ -1219,15 +1339,15 @@ function deepFreeze<T>(value: T): Readonly<T> {
 
 /** Persist the exact attempt before any provider/backend side effect. */
 export function writeTaskResultSettlementAttemptAtomic(
-  ref: TaskResultSettlementRefV1,
+  ref: ExecutionResultSettlementRef,
   createdAt: string = new Date().toISOString(),
 ): void {
-  const attempt: TaskResultSettlementAttemptV1 = { ...ref, state: 'pending', createdAt };
+  const attempt: ExecutionResultSettlementAttemptV1 = { ...ref, state: 'pending', createdAt };
   publishJsonFirstWriter(
     taskResultSettlementAttemptPath(ref),
     attempt,
     (existing) => {
-      const parsed = parseTaskResultSettlementAttempt(existing);
+      const parsed = parseExecutionResultSettlementAttempt(existing);
       return parsed !== null && sameRef(parsed, ref);
     },
   );
@@ -1246,7 +1366,7 @@ function parseTaskResultSettlementExecutionBudgetAuthority(
   const record = value as TaskResultSettlementExecutionBudgetAuthorityV1;
   try {
     if (
-      !hasValidRefShape(record as unknown as Record<string, unknown>)
+      ('subject' in record) || !hasValidRefShape(record as unknown as Record<string, unknown>)
       || record.lifecycleVersion !== TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION
       || record.state !== 'execution-budget-authority'
       || typeof record.writtenAt !== 'string'
@@ -1347,10 +1467,10 @@ export function readTaskResultSettlementExecutionBudgetAuthority(
 }
 
 export function writeTaskResultSettlementExecutionContractAtomic(
-  ref: TaskResultSettlementRefV1,
+  ref: ExecutionResultSettlementRef,
   contract: Readonly<CrossVerifyEnforcedAttemptContract>,
 ): Readonly<CrossVerifyEnforcedAttemptContract> {
-  const attempt = parseTaskResultSettlementAttempt(readJson(taskResultSettlementAttemptPath(ref)));
+  const attempt = parseExecutionResultSettlementAttempt(readJson(taskResultSettlementAttemptPath(ref)));
   if (!attempt || !sameRef(attempt, ref)) {
     throw createExecutionAuthorityError(
       'Docker execution contract authority has no matching durable pending attempt',
@@ -1387,7 +1507,7 @@ export function writeTaskResultSettlementExecutionContractAtomic(
 }
 
 export function readTaskResultSettlementExecutionContract(
-  ref: TaskResultSettlementRefV1,
+  ref: ExecutionResultSettlementRef,
 ): Readonly<CrossVerifyEnforcedAttemptContract> | null {
   const path = taskResultSettlementExecutionContractPath(ref);
   try {
@@ -1404,9 +1524,9 @@ export function readTaskResultSettlementExecutionContract(
   }
 }
 
-function parseTaskResultSettlementPromptArtifact(
+function parseExecutionResultSettlementPromptArtifact(
   value: unknown,
-): TaskResultSettlementPromptArtifactV1 | null {
+): ExecutionResultSettlementPromptArtifactV1 | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   if (
@@ -1421,15 +1541,25 @@ function parseTaskResultSettlementPromptArtifact(
     || !Number.isSafeInteger(record.byteLength)
     || record.byteLength < 0
   ) return null;
-  return record as unknown as TaskResultSettlementPromptArtifactV1;
+  return record as unknown as ExecutionResultSettlementPromptArtifactV1;
 }
 
 export function writeTaskResultSettlementPromptAtomic(
   ref: TaskResultSettlementRefV1,
   prompt: string,
+  preparedAt?: string,
+): TaskResultSettlementPromptArtifactV1;
+export function writeTaskResultSettlementPromptAtomic(
+  ref: ExecutionResultSettlementRef,
+  prompt: string,
+  preparedAt?: string,
+): ExecutionResultSettlementPromptArtifactV1;
+export function writeTaskResultSettlementPromptAtomic(
+  ref: ExecutionResultSettlementRef,
+  prompt: string,
   preparedAt: string = new Date().toISOString(),
-): TaskResultSettlementPromptArtifactV1 {
-  const attempt = parseTaskResultSettlementAttempt(readJson(taskResultSettlementAttemptPath(ref)));
+): ExecutionResultSettlementPromptArtifactV1 {
+  const attempt = parseExecutionResultSettlementAttempt(readJson(taskResultSettlementAttemptPath(ref)));
   if (!attempt || !sameRef(attempt, ref)) {
     throw createExecutionAuthorityError(
       'Docker prompt authority has no matching durable pending attempt',
@@ -1439,7 +1569,7 @@ export function writeTaskResultSettlementPromptAtomic(
     throw createExecutionAuthorityError('Docker prompt preparedAt is not a timestamp');
   }
   const bytes = Buffer.from(prompt, 'utf-8');
-  const artifact: TaskResultSettlementPromptArtifactV1 = {
+  const artifact: ExecutionResultSettlementPromptArtifactV1 = {
     ...ref,
     lifecycleVersion: TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION,
     state: 'prompt-prepared',
@@ -1452,7 +1582,7 @@ export function writeTaskResultSettlementPromptAtomic(
     taskResultSettlementPromptMetadataPath(ref),
     artifact,
     (existing) => {
-      const parsed = parseTaskResultSettlementPromptArtifact(existing);
+      const parsed = parseExecutionResultSettlementPromptArtifact(existing);
       return parsed !== null
         && sameRef(parsed, ref)
         && parsed.promptSha256 === artifact.promptSha256
@@ -1471,8 +1601,14 @@ export function writeTaskResultSettlementPromptAtomic(
 
 export function readTaskResultSettlementPrompt(
   ref: TaskResultSettlementRefV1,
-): TaskResultSettlementPromptArtifactV1 | null {
-  const artifact = parseTaskResultSettlementPromptArtifact(
+): TaskResultSettlementPromptArtifactV1 | null;
+export function readTaskResultSettlementPrompt(
+  ref: ExecutionResultSettlementRef,
+): ExecutionResultSettlementPromptArtifactV1 | null;
+export function readTaskResultSettlementPrompt(
+  ref: ExecutionResultSettlementRef,
+): ExecutionResultSettlementPromptArtifactV1 | null {
+  const artifact = parseExecutionResultSettlementPromptArtifact(
     readJson(taskResultSettlementPromptMetadataPath(ref)),
   );
   if (!artifact || !sameRef(artifact, ref)) return null;
@@ -1492,9 +1628,9 @@ export function readTaskResultSettlementPrompt(
 }
 
 export function taskResultSettlementPromptEvidenceRef(
-  artifact: TaskResultSettlementPromptArtifactV1,
+  artifact: ExecutionResultSettlementPromptArtifactV1,
 ): string {
-  const parsed = parseTaskResultSettlementPromptArtifact(artifact);
+  const parsed = parseExecutionResultSettlementPromptArtifact(artifact);
   if (!parsed) throw createExecutionAuthorityError('Invalid Docker prompt evidence');
   return `task-result-prompt:${sha256(JSON.stringify(parsed))}`;
 }
@@ -1511,11 +1647,11 @@ function landedRetirementDigest(retirement: TaskResultSettlementLandedRetirement
   return sha256(JSON.stringify(retirement));
 }
 
-function preparedDigest(prepared: TaskResultSettlementPreparedV1): string {
+function preparedDigest(prepared: ExecutionResultSettlementPreparedV1): string {
   return sha256(JSON.stringify(prepared));
 }
 
-function claimPredecessorSha256(claim: TaskResultSettlementActiveClaim): string | null {
+function claimPredecessorSha256(claim: ExecutionResultSettlementActiveClaim): string | null {
   return claim.lifecycleVersion === TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION_V2
     ? claim.previousAuthoritySha256
     : claim.previousClosureSha256;
@@ -1570,9 +1706,25 @@ function resolveTaskResultSettlementClaimChain(
   latest: TaskResultSettlementActiveClaim | null;
   nextPreviousAuthoritySha256: string | null;
   closedAttemptIds: ReadonlySet<string>;
+};
+function resolveTaskResultSettlementClaimChain(
+  ref: ExecutionResultSettlementRef,
+): {
+  active: ExecutionResultSettlementActiveClaim | null;
+  latest: ExecutionResultSettlementActiveClaim | null;
+  nextPreviousAuthoritySha256: string | null;
+  closedAttemptIds: ReadonlySet<string>;
+};
+function resolveTaskResultSettlementClaimChain(
+  ref: ExecutionResultSettlementRef,
+): {
+  active: ExecutionResultSettlementActiveClaim | null;
+  latest: ExecutionResultSettlementActiveClaim | null;
+  nextPreviousAuthoritySha256: string | null;
+  closedAttemptIds: ReadonlySet<string>;
 } {
   let previousAuthoritySha256: string | null = null;
-  let latest: TaskResultSettlementActiveClaim | null = null;
+  let latest: ExecutionResultSettlementActiveClaim | null = null;
   const closedAttemptIds = new Set<string>();
   const seenClaimPaths = new Set<string>();
   for (let depth = 0; depth < 1024; depth++) {
@@ -1584,11 +1736,11 @@ function resolveTaskResultSettlementClaimChain(
     if (!existsSync(claimPath)) {
       return { active: null, latest, nextPreviousAuthoritySha256: previousAuthoritySha256, closedAttemptIds };
     }
-    const claim = parseTaskResultSettlementActiveClaim(readJson(claimPath));
+    const claim = parseExecutionResultSettlementActiveClaim(readJson(claimPath));
     if (
       !claim
       || claim.projectRootSha256 !== ref.projectRootSha256
-      || claim.taskId !== ref.taskId
+      || !sameSettlementSubject(claim, ref)
       || claimPredecessorSha256(claim) !== previousAuthoritySha256
     ) {
       throw createExecutionAuthorityError(`Corrupt Docker result settlement claim chain: ${claimPath}`);
@@ -1600,11 +1752,14 @@ function resolveTaskResultSettlementClaimChain(
     const hasLandedRetirement = existsSync(landedRetirementPath);
     if (hasClosure && hasLandedRetirement) {
       throw createExecutionAuthorityError(
-        `Conflicting terminal and LANDED Docker result settlement authorities: ${claim.taskId}/${claim.attemptId}`,
+        `Conflicting terminal and LANDED Docker result settlement authorities: ${settlementCustodyKey(claim)}/${claim.attemptId}`,
       );
     }
     if (!hasClosure && !hasLandedRetirement) {
       return { active: claim, latest, nextPreviousAuthoritySha256: previousAuthoritySha256, closedAttemptIds };
+    }
+    if ('subject' in claim) {
+      throw createExecutionAuthorityError('Goal settlement terminal claim authority is not supported by the task closure reader');
     }
     let nextAuthoritySha256: string;
     if (hasClosure) {
@@ -1628,13 +1783,19 @@ function resolveTaskResultSettlementClaimChain(
 
 export function readTaskResultSettlementActiveClaim(
   ref: TaskResultSettlementRefV1,
-): TaskResultSettlementActiveClaim | null {
+): TaskResultSettlementActiveClaim | null;
+export function readTaskResultSettlementActiveClaim(
+  ref: ExecutionResultSettlementRef,
+): ExecutionResultSettlementActiveClaim | null;
+export function readTaskResultSettlementActiveClaim(
+  ref: ExecutionResultSettlementRef,
+): ExecutionResultSettlementActiveClaim | null {
   return resolveTaskResultSettlementClaimChain(ref).active;
 }
 
 /** Immutable fence identity consumed by host-owned landing checkpoints. */
 export function taskResultSettlementActiveClaimDigest(
-  ref: TaskResultSettlementRefV1,
+  ref: ExecutionResultSettlementRef,
 ): string {
   const claim = readTaskResultSettlementActiveClaim(ref);
   if (!claim || !sameRef(claim, ref)) {
@@ -1654,7 +1815,7 @@ export function taskResultSettlementActiveClaimDigest(
  * no claim matches the exact ref.
  */
 export function taskResultSettlementDurableClaimFence(
-  ref: TaskResultSettlementRefV1,
+  ref: ExecutionResultSettlementRef,
 ): { readonly fenceTokenHash: string; readonly claimedAt: string } | null {
   const chain = resolveTaskResultSettlementClaimChain(ref);
   const claim = chain.active ?? chain.latest;
@@ -1699,13 +1860,13 @@ export function readLatestTaskResultSettlementRef(
  * next first-writer-wins slot, so no actor ever unlinks a newer owner's claim.
  */
 export function claimTaskResultSettlementAttemptAtomic(
-  ref: TaskResultSettlementRefV1,
+  ref: ExecutionResultSettlementRef,
   claimedAt: string = new Date().toISOString(),
 ): 'claimed' | 'adopted' {
   if (!hasValidRefShape(ref as unknown as Record<string, unknown>)) {
     throw createExecutionAuthorityError('Invalid Docker result settlement reference');
   }
-  const attempt = parseTaskResultSettlementAttempt(readJson(taskResultSettlementAttemptPath(ref)));
+  const attempt = parseExecutionResultSettlementAttempt(readJson(taskResultSettlementAttemptPath(ref)));
   if (!attempt || !sameRef(attempt, ref)) {
     throw createExecutionAuthorityError('Docker result settlement claim has no matching durable pending attempt');
   }
@@ -1714,11 +1875,11 @@ export function claimTaskResultSettlementAttemptAtomic(
   if (chain.active) {
     if (sameRef(chain.active, ref)) return 'adopted';
     throw createExecutionAuthorityError(
-      `Conflicting active Docker result settlement attempt: ${chain.active.taskId}/${chain.active.attemptId}`,
+      `Conflicting active Docker result settlement attempt: ${settlementCustodyKey(chain.active)}/${chain.active.attemptId}`,
     );
   }
 
-  const claim: TaskResultSettlementActiveClaim = chain.nextPreviousAuthoritySha256 === null
+  const claim: ExecutionResultSettlementActiveClaim = chain.nextPreviousAuthoritySha256 === null
     ? {
         ...ref,
         lifecycleVersion: TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION,
@@ -1737,7 +1898,7 @@ export function claimTaskResultSettlementAttemptAtomic(
     taskResultSettlementClaimPath(ref, chain.nextPreviousAuthoritySha256),
     claim,
     (existing) => {
-      const parsed = parseTaskResultSettlementActiveClaim(existing);
+      const parsed = parseExecutionResultSettlementActiveClaim(existing);
       return parsed !== null
         && sameRef(parsed, ref)
         && claimPredecessorSha256(parsed) === chain.nextPreviousAuthoritySha256;
@@ -1746,8 +1907,8 @@ export function claimTaskResultSettlementAttemptAtomic(
   return published ? 'claimed' : 'adopted';
 }
 
-function assertPendingAttemptAndClaim(ref: TaskResultSettlementRefV1): void {
-  const attempt = parseTaskResultSettlementAttempt(readJson(taskResultSettlementAttemptPath(ref)));
+function assertPendingAttemptAndClaim(ref: ExecutionResultSettlementRef): void {
+  const attempt = parseExecutionResultSettlementAttempt(readJson(taskResultSettlementAttemptPath(ref)));
   const claim = readTaskResultSettlementActiveClaim(ref);
   if (!attempt || !sameRef(attempt, ref) || !claim || !sameRef(claim, ref)) {
     throw createExecutionAuthorityError('Docker dispatch metadata has no matching durable pending attempt claim');
@@ -1757,16 +1918,26 @@ function assertPendingAttemptAndClaim(ref: TaskResultSettlementRefV1): void {
 export function writeTaskResultSettlementPreparedAtomic(
   ref: TaskResultSettlementRefV1,
   model: string,
+  preparedAt?: string,
+): TaskResultSettlementPreparedV1;
+export function writeTaskResultSettlementPreparedAtomic(
+  ref: ExecutionResultSettlementRef,
+  model: string,
+  preparedAt?: string,
+): ExecutionResultSettlementPreparedV1;
+export function writeTaskResultSettlementPreparedAtomic(
+  ref: ExecutionResultSettlementRef,
+  model: string,
   preparedAt: string = new Date().toISOString(),
-): TaskResultSettlementPreparedV1 {
+): ExecutionResultSettlementPreparedV1 {
   assertPendingAttemptAndClaim(ref);
   if (!model.trim()) throw createExecutionAuthorityError('Docker dispatch model identity must be non-empty');
-  const prepared: TaskResultSettlementPreparedV1 = {
+  const prepared: ExecutionResultSettlementPreparedV1 = {
     ...ref,
     lifecycleVersion: TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION,
     state: 'prepared',
     preparedAt,
-    containerName: dockerContainerNameFromAuthority(ref.projectRootSha256, ref.taskId),
+    containerName: dockerContainerNameFromSettlement(ref),
     model,
     labels: dockerAttemptLabels(ref),
   };
@@ -1774,7 +1945,7 @@ export function writeTaskResultSettlementPreparedAtomic(
     taskResultSettlementPreparedPath(ref),
     prepared,
     (existing) => {
-      const parsed = parseTaskResultSettlementPrepared(existing);
+      const parsed = parseExecutionResultSettlementPrepared(existing);
       return parsed !== null
         && sameRef(parsed, ref)
         && parsed.model === prepared.model
@@ -1786,20 +1957,36 @@ export function writeTaskResultSettlementPreparedAtomic(
 
 export function readTaskResultSettlementPrepared(
   ref: TaskResultSettlementRefV1,
-): TaskResultSettlementPreparedV1 | null {
-  const prepared = parseTaskResultSettlementPrepared(readJson(taskResultSettlementPreparedPath(ref)));
+): TaskResultSettlementPreparedV1 | null;
+export function readTaskResultSettlementPrepared(
+  ref: ExecutionResultSettlementRef,
+): ExecutionResultSettlementPreparedV1 | null;
+export function readTaskResultSettlementPrepared(
+  ref: ExecutionResultSettlementRef,
+): ExecutionResultSettlementPreparedV1 | null {
+  const prepared = parseExecutionResultSettlementPrepared(readJson(taskResultSettlementPreparedPath(ref)));
   return prepared && sameRef(prepared, ref) ? prepared : null;
 }
 
 export function writeTaskResultSettlementDispatchAtomic(
   ref: TaskResultSettlementRefV1,
   containerId: string,
+  dispatchedAt?: string,
+): TaskResultSettlementDispatchV1;
+export function writeTaskResultSettlementDispatchAtomic(
+  ref: ExecutionResultSettlementRef,
+  containerId: string,
+  dispatchedAt?: string,
+): ExecutionResultSettlementDispatchV1;
+export function writeTaskResultSettlementDispatchAtomic(
+  ref: ExecutionResultSettlementRef,
+  containerId: string,
   dispatchedAt: string = new Date().toISOString(),
-): TaskResultSettlementDispatchV1 {
+): ExecutionResultSettlementDispatchV1 {
   assertPendingAttemptAndClaim(ref);
   const prepared = readTaskResultSettlementPrepared(ref);
   if (!prepared) throw createExecutionAuthorityError('Docker dispatch has no matching immutable prepared metadata');
-  const dispatch: TaskResultSettlementDispatchV1 = {
+  const dispatch: ExecutionResultSettlementDispatchV1 = {
     ...ref,
     lifecycleVersion: TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION,
     state: 'dispatched',
@@ -1810,14 +1997,14 @@ export function writeTaskResultSettlementDispatchAtomic(
     labels: prepared.labels,
     preparedSha256: preparedDigest(prepared),
   };
-  if (!parseTaskResultSettlementDispatch(dispatch)) {
+  if (!parseExecutionResultSettlementDispatch(dispatch)) {
     throw createExecutionAuthorityError('Invalid Docker dispatch container identity');
   }
   publishJsonFirstWriter(
     taskResultSettlementDispatchPath(ref),
     dispatch,
     (existing) => {
-      const parsed = parseTaskResultSettlementDispatch(existing);
+      const parsed = parseExecutionResultSettlementDispatch(existing);
       return parsed !== null
         && sameRef(parsed, ref)
         && parsed.containerId === dispatch.containerId
@@ -1829,8 +2016,14 @@ export function writeTaskResultSettlementDispatchAtomic(
 
 export function readTaskResultSettlementDispatch(
   ref: TaskResultSettlementRefV1,
-): TaskResultSettlementDispatchV1 | null {
-  const dispatch = parseTaskResultSettlementDispatch(readJson(taskResultSettlementDispatchPath(ref)));
+): TaskResultSettlementDispatchV1 | null;
+export function readTaskResultSettlementDispatch(
+  ref: ExecutionResultSettlementRef,
+): ExecutionResultSettlementDispatchV1 | null;
+export function readTaskResultSettlementDispatch(
+  ref: ExecutionResultSettlementRef,
+): ExecutionResultSettlementDispatchV1 | null {
+  const dispatch = parseExecutionResultSettlementDispatch(readJson(taskResultSettlementDispatchPath(ref)));
   if (!dispatch || !sameRef(dispatch, ref)) return null;
   const prepared = readTaskResultSettlementPrepared(ref);
   return prepared && dispatch.preparedSha256 === preparedDigest(prepared) ? dispatch : null;
@@ -2214,7 +2407,7 @@ function parseTaskVerificationIsolationHoldReceipt(
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   if (
-    !hasValidRefShape(record)
+    ('subject' in record) || !hasValidRefShape(record)
     || record.lifecycleVersion !== TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION
     || record.state !== 'verification-isolation-hold'
     || typeof record.observedAt !== 'string'
@@ -2592,6 +2785,9 @@ export function listPendingTaskResultSettlementAttempts(
 
   const pending: PendingTaskResultSettlementAttemptV1[] = [];
   for (const taskDirName of readdirSync(projectDir)) {
+    // Goal attempts have their own reserved subtree. Real task directories
+    // retain the same strict UUID-attempt corruption checks below.
+    if (taskDirName === GOAL_SETTLEMENT_NAMESPACE) continue;
     const taskDir = resolve(projectDir, taskDirName);
     let attemptNames: string[];
     try { attemptNames = readdirSync(taskDir); } catch { continue; }
