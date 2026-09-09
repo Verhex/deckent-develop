@@ -383,6 +383,14 @@ describe('560-006 · incident-shaped hermetic battery (11/11 regression proofs)'
     };
   }
 
+  it('does not relabel unrelated preparation faults as preamble budget exhaustion',async()=>{
+    const deps=loopDeps(scriptedLoopAdapter([]));
+    const fault=new Error('unexpected composition fault');
+    deps.getContextBudgetTokens=()=>32768;
+    deps.preambleBudgeter={snapshot:()=>undefined,observeToolResult:()=>{},prepare:async()=>{throw fault;}};
+    await expect(drainAll(runAgentTurn(deps,new Transcript(),'go'))).rejects.toBe(fault);
+  });
+
   describe('3 — reasoning + length + empty-visible collapses to one visible answer', () => {
     it('recovers reasoning-only length into one visible answer without exposing reasoning', async () => {
       const events = await drainAll<AgentEvent>(runAgentTurn(loopDeps(scriptedLoopAdapter([
@@ -1084,6 +1092,37 @@ describe('560-006 · incident-shaped hermetic battery (11/11 regression proofs)'
       const text = out.join('');
       expect(text).toContain(getMessage('native-output.continuation-exhausted', 'en'));
       expect(text).not.toContain(getMessage('native-context.admission-denied', 'en'));
+    });
+
+    it('an impossible five-token preamble produces a distinct localized hold before transcript recovery', async () => {
+      const adapter = scriptedNativeAdapter([]);
+      const out: string[] = [];
+      const nativeBudget = {
+        maxModelRounds: 20,
+        maxToolCalls: 50,
+        maxWallTimeMs: 600_000,
+        maxCumulativeTokens: 1_000_000,
+        maxNoProgressRounds: 10,
+        checkpointEveryRounds: 100_000,
+        checkpointEveryToolCalls: 100_000,
+        outputReserveTokens: 16,
+        contextSafetyReserveTokens: 16,
+      };
+      const engine = createNativeEngine({
+        adapter, registry: buildNativeToolRegistry({ cwd: () => tmpdir() }), cwd: tmpdir(), model: 'm', lang: 'en',
+        confirm: async () => 'y', toolSink: () => {},
+        t: (k) => getMessage(k, 'en'),
+        nativeBudget,
+        getContextBudgetTokens: () => 5,
+      });
+      await engine('go', { output: (t) => out.push(t), onTurnEnd: () => {} });
+      const text = out.join('');
+      expect(text).toContain(getMessage('native.PREAMBLE_CONTEXT_BUDGET_EXHAUSTED', 'en'));
+      expect(text).not.toContain(getMessage('native-context.admission-denied', 'en'));
+      expect(text).not.toContain(getMessage('native-context.checkpoint_token_pressure', 'en'));
+      expect(text).not.toContain(getMessage('native-output.continuation-exhausted', 'en'));
+      expect(text).not.toContain(getMessage('native.output-ceiling-reached', 'en'));
+      expect(text).not.toContain(getMessage('native.empty-visible-with-reasoning', 'en'));
     });
 
     it('INPUT_CONTEXT_OVERFLOW + MEASURED_CONTEXT_PRESSURE end-to-end: overflowed context renders measured-pressure checkpoint and terminal overflow notice', async () => {

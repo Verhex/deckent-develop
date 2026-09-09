@@ -3757,6 +3757,18 @@ const BASE_MESSAGES: MessageMap = {
   // must never read like a context-window overflow, and vice versa. Only the
   // INPUT_CONTEXT_OVERFLOW line below claims the context window is full; every
   // output-side line explicitly says it is NOT that, by construction.
+  'native.PREAMBLE_CONTEXT_BUDGET_EXHAUSTED': {
+    en: 'The reduced preamble cannot fit while preserving transcript, output and safety reserves. Review execution_budget.native_agent.minTranscriptShareOfContext, outputReserveTokens and contextSafetyReserveTokens, or increase the model context window. maxPreambleShareOfContext controls the target share; raising it alone cannot resolve a reserve conflict.',
+    tr: 'Küçültülmüş preamble, transcript, çıktı ve güvenlik rezervleri korunarak sığmıyor. execution_budget.native_agent.minTranscriptShareOfContext, outputReserveTokens ve contextSafetyReserveTokens ayarlarını inceleyin veya model context penceresini büyütün. maxPreambleShareOfContext hedef payı belirler; tek başına yükseltmek rezerv çakışmasını çözmez.',
+  },
+  'native-context.slash.preamble_floor_admitted': {
+    en: 'preamble share exceeded, floor admitted; transcript and output reserves preserved',
+    tr: 'preamble hedef payı aşıldı, taban kabul edildi; transcript ve çıktı rezervleri korundu',
+  },
+  'native-context.slash.preamble_budget': {
+    en: 'preamble: {tokens}/{limit} budget ({percent}% of window) · {tools} tool schemas',
+    tr: 'ön metin: {tokens}/{limit} bütçe (pencerenin %{percent} kadarı) · {tools} araç şeması',
+  },
   'native-context.slash.trigger': { en: 'last compaction trigger: {trigger}', tr: 'son sıkıştırma tetikleyicisi: {trigger}' },
   'native-context.trigger.token_pressure': { en: 'measured context pressure', tr: 'ölçülmüş bağlam baskısı' },
   'native-context.trigger.overflow': { en: 'input overflow recovery', tr: 'girdi taşması kurtarması' },

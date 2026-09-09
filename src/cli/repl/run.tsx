@@ -815,6 +815,8 @@ export interface ContextSlashLabels extends NativeRequestMetricLabels {
   epoch: string;          // "epoch: {epoch}"
   messages: string;       // "messages: {messages} · checkpoint preamble: {preamble}"
   checkpoint: string;     // "checkpoint: {status}"
+  preambleBudget?: string;
+  preambleFloorAdmitted?: string;
   contextTrigger?: string;
   contextTriggers?: Record<NonNullable<ContextSnapshot['lastContextTrigger']>, string>;
   highWater: string;      // "auto-compaction at {percent}% of the window"
@@ -835,6 +837,8 @@ export function buildContextSlashLabels(t: (key: string) => string): ContextSlas
     epoch: t('native-context.slash.epoch'),
     messages: t('native-context.slash.messages'),
     checkpoint: t('native-context.slash.checkpoint'),
+    preambleBudget: t('native-context.slash.preamble_budget'),
+    preambleFloorAdmitted: t('native-context.slash.preamble_floor_admitted'),
     contextTrigger: t('native-context.slash.trigger'),
     contextTriggers: {
       'token-pressure': t('native-context.trigger.token_pressure'),
@@ -884,6 +888,15 @@ export function formatContextSnapshot(snapshot: ContextSnapshot, labels: Context
   lines.push(`  ${labels.messages.replace('{messages}', String(snapshot.messages)).replace('{preamble}', String(snapshot.preambleMessages))}`);
   lines.push(`  ${labels.checkpoint.replace('{status}', snapshot.checkpoint)}`);
   lines.push(`  ${labels.highWater.replace('{percent}', String(Math.round(snapshot.highWaterRatio * 100)))}`);
+  if (snapshot.preambleBudget && labels.preambleBudget) {
+    const preamble = snapshot.preambleBudget;
+    lines.push(`  ${labels.preambleBudget.replace('{tokens}', String(preamble.tokens))
+      .replace('{limit}', String(preamble.limit)).replace('{percent}', String(Math.round(100 * preamble.tokens / preamble.window)))
+      .replace('{tools}', String(preamble.toolCount))}`);
+    if (preamble.status === 'floor-admitted' && labels.preambleFloorAdmitted) {
+      lines.push(`  ${labels.preambleFloorAdmitted}`);
+    }
+  }
   if (snapshot.lastContextTrigger && labels.contextTrigger && labels.contextTriggers) {
     lines.push(`  ${labels.contextTrigger.replace('{trigger}', labels.contextTriggers[snapshot.lastContextTrigger])}`);
   }

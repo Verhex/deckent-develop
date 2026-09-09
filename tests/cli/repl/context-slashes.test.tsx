@@ -16,7 +16,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  resolveContextSlash, resolveCompactSlash, withContextSlashes,
+  formatContextSnapshot, resolveContextSlash, resolveCompactSlash, withContextSlashes,
   buildContextSlashLabels, buildShortcutsPanel, buildReplLabels,
 } from '../../../src/cli/repl/run.js';
 import type { ReplEngine, ContextSnapshot } from '../../../src/cli/repl/native-agent-bridge.js';
@@ -283,4 +283,18 @@ describe('/context trigger and cached request provenance', () => {
     for (const value of Object.values(labels.contextTriggers!)) expect(text).not.toContain(value);
     expect(engine.sends).toEqual([]);
   });
+});
+
+it.each(['en', 'tr'])('shows measured preamble budget in %s', lang => {
+  const rendered = formatContextSnapshot({...snapshot, preambleBudget: {hardLimit: 90000, status: 'within-target',
+    tokens: 10000, limit: 19660, window: 131072, quality: 'conservative-upper-bound',
+    provenance: 'utf8-wire-bytes-plus-framing', toolCount: 3, reduced: true,
+  }}, buildContextSlashLabels(tFor(lang)));
+  expect(rendered).toContain('10000/19660');
+  expect(rendered).toContain(lang === 'en' ? '3 tool schemas' : '3 araç şeması');
+});
+
+it.each(['en','tr'])('shows the admitted preamble floor warning in %s',lang=>{
+ const rendered=formatContextSnapshot({...snapshot,preambleBudget:{tokens:3500,limit:2457,window:16384,hardLimit:8601,quality:'conservative-upper-bound',provenance:'utf8-wire-bytes-plus-framing',toolCount:3,reduced:true,status:'floor-admitted'}},buildContextSlashLabels(tFor(lang)));
+ expect(rendered).toContain(tFor(lang)('native-context.slash.preamble_floor_admitted'));
 });

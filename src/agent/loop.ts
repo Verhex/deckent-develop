@@ -24,6 +24,7 @@ import {
   type NativeBudgetState,
 } from './guards/recursion.js';
 import { DEFAULT_NATIVE_AGENT_BUDGET, type ResolvedNativeAgentBudget } from '../core/execution-budget-policy.js';
+import { PreambleBudgetError, type PreambleBudgeter } from './preamble-budget.js';
 import { brokerToolResult, ToolResultContextBudgetError, type ContentWriter } from './tool-result-broker.js';
 import { checkSelfModifying } from './guards/self-modifying.js';
 import { accrue, costExceeded, type CostGuardState } from './guards/cost.js';
@@ -129,6 +130,7 @@ export interface LoopDeps {
    *  Absent → the full eager `registry.toNativeSchemas()` dump (byte-identical
    *  legacy behavior; the flag-off path never constructs a getter at all). */
   getProviderToolSchemas?: () => NativeToolSchema[];
+  preambleBudgeter?: PreambleBudgeter;
   /** current approval mode (read per-decision so setApprovalMode takes effect). */
   getMode: () => ApprovalMode;
   /** Session-owned identity registration. The invocation is registered before
@@ -183,7 +185,7 @@ export function writeTargets(args: Record<string, unknown>): string[] {
 
 export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, userInput: string): AsyncIterable<AgentEvent> {
   transcript.appendUser(userInput);
-  const system = composeSystemPrompt({
+  let system = composeSystemPrompt({
     cwd: deps.cwd,
     lang: deps.lang,
     ...(deps.scratchDir !== undefined ? { scratchDir: deps.scratchDir } : {}),
@@ -230,12 +232,28 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     // empty turn with HTTP 200 and looks like a dead REPL.
     // NT-06: re-read every round — this is what makes a mid-turn reveal visible
     // on the NEXT request without any loop-side exposure state.
-    const toolSchemas = deps.getProviderToolSchemas?.() ?? deps.registry.toNativeSchemas();
+    let toolSchemas = deps.getProviderToolSchemas?.() ?? deps.registry.toNativeSchemas();
     const rawBudget = deps.getContextBudgetTokens?.();
     // NT-08: the generation room the prompt arithmetic reserves is also the
     // ceiling the backend is told to respect (adapter → `max_tokens`).
     const outputCeilingTokens = deps.nativeBudget?.outputReserveTokens ?? 0;
     const contextSafetyReserveTokens = deps.nativeBudget?.contextSafetyReserveTokens ?? 0;
+    if (deps.preambleBudgeter && rawBudget !== undefined && rawBudget > 0) {
+      try {
+        const prepared = await deps.preambleBudgeter.prepare({
+          compose: {cwd: deps.cwd, lang: deps.lang,
+            ...(deps.scratchDir ? {scratchDir: deps.scratchDir} : {})},
+          tools: toolSchemas, adapter, model, window: rawBudget,
+          outputCeilingTokens, safetyReserveTokens: contextSafetyReserveTokens,
+        });
+        system = prepared.system; toolSchemas = prepared.tools;
+      } catch (error) {
+        if (!(error instanceof PreambleBudgetError)) throw error;
+        yield {type: 'error', code: 'PREAMBLE_CONTEXT_BUDGET_EXHAUSTED', message: 'PREAMBLE_CONTEXT_BUDGET_EXHAUSTED'};
+        yield {type: 'turn-end'};
+        return;
+      }
+    }
     // 548-004 production wiring: the visible reserve arithmetic — system prompt,
     // serialized tool schemas and the configured output/safety reserves all come
     // OUT of the context before transcript fitting, so the backend can never be
@@ -723,6 +741,7 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       try { result = await def.handler(call.args); }
       catch (e) { result = { ok: false, output: e instanceof Error ? e.message : String(e) }; }
       finally { leaveToolExecution?.(); }
+      deps.preambleBudgeter?.observeToolResult(call.name, call.args, result);
       if (deps.nativeBudget && rawBudget !== undefined && rawBudget > 0) {
         const retainedBytes = transcript.toProviderMessages().reduce(
           (total, message) => total + (message.role === 'tool' ? Buffer.byteLength(message.content, 'utf8') : 0), 0,

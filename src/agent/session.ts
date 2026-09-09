@@ -37,6 +37,7 @@ import { decideProviderAdmission, estimateTokens, measureProviderRequest } from 
 import { openScratchStore, type CheckpointReadResult, type ScratchCheckpointPayload, type ScratchStore } from './scratch-checkpoint.js';
 import { createNativeBudgetState, evaluateNativeBudget, type NativeBudgetState } from './guards/recursion.js';
 import { containToolResult, renderToolResultEnvelope, type ContentWriter } from './tool-result-broker.js';
+import { createPreambleBudgeter, PreambleBudgetError, type PreambleSnapshot } from './preamble-budget.js';
 import { composeSystemPrompt } from './identity.js';
 import { resolveNativeAgentBudget } from '../core/execution-budget-policy.js';
 import { projectSlug } from '../core/project-slug.js';
@@ -232,6 +233,7 @@ export interface AgentSessionDeps {
   /** NT-06 progressive tool surface — per-round provider schema view (loop.ts
    *  falls back to the full registry when absent). */
   getProviderToolSchemas?: LoopDeps['getProviderToolSchemas'];
+  toolExposure?: import('./tools/exposure.js').ToolExposure;
   /** NATIVE-AGENT-HORIZON-001: resolved multi-dimension session budget. */
   nativeBudget?: import('../core/execution-budget-policy.js').ResolvedNativeAgentBudget;
   /** `slug` is the canonical project-directory slug (`projectSlug()`); absent →
@@ -315,6 +317,7 @@ export interface AgentSession {
 
 /** TERMINAL-TOOLS-010 — `/context` read model (see AgentSession.contextSnapshot). */
 export interface ContextSnapshot {
+  preambleBudget?: PreambleSnapshot;
   window: number | undefined;
   measuredInputTokens: number | undefined;
   lastRequestMeasurement?: RequestMeasurementEvent;
@@ -331,6 +334,13 @@ export interface ContextSnapshot {
 export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   const transcript = new Transcript();
   const contextBudget = { ...resolveNativeAgentBudget({}), ...deps.nativeBudget };
+  const preambleBudgeter = deps.nativeBudget ? createPreambleBudgeter({
+    share: contextBudget.maxPreambleShareOfContext,
+    transcriptReserveShare: contextBudget.minTranscriptShareOfContext,
+    ...(deps.toolExposure ? {exposure: deps.toolExposure} : {}),
+    registry: deps.registry,
+    ...(deps.contentStore ? {contentStore: deps.contentStore} : {}),
+  }) : undefined;
   let lastContextTrigger: ContextSnapshot['lastContextTrigger'];
   let mode: ApprovalMode = deps.policy.defaultMode;
   /** TERMINAL-TOOLS-008 — abort seam of the turn in flight (fresh per send()). */
@@ -847,6 +857,15 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       model,
       ...(deps.nativeBudget?.outputReserveTokens ? { outputCeilingTokens: deps.nativeBudget.outputReserveTokens } : {}),
     };
+    if (preambleBudgeter) {
+      const prepared = await preambleBudgeter.prepare({
+        compose: {cwd: deps.cwd, lang: deps.lang, ...(scratch ? {scratchDir: scratch.info.root} : {})},
+        tools: request.tools, adapter, model, window,
+        outputCeilingTokens: contextBudget.outputReserveTokens,
+        safetyReserveTokens: contextBudget.contextSafetyReserveTokens,
+      });
+      request.system = prepared.system; request.tools = prepared.tools;
+    }
     const identity: ProviderContextIdentity = {
       provider: adapter.name,
       model,
@@ -1010,7 +1029,13 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     }
     lastRawIntent = input.rawIntent;
     for (const reference of input.references) rememberReference(reference);
-    yield* maybeRefreshBeforeTurn(turnId, attributionGeneration);
+    try { yield* maybeRefreshBeforeTurn(turnId, attributionGeneration); }
+    catch (error) {
+      if (!(error instanceof PreambleBudgetError)) throw error;
+      yield {type: 'error', code: error.code, message: error.code};
+      yield {type: 'turn-end'};
+      return;
+    }
     // The recovery turn drops the expansion and rides intent + lineage instead —
     // re-sending the payload that just overflowed would be a doomed second call.
     const retryInput = epochObjective();
@@ -1067,6 +1092,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   function createTurnLoopDeps(turn: PermissionTurn): LoopDeps {
     return {
       adapter: deps.adapter,
+      ...(preambleBudgeter ? {preambleBudgeter} : {}),
       ...(deps.nativeBudget ? { nativeBudget: deps.nativeBudget } : {}),
       ...(nativeBudgetState ? { nativeBudgetState } : {}),
       ...(deps.contentStore ? { contentStore: deps.contentStore } : {}),
@@ -1216,6 +1242,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
         epoch: contextEpoch,
         messages: transcript.toProviderMessages().length,
         preambleMessages: epochPreambleLength,
+        ...(preambleBudgeter?.snapshot() ? {preambleBudget: preambleBudgeter.snapshot()} : {}),
         checkpoint: (checkpointDegradation ?? scratch?.readLatestCheckpoint() ?? { status: 'empty' }).status,
         refreshPlanned: contextRefreshPlanned,
         highWaterRatio: contextBudget.contextHighWaterRatio,

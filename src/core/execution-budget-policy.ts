@@ -32,6 +32,8 @@ export interface XverifyAdjudicationPurposeProfile {
 // ─── NATIVE-AGENT-HORIZON-001: terminal/native-agent session budget ─────────
 
 export interface ResolvedNativeAgentBudget {
+  readonly maxPreambleShareOfContext: number;
+  readonly minTranscriptShareOfContext: number;
   readonly contextHighWaterRatio: number;
   readonly maxToolResultShareOfContext: number;
   readonly maxTurnToolResultShareOfContext: number;
@@ -55,6 +57,9 @@ export interface ResolvedNativeAgentBudget {
  *  land instead of drowning. NO provider-name-keyed values — owner config is
  *  the only override authority. */
 export const DEFAULT_NATIVE_AGENT_BUDGET: ResolvedNativeAgentBudget = Object.freeze({
+  maxPreambleShareOfContext: 0.15,
+  // Preserve transcript room independently of the output and safety reserves.
+  minTranscriptShareOfContext: 0.10,
   contextHighWaterRatio: 0.75,
   maxToolResultShareOfContext: 0.05,
   maxTurnToolResultShareOfContext: 0.20,
@@ -87,7 +92,7 @@ export function resolveNativeAgentBudget(input: {
   for (const field of NATIVE_AGENT_BUDGET_FIELDS) {
     const value = authored[field];
     if (value === undefined) continue;
-    if (field === 'contextHighWaterRatio' || field === 'maxToolResultShareOfContext'
+    if (field === 'minTranscriptShareOfContext' || field === 'maxPreambleShareOfContext' || field === 'contextHighWaterRatio' || field === 'maxToolResultShareOfContext'
       || field === 'maxTurnToolResultShareOfContext') {
       if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value >= 1) {
         throw new ExecutionBudgetPolicyError(`execution_budget.native_agent.${field} must be a ratio strictly between 0 and 1`);

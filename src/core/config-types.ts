@@ -929,8 +929,12 @@ export interface ExecutionBudgetPolicyConfig {
 }
 
 /** Owner-authored overrides for the native-agent session budget (all optional,
- *  positive safe integers; unknown keys fail loudly at validation). */
+ *  positive safe integers or explicit fractional context shares; unknown keys fail loudly). */
 export interface NativeAgentBudgetConfig {
+  /** Target measured system/tool preamble share; an irreducible floor may exceed it while preserving reserves. */
+  maxPreambleShareOfContext?: number;
+  /** Minimum transcript room, additional to output/safety reserves. */
+  minTranscriptShareOfContext?: number;
   /** Request utilization that asks for an epoch checkpoint; strictly between 0 and 1. */
   contextHighWaterRatio?: number;
   /** Maximum rendered tool-result bytes as a conservative share of the context window. */

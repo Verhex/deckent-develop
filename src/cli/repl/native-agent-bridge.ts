@@ -699,20 +699,13 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   // fork session-lifetime grant/deny state between direct and nested dispatch.
   const policy = loadPolicy(deps.cwd);
   const ruleStore = createRuleStore(deps.cwd);
-  // NT-06 progressive tool surface — this session's monotonic exposure view.
-  // Flag-gated on the RESOLVED `tool_surface.progressive` (resolveToolSurfaceOptions
-  // admits only a literal `true`, fail-closed): flag absent/false constructs NOTHING,
-  // so the provider surface stays the full eager list, byte-identical to pre-NT-06.
-  // Filled onto the shared ToolSurfaceOptions object in place — the SAME pattern
-  // `execImpl`/`confirm` use below, and the only seam available here: run.tsx (not
-  // this bridge) calls buildNativeToolRegistry, so that mutable options object is
-  // what actually reaches the registered meta-tools. deckent_describe_tool and
-  // deckent_call_tool read `opts.exposure` per call, so this assignment is what
-  // makes a describe/call reveal into THIS session's view.
-  const exposure = deps.toolSurface?.progressive === true
-    ? createToolExposure({ progressive: true }, deps.registry)
-    : undefined;
-  if (exposure && deps.toolSurface) deps.toolSurface.exposure = exposure;
+  // One session view is shared by meta-tool handlers, NT-06 and preamble
+  // budgeting. Eager mode still publishes the full list until budget pressure;
+  // recording a reveal does not itself activate progressive filtering.
+  const exposure = deps.toolSurface?.exposure ?? createToolExposure({
+    progressive: deps.toolSurface?.progressive === true,
+  }, deps.registry);
+  if (deps.toolSurface) deps.toolSurface.exposure = exposure;
 
   // 7089 (NATIVE-SESSION-LEDGER) — the re-hydration seam. `session.ts` owns the
   // Transcript and exposes no seed, so hydration is applied at the ONE boundary
@@ -757,7 +750,8 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     // NT-06 consumer half (554-002 tech-debt closure, Brain hand-completion):
     // the per-round provider schema view is the exposure filter — a tool
     // revealed by describe/call in round N rides round N+1's request.
-    ...(exposure
+    toolExposure: exposure,
+    ...(deps.toolSurface?.progressive === true
       ? { getProviderToolSchemas: () => deps.registry.toNativeSchemas((def) => exposure.isExposed(def.name)) }
       : {}),
     ...(deps.scratch ? { scratch: { ...deps.scratch, checkpointInstruction: CHECKPOINT_INSTRUCTION } } : {}),
