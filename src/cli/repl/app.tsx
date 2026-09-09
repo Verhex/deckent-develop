@@ -85,6 +85,7 @@ import { RunFlowProviderHoldError, type RunFlowProviderHoldDetails } from './run
 import { ToolReadCard } from './tool-read-card.js';
 import { parseToolReadJson, safeTerminalText, type ToolReadKind, type ToolReadProjection } from './tool-read-model.js';
 import type { ToolReadLabels } from './tool-read-labels.js';
+import { toolReadDetailPages } from './tool-read-view.js';
 import type { CliReadRequest, CliToolDispatcher, CliToolReadResult } from '../commands/chat-tool-bridge.js';
 import { resolveCliReadRequest } from '../commands/chat-tool-bridge.js';
 import { cliArgsForStructuredActionRequest, cliToolForStructuredActionRequest, type CliStructuredActionRequest } from '../helpers/cli-tool-capture.js';
@@ -1067,6 +1068,9 @@ export interface ReplLabels {
   activeChatContext: string; // "local active chat context: {id}"
   /** Compact caller-owned status-row label for the same local identity. */
   activeChatSession: string;
+  /** On-demand `/status` card labels; injected by run.tsx. */
+  statusInspectTitle: string;
+  statusInspectHint: string;
   /** Caller-owned labels for the privacy-safe, last actual native request. */
   requestMetric: NativeRequestMetricLabels;
   busyQueueStatus: string; // "queue: {count} background · {state}"
@@ -1108,6 +1112,89 @@ export interface ReplLabels {
   /** TERMINAL-TOOLS-011 — Ask/Run/Control gate denial (tui.term_gate_denied;
    * templates {target} {risk} {mode} {suggested}). */
   termGateDenied: string;
+}
+
+interface StatusInspectCardProps {
+  readonly lines: readonly string[];
+  readonly title: string;
+  readonly hint: string;
+  readonly moreAbove: string;
+  readonly moreBelow: string;
+  readonly columns: number;
+  readonly rows: number;
+  readonly active: boolean;
+  readonly onClose: () => void;
+}
+
+export interface StatusInspectWindow {
+  readonly lines: readonly string[];
+  readonly offset: number;
+  readonly maxOffset: number;
+  readonly hiddenAbove: number;
+  readonly hiddenBelow: number;
+}
+
+/** Reuse the lossless tool-read wrapper, then budget exact card chrome/markers. */
+export function resolveStatusInspectWindow(
+  source: readonly string[], columns: number, rows: number, requestedOffset: number,
+): StatusInspectWindow {
+  const wrapped = source.flatMap((line, index) => toolReadDetailPages(
+    { id: `status:${index}`, title: line, fields: [] },
+    {} as ToolReadLabels,
+    Math.max(1, columns - 2),
+    Number.MAX_SAFE_INTEGER,
+  )[0] ?? []);
+  const contentRows = Math.max(1, rows - 4); // border(2) + title + hint
+  const maxOffset = wrapped.length <= contentRows
+    ? 0
+    : Math.max(1, wrapped.length - Math.max(1, contentRows - 1));
+  const offset = Math.max(0, Math.min(requestedOffset, maxOffset));
+  const remainingAbove = offset;
+  const showAbove = remainingAbove > 0 && contentRows > 1;
+  let visibleRows = Math.max(1, contentRows - Number(showAbove));
+  const showBelow = wrapped.length - offset > visibleRows && visibleRows > 1;
+  if (showBelow) visibleRows -= 1;
+  const lines = wrapped.slice(offset, offset + visibleRows);
+  return {
+    lines,
+    offset,
+    maxOffset,
+    hiddenAbove: showAbove ? remainingAbove : 0,
+    hiddenBelow: showBelow ? Math.max(0, wrapped.length - offset - lines.length) : 0,
+  };
+}
+
+/** Bounded, read-only command window. It owns no runtime state and never polls. */
+function StatusInspectCard(props: StatusInspectCardProps): ReactElement {
+  const { lines, title, hint, moreAbove, moreBelow, columns, rows, active, onClose } = props;
+  const palette = useInkPalette();
+  const glyphs = useTerminalGlyphs();
+  const [offset, setOffset] = useState(0);
+  useEffect(() => setOffset(0), [lines]);
+  const window = resolveStatusInspectWindow(lines, columns, rows, offset);
+  useEffect(() => {
+    if (offset !== window.offset) setOffset(window.offset);
+  }, [offset, window.offset]);
+  useInput((input, key) => {
+    if (key.escape || (key.ctrl && input === 'c')) { onClose(); return; }
+    if (key.upArrow) setOffset((value) => Math.max(0, value - 1));
+    else if (key.downArrow) setOffset((value) => Math.min(window.maxOffset, value + 1));
+    else if (key.pageUp) setOffset((value) => Math.max(0, value - Math.max(1, window.lines.length)));
+    else if (key.pageDown) setOffset((value) => Math.min(window.maxOffset, value + Math.max(1, window.lines.length)));
+    else if (key.home) setOffset(0);
+    else if (key.end) setOffset(window.maxOffset);
+  }, { isActive: active });
+  return (
+    <Box flexDirection="column" borderStyle={glyphs.borderStyle} borderColor={palette.accent.color} paddingX={1}>
+      <Text wrap="truncate-end">{title}</Text>
+      {window.hiddenAbove > 0 && <Text wrap="truncate-end" {...palette.muted}>{moreAbove.replace('{n}', String(window.hiddenAbove))}</Text>}
+      {window.lines.map((line, index) => (
+        <Text key={`${window.offset}:${index}`}>{line}</Text>
+      ))}
+      {window.hiddenBelow > 0 && <Text wrap="truncate-end" {...palette.muted}>{moreBelow.replace('{n}', String(window.hiddenBelow))}</Text>}
+      <Text wrap="truncate-end" {...palette.muted}>{hint}</Text>
+    </Box>
+  );
 }
 
 /** TERMINAL-TOOLS-003 — composer caret carrier (input-bar.tsx CaretStyle);
@@ -2046,7 +2133,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       ? pickerLabels.committed.default.replace('{value}', id)
       : pickerLabels.defaultWriteFailed.replace('{error}', out.error));
   };
-  const [footerLines, setFooterLines] = useState<string[]>([]);
+  const [statusInspectLines, setStatusInspectLines] = useState<string[] | null>(null);
+  const statusInspectGeneration = useRef(0);
+  useEffect(() => () => { statusInspectGeneration.current += 1; }, []);
   const bgQueue = useRef<ChatTurnQueue | null>(null);
   if (bgQueue.current === null) bgQueue.current = createChatTurnQueue();
 
@@ -2251,8 +2340,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     // recognized as stale by `output`/the tool sink and silently dropped
     // instead of drawing pre-clear content onto the just-cleared screen.
     clearEpoch.current += 1;
+    statusInspectGeneration.current += 1;
     invalidateSprintContext();
-    setTurns([]); setPartial(''); headPushed.current = false;
+    setTurns([]); setPartial(''); setStatusInspectLines(null); headPushed.current = false;
     segmenter.current = createStreamSegmenter((seg) => pushSegment(seg.markdown));
   };
 
@@ -2306,20 +2396,6 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       if (runFlowController) setRunFlowPreview(deriveRunFlowPreview(runFlowController.getContext()));
     });
   }, [registerToolSink, runFlowController]);
-
-  // Live-footer state-feed seam: poll it while enabled (Task 354-014 wires the
-  // real heartbeat/dashboard-state reader; this component only renders it).
-  useEffect(() => {
-    if (!replSurfaceEnabled || !stateFeed) { setFooterLines([]); return; }
-    const tick = (): void => setFooterLines(buildLiveFooter(stateFeed(), {
-      labels: liveFooterLabels,
-      width: columns,
-      clip: (text, width) => clipTerminalCells(text, width, dualStreamOverflow),
-    }));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [replSurfaceEnabled, stateFeed, liveFooterLabels, columns, dualStreamOverflow]);
 
   useEffect(() => {
     if (!healthAuthFeed) { setHealthAuthLine(null); return; }
@@ -2796,6 +2872,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       // second direct-dispatch authority for prompted arguments.
       trimmed = promptInput.line;
     }
+    // Any newer submitted intent supersedes an unresolved status read. A
+    // completed card already owns stdin, so this only fences async overlap.
+    if (!/^\/status(?:\s|$)/iu.test(trimmed)) statusInspectGeneration.current += 1;
     // TERMINAL-TOOLS-011 — `!<cmd>` shell passthrough (parity: Claude Code /
     // Codex / Hermes). Gated by the Ask/Run/Control ladder (Çalıştır), then
     // by the SAME exec dispatcher every bash tool call uses (approval modes,
@@ -3121,9 +3200,38 @@ export function ReplApp(props: ReplAppProps): ReactElement {
             await loadToolRead(readRequest);
             return;
           }
+          const statusGeneration = bridged.tool === 'deckent_status'
+            ? ++statusInspectGeneration.current
+            : null;
+          const statusClearEpoch = clearEpoch.current;
           const dispatchResult = await dispatcher.dispatch(bridged.tool, bridged.args);
+          if (statusGeneration !== null && (statusGeneration !== statusInspectGeneration.current
+            || statusClearEpoch !== clearEpoch.current)) return;
           const localDetail = bridged.tool === 'deckent_status' ? await nativeStatusDetail() : undefined;
-          pushTurn('seg', localDetail ? `${dispatchResult}\n${localDetail}` : dispatchResult);
+          if (bridged.tool === 'deckent_status' && replSurfaceEnabled) {
+            if (statusGeneration !== statusInspectGeneration.current
+              || statusClearEpoch !== clearEpoch.current) return;
+            let runtimeLines: string[] = [];
+            if (stateFeed) {
+              try {
+                runtimeLines = buildLiveFooter(stateFeed(), {
+                  labels: liveFooterLabels,
+                  width: columns,
+                  // The command window wraps/pages complete values itself.
+                  clip: (text) => text,
+                });
+              } catch {
+                runtimeLines = [liveFooterLabels.inspectFailure];
+              }
+            }
+            const lines = [dispatchResult, ...runtimeLines, localDetail]
+              .filter((value): value is string => value !== undefined && value.length > 0)
+              .flatMap((value) => value.split(/\r?\n/u))
+              .map(safeTerminalText);
+            setStatusInspectLines(lines);
+          } else {
+            pushTurn('seg', localDetail ? `${dispatchResult}\n${localDetail}` : dispatchResult);
+          }
         }
         return;
       }
@@ -3233,10 +3341,15 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   };
   // While a modal/card owns stdin the InputBar is inactive, so Ctrl-C must
   // still reach the policy (otherwise it would be silently swallowed).
-  const inputBarActiveNow = stdinOwner.inputBarActive && !runFlowPending && !inboxOpen && picker === null && !toolReadOpen;
+  const statusInspectActive = statusInspectLines !== null
+    && resolvePickerCardActive(confirm !== null, approvalPending, runFlowPending, inboxOpen)
+    && picker === null && !toolReadOpen;
+  const inputBarActiveNow = stdinOwner.inputBarActive && !runFlowPending && !inboxOpen
+    && picker === null && !toolReadOpen && statusInspectLines === null;
   const globalInterruptActive = resolveGlobalInterruptActive(
     inputBarActiveNow,
-    resolvePickerCardActive(confirm !== null, approvalPending, runFlowPending, inboxOpen) && picker !== null,
+    (resolvePickerCardActive(confirm !== null, approvalPending, runFlowPending, inboxOpen) && picker !== null)
+      || statusInspectActive,
   );
   useInput((input, key) => {
     if (!globalInterruptActive) return;
@@ -3246,6 +3359,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // Persistent phase anchor — the orientation signal ("am I working / done?").
   const phase: 'thinking' | 'generating' | 'idle' =
     busy ? 'thinking' : working ? 'generating' : 'idle';
+  const idleAnchorText = statusInspectActive
+    ? labels.statusInspectHint
+    : inputBarActiveNow ? `${glyphs.success} ${labels.ready}` : labels.inputPaused;
   const nativeToolActivityText = nativeToolActivity && replSurfaceEnabled
     ? (() => {
       const elapsed = `${Math.max(0, Math.floor((nativeToolNow - nativeToolActivity.startedAt) / 1000))}${liveFooterLabels.unitSeconds}`;
@@ -3264,7 +3380,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     ? (() => {
       const phaseText = phase === 'thinking' ? labels.thinking : labels.generating;
       const anchorPrefix = phase === 'idle'
-        ? `${inputBarActiveNow ? `${glyphs.success} ${labels.ready}` : labels.inputPaused} ${glyphs.separator} `
+        ? `${idleAnchorText} ${glyphs.separator} `
         : `${glyphs.assistant} deckent ${glyphs.separator} ${phaseText} ${glyphs.separator} `;
       const interruptSuffix = interruptHint ? `  ${glyphs.separator} ${interruptHint.text}` : '';
       return clipTerminalCells(
@@ -3385,6 +3501,22 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         </Box>
       )}
 
+      {statusInspectLines && (
+        <Box ref={readCardNode} flexDirection="column">
+        <StatusInspectCard
+          lines={statusInspectLines}
+          title={labels.statusInspectTitle}
+          hint={labels.statusInspectHint}
+          moreAbove={pickerLabels.more.replace('{glyph}', glyphs.up)}
+          moreBelow={pickerLabels.more.replace('{glyph}', glyphs.down)}
+          columns={columns}
+          rows={Math.max(1, effectiveTerminalRows - readReservedRows - 1)}
+          active={statusInspectActive}
+          onClose={() => setStatusInspectLines(null)}
+        />
+        </Box>
+      )}
+
       {/* TERMINAL-PICKER-002 — the interactive value picker (bare /model,
           /provider …). Rendered after the inbox card: the lowest-priority
           stdin consumer (resolvePickerCardActive). While a turn is in flight
@@ -3410,16 +3542,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         />
       )}
 
-      {/* REPL-SURFACE-WIRE (354-001): mode indicator + live-footer — both
-          inert unless replSurfaceEnabled (flag-off render stays byte-identical
-          to the pre-354-001 App). Footer lines pass through resolveFooterLines
-          (355-011 dual-stream seam) — a no-op unless a pending approval is
-          compressing it down to its tested min-1-line floor, so the footer
-          never fully disappears while the ApprovalCard above it is visible. */}
+      {/* The authority posture remains persistent. Detailed runtime status is
+          disclosed only by `/status` in the bounded card above. */}
       {replSurfaceEnabled && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold>{`[${resolveModeLabel(termMode.mode, labels)}]`}</Text>
-          {resolveFooterLines(footerLines, approvalPending, columns, dualStreamOverflow).map((line, i) => <Text key={i} {...palette.muted}>{line}</Text>)}
         </Box>
       )}
 
@@ -3431,7 +3558,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         {nativeToolActivityText
           ? <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`${glyphs.separator} ${nativeToolActivityText}`}</Text></>
           : phase === 'idle'
-          ? <Text {...palette.muted}>{inputBarActiveNow ? `${glyphs.success} ${labels.ready}` : labels.inputPaused}{nativeRequestMetricText ? ` ${glyphs.separator} ${nativeRequestMetricText}` : ''}</Text>
+          ? <Text {...palette.muted}>{idleAnchorText}{nativeRequestMetricText ? ` ${glyphs.separator} ${nativeRequestMetricText}` : ''}</Text>
           : <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`${glyphs.separator} ${phase === 'thinking' ? labels.thinking : labels.generating}${nativeRequestMetricText ? ` ${glyphs.separator} ${nativeRequestMetricText}` : ''}`}</Text></>}
         {/* TERMINAL-TOOLS-006: transient Ctrl-C hint (names the next key). */}
         {interruptHint ? <Text {...palette.info}>{`  ${glyphs.separator} ${interruptHint.text}`}</Text> : null}

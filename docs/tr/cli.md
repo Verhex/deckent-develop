@@ -17,6 +17,18 @@ için `DECKENT_LANGUAGE=tr` ayarlayın.
 Internal `gateway-runtime` child public referans sayfalarına bilinçli olarak alınmaz;
 registration drift denetimi kaybolmasın diye makine manifestinde `hidden: true` olarak kalır.
 
+## Native Terminal durumu
+
+Native etkileşimli Terminal'de runtime ayrıntıları sürekli panel olarak gösterilmez.
+`/status`, mevcut durum servisinin çıktısını runtime ve yerel sohbet bilgileriyle
+birlikte salt-okuma kartında açar. Yukarı/Aşağı veya PgUp/PgDn ile kaydırın;
+Esc yalnız kartı kapatır, işi iptal etmez. Güncel bir görüntü için `/status` komutunu
+yeniden açın. Ayrıntılar kapalıyken aktif iş göstergesi, yetki modu ve sohbet
+kimliği görünür kalır.
+
+Bağımsız `deckent status` komutunun CLI çıktı sözleşmesi değişmez. Bu etkileşim
+onayları, yürütme yetkisini veya task settlement'ını değiştirmez.
+
 ## Exact worker çıktısı
 
 Worker çıktısını doğrulanmış yürütme kayıtlarından okumak için

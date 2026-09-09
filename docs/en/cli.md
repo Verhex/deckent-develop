@@ -17,6 +17,18 @@ The internal `gateway-runtime` child is intentionally omitted from public refere
 remains present in the machine manifest with `hidden: true` so registration drift is still
 checked.
 
+## Native Terminal status
+
+In the native interactive Terminal, runtime details are not a permanent panel.
+Use `/status` to open a read-only snapshot from the existing status service,
+including the current runtime and local chat context. Scroll with Up/Down or
+PgUp/PgDn; Esc closes the card without cancelling work. Reopen `/status` to
+refresh the snapshot. The active-work indicator, authority posture and chat
+identity remain visible while the details are closed.
+
+The standalone `deckent status` command keeps its CLI output contract. This
+interaction does not change approvals, execution authority or task settlement.
+
 ## Exact worker output
 
 Use `deckent watch output <taskId> --tail 50` to inspect worker output through its

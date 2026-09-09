@@ -377,6 +377,8 @@ export function buildReplLabels(t: (key: string) => string): ReplLabels {
     resumeSprintSuperseded: t('tui.resume_sprint_context_superseded'),
     activeChatContext: t('tui.active_chat_context'),
     activeChatSession: t('tui.active_chat_session'),
+    statusInspectTitle: t('tui.status_inspect.title'),
+    statusInspectHint: t('tui.status_inspect.hint'),
     requestMetric: buildContextSlashLabels(t),
     // busy-controls: /queue /interrupt /steer (renderBusyDecision, app.tsx).
     busyQueueStatus: t('tui.busy_queue_status'),

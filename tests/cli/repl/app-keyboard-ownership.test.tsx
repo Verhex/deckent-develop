@@ -4,16 +4,18 @@ import { render } from 'ink-testing-library';
 import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ReplApp, type ConfirmTrigger, type ReplEngine } from '../../../src/cli/repl/app.js';
+import { ReplApp, resolveStatusInspectWindow, type ConfirmTrigger, type ReplEngine } from '../../../src/cli/repl/app.js';
 import { appendLedgerTurn } from '../../../src/cli/repl/session-ledger.js';
 import { projectSlug } from '../../../src/core/project-slug.js';
 import { buildSlashRegistry } from '../../../src/cli/commands/chat-slash-registry.js';
 import { buildPickerLabels } from '../../../src/cli/repl/picker-labels.js';
-import { buildReplLabels, buildShortcutsPanel } from '../../../src/cli/repl/run.js';
+import { buildLiveFooterLabels, buildReplLabels, buildShortcutsPanel } from '../../../src/cli/repl/run.js';
+import type { LiveFooterState } from '../../../src/cli/helpers/live-footer.js';
 import { getMessage } from '../../../src/cli/helpers/messages.js';
 import type { PickerSpec } from '../../../src/cli/repl/picker.js';
 import type { SprintHistoricalContextSource } from '../../../src/cli/repl/sprint-context-input.js';
 import type { ChatProviderAdapter } from '../../../src/cli/commands/chat-native.js';
+import { displayWidth } from '../../../src/cli/repl/cursor-model.js';
 
 const tick = (ms = 40): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 const CTRL_C = '\x03';
@@ -38,7 +40,7 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-function mountApp(options: { cwd?: string; sessionId?: string; replSurfaceEnabled?: boolean; startupRecentSessions?: boolean; dispatcher?: { dispatch: (name: string, args: Record<string, unknown>) => Promise<string> }; memory?: Record<string, unknown>; engine?: ReplEngine; legacy?: boolean; provider?: ChatProviderAdapter; sprintHistoricalContext?: SprintHistoricalContextSource; ledgerRoot?: string } = {}) {
+function mountApp(options: { cwd?: string; sessionId?: string; replSurfaceEnabled?: boolean; startupRecentSessions?: boolean; dispatcher?: { dispatch: (name: string, args: Record<string, unknown>) => Promise<string> }; memory?: Record<string, unknown>; engine?: ReplEngine; legacy?: boolean; provider?: ChatProviderAdapter; sprintHistoricalContext?: SprintHistoricalContextSource; ledgerRoot?: string; stateFeed?: () => LiveFooterState } = {}) {
   const cwd = options.cwd ?? mkdtempSync(join(tmpdir(), 'deckent-l6-keyboard-'));
   if (!options.cwd) roots.push(cwd);
   const ledgerRoot = options.ledgerRoot ?? mkdtempSync(join(tmpdir(), 'deckent-l4c-ledger-root-'));
@@ -63,7 +65,7 @@ function mountApp(options: { cwd?: string; sessionId?: string; replSurfaceEnable
       inboxLabels={{} as never}
       pickerLabels={pickerLabels}
       pickerSpecs={{ model: () => MODEL_SPEC }}
-      liveFooterLabels={{} as never}
+      liveFooterLabels={buildLiveFooterLabels(t)}
       approvalLabels={{} as never}
       runFlowCardLabels={{} as never}
       runFlowMountLabels={{} as never}
@@ -77,6 +79,7 @@ function mountApp(options: { cwd?: string; sessionId?: string; replSurfaceEnable
       {...(options.replSurfaceEnabled ? { replSurfaceEnabled: true } : {})}
       {...(options.startupRecentSessions ? { startupRecentSessions: true } : {})}
       {...(options.sprintHistoricalContext ? { sprintHistoricalContext: options.sprintHistoricalContext } : {})}
+      {...(options.stateFeed ? { stateFeed: options.stateFeed } : {})}
       resumeLedgerOptions={{ rootDir: ledgerRoot }}
     />,
   );
@@ -136,6 +139,94 @@ describe('ReplApp mounted keyboard ownership', () => {
     expect(lastFrame() ?? '').toContain('local active chat context: chat-memory-123');
     expect(contextSnapshot).not.toHaveBeenCalled();
     unmount();
+  });
+
+  it('keeps runtime detail hidden without polling, then opens one fresh /status snapshot and closes it with Esc', async () => {
+    const dispatch = vi.fn(async () => 'run truth: sprint-7099 active');
+    const stateFeed = vi.fn(() => ({
+      running: 'sprint-7099',
+      startedAt: '2026-09-09T06:00:00.000Z',
+      next: 'verify exact terminal surface',
+    }));
+    const { stdin, lastFrame, unmount } = mountApp({
+      sessionId: 'chat-status-123',
+      dispatcher: { dispatch },
+      replSurfaceEnabled: true,
+      stateFeed,
+    });
+    try {
+      await tick(1100);
+      expect(stateFeed).not.toHaveBeenCalled();
+      expect(lastFrame() ?? '').not.toContain('sprint-7099');
+      expect(lastFrame() ?? '').toContain('chat-status-123');
+
+      stdin.write('/status');
+      stdin.write(ENTER);
+      await tick(100);
+      expect(dispatch).toHaveBeenCalledWith('deckent_status', { root: '.' });
+      expect(stateFeed).toHaveBeenCalledOnce();
+      expect(lastFrame() ?? '').toContain('run truth: sprint-7099 active');
+      expect(lastFrame() ?? '').toContain('verify exact terminal surface');
+      expect(lastFrame() ?? '').toContain(labels.statusInspectHint);
+      expect(lastFrame() ?? '').not.toContain(labels.inputPaused);
+
+      stdin.write('\x1b');
+      await tick();
+      expect(lastFrame() ?? '').not.toContain('run truth: sprint-7099 active');
+      expect(lastFrame() ?? '').toContain('chat-status-123');
+      expect(stateFeed).toHaveBeenCalledOnce();
+    } finally {
+      unmount();
+    }
+  });
+
+  it('drops a late /status response after clear instead of reopening stale detail', async () => {
+    let resolveDispatch!: (value: string) => void;
+    const dispatch = vi.fn(() => new Promise<string>((resolve) => { resolveDispatch = resolve; }));
+    const stateFeed = vi.fn(() => ({ running: 'stale-sprint' }));
+    const { stdin, lastFrame, unmount } = mountApp({
+      dispatcher: { dispatch }, replSurfaceEnabled: true, stateFeed,
+    });
+    try {
+      await tick();
+      stdin.write('/status'); stdin.write(ENTER);
+      await tick();
+      stdin.write('\x0c');
+      await tick();
+      resolveDispatch('late status result');
+      await tick(100);
+      expect(lastFrame() ?? '').not.toContain('late status result');
+      expect(lastFrame() ?? '').not.toContain('stale-sprint');
+      expect(stateFeed).not.toHaveBeenCalled();
+    } finally {
+      unmount();
+    }
+  });
+
+  it('wraps long status identities losslessly and re-clamps the window to the measured row budget', () => {
+    const identity = `run:${'abcdef0123456789'.repeat(20)}`;
+    const all = resolveStatusInspectWindow([identity], 32, 100, 0);
+    expect(all.lines.join('')).toBe(identity);
+    expect(all.lines.every((line) => displayWidth(line) <= 28)).toBe(true);
+
+    const small = resolveStatusInspectWindow([identity], 32, 8, 999);
+    expect(small.offset).toBe(small.maxOffset);
+    expect(small.lines.length + 4 + Number(small.hiddenAbove > 0) + Number(small.hiddenBelow > 0)).toBeLessThanOrEqual(8);
+
+    const resized = resolveStatusInspectWindow([identity], 18, 6, small.offset);
+    expect(resized.offset).toBeLessThanOrEqual(resized.maxOffset);
+    expect(resized.lines.every((line) => displayWidth(line) <= 14)).toBe(true);
+    expect(resized.lines.length + 4 + Number(resized.hiddenAbove > 0) + Number(resized.hiddenBelow > 0)).toBeLessThanOrEqual(6);
+
+    // Actual Ink PTY closure needs one boundary/newline row beyond measured
+    // Workline chrome; without it a 24-row frame triggers a full-screen clear.
+    const terminalRows = 24;
+    const measuredWorklineRows = 8;
+    const cardBudget = terminalRows - measuredWorklineRows - 1;
+    const pty = resolveStatusInspectWindow([identity], 80, cardBudget, 0);
+    const renderedCardRows = pty.lines.length + 4
+      + Number(pty.hiddenAbove > 0) + Number(pty.hiddenBelow > 0);
+    expect(renderedCardRows + measuredWorklineRows + 1).toBeLessThanOrEqual(terminalRows);
   });
 
   it('commits a typed native resume only after hydration succeeds', async () => {

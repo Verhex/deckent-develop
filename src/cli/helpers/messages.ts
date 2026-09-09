@@ -6742,6 +6742,11 @@ const BASE_MESSAGES: MessageMap = {
   },
   'tui.active_chat_context': { en: 'local active chat context: {id}', tr: 'yerel etkin sohbet bağlamı: {id}' },
   'tui.active_chat_session': { en: 'chat:', tr: 'sohbet:' },
+  'tui.status_inspect.title': { en: 'Runtime status', tr: 'Runtime durumu' },
+  'tui.status_inspect.hint': {
+    en: 'Esc close / Up/Down scroll / PgUp/PgDn page',
+    tr: 'Esc kapat / Yukarı/Aşağı kaydır / PgUp/PgDn sayfa',
+  },
 
   // ─── busy-controls: /queue /interrupt /steer (APP-SURFACE-WIRE 358-006 —
   // ReplLabels.busy*; renderBusyDecision in app.tsx, wired by run.tsx's
