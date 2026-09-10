@@ -23,7 +23,7 @@ import {
   runChatNativeLoop, type ChatProviderAdapter, type McpToolDispatcher, type ChatMemoryAdapter,
   buildNervousOutput, buildInterrogateOutput, resolveNativeSlashText,
 } from '../commands/chat-native.js';
-import { renderMarkdown } from '../commands/chat-render.js';
+import { TranscriptTurnView } from './transcript-turn-view.js';
 import { InputBar, type CaretStyle, type ShortcutsPanel } from './input-bar.js';
 import { StatusRow, formatSessionIdForTerminal } from './status-row.js';
 import { resolveCtrlC, CTRL_C_EXIT_WINDOW_MS } from './interrupt-policy.js';
@@ -1115,6 +1115,11 @@ export interface ReplLabels {
   /** TERMINAL-TOOLS-011 — Ask/Run/Control gate denial (tui.term_gate_denied;
    * templates {target} {risk} {mode} {suggested}). */
   termGateDenied: string;
+  /** Transcript turn headers — user vs deckent separation (tui.transcript.*). */
+  transcriptUser: string;
+  transcriptAssistant: string;
+  transcriptUserHint: string;
+  transcriptAssistantHint: string;
 }
 
 interface StatusInspectCardProps {
@@ -1737,73 +1742,6 @@ function Spinner(): ReactElement {
     return () => clearInterval(id);
   }, []);
   return <Text {...palette.accent}>{frames[i]}</Text>;
-}
-
-function DeckentHeader(): ReactElement {
-  const palette = useInkPalette();
-  const glyphs = useTerminalGlyphs();
-  return <Text><Text {...palette.accent}>{`${glyphs.assistant} `}</Text><Text bold>deckent</Text></Text>;
-}
-
-function TurnView({ turn, hyperlinks }: { turn: Turn; hyperlinks: boolean }): ReactElement {
-  const palette = useInkPalette();
-  const glyphs = useTerminalGlyphs();
-  if (turn.role === 'user') {
-    return (
-      <Box marginTop={1}>
-        <Text {...palette.muted}>{`${glyphs.user} `}</Text>
-        <Text>{turn.text}</Text>
-      </Box>
-    );
-  }
-  if (turn.role === 'tool' && turn.tool) {
-    const { verb, target, added, removed, note, failed } = turn.tool;
-    const hasDelta = added !== undefined || removed !== undefined || note !== undefined;
-    // Denied/errored action: honest "✗ verb target" with NO success delta —
-    // never let a blocked write look like it landed (REPL-TOOL-DEBT-1).
-    if (failed) {
-      // 7114 — a failed line carries the same glanceable detail as a successful
-      // one (target + elapsed/read-only note); dropping `note` here used to hide
-      // how long a denied or errored call actually cost.
-      return (
-        <Box marginTop={1}>
-          <Text {...palette.muted}><Text {...palette.error}>{`${glyphs.failure} `}</Text>{verb}<Text {...palette.muted}> {target}</Text>{note !== undefined ? <Text {...palette.muted}>{` ${glyphs.separator} ${note}`}</Text> : null}</Text>
-        </Box>
-      );
-    }
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        <Text><Text {...palette.accent}>{`${glyphs.assistant} `}</Text><Text bold>{verb}</Text><Text {...palette.muted}> {target}</Text></Text>
-        {hasDelta && (
-          <Text>
-            {`  ${glyphs.branch} `}
-            {added !== undefined ? <Text {...palette.success}>+{added} </Text> : null}
-            {removed !== undefined ? <Text {...palette.error}>-{removed} </Text> : null}
-            {note !== undefined ? <Text {...palette.muted}>{note}</Text> : null}
-          </Text>
-        )}
-      </Box>
-    );
-  }
-  if (turn.role === 'head') return <Box marginTop={1}><DeckentHeader /></Box>;
-  if (turn.role === 'bg') {
-    // Background-completed-work turn (ChatTurnQueue.drainAsTurns()) — flows in
-    // as its OWN new turn, never folded into an in-flight reply.
-    return (
-      <Box flexDirection="column" marginTop={1}>
-        {turn.text.split('\n').map((line, i) => (
-          <Text key={i} {...palette.muted}><Text {...palette.accent}>{`${glyphs.background} `}</Text>{line}</Text>
-        ))}
-      </Box>
-    );
-  }
-  if (turn.role === 'foot') {
-    const s = turn.stats;
-    return <Text {...palette.muted}>{`${glyphs.elapsed} ${s ? (s.elapsedMs / 1000).toFixed(1) : '0'}s${s?.tokens ? ` ${glyphs.separator} ${s.tokens} tok` : ''}`}</Text>;
-  }
-  // 'seg' — one completed reply line/block, rendered markdown, no margin (flows
-  // directly under the head + previous segments).
-  return <Text>{renderMarkdown(turn.text, true, { hyperlinks, ascii: glyphs.ascii })}</Text>;
 }
 
 export interface NativeMcpRouteOptions {
@@ -3484,7 +3422,19 @@ export function ReplApp(props: ReplAppProps): ReactElement {
 
   return (
     <Box flexDirection="column" ref={worklineNode}>
-      <Static items={turns}>{(turn) => <TurnView key={turn.id} turn={turn} hyperlinks={props.hyperlinks === true} />}</Static>
+      <Static items={turns}>{(turn) => (
+        <TranscriptTurnView
+          key={turn.id}
+          turn={turn}
+          hyperlinks={props.hyperlinks === true}
+          labels={{
+            transcriptUser: labels.transcriptUser,
+            transcriptAssistant: labels.transcriptAssistant,
+            transcriptUserHint: labels.transcriptUserHint,
+            transcriptAssistantHint: labels.transcriptAssistantHint,
+          }}
+        />
+      )}</Static>
 
       {/* In-progress (incomplete) line — the only streamed text in the dynamic
           region (one line). Completed lines/blocks already flowed into <Static>

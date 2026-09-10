@@ -30,6 +30,8 @@ export interface TerminalGlyphs {
   readonly bullet: string;
   readonly horizontal: string;
   readonly dash: string;
+  /** Left rail for transcript turn grouping (ASCII-safe). */
+  readonly rail: string;
 }
 
 const UNICODE_TERMINAL_GLYPHS: TerminalGlyphs = Object.freeze({
@@ -59,6 +61,7 @@ const UNICODE_TERMINAL_GLYPHS: TerminalGlyphs = Object.freeze({
   bullet: '•',
   horizontal: '─',
   dash: '—',
+  rail: '│',
 });
 
 const ASCII_TERMINAL_GLYPHS: TerminalGlyphs = Object.freeze({
@@ -88,6 +91,7 @@ const ASCII_TERMINAL_GLYPHS: TerminalGlyphs = Object.freeze({
   bullet: '-',
   horizontal: '-',
   dash: '-',
+  rail: '|',
 });
 
 export function resolveTerminalGlyphs(ascii: boolean): TerminalGlyphs {

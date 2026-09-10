@@ -445,6 +445,10 @@ export function buildReplLabels(t: (key: string) => string): ReplLabels {
     // TERMINAL-TOOLS-013 — one-time confirm hint + paused-input anchor.
     confirmHintOnce: t('tui.confirm_hint_once'),
     inputPaused: t('tui.input_paused'),
+    transcriptUser: t('tui.transcript.user'),
+    transcriptAssistant: t('tui.transcript.assistant'),
+    transcriptUserHint: t('tui.transcript.user_hint'),
+    transcriptAssistantHint: t('tui.transcript.assistant_hint'),
   };
 }
 

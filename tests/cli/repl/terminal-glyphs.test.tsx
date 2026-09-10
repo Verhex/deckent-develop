@@ -22,11 +22,11 @@ describe('native Terminal glyph contract', () => {
   it('keeps the exact rich Unicode default and exposes punctuation-only ASCII', () => {
     expect(resolveTerminalGlyphs(false)).toMatchObject({
       borderStyle: 'round', assistant: '●', user: '›', success: '✓', branch: '⎿',
-      elapsed: '⏱', tokens: 'Σ', separator: '·', ellipsis: '…', cursor: '❯',
+      elapsed: '⏱', tokens: 'Σ', separator: '·', ellipsis: '…', cursor: '❯', rail: '│',
     });
     expect(resolveTerminalGlyphs(true)).toMatchObject({
       borderStyle: 'classic', assistant: '*', user: '>', success: '+', failure: 'x',
-      warning: '!', branch: '->', elapsed: '@', tokens: '#', separator: '|', ellipsis: '...', cursor: '>',
+      warning: '!', branch: '->', elapsed: '@', tokens: '#', separator: '|', ellipsis: '...', cursor: '>', rail: '|',
     });
   });
 

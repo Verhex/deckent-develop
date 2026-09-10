@@ -1,0 +1,10 @@
+{
+  "utc": "2026-09-10T22:01:30.000Z",
+  "slice": "TERMINAL-TRANSCRIPT-USER-DECKENT-SEPARATION",
+  "classification": "RELATED terminal readability (Astra flow analysis item I)",
+  "localVerification": {
+    "command": "npx vitest run tests/cli/repl/transcript-turn-view.test.tsx tests/cli/repl/terminal-glyphs.test.tsx",
+    "result": "8/8 PASS"
+  },
+  "notes": "Hierarchy-first rails + i18n labels; NO_COLOR uses ASCII rail. Not PTY-closure proof."
+}
