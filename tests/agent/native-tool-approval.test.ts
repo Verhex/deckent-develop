@@ -3,6 +3,7 @@ import {
   classifyNativeToolApproval,
   nativeBuiltinApprovalClassifier,
 } from '../../src/agent/native-tool-approval.js';
+import { permissionResource } from '../../src/agent/native-permission-resource.js';
 
 describe('native tool approval producer metadata', () => {
   it('classifies actual builtin arguments', () => {
@@ -13,6 +14,39 @@ describe('native tool approval producer metadata', () => {
   it('holds missing, external, and malformed classifications', () => {
     expect(classifyNativeToolApproval(undefined, {})).toEqual({ reasonCode: 'NATIVE_PERMISSION_CLASSIFICATION_UNAVAILABLE' });
     expect(classifyNativeToolApproval(nativeBuiltinApprovalClassifier('deckent_bash'), {})).toEqual({ reasonCode: 'NATIVE_PERMISSION_CLASSIFICATION_UNAVAILABLE' });
+  });
+
+  it('classifies silent read surfaces with file-read scope aligned to primaryResource', () => {
+    expect(classifyNativeToolApproval(nativeBuiltinApprovalClassifier('deckent_read_file'), { path: 'docs/a.md' }, 'docs/a.md'))
+      .toEqual({ scope: 'file-read', risk: 'none', scopeId: 'deckent_read_file', resource: 'docs/a.md' });
+    expect(classifyNativeToolApproval(nativeBuiltinApprovalClassifier('deckent_list_dir'), { path: 'src' }, 'src'))
+      .toEqual({ scope: 'file-read', risk: 'none', scopeId: 'deckent_list_dir', resource: 'src' });
+    expect(classifyNativeToolApproval(nativeBuiltinApprovalClassifier('deckent_list_dir'), {}, '.'))
+      .toEqual({ scope: 'file-read', risk: 'none', scopeId: 'deckent_list_dir', resource: '.' });
+    expect(classifyNativeToolApproval(nativeBuiltinApprovalClassifier('deckent_grep'), { pattern: 'foo', path: 'src' }, 'src'))
+      .toEqual({ scope: 'file-read', risk: 'low', scopeId: 'deckent_grep', resource: 'src' });
+    expect(classifyNativeToolApproval(nativeBuiltinApprovalClassifier('deckent_glob'), { pattern: '**/*.ts' }, '**/*.ts'))
+      .toEqual({ scope: 'file-read', risk: 'low', scopeId: 'deckent_glob', resource: '**/*.ts' });
+  });
+
+  it('fail-closes read classifiers on invalid args or empty resource (no broad scope)', () => {
+    expect(classifyNativeToolApproval(nativeBuiltinApprovalClassifier('deckent_read_file'), {}, '')).toEqual({ reasonCode: 'NATIVE_PERMISSION_CLASSIFICATION_UNAVAILABLE' });
+    expect(classifyNativeToolApproval(nativeBuiltinApprovalClassifier('deckent_list_dir'), {}, '')).toEqual({ reasonCode: 'NATIVE_PERMISSION_CLASSIFICATION_UNAVAILABLE' });
+    expect(classifyNativeToolApproval(nativeBuiltinApprovalClassifier('deckent_list_dir'), { path: 'src' }, '.')).toEqual({ reasonCode: 'NATIVE_PERMISSION_CLASSIFICATION_UNAVAILABLE' });
+    expect(classifyNativeToolApproval(nativeBuiltinApprovalClassifier('deckent_grep'), { path: 'src' }, 'src')).toEqual({ reasonCode: 'NATIVE_PERMISSION_CLASSIFICATION_UNAVAILABLE' });
+    expect(classifyNativeToolApproval(
+      nativeBuiltinApprovalClassifier('deckent_list_dir'),
+      { file_path: 'docs' },
+      permissionResource('deckent_list_dir', { file_path: 'docs' }),
+    )).toEqual({ reasonCode: 'NATIVE_PERMISSION_CLASSIFICATION_UNAVAILABLE' });
+  });
+
+  it('preserves whitespace in list_dir path resource identity (no trim)', () => {
+    const args = { path: '  private  ' };
+    const resource = permissionResource('deckent_list_dir', args);
+    expect(resource).toBe('  private  ');
+    expect(classifyNativeToolApproval(nativeBuiltinApprovalClassifier('deckent_list_dir'), args, resource))
+      .toMatchObject({ scope: 'file-read', resource: '  private  ' });
   });
 });
 

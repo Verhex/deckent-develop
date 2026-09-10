@@ -35,7 +35,7 @@ import type { ContentWriter } from '../../agent/tool-result-broker.js';
 import type { ToolRegistry } from '../../agent/tools/registry.js';
 import { classifyNativeToolApproval } from '../../agent/native-tool-approval.js';
 import { createToolExposure } from '../../agent/tools/exposure.js';
-import { primaryResource, writeTargets, type PermissionResponse } from '../../agent/loop.js';
+import { permissionResource, writeTargets, type PermissionResponse } from '../../agent/loop.js';
 import { decide, resolveTier } from '../../agent/permission.js';
 import { checkSelfModifying } from '../../agent/guards/self-modifying.js';
 import { classifyShellCommand } from '../../agent/guards/shell-risk.js';
@@ -802,7 +802,7 @@ export function createParityExecImpl(ctx: ParityExecContext) {
     const callArgs = (args && typeof args === 'object' && !Array.isArray(args))
       ? (args as Record<string, unknown>)
       : {};
-    const resource = primaryResource(callArgs);
+    const resource = permissionResource(name, callArgs);
     const elevated = checkSelfModifying(ctx.cwd, writeTargets(callArgs)).elevated;
     let tier = resolveTier(def, ctx.policy);
     if (elevated) tier = 'always';
@@ -923,7 +923,7 @@ export function projectNativePermissionRoundItem(
 ): NativePermissionRoundItem | null {
   const def = deps.registry.get(call.tool);
   if (!def) return null;
-  const resource = primaryResource(call.args);
+  const resource = permissionResource(call.tool, call.args);
   const elevated = checkSelfModifying(deps.cwd, writeTargets(call.args)).elevated;
   let tier = resolveTier(def, deps.policy);
   const isShellTool = call.tool === 'bash' || call.tool.endsWith('_bash');

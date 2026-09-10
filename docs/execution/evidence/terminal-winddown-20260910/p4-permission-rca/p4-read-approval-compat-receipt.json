@@ -1,0 +1,24 @@
+{
+  "utc": "2026-09-10T22:14:00.000Z",
+  "assignment": "ENTRY169 P4-READ-APPROVAL-COMPAT + ENTRY172/174 REVISE",
+  "entry174DigestPrefix": "84fef55a33c9",
+  "verdict": "IMPLEMENTATION_LOCAL_VERIFIED",
+  "ownerPtyResolvedClaim": false,
+  "changedProductFiles": [
+    "src/agent/native-permission-resource.ts",
+    "src/agent/loop.ts",
+    "src/agent/native-tool-approval.ts",
+    "src/cli/repl/native-agent-bridge.ts",
+    "tests/agent/native-tool-approval.test.ts",
+    "tests/agent/native-read-approval-registry.test.ts",
+    "tests/agent/native-permission-session.test.ts",
+    "tests/cli/repl/native-permission-round.test.tsx",
+    "docs/execution/evidence/terminal-winddown-20260910/p4-permission-rca/probe-permission-path.test.ts"
+  ],
+  "verification": {
+    "vitest": "45/45 targeted approval+registry+session+round PASS",
+    "evidenceProbe": "6/6 PASS",
+    "build": "npm run build exit 0 (clean allowed; bot off)"
+  },
+  "notes": "permissionResource matches chat-tool-exec: list_dir path-only no trim; no file_path alias authority; grep/glob pattern resource; classifiers use same helper; nested call_tool parity tests added."
+}

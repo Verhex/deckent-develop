@@ -154,7 +154,7 @@ describe('7111 — bridge helpers', () => {
     const registry = new ToolRegistry();
     registry.register({ name: 'deckent_bash', description: 'b', inputSchema: {}, category: 'coding', tier: 'confirm', source: 'builtin', approval: nativeBuiltinApprovalClassifier('deckent_bash', { cwd: () => '/srv/p', platform: 'linux' }), handler: async () => ({ ok: true, output: '' }) });
     registry.register({ name: 'deckent_write_file', description: 'w', inputSchema: {}, category: 'coding', tier: 'confirm', source: 'builtin', approval: nativeBuiltinApprovalClassifier('deckent_write_file'), handler: async () => ({ ok: true, output: '' }) });
-    registry.register({ name: 'deckent_read_file', description: 'r', inputSchema: {}, category: 'coding', tier: 'silent', source: 'builtin', handler: async () => ({ ok: true, output: '' }) });
+    registry.register({ name: 'deckent_read_file', description: 'r', inputSchema: {}, category: 'coding', tier: 'silent', source: 'builtin', approval: nativeBuiltinApprovalClassifier('deckent_read_file'), handler: async () => ({ ok: true, output: '' }) });
     const deps = {
       registry, policy: SAFE_DEFAULT_POLICY, cwd: '/srv/p', platform: 'linux' as const,
       ruleStore: { activeRules: () => [], activeDenies: () => [{ tool: 'deckent_write_file', pattern: 'locked/**' }] },
@@ -164,7 +164,7 @@ describe('7111 — bridge helpers', () => {
     expect(projectNativePermissionRoundItem(deps, { id: 'b', tool: 'deckent_bash', args: { cmd: 'npm test' } })).toMatchObject({ scope: 'shell-exec', risk: 'medium', projection: 'confirm' });
     expect(projectNativePermissionRoundItem(deps, { id: 'c', tool: 'deckent_bash', args: { cmd: 'rm -rf build' } })).toMatchObject({ projection: 'floor' });
     expect(projectNativePermissionRoundItem(deps, { id: 'd', tool: 'deckent_write_file', args: { path: 'locked/a.ts' } })).toMatchObject({ scope: 'file-write', projection: 'denied' });
-    expect(projectNativePermissionRoundItem(deps, { id: 'e', tool: 'deckent_read_file', args: { path: 'a.ts' } })).toMatchObject({ scope: 'unclassified', projection: 'auto' });
+    expect(projectNativePermissionRoundItem(deps, { id: 'e', tool: 'deckent_read_file', args: { path: 'a.ts' } })).toMatchObject({ scope: 'file-read', risk: 'none', projection: 'auto' });
     expect(projectNativePermissionRoundItem(deps, { id: 'f', tool: 'nope', args: {} })).toBeNull();
     expect(projectNativePermissionRoundItem(deps, { id: 'g', tool: 'deckent_bash', args: { cmd: 'curl -H "Authorization: Bearer sk-abcdefghijklmnop" x' } })?.resource).not.toContain('sk-abcdefghijklmnop');
 

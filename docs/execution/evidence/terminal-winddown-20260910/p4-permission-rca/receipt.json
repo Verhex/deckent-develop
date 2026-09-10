@@ -1,0 +1,30 @@
+{
+  "utc": "2026-09-10T21:56:00.000Z",
+  "assignment": "ENTRY167 P4-PERMISSION-RCA evidence-only",
+  "entry167DigestPrefix": "4d5261562719",
+  "verdict": "RCA_COMPLETE_SCOPED_HOLD_ON_PTY_BRANCH",
+  "ownerSessionExactBranch": "HOLD — no archived tool-call ledger for chat-2026-09-10T21-09-07-050Z-ipknjv",
+  "deterministicProbe": {
+    "command": "npx vitest run --config docs/execution/evidence/terminal-winddown-20260910/p4-permission-rca/vitest.config.ts",
+    "result": "5/5 PASS",
+    "utc": "2026-09-10T21:55:14Z"
+  },
+  "unitTests": {
+    "command": "npx vitest run tests/agent/native-tool-approval.test.ts tests/agent/native-permission-session.test.ts",
+    "result": "19/19 PASS"
+  },
+  "productMutation": false,
+  "files": {
+    "src/agent/loop.ts": "3f7ceee33cb83e310ad0afefef15113b6dece8171e6da6e934de8504614a249d",
+    "src/agent/native-tool-approval.ts": "87d3e94ce3280251545bb7e30b26ed9ce54cec0b547866ab60364f8d7deac1f1",
+    "src/cli/repl/native-tool-registry.ts": "cab358d998d4a339db0953e868201d94ace0b96206d917ddf5f91b3a21bd0614",
+    "src/agent/permission.ts": "596b70ae25f9392d57bbd555b4beb858e289c6cbee0234a0b8686812feac9a4c",
+    "docs/execution/evidence/terminal-winddown-20260910/p4-permission-rca/ANALYSIS.md": "0c6855430160b87098a23a070c88a771a2e1ea916db704415c9a988b5970ec1a",
+    "docs/execution/evidence/terminal-winddown-20260910/p4-permission-rca/probe-permission-path.test.ts": "a98d0c6126fa490477caffaef5139cb0c97d96dfaa6a153449b8db3c587018db"
+  },
+  "recommendedNextImplementation": [
+    "file-read approval producers OR confirm tier policy audit",
+    "split classification-unavailable subcodes in loop.ts",
+    "structured logging on ask-blocked path"
+  ]
+}

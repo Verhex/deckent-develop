@@ -1,0 +1,14 @@
+{
+  "utc": "2026-09-10T22:11:06.467380+00:00",
+  "entry": 173,
+  "declaredDigest": "709ef96bb8ecd15f342c76fedf3da778f9e9aeda544212b9d68f25f40255a2b4",
+  "actualDigest": "6a6abf7443efc3c1657ad4fcef79602e72469499cf88faab5296b084ae4128df",
+  "consumed": false,
+  "codeVerdict": "REVISE_RESOURCE_DISPATCH_PARITY",
+  "probeExitCode": 0,
+  "findings": [
+    "path trim changes resource identity",
+    "file_path alias can authorize docs while dispatcher lists cwd",
+    "grep/glob ask path coverage absent"
+  ]
+}

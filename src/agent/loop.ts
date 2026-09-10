@@ -273,13 +273,8 @@ export interface LoopDeps {
   interimDeliverable?: InterimDeliverableTracker;
 }
 
-/** Best-effort primary resource for permission glob matching. Exported for the
- *  call_tool parity resolver (born-607) — a nested dispatch must derive the SAME
- *  resource this loop would, or deny-globs diverge between direct and nested paths. */
-export function primaryResource(args: Record<string, unknown>): string {
-  const v = args['path'] ?? args['file_path'] ?? args['cmd'] ?? args['url'] ?? args['pattern'] ?? '';
-  return typeof v === 'string' ? v : '';
-}
+import { primaryResource, permissionResource } from './native-permission-resource.js';
+export { primaryResource, permissionResource } from './native-permission-resource.js';
 
 /** Candidate write-target paths for the self-modifying guard. Exported for the
  *  call_tool parity resolver (born-607) — same rationale as primaryResource. */
@@ -993,7 +988,7 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         continue;
       }
       const resolveCurrentPermission = () => {
-        const resource = primaryResource(call.args);
+        const resource = permissionResource(call.name, call.args);
         const elevated = checkSelfModifying(deps.cwd, writeTargets(call.args)).elevated;
         let tier = resolveTier(def, deps.policy);
         const isShellTool = call.name === 'bash' || call.name.endsWith('_bash');

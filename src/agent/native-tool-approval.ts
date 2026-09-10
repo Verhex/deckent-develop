@@ -1,5 +1,6 @@
 import { classifyApprovalCommand } from '../core/approval-command-classification.js';
 import { resolveShellDialectForPlatform } from '../core/shell-readonly-classifier.js';
+import { permissionResource } from './native-permission-resource.js';
 import type {
   NativeToolApprovalClassification,
   NativeToolApprovalClassifier,
@@ -55,6 +56,23 @@ export function nativeBuiltinApprovalClassifier(
   }
   if (tool === 'deckent_git_add' || tool === 'deckent_git_commit') {
     return (_args, resource) => classified('git-mutation', 'high', tool, resource);
+  }
+  if (tool === 'deckent_read_file' || tool === 'deckent_list_dir' || tool === 'deckent_grep' || tool === 'deckent_glob') {
+    return (args, resource) => {
+      if (args['file_path'] !== undefined && args['file_path'] !== null) return null;
+      const expected = permissionResource(tool, args);
+      if (expected !== resource) return null;
+      if (tool === 'deckent_read_file') {
+        if (typeof args['path'] !== 'string' || args['path'].length === 0) return null;
+        return classified('file-read', 'none', tool, resource);
+      }
+      if (tool === 'deckent_list_dir') {
+        return classified('file-read', 'none', tool, resource);
+      }
+      const pattern = args['pattern'];
+      if (typeof pattern !== 'string' || pattern.length === 0) return null;
+      return classified('file-read', 'low', tool, resource);
+    };
   }
   return undefined;
 }
