@@ -21,6 +21,7 @@ import { approximateReasoningTokens } from '../../agent/reasoning-control.js';
 import { describeToolTarget, toolElapsedMs } from './tool-target.js';
 import type { CheckpointTrailLabels } from '../../agent/checkpoint-trail.js';
 import { CONTENT_REF_CODE_PREFIX, CONTENT_REF_REASON_CODES } from '../../agent/tools/content-ref-tool.js';
+import type { ReferenceDigestProgress } from '../../agent/reference-digest-types.js';
 import type { RequestMeasurementEvent } from '../../agent/events.js';
 import type { PermissionRequestEvent } from '../../agent/events.js';
 import { permittedNativePermissionLifetimes } from '../../agent/native-permission-binding.js';
@@ -99,10 +100,14 @@ export interface ReplEngine {
        * view can show a collapsed "thinking… ~N tokens" line while nothing
        * visible streams; `clear` when visible output or a tool takes over. */
       onReasoningActivity?: (event: NativeReasoningActivityEvent) => void;
+      /** 7113 D — live large-reference digest progress for the Workline's single
+       *  activity line. Absent callback ⇒ the bridge emits nothing at all. */
+      onReferenceActivity?: (event: NativeReferenceActivityEvent) => void;
       /** Privacy-safe admission fact for an actual provider request. An
        * admitted measurement never means the request completed or was sent. */
       onRequestMeasurement?: (event: RequestMeasurementEvent) => void;
     },
+    referenceInput?: StructuredTurnInput,
   ): Promise<void>;
   /**
    * born-493 (387-002) — bridges `/approve <mode>` to the native
@@ -117,6 +122,7 @@ export interface ReplEngine {
    * bare function value (e.g. a test fake) still structurally satisfies
    * ReplEngine.
    */
+  largeReferencesEnabled?: boolean;
   setApprovalMode?: (mode: ApprovalMode) => void;
   /**
    * NT-03 (553-002) — bridges REPL teardown to the AgentSession's own scratch-store
@@ -197,6 +203,13 @@ export type NativeToolActivityEvent =
     }
   | { readonly kind: 'clear'; readonly id?: string };
 
+/** 7113 D — string-free large-reference progress event. The bridge resolves
+ *  every label from the catalog; the view only chooses which one fits the width.
+ *  Counts and phase only — no source text and no model text ever ride it. */
+export type NativeReferenceActivityEvent =
+  | { readonly kind: 'progress'; readonly label: string; readonly compactLabel: string; readonly terminal: boolean }
+  | { readonly kind: 'clear' };
+
 /** 7108 — string-free reasoning indicator event; the label (with a `{tokens}`
  *  placeholder) is injected by this bridge from the localizer, never by the view. */
 export type NativeReasoningActivityEvent =
@@ -208,10 +221,60 @@ export type NativeReasoningActivityEvent =
  *  needs a live number, not a re-render per token. */
 const REASONING_ACTIVITY_RENDER_INTERVAL_MS = 200;
 const REASONING_ACTIVITY_LABEL_KEY = 'tui.native_reasoning_active';
+/** 7113 D — the digest program publishes at every real transition (per chunk on
+ *  a large source); the Workline repaints at the SAME cadence as the reasoning
+ *  indicator, and a terminal phase always repaints. */
+const REFERENCE_ACTIVITY_RENDER_INTERVAL_MS = REASONING_ACTIVITY_RENDER_INTERVAL_MS;
+const REFERENCE_ACTIVITY_LABEL_KEY = 'tui.native_reference_active';
+const REFERENCE_ACTIVITY_COMPACT_KEY = 'tui.native_reference_active_compact';
+const REFERENCE_PHASE_KEY_PREFIX = 'native.reference.phase.';
+const REFERENCE_UNKNOWN_KEY = 'native.reference.unknown';
+const REFERENCE_FAILURE_KEY_PREFIX = 'native.reference.failure.';
+const REFERENCE_REMEDY_KEY_PREFIX = 'native.reference.remedy.';
+const REFERENCE_INTERIM_SKIP_KEY_PREFIX = 'native.reference.interim-skip.';
+/** The typed skip reasons (agent/reference-digest-runner-types.ts). */
+const INTERIM_SKIP_REASONS: ReadonlySet<string> = new Set([
+  'not-due', 'budget-refused', 'unconfirmed-reservation', 'empty-answer', 'stopped',
+  'invalid-answer', 'seam-closed',
+]);
 const REASONING_RECOVERY_ACTION_KEY_PREFIX = 'native.reasoning_recovery.';
 
 /** Interpolate `{name}` placeholders from a coded signal's `vars`. The `action`
  *  var names a recovery action and is itself localized through the catalog. */
+/** 7113 D — bytes rendered in a stable, locale-neutral unit. Bytes are a
+ *  SEPARATE unit from tokens and are never summed with them. */
+export function formatReferenceBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
+}
+
+/** 7113 D — the Workline's single reference line, both widths. Every value is
+ *  the host's own projection; an unknown section total renders as unknown and
+ *  never as zero. */
+export function formatReferenceActivityLabels(input: {
+  progress: ReferenceDigestProgress;
+  t: (key: string) => string;
+  now: number;
+}): { label: string; compactLabel: string } {
+  const { progress, t } = input;
+  const phase = t(`${REFERENCE_PHASE_KEY_PREFIX}${progress.phase.toLowerCase()}`);
+  const unknown = t(REFERENCE_UNKNOWN_KEY);
+  const source = progress.sourcePath ?? `sha256:${progress.sourceDigest.slice(0, 12)}`;
+  const sections = progress.sections
+    ? `${progress.sections.covered}/${progress.sections.total}`
+    : unknown;
+  const elapsed = Math.max(0, Math.round((input.now - progress.startedAtMs) / 1000));
+  const fill = (text: string): string => text
+    .replace('{source}', source)
+    .replace('{phase}', phase)
+    .replace('{sections}', sections)
+    .replace('{bytes}', formatReferenceBytes(progress.sourceBytes))
+    .replace('{elapsed}', String(elapsed))
+    .replace('{failure}', progress.failure ? t(`${REFERENCE_FAILURE_KEY_PREFIX}${progress.failure.toLowerCase()}`) : '');
+  return { label: fill(t(REFERENCE_ACTIVITY_LABEL_KEY)), compactLabel: fill(t(REFERENCE_ACTIVITY_COMPACT_KEY)) };
+}
+
 export function applySignalVars(
   t: (key: string) => string,
   text: string,
@@ -220,15 +283,42 @@ export function applySignalVars(
   if (!vars) return text;
   let out = text;
   for (const [name, value] of Object.entries(vars)) {
+    // 7113 D — a typed reference failure reaches the user as a sentence, not as
+    // a raw code; an unlocalized code still falls back to itself rather than
+    // disappearing.
     const rendered = name === 'action'
       ? localizeOrFallback(t, `${REASONING_RECOVERY_ACTION_KEY_PREFIX}${value}`, value)
-      : value;
+      // 7113-E B-2 — a skip reason is a typed code; the user reads a sentence.
+      : name === 'reason' && INTERIM_SKIP_REASONS.has(value)
+        ? localizeOrFallback(t, `${REFERENCE_INTERIM_SKIP_KEY_PREFIX}${value}`, value)
+      : name === 'reason' && value.startsWith('REFERENCE_')
+        // 7113-E — a failure the OWNER can act on carries its remedy here, in
+        // the full sentence. The remedy is deliberately absent from the phrase
+        // itself, which also renders inside the one-line Workline indicator.
+        ? withReferenceRemedy(t, value, localizeOrFallback(t, `${REFERENCE_FAILURE_KEY_PREFIX}${value.toLowerCase()}`, value))
+        : value;
     out = out.split(`{${name}}`).join(rendered);
   }
   return out;
 }
 
+/**
+ * Typed reference failures that carry an owner-actionable remedy line. It is an
+ * explicit set, not a lookup-and-see: `getMessage` logs a missing-key warning on
+ * a miss, and a speculative lookup printed that warning into the real terminal
+ * for every failure code without a remedy (measured in the rev4 ingress run).
+ */
+const REFERENCE_REMEDY_CODES: ReadonlySet<string> = new Set(['REFERENCE_STRUCTURED_OUTPUT_UNAVAILABLE']);
+
+/** Append the localized remedy for a typed reference failure, when one exists. */
+function withReferenceRemedy(t: (key: string) => string, code: string, phrase: string): string {
+  if (!REFERENCE_REMEDY_CODES.has(code)) return phrase;
+  const remedy = localizeOrFallback(t, `${REFERENCE_REMEDY_KEY_PREFIX}${code.toLowerCase()}`, '');
+  return remedy ? `${phrase}. ${remedy}` : phrase;
+}
+
 export interface NativeEngineDeps {
+  referenceCapability?: import('../../agent/reference-session.js').ReferenceSessionCapability;
   adapter: ProviderAdapter;
   registry: ToolRegistry;
   cwd: string;
@@ -555,6 +645,9 @@ const REFERENCE_DESCRIPTOR_FALLBACK_KEY = 'native.reference-descriptor-fallback'
 
 /** 7114 — catalog keys of the interaction-flow lines (bridge-owned, EN+TR). */
 const INTERIM_DELIVERABLE_REQUIRED_KEY = 'native.interim_deliverable_required';
+const INTERIM_DELIVERABLE_FINAL_KEY = 'native.interim_deliverable_final';
+const INTERIM_DELIVERABLE_FAILURE_STOP_KEY = 'native.interim_deliverable_failure_stop';
+const INTERIM_DELIVERABLE_OVERDUE_KEY = 'native.interim_deliverable_overdue';
 const TURN_INTERRUPTED_KEY = 'native.turn_interrupted';
 const TOOL_ELAPSED_KEY = 'native.tool_elapsed';
 
@@ -653,7 +746,13 @@ export function localizeNativeAgentSignal(
   fallback: string,
 ): string {
   if (!code) return fallback;
-  const key = NATIVE_AGENT_SIGNAL_KEYS.has(code) ? code : `native.${code}`;
+  // 7113-E-LOCALIZATION — three cases, in order. An allow-listed code is its own
+  // key; a code that ALREADY carries the `native.` namespace is used as-is
+  // (prefixing it again looked up `native.native.…`, which is why the real run
+  // 2026-09-10T01:28Z printed the bare key `native.reference.unavailable` with
+  // no cause); anything else keeps the historical `native.` prefixing. An
+  // unknown key still falls back to the caller's text, exactly as before.
+  const key = NATIVE_AGENT_SIGNAL_KEYS.has(code) || code.startsWith('native.') ? code : `native.${code}`;
   return localizeOrFallback(t, key, fallback);
 }
 
@@ -916,13 +1015,24 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   // byte-identical to pre-7089.
   const hydrated: ProviderMessage[] = [];
   const withHydratedPrefix = (req: ProviderRequest): ProviderRequest =>
-    (hydrated.length === 0 ? req : { ...req, messages: [...hydrated, ...req.messages] });
+    // 7113-E D1 — `reference-interim` joins the isolated purposes. It is a
+    // reference-program request like the other two: its ONLY input is validated
+    // digest evidence, and prepending the parent conversation would leak that
+    // history into a child request the whole design keeps isolated (caught by
+    // the hydrated-bridge test, 2026-09-10).
+    (hydrated.length === 0 || req.purpose === 'reference-map' || req.purpose === 'reference-reduce'
+      || req.purpose === 'reference-interim' ? req : { ...req, messages: [...hydrated, ...req.messages] });
   const hydrating = (base: ProviderAdapter): ProviderAdapter => ({
     get name() { return base.name; },
     // 7108 — the reasoning-control authority is a per-model capability, not a
     // request; it rides through untouched so the loop's ceiling arithmetic
     // sees the SAME descriptor the transport maps onto the wire.
     ...(base.reasoningControl ? { reasoningControl: base.reasoningControl } : {}),
+    // 7113-E — the schema-enforcement authority is a per-model capability too.
+    // This projection copies capabilities field by field, so a capability that
+    // is not named here is SILENTLY dropped: the reference program would then
+    // resolve "no evidence" and hold, even though the transport can enforce.
+    ...(base.structuredOutputControl ? { structuredOutputControl: base.structuredOutputControl } : {}),
     ...(base.requestMeasurement
       // Measure the request the backend will actually receive — a measurement
       // that ignored the prefix would under-count and fail admission OPEN.
@@ -961,6 +1071,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
       : {}),
     ...(deps.scratch ? { scratch: { ...deps.scratch, checkpointInstruction: CHECKPOINT_INSTRUCTION } } : {}),
     ...(deps.contentStore ? { contentStore: deps.contentStore } : {}),
+    ...(deps.referenceCapability ? { referenceCapability: deps.referenceCapability } : {}),
     ...(deps.measurementAuthority ? { measurementAuthority: deps.measurementAuthority } : {}),
     checkpointLabels: buildCheckpointTrailLabels(t),
     // 7114 — one clock: the session's interim-deliverable tracker and this
@@ -1031,7 +1142,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   let cancelRequestedForTurn = false;
   const nowMs = (): number => deps.now?.() ?? Date.now();
 
-  const runTurnInner: ReplEngine = async (input, cbs) => {
+  const runTurnInner: ReplEngine = async (input, cbs, referenceInput) => {
     permissionWaitAbort = new AbortController();
     cancelRequestedForTurn = false;
     const turnStartedMs = nowMs();
@@ -1045,7 +1156,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     // 560-004: the three carriers are separated HERE, at the last seam before the
     // session — the live turn still rides the expanded payload, but a context
     // epoch now compacts onto the raw intent plus reference identity.
-    const { lineage, descriptorCount } = deriveAtRefLineage(input);
+    const { lineage, descriptorCount } = referenceInput ? { lineage: referenceInput, descriptorCount: 0 } : deriveAtRefLineage(input);
     // 562-003 — ONE typed info line per turn when Task 1's budget-aware @ref
     // expansion (at-ref.ts's expandAtRefs) fell back to a descriptor for at least
     // one reference. Rendered BEFORE dispatch: this is a heads-up on what the
@@ -1065,6 +1176,15 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     // takes over. Counts only — the reasoning text never reaches this layer.
     let reasoningIndicatorShown = false;
     let reasoningIndicatorLastRenderMs = 0;
+    // 7113 D — Workline repaint bookkeeping for the reference line.
+    let referenceIndicatorShown = false;
+    let referenceIndicatorLastRenderMs = 0;
+    let referenceAuditedPhase: string | undefined;
+    const clearReferenceIndicator = (): void => {
+      if (!referenceIndicatorShown) return;
+      cbs.onReferenceActivity?.({ kind: 'clear' });
+      referenceIndicatorShown = false;
+    };
     const clearReasoningIndicator = (): void => {
       if (!reasoningIndicatorShown) return;
       cbs.onReasoningActivity?.({ kind: 'clear' });
@@ -1086,6 +1206,36 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           clearReasoningIndicator();
           cbs.output(ev.text);
           break;
+        case 'reference-progress': {
+          const terminal = ev.progress.phase === 'COMPLETE' || ev.progress.phase === 'PARTIAL'
+            || ev.progress.phase === 'FAILED' || ev.progress.phase === 'CANCELLED';
+          // A phase transition is a durable fact: audited once, counts only.
+          if (referenceAuditedPhase !== ev.progress.phase) {
+            referenceAuditedPhase = ev.progress.phase;
+            writeAuditEvent(deps.cwd, NATIVE_AGENT_AUDIT_PARTITION, {
+              tenantId: deps.scratch?.tenantId ?? 'local',
+              actor: 'native-agent',
+              action: `reference-digest.${ev.progress.phase.toLowerCase()}`,
+              target: deps.scratch?.sessionId ?? 'session',
+              metadata: {
+                sourceBytes: ev.progress.sourceBytes, coveredBytes: ev.progress.coveredBytes,
+                mapRequests: ev.progress.requests.map, reduceRequests: ev.progress.requests.reduce,
+                inputTokens: ev.progress.usage.inputTokens, outputTokens: ev.progress.usage.outputTokens,
+                ...(ev.progress.sections ? { sectionsCovered: ev.progress.sections.covered, sectionsTotal: ev.progress.sections.total } : {}),
+                ...(ev.progress.failure ? { failure: ev.progress.failure } : {}),
+              },
+            });
+          }
+          if (!cbs.onReferenceActivity) break;
+          const now = nowMs();
+          // Throttle the repaint, never the facts: a terminal phase always paints.
+          if (!terminal && referenceIndicatorShown && now - referenceIndicatorLastRenderMs < REFERENCE_ACTIVITY_RENDER_INTERVAL_MS) break;
+          referenceIndicatorLastRenderMs = now;
+          referenceIndicatorShown = true;
+          clearReasoningIndicator();
+          cbs.onReferenceActivity({ kind: 'progress', terminal, ...formatReferenceActivityLabels({ progress: ev.progress, t, now: Date.now() }) });
+          break;
+        }
         case 'reasoning-activity': {
           if (!cbs.onReasoningActivity) break;
           const now = Date.now();
@@ -1272,10 +1422,25 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           // answer streams next through the ordinary text-delta path; this
           // line tells the user WHY the assistant is about to report.
           clearReasoningIndicator();
-          if (ev.phase === 'required') {
-            cbs.output(`\n[${t(INTERIM_DELIVERABLE_REQUIRED_KEY)
-              .replace('{toolCalls}', String(ev.toolCalls))
-              .replace('{elapsed}', String(Math.round(ev.elapsedMs / 1000)))}]\n`);
+          // 7114-b — each ask says WHY it is being made: a routine interim, the
+          // honest final answer forced by the per-turn tool ceiling, the stop on
+          // a repeatedly failing target, or an overdue answer the host cannot
+          // cut short. Counts only; never the model's text.
+          const interimKey = ev.phase === 'overdue'
+            ? INTERIM_DELIVERABLE_OVERDUE_KEY
+            : ev.phase === 'required'
+              ? ev.demand === 'final'
+                ? INTERIM_DELIVERABLE_FINAL_KEY
+                : ev.demand === 'failure-stop' ? INTERIM_DELIVERABLE_FAILURE_STOP_KEY : INTERIM_DELIVERABLE_REQUIRED_KEY
+              : undefined;
+          if (interimKey) {
+            cbs.output(`\n[${t(interimKey)
+              // The budget line names the TURN's own count, not the count since
+              // the last delivery: those are different facts.
+              .replace('{toolCalls}', String(ev.demand === 'final' ? (ev.toolCallsThisTurn ?? ev.toolCalls) : ev.toolCalls))
+              .replace('{elapsed}', String(Math.round(ev.elapsedMs / 1000)))
+              .replace('{target}', ev.target ?? '')
+              .replace('{attempts}', String(ev.attempts ?? 0))}]\n`);
           }
           // Privacy-safe audit: phase, trigger and counters only — never text.
           writeAuditEvent(deps.cwd, NATIVE_AGENT_AUDIT_PARTITION, {
@@ -1283,7 +1448,12 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
             actor: 'native-agent',
             action: `interim-deliverable.${ev.phase}`,
             target: deps.scratch?.sessionId ?? 'session',
-            metadata: { ...(ev.trigger ? { trigger: ev.trigger } : {}), toolCalls: ev.toolCalls, elapsedMs: ev.elapsedMs },
+            metadata: {
+              ...(ev.trigger ? { trigger: ev.trigger } : {}),
+              ...(ev.demand ? { demand: ev.demand } : {}),
+              ...(ev.attempts !== undefined ? { attempts: ev.attempts } : {}),
+              toolCalls: ev.toolCalls, elapsedMs: ev.elapsedMs,
+            },
           });
           break;
         }
@@ -1315,7 +1485,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
         // 'turn-end' falls through.
         }
       }
-    } finally { clearActiveTool(); clearReasoningIndicator(); }
+    } finally { clearActiveTool(); clearReasoningIndicator(); clearReferenceIndicator(); }
     // 7114 — an interrupted turn closes with what actually happened. Rides the
     // same output stream as the streamed text, so the partial narration and
     // the last interim deliverable stay above it in order (never discarded).
@@ -1345,10 +1515,10 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   // extra Promise hops, no queue reads at all).
   // TERMINAL-TOOLS-008 — in-flight bookkeeping for cancelTurn (below): the
   // seam must refuse while idle, so a stray Esc never cancels the NEXT turn.
-  const runTurn: ReplEngine = async (input, cbs) => {
+  const runTurn: ReplEngine = async (input, cbs, referenceInput) => {
     turnsInFlight++;
     try {
-      await runTurnInner(input, cbs);
+      await runTurnInner(input, cbs, referenceInput);
     } finally {
       permissionWaitAbort?.abort();
       permissionWaitAbort = undefined;
@@ -1358,10 +1528,10 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   const bgQueue = deps.bgQueue;
   const engine: ReplEngine = (!bgQueue || !deps.bgTurnsEnabled)
     ? runTurn
-    : async (input, cbs) => {
+    : async (input, cbs, referenceInput) => {
         bgQueue.userTurnActive = true;
         try {
-          await runTurn(input, cbs);
+          await runTurn(input, cbs, referenceInput);
         } finally {
           bgQueue.userTurnActive = false;
         }
@@ -1375,6 +1545,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           await runTurn(formatBgTurnInput(payload), cbs);
         }
       };
+  engine.largeReferencesEnabled = deps.nativeBudget?.largeReference?.enabled === true;
   // TERMINAL-TOOLS-010 — `/context` and `/compact` seams (run.tsx withContextSlashes).
   engine.contextSnapshot = () => session.contextSnapshot();
   engine.compactContext = async (callbacks) => {

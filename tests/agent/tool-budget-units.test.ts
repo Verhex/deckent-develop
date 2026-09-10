@@ -192,10 +192,10 @@ describe('runAgentTurn retained tool-result checkpoints (7109)', () => {
     expect(checkpoints[0]).toMatchObject({
       pressure: {
         retainedTokens: expect.any(Number),
-        capTokens: Math.floor(WINDOW_131K * budget.maxTurnToolResultShareOfContext * budget.contextHighWaterRatio),
+        capTokens: Math.floor(WINDOW_131K * budget.contextHighWaterRatio),
         windowTokens: WINDOW_131K,
         quality: 'exact',
-        scope: 'tool-results',
+        scope: 'full-request',
       },
     });
   });

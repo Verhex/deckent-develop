@@ -54,8 +54,15 @@ describe('execution_budget config round-trip', () => {
     );
     // KN2: the default config contributes a landing block; global/project
     // overlays deep-merge ON TOP of it, so the merged policy carries the
-    // default landing unless an overlay overrides it.
+    // default landing unless an overlay overrides it. 7114-b adds the three
+    // owner-facing deliverable bounds to that same canonical default block, so
+    // an overlay that does not mention them inherits them here too.
     expect(resolved.execution_budget).toEqual({
+      native_agent: {
+        maxInterimRequestsPerTurn: 3,
+        maxToolCallsPerTurn: 40,
+        maxConsecutiveFailuresPerTarget: 3,
+      },
       roles: {
         worker: {
           // Field-wise deep-merge: the overlay's keys win, the default's

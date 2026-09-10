@@ -1,3 +1,4 @@
+import type { StructuredTurnInput } from '../../agent/session.js';
 // ═══ Ink REPL App (Sprint 224 — native TUI via React-for-CLI) ════════════════
 //
 // Why Ink: the hand-rolled raw-ANSI TUI could not deliver native feel (multi-line
@@ -28,10 +29,10 @@ import { StatusRow, formatSessionIdForTerminal } from './status-row.js';
 import { resolveCtrlC, CTRL_C_EXIT_WINDOW_MS } from './interrupt-policy.js';
 import { useTerminalColumns } from './use-terminal-columns.js';
 import { TerminalViewportContext } from './terminal-resize-mediator.js';
-import { expandAtRefs } from './at-ref.js';
+import { extractAtRefs, expandAtRefs } from './at-ref.js';
 import { resolveSlash, type SlashRegistry } from '../commands/chat-slash-registry.js';
 import type { ChatMode } from '../commands/chat-mode.js';
-import type { NativeReasoningActivityEvent, NativeToolActivityEvent, ReplEngine } from './native-agent-bridge.js';
+import type { NativeReasoningActivityEvent, NativeReferenceActivityEvent, NativeToolActivityEvent, ReplEngine } from './native-agent-bridge.js';
 import type { RequestMeasurementEvent } from '../../agent/events.js';
 import {
   formatNativeRequestMetricDetail,
@@ -1344,7 +1345,7 @@ export function resolveSwitchGate(
  * project dependency; see tests/cli/repl-turn-exception.test.ts).
  */
 export async function runNativeTurnLoop(
-  lines: AsyncIterable<string>,
+  lines: AsyncIterable<string | StructuredTurnInput>,
   engine: ReplEngine,
   cbs: {
     output: (text: string) => void;
@@ -1353,6 +1354,8 @@ export async function runNativeTurnLoop(
     onToolActivity?: (event: NativeToolActivityEvent, turnId: number) => void;
     /** 7108 — collapsed hidden-reasoning progress for the phase anchor. */
     onReasoningActivity?: (event: NativeReasoningActivityEvent, turnId: number) => void;
+    /** 7113 D — large-reference digest progress for the same single line. */
+    onReferenceActivity?: (event: NativeReferenceActivityEvent, turnId: number) => void;
     /** Captured once before each engine call; callers can invalidate a prior
      * chat attribution without suppressing measurements from the next turn. */
     measurementAttribution?: () => number;
@@ -1369,7 +1372,9 @@ export async function runNativeTurnLoop(
   now: () => number = () => performance.now(),
 ): Promise<void> {
   let turnId = 0;
-  for await (const line of lines) {
+  for await (const item of lines) {
+    const line = typeof item === 'string' ? item : item.expandedPayload;
+    const referenceInput = typeof item === 'string' ? undefined : item;
     const currentTurnId = ++turnId;
     const measurementAttribution = cbs.measurementAttribution?.();
     const startMs = now();
@@ -1383,7 +1388,7 @@ export async function runNativeTurnLoop(
       : cbs.output;
     let turnOpen = true;
     try {
-      await engine(line, {
+      const engineCallbacks: Parameters<ReplEngine>[1] = {
         output: captureOutput,
         onTurnEnd: measuredOnTurnEnd(startMs, now, cbs.onTurnStats),
         ...(cbs.onToolActivity ? {
@@ -1396,19 +1401,27 @@ export async function runNativeTurnLoop(
             if (turnOpen) cbs.onReasoningActivity?.(event, currentTurnId);
           },
         } : {}),
+        ...(cbs.onReferenceActivity ? {
+          onReferenceActivity: (event) => {
+            if (turnOpen) cbs.onReferenceActivity?.(event, currentTurnId);
+          },
+        } : {}),
         ...(cbs.onRequestMeasurement ? {
           onRequestMeasurement: (event) => {
             if (turnOpen) cbs.onRequestMeasurement?.(event, currentTurnId, measurementAttribution);
           },
         } : {}),
-      });
-      cbs.persistTurn?.(line, assistantText);
+      };
+      if (referenceInput) await engine(line, engineCallbacks, referenceInput);
+      else await engine(line, engineCallbacks);
+      cbs.persistTurn?.(referenceInput?.rawIntent ?? line, assistantText);
     } catch (err) {
       cbs.onTurnError(err instanceof Error ? err.message : String(err));
     } finally {
       turnOpen = false;
       cbs.onToolActivity?.({ kind: 'clear' }, currentTurnId);
       cbs.onReasoningActivity?.({ kind: 'clear' }, currentTurnId);
+      cbs.onReferenceActivity?.({ kind: 'clear' }, currentTurnId);
     }
   }
 }
@@ -1839,6 +1852,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // 7108 — collapsed "thinking… ~N tokens" fact while hidden reasoning streams.
   const [nativeReasoningActivity, setNativeReasoningActivity] = useState<{
     turnId: number; approxTokens: number; label: string; generation: number;
+  } | null>(null);
+  // 7113 D — the large-reference digest's own progress fact for the SAME single
+  // activity line; it never opens a second line, card or stdin owner.
+  const [nativeReferenceActivity, setNativeReferenceActivity] = useState<{
+    turnId: number; label: string; compactLabel: string; generation: number;
   } | null>(null);
   const [healthAuthLine, setHealthAuthLine] = useState<string | null>(() => healthAuthFeed?.getSnapshot() ?? null);
   const nativeToolGenerationRef = useRef(0);
@@ -2487,7 +2505,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       }
     };
 
-    async function* inputIter(): AsyncGenerator<string> {
+    async function* inputIter(): AsyncGenerator<string | StructuredTurnInput> {
       for (;;) {
         while (queue.current!.size() > 0) {
           const line = queue.current!.dequeue() as string;
@@ -2520,7 +2538,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
             contextBudgetGetter,
             transcriptCharsRef.current + line.length,
           );
-          const expanded = atRefReader && !line.startsWith('/')
+          const referenceRequests = nativeEngine?.largeReferencesEnabled && !line.startsWith('/') ? extractAtRefs(line) : [];
+          const expanded = referenceRequests.length === 0 && atRefReader && !line.startsWith('/')
             ? expandAtRefs(line, atRefReader, expansionBudgetChars === undefined ? {} : { expansionBudgetChars }).prompt
             : line;
           // TERMINAL-TOOLS-011 — pending `!` shell outputs ride ahead of this
@@ -2529,9 +2548,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           if (shellPrefix.length > 0) shellNotesRef.current = [];
           const historicalContext = line.startsWith('/') ? null : pendingSprintContextRef.current;
           if (historicalContext) pendingSprintContextRef.current = null;
-          yield historicalContext
+          const outbound = historicalContext
             ? appendSprintHistoricalContext(shellPrefix + expanded, historicalContext)
             : shellPrefix + expanded;
+          yield referenceRequests.length > 0
+            ? { rawIntent: line, expandedPayload: outbound, references: [], referenceRequests }
+            : outbound;
           finalizeReply(); // turn finished streaming → close it out
           // 358-006: turn-end steer drain (busy-controls markIdle) — the SAME
           // "never mid-turn" contract as the ChatTurnQueue drain below: notes
@@ -2602,6 +2624,20 @@ export function ReplApp(props: ReplAppProps): ReactElement {
             && current.generation === generation
             && current.turnId === turnId
             && (event.id === undefined || current.id === event.id)
+            ? null
+            : current);
+        },
+        onReferenceActivity: (event, turnId) => {
+          if (!nativeLoopActive) return;
+          if (event.kind === 'progress') {
+            setNativeReferenceActivity((current) => current !== null && current.generation > generation
+              ? current
+              : { turnId, label: event.label, compactLabel: event.compactLabel, generation });
+            return;
+          }
+          setNativeReferenceActivity((current) => current !== null
+            && current.generation === generation
+            && current.turnId === turnId
             ? null
             : current);
         },
@@ -2690,7 +2726,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           activeSessionIdRef.current = id;
         },
         localStatusDetail: localChatContext,
-        input: inputIter(),
+        input: (async function* () { for await (const item of inputIter()) yield typeof item === 'string' ? item : item.expandedPayload; })(),
         // Stream tokens straight through the segmenter: completed lines/blocks flow
         // into the scrollback immediately (real-time readable — Alperen: "yukarıya
         // yazdır, beklemeyelim"); the in-progress partial line shows live + small.
@@ -3406,6 +3442,19 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       return clipTerminalCells(displayWidth(rich) <= budget ? rich : compact, budget, dualStreamOverflow);
     })()
     : null;
+  // 7113 D — the digest line shares the tool line's width budget and reflow
+  // rules; on a narrow terminal it degrades to the compact label, never wraps
+  // into a second Workline row.
+  const nativeReferenceActivityText = nativeReferenceActivity && replSurfaceEnabled
+    ? (() => {
+      const budget = Math.max(1, columns - displayWidth(`${glyphs.assistant} deckent ${glyphs.separator} `));
+      return clipTerminalCells(
+        displayWidth(nativeReferenceActivity.label) <= budget ? nativeReferenceActivity.label : nativeReferenceActivity.compactLabel,
+        budget,
+        dualStreamOverflow,
+      );
+    })()
+    : null;
   const nativeRequestMetricText = nativeRequestMeasurement && replSurfaceEnabled
     ? (() => {
       const phaseText = phase === 'thinking' ? labels.thinking : labels.generating;
@@ -3593,6 +3642,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
             instead of promising "your turn" (textual carrier, not layout). */}
         {nativeToolActivityText
           ? <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`${glyphs.separator} ${nativeToolActivityText}`}</Text></>
+          : nativeReferenceActivityText
+            ? <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`${glyphs.separator} ${nativeReferenceActivityText}`}</Text></>
           : phase === 'idle'
           ? <Text {...palette.muted}>{idleAnchorText}{nativeRequestMetricText ? ` ${glyphs.separator} ${nativeRequestMetricText}` : ''}</Text>
           : <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`${glyphs.separator} ${phaseAnchorText}${nativeRequestMetricText ? ` ${glyphs.separator} ${nativeRequestMetricText}` : ''}`}</Text></>}

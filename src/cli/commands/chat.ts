@@ -106,6 +106,8 @@ async function runConfiguredNativeChat(
     native_provider: nativeProvider,
     native_model: (cfg as { native_model?: string }).native_model,
     native_context_tokens: (cfg as { native_context_tokens?: number }).native_context_tokens,
+    // 7113-E — same real-ingress rule as the interactive entry.
+    native_structured_output_control: (cfg as { native_structured_output_control?: NativeTransportConfig['native_structured_output_control'] }).native_structured_output_control,
     providers: (cfg as { providers?: NativeTransportConfig['providers'] }).providers,
     local_llm: (cfg as { local_llm?: NativeTransportConfig['local_llm'] }).local_llm,
   };

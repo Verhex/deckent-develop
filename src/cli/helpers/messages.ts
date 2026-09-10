@@ -3959,6 +3959,10 @@ const BASE_MESSAGES: MessageMap = {
   // when at-ref.ts's expandAtRefs (562-001) could not fit one or more `@ref`
   // references inline within the measured budget and fell back to a descriptor
   // (path + size + digest) that the model reads itself via deckent_read_file.
+  'native.reference.unavailable': {
+    en: 'Reference analysis could not finish: {reason}. No complete analysis is claimed.',
+    tr: 'Referans analizi tamamlanamadı: {reason}. Tam analiz iddiası yok.',
+  },
   'native.reference-descriptor-fallback': {
     en: '{n} reference(s) exceeded the measured budget; switched to tool-mediated partial reads.',
     tr: '{n} referans ölçülen bütçeye sığmadı; araçlı parçalı okumaya geçildi.',

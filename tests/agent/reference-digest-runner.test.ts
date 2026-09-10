@@ -39,7 +39,8 @@ async function fixture(text = 'α😀\r\n'.repeat(40), partBytes = 128) {
       maxMapOutputTokens: 512, maxReduceOutputTokens: 512, maxResponseBytes: 8192, maxItems: 30, maxTextBytes: 2000,
       finalAnswerReserveTokens: 1024, contextSafetyReserveTokens: 100, concurrencyCap: 3, providerConcurrency: 2, tenantConcurrency: 2, measurementTimeoutMs: 1000 },
     ledger: { async reserve(id) { reserved.add(id); return true; }, async settle(id, usage) { if (settled.has(id)) expect(settled.get(id)).toEqual(usage); settled.set(id, usage); } },
-    adapter: { name: 'fixture', reasoningControl: () => descriptor, requestMeasurement: { async measure() { return { inputTokens: 100, provenance: 'fixture-exact' }; } },
+    adapter: { name: 'fixture', reasoningControl: () => descriptor,
+      structuredOutputControl: () => ({ toggle: { kind: 'openai.response_format.json_schema' as const }, provenance: 'configured' as const }), requestMeasurement: { async measure() { return { inputTokens: 100, provenance: 'fixture-exact' }; } },
       async *send(req) { calls.push(req); yield* respond(req, calls.length); } },
   };
   return { root, input, calls, settled, reserved, setRespond(fn: typeof respond) { respond = fn; } };
@@ -58,7 +59,9 @@ describe('7113 B measured digest and durable accounting', () => {
     const f = await fixture('data'); f.setRespond(async function* (req, n) { yield { type: 'text-delta', text: n === 1 ? '{}' : JSON.stringify(payload(req)) }; yield { type: 'usage', inputTokens: 100, outputTokens: 50 }; yield { type: 'done' }; });
     const result = await runReferenceDigest(f.input); expect(result.phase).toBe('ANSWERING'); expect(f.calls).toHaveLength(2); expect(result.usage).toEqual({ inputTokens: 200, outputTokens: 100 });
   });
-  it.each(['empty', 'oversize', 'foreign-citation', 'tool', 'length', 'reasoning'])('fails %s after one retry without fake coverage', async mode => {
+  // 7113-E: `length` is no longer a blind retry — a confirmed truncation is
+  // subdivided instead, so it has its own expectations below.
+  it.each(['empty', 'oversize', 'foreign-citation', 'tool', 'reasoning'])('fails %s after one retry without fake coverage', async mode => {
     const f = await fixture('data');
     f.setRespond(async function* (req) {
       const data = payload(req); if (mode === 'foreign-citation') data.claims[0]!.citations[0] = { sectionId: 'forged', byteStart: 0, byteEnd: 1 };
@@ -69,6 +72,25 @@ describe('7113 B measured digest and durable accounting', () => {
     });
     const result = await runReferenceDigest(f.input); expect(result.failure).toBe('REFERENCE_OUTPUT_INVALID'); expect(result.coveredRanges).toEqual([]); expect(f.calls).toHaveLength(2);
     await runReferenceDigest(f.input); expect(f.calls).toHaveLength(2);
+  });
+
+  it('a confirmed length truncation subdivides instead of repeating the same request, and stays finite', async () => {
+    const f = await fixture('data');
+    f.setRespond(async function* (req) {
+      yield { type: 'text-delta', text: JSON.stringify(payload(req)) };
+      yield { type: 'usage', inputTokens: 100, outputTokens: 50 };
+      yield { type: 'done', stopReason: 'length' };
+    });
+    const result = await runReferenceDigest(f.input);
+    expect(result.failure).toBe('REFERENCE_OUTPUT_INVALID');
+    // No fabricated coverage, and the program still terminates.
+    expect(result.coveredRanges).toEqual([]);
+    // Every child is a NEW, smaller request: no two calls carry the same source.
+    const sources = f.calls.map(call => JSON.parse(call.messages[0]!.content).data.source as string);
+    expect(new Set(sources).size).toBe(sources.length);
+    expect(sources.length).toBeGreaterThan(1);
+    // Each split halves the part: the shortest source is strictly smaller.
+    expect(Math.min(...sources.map(x => x.length))).toBeLessThan(Math.max(...sources.map(x => x.length)));
   });
   it('holds uncertain usage with a durable reservation and never repeats that request on resume', async () => {
     const f = await fixture('data'); f.setRespond(async function* (req) { yield { type: 'text-delta', text: JSON.stringify(payload(req)) }; yield { type: 'done' }; });

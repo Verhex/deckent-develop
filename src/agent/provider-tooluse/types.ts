@@ -5,6 +5,7 @@
 
 import type { NativeToolSchema } from '../tools/registry.js';
 import type { ReasoningControlDescriptor } from '../../core/model-registry-types.js';
+import type { StructuredOutputControlDescriptor } from '../../core/structured-output-control.js';
 
 /** 7108 — per-request hidden-reasoning directive. The LOOP decides (from the
  *  config-resolved policy, the model's registry descriptor and whether the
@@ -44,7 +45,17 @@ export interface ProviderMessage {
   toolCalls?: ToolCallRef[];
 }
 
+/** 7113-E — the exact JSON Schema a response must satisfy, named for the wire.
+ *  The schema is authored by the HOST from its own bounded policy; a model
+ *  never supplies it and no code path relaxes it. */
+export interface StructuredOutputDirective {
+  readonly name: string;
+  readonly schema: Readonly<Record<string, unknown>>;
+}
+
 export interface ProviderRequest {
+  /** Host-only dispatch purpose; transports never serialize this as model input. */
+  purpose?: 'reference-map' | 'reference-reduce' | 'reference-interim';
   /** Composed system prompt (identity.ts). */
   system: string;
   messages: ProviderMessage[];
@@ -59,6 +70,10 @@ export interface ProviderRequest {
    *  Absent → the field is omitted on the wire and the backend keeps its own
    *  default (behavior unchanged for callers that never set it). */
   outputCeilingTokens?: number;
+  /** 7113-E — ask the SERVER to enforce the response schema. A transport writes
+   *  it only when its descriptor names a mechanism that can; accepting the
+   *  directive and silently dropping it is forbidden. */
+  structuredOutput?: StructuredOutputDirective;
   /** 7108 — hidden-reasoning directive (see {@link ReasoningDirective}).
    *  Absent → the transport sends whatever the backend defaults to. */
   reasoning?: ReasoningDirective;
@@ -147,6 +162,10 @@ export interface ProviderAdapter {
   readonly name: string;
   readonly requestMeasurement?: ProviderRequestMeasurementCapability;
   readonly reasoningControl?: ProviderReasoningControlCapability;
+  /** 7113-E — this transport's structured-output evidence for one model.
+   *  Absent means the transport exposes no such mechanism at all, which the
+   *  caller must treat as a typed hold rather than a silent downgrade. */
+  readonly structuredOutputControl?: (model: string, signal?: AbortSignal) => StructuredOutputControlDescriptor | undefined | Promise<StructuredOutputControlDescriptor | undefined>;
   send(req: ProviderRequest): AsyncIterable<ProviderEvent>;
 }
 

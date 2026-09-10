@@ -36,6 +36,37 @@ describe('583/N2a — silent READ tools', () => {
     expect(await dispatch('deckent_grep', { pattern: '(' })).toContain('invalid regex');
   });
 
+  it('grep scans a multi-MB file with long lines via the dispatcher (7111-c)', async () => {
+    mkdirSync(join(root, 'wide'), { recursive: true });
+    const lines: string[] = [];
+    let bytes = 0;
+    while (bytes < 1_200_000) {
+      const idx = lines.length + 1;
+      lines.push(idx === 7 ? `DISPATCH-NEEDLE ${'z'.repeat(16_000)}` : `row-${idx} ${'q'.repeat(13_000)}`);
+      bytes += Buffer.byteLength(lines[lines.length - 1]!, 'utf8') + 1;
+    }
+    writeFileSync(join(root, 'wide', 'payload.txt'), lines.join('\n') + '\n', 'utf8');
+    const out = await dispatch('deckent_grep', { pattern: 'DISPATCH-NEEDLE', path: 'wide' });
+    expect(out).toContain('payload.txt:7:DISPATCH-NEEDLE');
+    expect(out).toContain('bytes elided');
+    expect(out).not.toBe('[deckent] no matches');
+  });
+
+  it('grep reports skipped too-large files instead of silent no-match', async () => {
+    writeFileSync(join(root, 'oversize.txt'), 'x'.repeat(17 * 1024 * 1024));
+    const out = await dispatch('deckent_grep', { pattern: 'x', path: '.' });
+    expect(out).toContain('skipped oversize.txt (too-large:');
+    expect(out).not.toBe('[deckent] no matches');
+  });
+
+  it('grep reports binary/read-error skip reasons when every file is skipped (7111-c REVISE)', async () => {
+    writeFileSync(join(root, 'bin.dat'), Buffer.from([0x48, 0x00, 0x65]));
+    const out = await dispatch('deckent_grep', { pattern: 'H', path: '.' });
+    expect(out).toContain('skipped bin.dat (binary: contains NUL byte)');
+    expect(out).toContain('not fully scanned');
+    expect(out).not.toBe('[deckent] no matches');
+  });
+
   it('glob matches ** and * against project-relative paths', async () => {
     const out = await dispatch('deckent_glob', { pattern: '**/*.ts' });
     expect(out).toContain('src/alpha.ts');

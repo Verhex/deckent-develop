@@ -11,11 +11,17 @@
 
 import { detectTransport, type TransportConfig } from '../../agent/provider-detect.js';
 import { ANTHROPIC_DEFAULT_BASE_URL, createAnthropicAdapter } from '../../agent/provider-tooluse/anthropic.js';
-import { createOpenAIAdapter, toOpenAIChatMessages, toOpenAIChatTools } from '../../agent/provider-tooluse/openai.js';
+import {
+  createOpenAIAdapter,
+  mapReasoningDirectiveToWire,
+  toOpenAIChatMessages,
+  toOpenAIChatTools,
+} from '../../agent/provider-tooluse/openai.js';
 import { createOllamaAdapter } from '../../agent/provider-tooluse/ollama.js';
 import type {
   ProviderAdapter,
   ProviderContextIdentity,
+  ProviderReasoningControlCapability,
   ProviderRequest,
   ProviderRequestMeasurementCapability,
 } from '../../agent/provider-tooluse/types.js';
@@ -36,6 +42,13 @@ import {
   validateReasoningControlConfig,
 } from '../../core/reasoning-control.js';
 import { resolveProjectModelExecutionAuthority } from '../../core/model-activation-store.js';
+import {
+  createStructuredOutputControlResolver,
+  validateStructuredOutputControlConfig,
+  type StructuredOutputControlDescriptor,
+  type StructuredOutputControlResolver,
+} from '../../core/structured-output-control.js';
+import type { StructuredOutputControlConfig } from '../../core/config-types.js';
 import { getMessage } from '../helpers/messages.js';
 import { createStreamSegmenter, type Segment } from './stream-segmenter.js';
 import {
@@ -100,8 +113,111 @@ function llamaCppTemplateBody(req: Pick<ProviderRequest, 'model' | 'system' | 'm
   };
 }
 
+/** Race a descriptor probe against abort so non-cooperative awaits cannot park boot/measure. */
+async function awaitReasoningDescriptorWithSignal(
+  reasoningControl: ProviderReasoningControlCapability,
+  model: string,
+  signal: AbortSignal,
+): Promise<ReasoningControlDescriptor | undefined> {
+  if (signal.aborted) return undefined;
+  let onAbort: (() => void) | undefined;
+  try {
+    const descriptorPromise = Promise.resolve(reasoningControl(model, signal)).then(
+      (value) => value ?? undefined,
+    );
+    return await Promise.race([
+      descriptorPromise,
+      new Promise<undefined>((resolve) => {
+        onAbort = () => resolve(undefined);
+        signal.addEventListener('abort', onAbort, { once: true });
+      }),
+    ]);
+  } catch {
+    return undefined;
+  } finally {
+    if (onAbort) signal.removeEventListener('abort', onAbort);
+  }
+}
+
+/** 7109-c / 7113-E — apply-template must carry the same reasoning AND
+ *  structured-output wire fields as send(); a field that changes the rendered
+ *  prompt but is missing from the measurement body reproduces the 7109-c
+ *  constant-offset class. */
+/**
+ * The measurement body renders the PROMPT, so it carries exactly the fields that
+ * change the rendered prompt and nothing else.
+ *
+ * The reasoning directive belongs here: it becomes `chat_template_kwargs`, which
+ * the chat template reads, so omitting it would measure a different prompt than
+ * the one `send()` submits (the 7109-c defect).
+ *
+ * The 7113-E structured-output directive deliberately does NOT belong here, and
+ * that is a MEASURED decision, not a general claim about the field. On the
+ * installed build (`b10398-8e7f22b67`, model `Qwen3.8-27B-Q4_K_M`,
+ * `proof/apply-template-field.json`) `/apply-template` ACCEPTS a body carrying
+ * `response_format` and renders a byte-identical prompt: same digest, same 242
+ * bytes, with and without it. So the field cannot move the prompt-token count
+ * here, and carrying it would add nothing to the measurement. The end-to-end
+ * check agrees — the measured prompt equalled the provider-reported
+ * `prompt_tokens` (48 == 48) for a request that DID carry the field on the wire
+ * (`proof/enforcement-proof.json`).
+ *
+ * This is evidence for this endpoint and build, not a provider-neutral
+ * guarantee. A backend that folded the schema into the prompt would break the
+ * equality, which is exactly what the parity measurement would report.
+ * Parity here means prompt parity, not field-for-field parity.
+ */
+export async function buildLlamaCppApplyTemplateBody(
+  req: ProviderRequest,
+  reasoningControl?: ProviderReasoningControlCapability,
+  signal?: AbortSignal,
+): Promise<Record<string, unknown>> {
+  const body = llamaCppTemplateBody(req);
+  if (req.reasoning && reasoningControl) {
+    let descriptor: ReasoningControlDescriptor | undefined;
+    try {
+      descriptor = signal
+        ? await awaitReasoningDescriptorWithSignal(reasoningControl, req.model, signal)
+        : (await reasoningControl(req.model, signal)) ?? undefined;
+    } catch {
+      descriptor = undefined;
+    }
+    Object.assign(body, mapReasoningDirectiveToWire(req.reasoning, descriptor, body));
+  }
+  return body;
+}
+
 function llamaCppTokenizeBody(model: string, content: string): Record<string, unknown> {
   return { model, content, add_special: true };
+}
+
+/**
+ * 7113-E — resolve the owner-declared schema-enforcement evidence once, for
+ * whichever native endpoint is selected. An unrecognised dialect is a typed
+ * refusal, never a silent downgrade to "unknown": a downgrade would read as
+ * "the server just does not support it" and hide the owner's typo. An explicit
+ * `unknown` is NOT a typo — it is the honest default, and it falls through to
+ * the served model's catalog entry.
+ */
+function nativeStructuredOutputResolver(
+  config: NativeTransportConfig,
+): { resolver: StructuredOutputControlResolver } | { error: string; errorCode: string; detail: string } {
+  let configured: StructuredOutputControlDescriptor | undefined;
+  if (config.native_structured_output_control !== undefined) {
+    try {
+      configured = validateStructuredOutputControlConfig(
+        config.native_structured_output_control, 'native_structured_output_control');
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : String(error),
+        errorCode: 'invalid-structured-output-control',
+        detail: 'native_structured_output_control',
+      };
+    }
+  }
+  return {
+    resolver: createStructuredOutputControlResolver({ ...(configured ? { configured } : {}) }),
+  };
 }
 
 export interface ResolvedProvider {
@@ -132,6 +248,9 @@ function requestMeasurementCapability(input: {
   endpoint: string;
   fetchFn: typeof globalThis.fetch;
   headers?: Record<string, string>;
+  reasoningControl?: ProviderReasoningControlCapability;
+  /** 7113-E — same descriptor the transport uses, so the measured body and the
+   *  sent body carry identical schema fields. */
 }): ProviderRequestMeasurementCapability {
   const llamaRoot = input.kind === 'llama.cpp' ? llamaCppRootBase(input.endpoint) : undefined;
   return {
@@ -147,9 +266,10 @@ function requestMeasurementCapability(input: {
           ? { inputTokens: body.input_tokens, provenance: 'anthropic-count-tokens' }
           : null;
       }
+      const applyTemplateBody = await buildLlamaCppApplyTemplateBody(req, input.reasoningControl, signal);
       const templated = await input.fetchFn(new URL('apply-template', llamaRoot!).toString(), {
         method: 'POST', signal, headers: { 'content-type': 'application/json', ...input.headers },
-        body: JSON.stringify(llamaCppTemplateBody(req)),
+        body: JSON.stringify(applyTemplateBody),
       });
       if (!templated.ok) return null;
       const templateBody = await templated.json() as { prompt?: unknown };
@@ -177,6 +297,7 @@ export async function probeRequestMeasurementAuthority(input: {
   fetchFn?: typeof globalThis.fetch;
   headers?: Record<string, string>;
   timeoutMs?: number;
+  reasoningControl?: ProviderReasoningControlCapability;
 }): Promise<RequestMeasurementAuthorityStatus> {
   const fetchFn = input.fetchFn ?? globalThis.fetch;
   if (input.providerName === 'claude') {
@@ -206,24 +327,30 @@ export async function probeRequestMeasurementAuthority(input: {
   }
   if (input.providerName === 'local-llm' && input.endpoint) {
     const root = llamaCppRootBase(input.endpoint);
-    const probeRequest = {
+    const probeRequest: ProviderRequest = {
       model: input.model,
       system: '',
       messages: [{ role: 'user' as const, content: 'probe' }],
-      tools: [] as ProviderRequest['tools'],
+      tools: [],
+      reasoning: { mode: 'off' },
     };
-    const wireBytes = Buffer.byteLength(JSON.stringify(llamaCppTemplateBody(probeRequest)), 'utf8');
     const controller = new AbortController();
+    const wireBytes = Buffer.byteLength(JSON.stringify(llamaCppTemplateBody(probeRequest)), 'utf8');
     const timeout = setTimeout(
       () => controller.abort(),
       input.timeoutMs ?? resolveMeasurementTimeoutMs(wireBytes),
     );
     try {
+      const probeTemplateBody = await buildLlamaCppApplyTemplateBody(
+        probeRequest,
+        input.reasoningControl,
+        controller.signal,
+      );
       const templated = await fetchFn(new URL('apply-template', root).toString(), {
         method: 'POST',
         signal: controller.signal,
         headers: { 'content-type': 'application/json', ...input.headers },
-        body: JSON.stringify(llamaCppTemplateBody(probeRequest)),
+        body: JSON.stringify(probeTemplateBody),
       });
       if (templated.status === 404) return { state: 'unavailable', reason: 'http-404' };
       if (!templated.ok) return { state: 'unavailable', reason: 'schema' };
@@ -292,6 +419,10 @@ export function withMeasuredAdmission(input: {
     // wrapper unchanged, so the loop's ceiling arithmetic and the transport's
     // wire mapping read the SAME descriptor.
     ...(input.adapter.reasoningControl ? { reasoningControl: input.adapter.reasoningControl } : {}),
+    // 7113-E — the same is true of the schema-enforcement authority: the
+    // admission wrapper is a field-by-field projection, and a capability it
+    // does not name never reaches the reference program.
+    ...(input.adapter.structuredOutputControl ? { structuredOutputControl: input.adapter.structuredOutputControl } : {}),
     async *send(req: ProviderRequest) {
       const identity = typeof input.identity === 'function' ? await input.identity() : input.identity;
       const measurement = await measureProviderRequest({
@@ -382,6 +513,7 @@ export type NativeTransportConfig = TransportConfig & {
   };
   /** Resolved direct llama.cpp lifecycle authority shared with the CLI command. */
   local_llm?: { endpoint?: string; contextSize?: number; reasoningControl?: ReasoningControlConfig };
+  native_structured_output_control?: StructuredOutputControlConfig;
   /** 7108-b: `native_agent.reasoningProbeTimeoutMs` bounds the live descriptor probe. */
   execution_budget?: ExecutionBudgetPolicyConfig;
 };
@@ -807,6 +939,12 @@ export function resolveNativeSelection(
       // 7108 — registry descriptor only (hosted endpoints publish no template).
       reasoningControl: (wireModel) => resolveModelReasoningControl(wireModel),
     };
+    // 7113-E — the SAME provider-neutral key answers here: it describes the
+    // endpoint that was selected, not a particular server product. Owner
+    // evidence first, then the served model's catalog entry.
+    const hostedStructuredOutput = nativeStructuredOutputResolver(config);
+    if ('error' in hostedStructuredOutput) return { ...hostedStructuredOutput, provider: 'openai' };
+    opts.structuredOutputControl = (wireModel, signal) => hostedStructuredOutput.resolver.resolve(wireModel, signal);
     if (apiKey) opts.apiKey = apiKey;
     return measuredResolved({
       adapter: createOpenAIAdapter(opts), model, providerName: 'openai',
@@ -890,15 +1028,31 @@ export function resolveNativeSelection(
         endpoint, model: wireModel, fetchFn, timeoutMs: reasoningProbeTimeoutMs, ...(signal ? { signal } : {}),
       }),
     });
+    // 7113-E — schema-enforcement evidence for THIS endpoint: owner config for
+    // the endpoint, else the registry entry populated from
+    // `providers.registry[...].structuredOutputControl`. No probe is issued and
+    // no support is assumed from a model name; absent evidence resolves to
+    // `unknown`, and the reference program then holds honestly instead of
+    // sending a request whose contract nobody enforces.
+    const structuredOutput = nativeStructuredOutputResolver(config);
+    if ('error' in structuredOutput) return { ...structuredOutput, provider: 'local-llm' };
+    const resolveStructuredOutput = (wireModel: string, signal?: AbortSignal) =>
+      structuredOutput.resolver.resolve(wireModel, signal);
     return {
       ...measuredResolved({
         adapter: createOpenAIAdapter({
           baseUrl: endpoint, name: 'local-llm',
           reasoningControl: (wireModel, signal) => reasoningControl.resolve(wireModel, signal),
+          structuredOutputControl: resolveStructuredOutput,
         }),
         model: selectedModel,
         providerName: 'local-llm',
-        capability: requestMeasurementCapability({ kind: 'llama.cpp', endpoint, fetchFn }),
+        capability: requestMeasurementCapability({
+          kind: 'llama.cpp',
+          endpoint,
+          fetchFn,
+          reasoningControl: (wireModel, signal) => reasoningControl.resolve(wireModel, signal),
+        }),
         identity,
       }),
       endpointHealth: () => probeNativeEndpointHealth(endpoint, ctx.fetchFn),

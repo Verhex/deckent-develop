@@ -1,0 +1,221 @@
+{
+  "ok": false,
+  "skipped": false,
+  "payload": {
+    "schema": "terminal-acceptance-battery-v3",
+    "generatedAt": "2026-09-10T05:31:30.779Z",
+    "acceptanceDoc": "docs/execution/active/TERMINAL-FLUENCY-PROGRAM-001.md",
+    "runtime": {
+      "entryPath": "/tmp/deckent-terminal-integration-astra-20260910/dist/cli/entry.js",
+      "entrySha256": "c7df3d28480d8efa10b489353aa557435d2b03c0c56d7ac78e6bf5c73d45b118",
+      "gitHead": "df1130b27efaa9b1c05a99f3b0b76541f322e180",
+      "modelId": "Qwen3.8-27B-Q4_K_M",
+      "effectiveContextSize": 0,
+      "configuredContextSize": 131072,
+      "endpoint": "http://127.0.0.1:8080/v1"
+    },
+    "scenarios": [
+      {
+        "scenario": {
+          "id": "local-llm-32768-suggest",
+          "provider": "local-llm",
+          "contextSize": 32768,
+          "approvalMode": "suggest",
+          "requiresLocalLlm": true,
+          "interruptTest": false,
+          "prompt": "@docs/MASTER-PLAN.md dokümanını oku ve analiz et"
+        },
+        "expectedBinding": {
+          "provider": "local-llm",
+          "model": "Qwen3.8-27B-Q4_K_M",
+          "contextSize": 32768
+        },
+        "workspace": "/tmp/deckent-battery-Hs9vsd",
+        "metrics": {
+          "approvalCount": 0,
+          "toolCallCount": 0,
+          "toolCountAuthority": "rendered-rows-only",
+          "toolRowsAtFirstInterim": 0,
+          "toolLines": [],
+          "checkpointCount": 0,
+          "scratchCheckpointCount": 0,
+          "uiCheckpointCount": 0,
+          "tokenPressureCheckpointCount": 0,
+          "transportFailureCount": 0,
+          "measurementAuthority": "exact",
+          "bootStatus": {
+            "expectedProvider": "local-llm",
+            "expectedModel": "Qwen3.8-27B-Q4_K_M",
+            "bootProviderModelSeen": true,
+            "measurementExactSeen": true,
+            "providerMatch": true
+          },
+          "promptSent": true,
+          "promptEchoed": true,
+          "turnCompleted": true,
+          "turnEndMs": 150100,
+          "hasVisibleAnalysis": true,
+          "firstVisibleNarrativeMs": 105803,
+          "firstVisibleNarrativeText": "[ara yanıt istendi — son görünür sonuçtan bu yana 0 araç çağrısı / 106 sn; asistan şimdi bilinen · kalan · sonraki adımı",
+          "firstInterimDeliverableMs": 105803,
+          "interimDeliverableSeen": true,
+          "fakeContextCheckpointsInFirstWindow": 0,
+          "interruptPartialOnScreen": false,
+          "interruptPartialInTranscript": false,
+          "scrollbackBytes": 19474,
+          "elapsedMs": 141824,
+          "referenceIngressExercised": true,
+          "referencePartial": true,
+          "referenceFailed": false,
+          "referenceTypedUnavailable": true,
+          "referencePreDispatchUnavailable": false,
+          "referenceOutputInvalid": false,
+          "childMapRequests": 6,
+          "childReduceRequests": 0,
+          "referenceChildInvoked": true,
+          "referenceChildInvocationAuthority": "rendered-slash-receipt"
+        },
+        "acceptance": {
+          "checks": [
+            {
+              "id": "scenario-provider-match",
+              "pass": true,
+              "detail": {
+                "expectedProvider": "local-llm",
+                "expectedModel": "Qwen3.8-27B-Q4_K_M",
+                "bootProviderModelSeen": true,
+                "measurementExactSeen": true,
+                "providerMatch": true
+              }
+            },
+            {
+              "id": "prompt-sent-and-echoed",
+              "pass": true,
+              "detail": {
+                "promptSent": true,
+                "promptEchoed": true
+              }
+            },
+            {
+              "id": "turn-completed-before-timeout",
+              "pass": true,
+              "detail": {
+                "turnCompleted": true,
+                "turnEndMs": 150100,
+                "elapsedMs": 141824,
+                "timeoutMs": 180000
+              }
+            },
+            {
+              "id": "tool-calls-nonzero-or-reference-child",
+              "pass": true,
+              "disposition": "evaluated",
+              "detail": {
+                "toolCallCount": 0,
+                "toolCountAuthority": "rendered-rows-only",
+                "referenceChildInvoked": true,
+                "referenceChildInvocationAuthority": "rendered-slash-receipt",
+                "childMapRequests": 6,
+                "childReduceRequests": 0
+              }
+            },
+            {
+              "id": "visible-analysis-within-10m",
+              "pass": true,
+              "disposition": "evaluated",
+              "detail": {
+                "hasVisibleAnalysis": true,
+                "firstVisibleNarrativeText": "[ara yanıt istendi — son görünür sonuçtan bu yana 0 araç çağrısı / 106 sn; asistan şimdi bilinen · kalan · sonraki adımı",
+                "referencePartial": true,
+                "referenceFailed": false,
+                "referenceTypedUnavailable": true,
+                "referencePreDispatchUnavailable": false,
+                "elapsedMs": 141824,
+                "timeoutMs": 180000
+              }
+            },
+            {
+              "id": "no-fake-context-checkpoint-first-20-tools",
+              "pass": true,
+              "detail": {
+                "toolCallCount": 0,
+                "tokenPressureCheckpointCount": 0,
+                "measurementAuthority": "exact"
+              }
+            },
+            {
+              "id": "7114-first-visible-narrative-10s",
+              "pass": false,
+              "disposition": "evaluated",
+              "detail": {
+                "firstVisibleNarrativeMs": 105803,
+                "referencePartial": true,
+                "referenceFailed": false,
+                "limitMs": 10000
+              }
+            },
+            {
+              "id": "7114-interim-deliverable-bound",
+              "pass": false,
+              "disposition": "evaluated",
+              "detail": {
+                "firstInterimDeliverableMs": 105803,
+                "toolCallCount": 0,
+                "referenceIngressExercised": true,
+                "referencePartial": true,
+                "referenceFailed": false,
+                "holdReason": null,
+                "limits": {
+                  "ms": 90000,
+                  "toolCalls": 12
+                }
+              }
+            },
+            {
+              "id": "standard-readonly-approval-posture",
+              "pass": true,
+              "detail": {
+                "approvalMode": "suggest",
+                "approvalCount": 0
+              }
+            },
+            {
+              "id": "measurement-authority-exact",
+              "pass": true,
+              "detail": {
+                "measurementAuthority": "exact"
+              }
+            }
+          ],
+          "overall": "fail",
+          "failedIds": [
+            "7114-first-visible-narrative-10s",
+            "7114-interim-deliverable-bound"
+          ],
+          "holdIds": []
+        },
+        "exitCode": null,
+        "firstToolLines": [],
+        "observation": {
+          "firstVisibleNarrativeMs": 105803,
+          "firstVisibleNarrativeText": "[ara yanıt istendi — son görünür sonuçtan bu yana 0 araç çağrısı / 106 sn; asistan şimdi bilinen · kalan · sonraki adımı",
+          "firstInterimDeliverableMs": 105803,
+          "toolRowsAtFirstInterim": 0
+        },
+        "observationPath": "/tmp/deckent-battery-Hs9vsd/pty-observations.json",
+        "observationSha256": "41fece55bb2116038b973da05da8afc67747426167c20a3501531fc70f5d8328",
+        "firstVisibleNarrativePreview": "[ara yanıt istendi — son görünür sonuçtan bu yana 0 araç çağrısı / 106 sn; asistan şimdi bilinen · kalan · sonraki adımı",
+        "scrollbackPreview": "› /context\n● deckent\nBağlam\n  son isteğin penceresi: 32768 token\n  son gerçek istek: tur · kabul edildi · 8208 token (o istek penceresinin %25 kadarı) · kesin\n  sağlayıcı/model: local-llm · Qwen3.8-27B-Q4_K_M\n  ölçüm: 8208 token · kesin\n  istek kapasitesi: 28672 kullanılabilir · 32768 pencere\n  ölçüm kaynağı: llama.cpp-apply-template-tokenize\n  istek özeti: ff7583926ad56a699813022c302d8ffe8c9dd60843006ceb9ac126a9fba4c557\n  sağlayıcı bildirimleri: girdi 52795 · çıktı 9043 · bildirim 6\n  bağlam epoch: 1\n  mesaj: 1 · checkpoint önsözü: 0\n  checkpoint: empty\n  otomatik sıkıştırma pencerenin %75 doluluğunda\n  ön metin: 4157/4915 bütçe (pencerenin %13 kadarı) · 3 araç şeması\n  ölçüm otoritesi: kesin\n  ara teslimat: son teslimattan bu yana 0/12 araç çağrısı · 34/90 sn · teslim edilen 1 · host isteği 1\n  tur araç bütçesi: 0/40 çağrı · kalan host isteği 2\n  referans özeti: docs/MASTER-PLAN.md · kısmi\n  kaynak: 1.2 MiB · doğrulanan 48.0 KiB · bölüm 1/5\n  alt istek: 6 map · 0 reduce (üst sınır 12) · kullanım 52795 giriş / 9043 çıkış token\n  saklanan özet: bilinmiyor tokenin bilinmiyor kadarı (pencere bilinmiyor)\n  kalan süre: 9 sn · günlük: reference-journal:b7e2eda10deaec7aa7b522d51e77c924fe198834fcf8a6952a7106392b1254da\n  son hata: süre sınırına ulaşıldı\n⏱ 0.0s\n[Çalıştır]\nkimlik doğrulama: bilinmiyor\n✓ hazır · sıra sende · son gerçek istek: tur · kabul edildi · 8208 token (o istek penceresinin %25 kadarı) · kesin\n╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮\n│ › |                                                                                                                  │\n╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯\ndeckent  local-llm · Qwen3.8-27B-Q4_K_M  /tmp/deckent-battery-Hs9vsd  · Σ 9043 tok\n[Çalıştır]\nkimlik doğrulama: bilinmiyor\n✓ hazır · sıra sende · son gerçek istek: tur · kabul edildi · 8208 token (o istek penceres…  · çıkmak için tekrar Ctrl-C\n╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮\n│ › |                                                                                                                  │\n╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯\ndeckent  local-llm · Qwen3.8-27B-Q4_K_M  /tmp/deckent-battery-Hs9vsd  · Σ 9043 tok",
+        "skipped": false,
+        "skipReason": null
+      }
+    ],
+    "evidence": {
+      "jsonPath": "/tmp/deckent-terminal-integration-astra-20260910/docs/execution/evidence/7107/battery-2026-09-10T053130779Z.json",
+      "mdPath": "/tmp/deckent-terminal-integration-astra-20260910/docs/execution/evidence/7107/battery-2026-09-10T053130779Z.md"
+    }
+  },
+  "jsonPath": "/tmp/deckent-terminal-integration-astra-20260910/docs/execution/evidence/7107/battery-2026-09-10T053130779Z.json",
+  "mdPath": "/tmp/deckent-terminal-integration-astra-20260910/docs/execution/evidence/7107/battery-2026-09-10T053130779Z.md",
+  "lang": "tr"
+}

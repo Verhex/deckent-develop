@@ -1,0 +1,26 @@
+[
+  {
+    "file": "astra-main-landing-i18n.log",
+    "rawSha256": "df7da6cd33fda43eb682439deb25b785ea7b98aec3df0c04e8b03a1ea064eee0",
+    "committedSha256": "4832d17dd88e6bf554c6a6f8504210cf2632fe83be925d8adc9d13e645693d9d",
+    "transform": "trailing whitespace and terminal blank lines removed only; raw retained under /tmp"
+  },
+  {
+    "file": "astra-main-landing-tests.log",
+    "rawSha256": "0e15fdec7d7a18f63171e77999a6707c12fb61aec89ca7c74cd74d90e7ecadb1",
+    "committedSha256": "07e8f3b1d9f36e19f2b3e27a657e03b0ffc6a6155114d5bad363a4c5dbc45bee",
+    "transform": "trailing whitespace and terminal blank lines removed only; raw retained under /tmp"
+  },
+  {
+    "file": "astra-main-landing-tsc.log",
+    "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "committedSha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "transform": "trailing whitespace and terminal blank lines removed only; raw retained under /tmp"
+  },
+  {
+    "file": "astra-host-landing-tests.log",
+    "rawSha256": "5c0f04521f61d55839790745c099cfbefe57af6df18316be4e17f61484e17151",
+    "committedSha256": "10ca180d7d7722ee7ac59ed7665ae0883dc49f3f6fdffcb6c40e8c5d32ecc6b0",
+    "transform": "trailing whitespace and terminal blank lines removed only; raw retained under /tmp"
+  }
+]

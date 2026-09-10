@@ -24,6 +24,8 @@ import {
   sleepWithSignal,
 } from './transport-errors.js';
 import type { ReasoningControlDescriptor } from '../../core/model-registry-types.js';
+import type { StructuredOutputControlDescriptor } from '../../core/structured-output-control.js';
+import type { StructuredOutputDirective } from './types.js';
 
 export interface OpenAIAdapterOptions {
   baseUrl: string;
@@ -38,6 +40,8 @@ export interface OpenAIAdapterOptions {
    *  sources). Absent → no descriptor → a `reasoning` directive puts NOTHING on
    *  the wire (honest no-op), never a guessed field. */
   reasoningControl?: ProviderReasoningControlCapability;
+  /** 7113-E — per-model structured-output evidence for this transport. */
+  structuredOutputControl?: (model: string, signal?: AbortSignal) => StructuredOutputControlDescriptor | undefined | Promise<StructuredOutputControlDescriptor | undefined>;
   fetchImpl?: typeof fetch;
 }
 
@@ -66,6 +70,28 @@ export function mapReasoningDirectiveToWire(
     return { reasoning_effort: directive.mode === 'on' ? toggle.on : toggle.off };
   }
   return {};
+}
+
+/**
+ * 7113-E — the structured-output directive on the wire. Written ONLY when the
+ * descriptor names a mechanism that actually enforces it; an `none`/`unknown`
+ * descriptor writes nothing, and the caller is expected to have held before
+ * dispatch rather than sending an unenforced request. The shape is the
+ * OpenAI-compatible `response_format.json_schema` dialect — a llama.cpp GBNF
+ * grammar is a DIFFERENT mechanism and is deliberately not treated as an
+ * equivalent here.
+ */
+export function mapStructuredOutputDirectiveToWire(
+  directive: StructuredOutputDirective | undefined,
+  descriptor: StructuredOutputControlDescriptor | undefined,
+): Record<string, unknown> {
+  if (!directive || !descriptor || descriptor.toggle.kind !== 'openai.response_format.json_schema') return {};
+  return {
+    response_format: {
+      type: 'json_schema',
+      json_schema: { name: directive.name, strict: true, schema: directive.schema },
+    },
+  };
 }
 
 /** Outcome of the normalized output-ceiling resolution (RCA §2). `unresolved`
@@ -217,6 +243,7 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
   return {
     name: opts.name ?? 'openai',
     ...(opts.reasoningControl ? { reasoningControl: opts.reasoningControl } : {}),
+    ...(opts.structuredOutputControl ? { structuredOutputControl: opts.structuredOutputControl } : {}),
     async *send(req: ProviderRequest): AsyncIterable<ProviderEvent> {
       const v = validateProviderRequest(req);
       if (v) throw new Error(`invalid provider request: ${v}`);
@@ -248,6 +275,20 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
         // never delayed by a second /props round-trip.
         try { descriptor = (await opts.reasoningControl(req.model, req.signal)) ?? undefined; } catch { descriptor = undefined; }
         Object.assign(body, mapReasoningDirectiveToWire(req.reasoning, descriptor, body));
+      }
+      // 7113-E — schema enforcement, same discipline as the reasoning toggle:
+      // the descriptor decides, and a directive this transport cannot enforce
+      // is NEVER silently dropped — it throws, so the caller holds instead of
+      // sending a request whose contract nobody enforces.
+      if (req.structuredOutput) {
+        let structured: StructuredOutputControlDescriptor | undefined;
+        try { structured = (await opts.structuredOutputControl?.(req.model, req.signal)) ?? undefined; }
+        catch { structured = undefined; }
+        const fields = mapStructuredOutputDirectiveToWire(req.structuredOutput, structured);
+        if (Object.keys(fields).length === 0) {
+          throw new Error('structured output requested but this transport has no descriptor that enforces it');
+        }
+        Object.assign(body, fields);
       }
 
       // 7108 §3 — bounded retry (up to the caller's CONFIGURED count, 0..N) for

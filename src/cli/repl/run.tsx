@@ -215,7 +215,9 @@ import {
   type CliStructuredActionRequest,
 } from '../helpers/cli-tool-capture.js';
 import { createToolExecDispatcher, walkProjectFiles, readIgnoredDirs, resolveRealPathLenient } from '../commands/chat-tool-exec.js';
-import { createCachedPathLister, isScopedRelPath } from './at-ref.js';
+import { createCachedPathLister, isScopedRelPath, expandAtRefs } from './at-ref.js';
+import { REFERENCE_FAILURE_CODES } from '../../agent/reference-digest-types.js';
+import { formatReferenceBytes } from './native-agent-bridge.js';
 import { createPermissionStore } from '../commands/chat-permissions.js';
 import { classifyTool } from './tool-permissions.js';
 import { buildSlashRegistry } from '../commands/chat-slash-registry.js';
@@ -285,6 +287,20 @@ export function createResolvedNativeEngine(
   return factory({
     ...deps,
     nativeBudget,
+    ...(nativeBudget.largeReference.enabled && deps.contentStore ? {
+      referenceCapability: {
+        snapshot: (path, scope, signal, authorizeRead) => openScopedReferenceSnapshot({
+          resolveCwd: () => deps.cwd, path, scope, signal, authorizeRead,
+          store: deps.contentStore as SessionToolContentStore,
+          maxBytes: nativeBudget.largeReference.maxSourceBytes, maxWallTimeMs: nativeBudget.largeReference.maxWallTimeMs,
+        }),
+        inline: (raw, contents) => {
+          const value = expandAtRefs(raw, path => contents.get(path) ?? null);
+          return { prompt: value.prompt, references: value.refs.map(ref => ({ path: ref.path, digest: ref.digest, bytes: ref.bytes,
+            excerpt: (contents.get(ref.path) ?? '').slice(0, 320), ok: ref.ok, truncated: ref.truncated })) };
+        },
+      } satisfies import('../../agent/reference-session.js').ReferenceSessionCapability,
+    } : {}),
     // Back-compat for session implementations still reading the legacy seam.
     maxIterations: nativeBudget.maxModelRounds,
   });
@@ -806,10 +822,15 @@ export function resolveRenewSlash(
  * ReplEngine tomorrow rides through without touching this function.
  */
 export function withRenewSlash(engine: ReplEngine, labels: RenewSlashLabels): ReplEngine {
-  const wrapped: ReplEngine = async (input, cbs) => {
+  // 7113 D — the structured turn (referenceRequests) is the THIRD argument.
+  // run.tsx wraps every native engine, so a wrapper that drops it silently
+  // disables the whole large-reference path in production while unit tests
+  // that call the session directly stay green.
+  const wrapped: ReplEngine = async (input, cbs, referenceInput) => {
     const line = resolveRenewSlash(input, engine, labels);
     if (line === undefined) {
-      await engine(input, cbs);
+      if (referenceInput) await engine(input, cbs, referenceInput);
+      else await engine(input, cbs);
       return;
     }
     cbs.output(line);
@@ -854,10 +875,24 @@ export interface ContextSlashLabels extends NativeRequestMetricLabels {
   measurementReasonSchema?: string;
   measurementReasonUnsupported?: string;
   measurementReasonFailed?: string;
+  /** 7113 D — large-reference digest detail (host projection only). */
+  referenceHeader?: string;
+  referenceSource?: string;
+  referenceRequests?: string;
+  referenceRetained?: string;
+  referenceDeadline?: string;
+  referenceFailure?: string;
+  referenceUnknown?: string;
+  referencePhases?: Record<string, string>;
+  referenceFailures?: Record<string, string>;
   highWater: string;      // "auto-compaction at {percent}% of the window"
   refreshPlanned: string; // "a compaction is planned for the next turn"
   /** 7114 — interim-deliverable counters; optional so older label sets still type. */
   interimDeliverable?: string;
+  interimBudget?: string;
+  interimOverdue?: string;
+  interimExhausted?: string;
+  interimStoppedTarget?: string;
   interimDeliverablePending?: string;
   unknown: string;        // "unknown"
   unavailable: string;    // "/context is not available on this engine"
@@ -891,6 +926,16 @@ export function buildContextSlashLabels(t: (key: string) => string): ContextSlas
     measurementReasonSchema: t('native.measurement_authority.reason.schema'),
     measurementReasonUnsupported: t('native.measurement_authority.reason.unsupported_endpoint'),
     measurementReasonFailed: t('native.measurement_authority.reason.measurement_failed'),
+    referenceHeader: t('native-context.slash.reference_header'),
+    referenceSource: t('native-context.slash.reference_source'),
+    referenceRequests: t('native-context.slash.reference_requests'),
+    referenceRetained: t('native-context.slash.reference_retained'),
+    referenceDeadline: t('native-context.slash.reference_deadline'),
+    referenceFailure: t('native-context.slash.reference_failure'),
+    referenceUnknown: t('native.reference.unknown'),
+    referencePhases: Object.fromEntries((['admitting', 'snapshotting', 'mapping', 'reducing', 'answering', 'complete', 'partial', 'failed', 'cancelled'] as const)
+      .map(phase => [phase, t(`native.reference.phase.${phase}`)])),
+    referenceFailures: Object.fromEntries(REFERENCE_FAILURE_CODES.map(code => [code, t(`native.reference.failure.${code.toLowerCase()}`)])),
     contextTriggers: {
       'token-pressure': t('native-context.trigger.token_pressure'),
       overflow: t('native-context.trigger.overflow'),
@@ -901,6 +946,10 @@ export function buildContextSlashLabels(t: (key: string) => string): ContextSlas
     highWater: t('native-context.slash.high_water'),
     refreshPlanned: t('native-context.slash.refresh_planned'),
     interimDeliverable: t('native-context.slash.interim_deliverable'),
+    interimBudget: t('native-context.slash.interim_budget'),
+    interimOverdue: t('native-context.slash.interim_overdue'),
+    interimExhausted: t('native-context.slash.interim_exhausted'),
+    interimStoppedTarget: t('native-context.slash.interim_stopped_target'),
     interimDeliverablePending: t('native-context.slash.interim_deliverable_pending'),
     unknown: t('native-context.slash.unknown'),
     unavailable: t('native-context.slash.unavailable'),
@@ -997,6 +1046,58 @@ export function formatContextSnapshot(snapshot: ContextSnapshot, labels: Context
       .replace('{delivered}', String(interim.delivered))
       .replace('{requested}', String(interim.requested))}`);
     if (interim.pending && labels.interimDeliverablePending) lines.push(`  ${labels.interimDeliverablePending}`);
+    // 7114-b — the bounds that make the promise honest, in the same block.
+    if (labels.interimBudget) {
+      lines.push(`  ${labels.interimBudget
+        .replace('{calls}', String(interim.toolCallsThisTurn))
+        .replace('{callsLimit}', String(interim.toolCallsPerTurnLimit))
+        .replace('{requestsLeft}', String(interim.requestsRemaining))}`);
+    }
+    if (interim.overdue && labels.interimOverdue) lines.push(`  ${labels.interimOverdue}`);
+    if (interim.toolBudgetExhausted && labels.interimExhausted) lines.push(`  ${labels.interimExhausted}`);
+    if (interim.stoppedTarget && labels.interimStoppedTarget) {
+      lines.push(`  ${labels.interimStoppedTarget.replace('{target}', interim.stoppedTarget)}`);
+    }
+  }
+  // 7113 D — the large-reference digest block. Bytes and tokens stay separate
+  // units; an unknown value prints the unknown label, never 0. Absent progress
+  // means no digest program ran in this session, so the block is omitted whole.
+  const reference = snapshot.referenceProgress;
+  if (reference && labels.referenceHeader) {
+    const unknown = labels.referenceUnknown ?? '';
+    const source = reference.sourcePath ?? `sha256:${reference.sourceDigest.slice(0, 12)}`;
+    lines.push(`  ${labels.referenceHeader
+      .replace('{source}', source)
+      .replace('{phase}', labels.referencePhases?.[reference.phase.toLowerCase()] ?? reference.phase)}`);
+    if (labels.referenceSource) {
+      lines.push(`  ${labels.referenceSource
+        .replace('{bytes}', formatReferenceBytes(reference.sourceBytes))
+        .replace('{coveredBytes}', formatReferenceBytes(reference.coveredBytes))
+        .replace('{sections}', reference.sections ? `${reference.sections.covered}/${reference.sections.total}` : unknown)}`);
+    }
+    if (labels.referenceRequests) {
+      lines.push(`  ${labels.referenceRequests
+        .replace('{map}', String(reference.requests.map))
+        .replace('{reduce}', String(reference.requests.reduce))
+        .replace('{cap}', String(reference.requests.cap))
+        .replace('{input}', String(reference.usage.inputTokens))
+        .replace('{output}', String(reference.usage.outputTokens))}`);
+    }
+    if (labels.referenceRetained) {
+      lines.push(`  ${labels.referenceRetained
+        .replace('{digest}', reference.retained ? String(reference.retained.digestTokens) : unknown)
+        .replace('{cap}', reference.retained ? String(reference.retained.capTokens) : unknown)
+        .replace('{window}', reference.retained ? String(reference.retained.windowTokens) : unknown)}`);
+    }
+    if (labels.referenceDeadline) {
+      lines.push(`  ${labels.referenceDeadline
+        .replace('{seconds}', String(Math.round(reference.deadlineRemainingMs / 1000)))
+        .replace('{journal}', reference.journalRef ?? unknown)}`);
+    }
+    if (reference.failure && labels.referenceFailure) {
+      lines.push(`  ${labels.referenceFailure
+        .replace('{failure}', labels.referenceFailures?.[reference.failure] ?? reference.failure)}`);
+    }
   }
   return lines.join('\n');
 }
@@ -1036,14 +1137,19 @@ export async function resolveCompactSlash(
 /** Wrap an engine so `/context` and `/compact` are answered locally; every
  *  other input passes through; every engine member is forwarded. */
 export function withContextSlashes(engine: ReplEngine, labels: ContextSlashLabels): ReplEngine {
-  const wrapped: ReplEngine = async (input, cbs) => {
+  // 7113 D — the structured turn (referenceRequests) is the THIRD argument.
+  // run.tsx wraps every native engine, so a wrapper that drops it silently
+  // disables the whole large-reference path in production while unit tests
+  // that call the session directly stay green.
+  const wrapped: ReplEngine = async (input, cbs, referenceInput) => {
     let compactUsage: { inputTokens: number; outputTokens: number } | undefined;
     const line = (await resolveContextSlash(input, engine, labels)) ?? (await resolveCompactSlash(input, engine, labels, {
       ...(cbs.onRequestMeasurement ? { onRequestMeasurement: cbs.onRequestMeasurement } : {}),
       onOutcome: (outcome) => { compactUsage = outcome.usage; },
     }));
     if (line === undefined) {
-      await engine(input, cbs);
+      if (referenceInput) await engine(input, cbs, referenceInput);
+      else await engine(input, cbs);
       return;
     }
     cbs.output(line);
@@ -1697,6 +1803,8 @@ export async function runInkRepl(
     native_provider?: string;
     native_model?: string;
     native_context_tokens?: number;
+    /** 7113-E: schema-enforcement evidence for the selected native endpoint. */
+    native_structured_output_control?: NativeTransportConfig['native_structured_output_control'];
     openai_base_url?: string;
     ollama_host?: string;
     providers?: NativeTransportConfig['providers'];
@@ -1746,6 +1854,10 @@ export async function runInkRepl(
       native_provider: projectCfg.native_provider,
       native_model: projectCfg.native_model,
       native_context_tokens: projectCfg.native_context_tokens,
+      // 7113-E — this projection is the REAL ingress: a leaf missing here makes
+      // the compiled CLI read "no evidence" no matter what the owner declared,
+      // and the reference program then holds while every unit test stays green.
+      native_structured_output_control: projectCfg.native_structured_output_control,
       providers: projectCfg.providers,
       local_llm: projectCfg.local_llm,
       execution_budget: projectCfg.execution_budget,
@@ -1771,6 +1883,9 @@ export async function runInkRepl(
         providerName: nativeBoot.providerName,
         model: nativeBoot.model,
         endpoint: resolveNativeMeasurementEndpoint(nativeBoot.providerName, nativeCfg),
+        ...(nativeBoot.adapter.reasoningControl
+          ? { reasoningControl: nativeBoot.adapter.reasoningControl }
+          : {}),
         ...(nativeBoot.providerName === 'claude' && claudeKey
           ? { headers: { 'x-api-key': claudeKey, 'anthropic-version': '2023-06-01' } }
           : {}),
@@ -2614,7 +2729,7 @@ export async function runInkRepl(
   // event loop alive) — bounded so a slow MCP close() cannot hang a plain `/exit`.
   resizeMediator.dispose();
   await Promise.race([teardown(), new Promise((r) => setTimeout(r, REPL_TEARDOWN_TIMEOUT_MS))]);
-  sessionContentStore.close();
+  if (!nativeEngine?.largeReferencesEnabled) sessionContentStore.close();
   process.exit(0);
 }
 

@@ -1,0 +1,14 @@
+{
+  "source": "/tmp/deckent-terminal-integration-astra-20260910/proof/e-first-result.json",
+  "scenarioId": "local-llm-32768-suggest",
+  "capturedAt": "2026-09-10T01:29:34.701Z",
+  "metrics": {
+    "firstVisibleNarrativeMs": 11,
+    "firstVisibleNarrativeText": "› @docs/MASTER-PLAN.md dokümanını oku ve analiz et",
+    "hasVisibleAnalysis": true,
+    "toolCallCount": 0,
+    "interimDeliverableSeen": false,
+    "acceptanceOverall": "fail",
+    "failedIds": ["tool-calls-nonzero", "7114-interim-deliverable-bound"]
+  }
+}

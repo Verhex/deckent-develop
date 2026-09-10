@@ -1,3 +1,4 @@
+import { DEFAULT_LARGE_REFERENCE_POLICY, resolveLargeReferencePolicy, type LargeReferencePolicy } from './large-reference-policy.js';
 import { createHash } from 'node:crypto';
 import type {
   ExecutionLandingPolicyConfig,
@@ -32,6 +33,7 @@ export interface XverifyAdjudicationPurposeProfile {
 // ─── NATIVE-AGENT-HORIZON-001: terminal/native-agent session budget ─────────
 
 export interface ResolvedNativeAgentBudget {
+  readonly largeReference: Readonly<LargeReferencePolicy>;
   readonly maxPreambleShareOfContext: number;
   readonly minTranscriptShareOfContext: number;
   readonly contextHighWaterRatio: number;
@@ -72,9 +74,19 @@ export interface ResolvedNativeAgentBudget {
   /** 7114 — wall-clock milliseconds since the last deliverable before the host
    *  injects the interim-answer turn. */
   readonly interimAnswerAfterMs: number;
-  /** 7114 — visible assistant characters that count as a deliverable (the
-   *  counters reset only when the model produced at least this much text). */
+  /** 7114/7114-b — visible characters ONE round must carry to count as an
+   *  answer. Text is never summed across rounds, and narration alongside tool
+   *  calls is not an answer however long it is. */
   readonly interimAnswerMinChars: number;
+  /** 7114-b — host interim requests per turn; after this the host stops
+   *  nudging and the turn's own budgets end it. */
+  readonly maxInterimRequestsPerTurn: number;
+  /** 7114-b — tool calls a single turn may execute before the host requires
+   *  one honest answer and refuses further calls. */
+  readonly maxToolCallsPerTurn: number;
+  /** 7114-b — consecutive failures against the same exact target before that
+   *  line of attack is closed. */
+  readonly maxConsecutiveFailuresPerTarget: number;
 }
 
 export type NativeReasoningMode = 'auto' | 'off' | 'on';
@@ -103,6 +115,7 @@ export const MAX_NATIVE_TRANSPORT_RETRY = 3;
  *  land instead of drowning. NO provider-name-keyed values — owner config is
  *  the only override authority. */
 export const DEFAULT_NATIVE_AGENT_BUDGET: ResolvedNativeAgentBudget = Object.freeze({
+  largeReference: DEFAULT_LARGE_REFERENCE_POLICY,
   maxPreambleShareOfContext: 0.15,
   // Preserve transcript room independently of the output and safety reserves.
   minTranscriptShareOfContext: 0.10,
@@ -139,6 +152,13 @@ export const DEFAULT_NATIVE_AGENT_BUDGET: ResolvedNativeAgentBudget = Object.fre
   interimAnswerAfterToolCalls: 12,
   interimAnswerAfterMs: 90_000,
   interimAnswerMinChars: 200,
+  // 7114-b (owner run 2026-09-09 21:39Z: 28 calls / 1092 s, zero interim
+  // answers because narration was counted as delivery). Nudging is finite,
+  // the turn's tool spiral has a ceiling that forces ONE honest answer, and a
+  // line of attack that keeps failing against the same exact target is closed.
+  maxInterimRequestsPerTurn: 3,
+  maxToolCallsPerTurn: 40,
+  maxConsecutiveFailuresPerTarget: 3,
 });
 
 const NATIVE_AGENT_BUDGET_FIELDS = Object.keys(DEFAULT_NATIVE_AGENT_BUDGET) as
@@ -197,10 +217,14 @@ export function resolveNativeAgentBudget(input: {
     throw new ExecutionBudgetPolicyError('execution_budget.native_agent must be an object');
   }
   assertKnownKeys(authored, NATIVE_AGENT_BUDGET_FIELDS as readonly string[], 'execution_budget.native_agent');
-  const merged: Record<string, number | ResolvedNativeReasoningPolicy> = { ...DEFAULT_NATIVE_AGENT_BUDGET };
+  const merged: Record<string, number | ResolvedNativeReasoningPolicy | Readonly<LargeReferencePolicy>> = { ...DEFAULT_NATIVE_AGENT_BUDGET };
   for (const field of NATIVE_AGENT_BUDGET_FIELDS) {
     const value = authored[field];
     if (value === undefined) continue;
+    if (field === 'largeReference') {
+      merged[field] = resolveLargeReferencePolicy(value);
+      continue;
+    }
     if (field === 'reasoning') {
       merged[field] = resolveNativeReasoningPolicy(value);
       continue;
@@ -240,6 +264,12 @@ export function resolveNativeAgentBudget(input: {
   // budget then terminates first and the deliverable simply never fires.
   if ((merged.progressNoteEveryToolCalls as number) > (merged.interimAnswerAfterToolCalls as number)) {
     throw new ExecutionBudgetPolicyError('execution_budget.native_agent requires progressNoteEveryToolCalls <= interimAnswerAfterToolCalls');
+  }
+  // 7114-b: the per-turn tool ceiling that forces the honest final answer must
+  // leave room for at least one interim bound, otherwise the host would demand
+  // the final answer before it ever asked for an interim one.
+  if ((merged.maxToolCallsPerTurn as number) < (merged.interimAnswerAfterToolCalls as number)) {
+    throw new ExecutionBudgetPolicyError('execution_budget.native_agent requires interimAnswerAfterToolCalls <= maxToolCallsPerTurn');
   }
   return Object.freeze(merged) as unknown as ResolvedNativeAgentBudget;
 }

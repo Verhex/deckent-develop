@@ -107,6 +107,62 @@ export class Transcript {
     this.evict();
   }
 
+  /** Ordered tool-call ids (oldest first) for retention shrink (7109-d). */
+  listToolResultCallIds(): string[] {
+    const ids: string[] = [];
+    for (const message of this.messages) {
+      if (message.role === 'tool' && message.toolCallId !== undefined) ids.push(message.toolCallId);
+    }
+    return ids;
+  }
+
+  getToolResultContent(toolCallId: string): string | undefined {
+    const message = this.messages.find((m) => m.role === 'tool' && m.toolCallId === toolCallId);
+    return message?.content;
+  }
+
+  captureToolResultSnapshot(toolCallId: string): { toolCallId: string; message: ProviderMessage; entry: TranscriptEntry } | undefined {
+    const index = this.messages.findIndex((m) => m.role === 'tool' && m.toolCallId === toolCallId);
+    if (index < 0) return undefined;
+    const message = this.messages[index]!;
+    const entry = this.entries[index]!;
+    return {
+      toolCallId,
+      message: { ...message },
+      entry: { message: { ...entry.message }, turnId: entry.turnId, origin: entry.origin, contentHash: entry.contentHash },
+    };
+  }
+
+  restoreToolResultSnapshot(snapshot: { toolCallId: string; message: ProviderMessage; entry: TranscriptEntry }): void {
+    const index = this.messages.findIndex((m) => m.role === 'tool' && m.toolCallId === snapshot.toolCallId);
+    if (index < 0) return;
+    this.messages[index] = { ...snapshot.message };
+    this.entries[index] = { ...snapshot.entry, message: this.messages[index]! };
+  }
+
+  /** 7109-d — mutate backing store inline; does NOT touch epoch compaction APIs. */
+  shrinkToolResultInline(
+    toolCallId: string,
+    newContent: string,
+  ): { status: 'applied'; priorBytes: number; newBytes: number } | { status: 'not-found' } | { status: 'unchanged' } {
+    const index = this.messages.findIndex((m) => m.role === 'tool' && m.toolCallId === toolCallId);
+    if (index < 0) return { status: 'not-found' };
+    const prior = this.messages[index]!.content;
+    if (prior === newContent) return { status: 'unchanged' };
+    const entry = this.entries[index]!;
+    const priorBytes = Buffer.byteLength(prior, 'utf8');
+    const newBytes = Buffer.byteLength(newContent, 'utf8');
+    const message: ProviderMessage = { role: 'tool', content: newContent, toolCallId };
+    this.messages[index] = message;
+    this.entries[index] = {
+      message,
+      turnId: entry.turnId,
+      origin: entry.origin,
+      contentHash: createHash('sha256').update(newContent).digest('hex'),
+    };
+    return { status: 'applied', priorBytes, newBytes };
+  }
+
   /** A defensive copy — callers iterate, the loop owns the source of truth. */
   toProviderMessages(): ProviderMessage[] {
     return this.messages.map((m) => ({ ...m }));

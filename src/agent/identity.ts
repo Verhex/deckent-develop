@@ -80,13 +80,13 @@ export function narrationContractSection(policy: NarrationPolicy, lang?: 'en' | 
   const s = String(seconds);
   return lang === 'en'
     ? [
-        'NARRATION (immutable): never work silently.',
+        'NARRATION (immutable): never work silently. Write user-visible lines in English.',
         'Before each tool batch write one short line: what you are about to do and why.',
         `After every ${n} tool calls write a 1–3 line interim finding.`,
         `Never pass ${m} tool calls or ${s} s without an interim structured answer (known so far / remaining / next step), then continue.`,
       ].join(' ')
     : [
-        'ANLATIM (değiştirilemez): asla sessiz çalışma.',
+        'ANLATIM (değiştirilemez): asla sessiz çalışma. Kullanıcı satırlarını Türkçe yaz.',
         'Her araç grubundan önce tek kısa satır yaz: ne yapacaksın ve neden.',
         `Her ${n} araç çağrısında 1–3 satırlık ara bulgu yaz.`,
         `${m} araç çağrısını veya ${s} sn'yi ara yapılandırılmış yanıt (şimdiye kadar bilinen / kalan / sonraki adım) vermeden asla geçme, sonra devam et.`,

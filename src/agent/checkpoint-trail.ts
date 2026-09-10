@@ -363,6 +363,8 @@ export function boundLastAssistantText(text: string): string {
 // ─── Host stamping of a MODEL-written checkpoint ────────────────────────────
 
 export interface HostCheckpointState {
+  /** Host-verified retained source/digest refs cannot be dropped by model summaries. */
+  evidenceRefs?: readonly string[];
   /** Objective the host would open the epoch on (used when the model omits one). */
   objective: string;
   toolTrail: CheckpointToolTrailEntry[];
@@ -418,7 +420,7 @@ export function hostStampCheckpoint(candidate: unknown, host: HostCheckpointStat
     schemaVersion: SCRATCH_CHECKPOINT_SCHEMA_VERSION,
     objective,
     findings: summary.findings!,
-    evidenceRefs: summary.evidenceRefs!,
+    evidenceRefs: host.evidenceRefs?.length ? [...new Set([...host.evidenceRefs, ...summary.evidenceRefs!])] : summary.evidenceRefs!,
     decisions: summary.decisions!,
     unresolved: summary.unresolved!,
     nextActions: summary.nextActions!,

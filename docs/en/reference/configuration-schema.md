@@ -6,7 +6,7 @@ Deckent's authored JSON configuration has three layers: built-in defaults, platf
 
 Use `deckent config` to print the effective merged view, `deckent config --raw` for project JSON, `deckent config get <path>` for one dot path, and `deckent config set <path> <value>` to persist a project override. There is no `config show` subcommand: both `config show` and `config show --json` were executed and exited 1. [Evidence: real-binary outputs, 2026-08-01; `src/cli/commands/config.ts:72-108`]
 
-The current local effective snapshot is recorded in [Configuration](../configuration.md); the table below is the complete **default schema**, not the local effective result. It contains 164 recursive leaves read from the built `createDefaultConfig()` after the owner ran `npm run build:all`. `unset` means the optional field has no default value; it does not mean every effective configuration omits it. [Evidence: built-artifact introspection, 2026-08-01; `src/core/config.ts:1613-1784`]
+The current local effective snapshot is recorded in [Configuration](../configuration.md); the table below is the complete **default schema**, not the local effective result. It contains 165 recursive leaves read from the built `createDefaultConfig()` after the owner ran `npm run build:all`. `unset` means the optional field has no default value; it does not mean every effective configuration omits it. [Evidence: built-artifact introspection, 2026-08-01; `src/core/config.ts:1613-1784`]
 
 ## Group semantics
 
@@ -51,6 +51,7 @@ The current local effective snapshot is recorded in [Configuration](../configura
 | `providers.brain` | `"claude"` | `string` |
 | `providers.worker` | `"claude"` | `string` |
 | `provider_overrides` | `unset` | `undefined` |
+| `native_structured_output_control` | `"unknown"` | `string` |
 | `cost_optimization` | `false` | `boolean` |
 | `spawn_backend` | `"docker"` | `string` |
 | `auth_mode` | `"subscription"` | `string` |
@@ -220,3 +221,52 @@ The four built-in mode presets and the verified local effective projection are d
 - ⚠️ `CONFIG_METADATA` is not a complete schema authority: only a subset of roots is represented, and at least the mode, memory budget, and decay defaults have drifted from `createDefaultConfig()`. Generated config reference must not replace runtime introspection until this is reconciled. [Evidence: `src/core/config.ts:2485-2819`; built default introspection, 2026-08-01]
 - ⚠️ The global reader is platform-aware but `saveGlobalConfig` still targets the legacy location; OQ-15 tracks whether this is transitional policy. [Evidence: `src/core/config.ts:1829-1862,2350-2378`; OQ-15]
 - ⚠️ `loadConfig` and bare `deckent config` can persist compatibility repair/migration, so they are not unconditionally pure reads. [Evidence: `src/core/config.ts:1913-1955`; `src/cli/commands/config.ts:89-101`]
+
+## native_structured_output_control (7113-E)
+
+Whether the native transport's **endpoint** is known to enforce a response schema on the server, and by which wire mechanism. The key is provider-neutral on purpose: it describes the endpoint that is actually selected, so the same key answers for a local server and for a hosted OpenAI-compatible one. Per-served-model evidence belongs on `providers.registry[...].structuredOutputControl` instead, and is used when this key declares no evidence.
+
+| Value | Meaning |
+|---|---|
+| `"unknown"` | Default. No evidence declared. Not a claim of support: the large-reference digest program stops with `REFERENCE_STRUCTURED_OUTPUT_UNAVAILABLE` before dispatching any request. |
+| `"none"` | Positive evidence that this endpoint enforces nothing. Same typed hold, different reason; it also overrides a catalog entry. |
+| `"openai.response_format.json_schema"` | The endpoint enforces the schema through `response_format.json_schema` with `strict: true`. |
+| anything else | Refused loudly at provider resolution (`invalid-structured-output-control`), never downgraded to `"unknown"`. |
+
+The object form `{ "toggle": "<value>" }` is accepted for the same three values. A dialect this build cannot express (a llama.cpp GBNF grammar, for example) is deliberately absent rather than approximated. Declaring enforcement does not relax host-side validation: every response still passes the digest payload validator, its citations must resolve to supplied byte ranges, and nothing repairs or unwraps malformed JSON.
+
+## execution_budget.native_agent.largeReference (7113)
+
+Large references use the same native session, read permissions, content store, and usage budget. The feature is disabled by default until Terminal acceptance. Small references keep their existing inline representation when the full request fits. Large raw sources are not inserted into the parent transcript.
+
+| Key | Default | Contract |
+|---|---:|---|
+| `enabled` | false | Boolean |
+| `maxSourceBytes` | 8388608 | 1..8388608 bytes; total per turn |
+| `maxReferences` | 5 | 1..5 |
+| `maxWallTimeMs` | 600000 | Positive integer; native remaining wall time also applies |
+| `maxRequests` | 96 | 1..100000; native remaining rounds also apply |
+| `maxDepth` | 8 | Positive integer; reduce fan-in >=2 |
+| `maxMapOutputTokens` | 2048 | Positive integer |
+| `maxReduceOutputTokens` | 4096 | Positive integer |
+| `finalAnswerReserveTokens` | 4096 | Positive integer; protected before child admission |
+| `concurrencyCap` | 1 | Positive integer; upper bound for native child requests |
+| `firstPartBytes` | 32768 | Bytes of the FIRST outline part only (>= 4); a latency shape that leaves coverage, budgets and every ceiling unchanged |
+
+Provider-reported child usage is durably keyed by request identity and updates the same native working/cost counters. An uncertain request is not silently replayed. Source and node pins remain in the existing scratch recovery namespace; expired, changed, or foreign custody refuses recovery. Source snapshots currently return an explicit unsupported result on native Windows until the reparse-point adapter is verified. `ANSWERING` identifies an available digest, not a completed user answer.
+
+## execution_budget.native_agent deliverable bounds (7114 / 7114-b)
+
+The host enforces that a long autonomous turn still answers. A delivery is a substantive response that proposes **no** tool call, so narration that introduces the next batch never counts; the wall clock runs from the last real delivery. A round still streaming past the wall bound is reported as overdue — the host cannot cut a provider stream short without cancelling the user's turn — while the turn's own `maxWallTimeMs` remains the hard stop and now also applies inside a round.
+
+| Key | Default | Contract |
+|---|---:|---|
+| `progressNoteEveryToolCalls` | 5 | Positive integer; <= `interimAnswerAfterToolCalls` |
+| `interimAnswerAfterToolCalls` | 12 | Positive integer; tool calls since the last delivery |
+| `interimAnswerAfterMs` | 90000 | Positive integer; milliseconds since the last delivery |
+| `interimAnswerMinChars` | 200 | Positive integer; floor for ONE round's answer, never summed across rounds |
+| `maxInterimRequestsPerTurn` | 3 | Positive integer; after this the host stops asking |
+| `maxToolCallsPerTurn` | 40 | Positive integer; >= `interimAnswerAfterToolCalls`; further calls are refused and one honest final answer is required |
+| `maxConsecutiveFailuresPerTarget` | 3 | Positive integer; consecutive failures against the same exact target (tool + primary resource) close that line |
+
+A refused call is still paired in the transcript with a typed result, so the next request stays valid. The final ask forbids claiming completion. `/context` shows the live counters, the turn tool budget, remaining host asks, an overdue answer and any closed target.

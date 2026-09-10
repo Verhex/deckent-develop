@@ -1,0 +1,221 @@
+{
+  "ok": false,
+  "skipped": false,
+  "payload": {
+    "schema": "terminal-acceptance-battery-v3",
+    "generatedAt": "2026-09-10T05:16:42.132Z",
+    "acceptanceDoc": "docs/execution/active/TERMINAL-FLUENCY-PROGRAM-001.md",
+    "runtime": {
+      "entryPath": "/tmp/deckent-terminal-integration-astra-20260910/dist/cli/entry.js",
+      "entrySha256": "c7df3d28480d8efa10b489353aa557435d2b03c0c56d7ac78e6bf5c73d45b118",
+      "gitHead": "df1130b27efaa9b1c05a99f3b0b76541f322e180",
+      "modelId": "Qwen3.8-27B-Q4_K_M",
+      "effectiveContextSize": 0,
+      "configuredContextSize": 131072,
+      "endpoint": "http://127.0.0.1:8080/v1"
+    },
+    "scenarios": [
+      {
+        "scenario": {
+          "id": "local-llm-32768-suggest",
+          "provider": "local-llm",
+          "contextSize": 32768,
+          "approvalMode": "suggest",
+          "requiresLocalLlm": true,
+          "interruptTest": false,
+          "prompt": "@docs/MASTER-PLAN.md dokümanını oku ve analiz et"
+        },
+        "expectedBinding": {
+          "provider": "local-llm",
+          "model": "Qwen3.8-27B-Q4_K_M",
+          "contextSize": 32768
+        },
+        "workspace": "/tmp/deckent-battery-l7JieX",
+        "metrics": {
+          "approvalCount": 0,
+          "toolCallCount": 0,
+          "toolCountAuthority": "rendered-rows-only",
+          "toolRowsAtFirstInterim": null,
+          "toolLines": [],
+          "checkpointCount": 0,
+          "scratchCheckpointCount": 0,
+          "uiCheckpointCount": 0,
+          "tokenPressureCheckpointCount": 0,
+          "transportFailureCount": 0,
+          "measurementAuthority": "exact",
+          "bootStatus": {
+            "expectedProvider": "local-llm",
+            "expectedModel": "Qwen3.8-27B-Q4_K_M",
+            "bootProviderModelSeen": true,
+            "measurementExactSeen": true,
+            "providerMatch": true
+          },
+          "promptSent": true,
+          "promptEchoed": true,
+          "turnCompleted": true,
+          "turnEndMs": 150100,
+          "hasVisibleAnalysis": false,
+          "firstVisibleNarrativeMs": 58380,
+          "firstVisibleNarrativeText": "[Henüz ara cevap yok (zamanı gelmedi); okuma sürüyor.]",
+          "firstInterimDeliverableMs": null,
+          "interimDeliverableSeen": false,
+          "fakeContextCheckpointsInFirstWindow": 0,
+          "interruptPartialOnScreen": false,
+          "interruptPartialInTranscript": false,
+          "scrollbackBytes": 19080,
+          "elapsedMs": 141841,
+          "referenceIngressExercised": true,
+          "referencePartial": true,
+          "referenceFailed": false,
+          "referenceTypedUnavailable": true,
+          "referencePreDispatchUnavailable": false,
+          "referenceOutputInvalid": false,
+          "childMapRequests": 6,
+          "childReduceRequests": 0,
+          "referenceChildInvoked": true,
+          "referenceChildInvocationAuthority": "rendered-slash-receipt"
+        },
+        "acceptance": {
+          "checks": [
+            {
+              "id": "scenario-provider-match",
+              "pass": true,
+              "detail": {
+                "expectedProvider": "local-llm",
+                "expectedModel": "Qwen3.8-27B-Q4_K_M",
+                "bootProviderModelSeen": true,
+                "measurementExactSeen": true,
+                "providerMatch": true
+              }
+            },
+            {
+              "id": "prompt-sent-and-echoed",
+              "pass": true,
+              "detail": {
+                "promptSent": true,
+                "promptEchoed": true
+              }
+            },
+            {
+              "id": "turn-completed-before-timeout",
+              "pass": true,
+              "detail": {
+                "turnCompleted": true,
+                "turnEndMs": 150100,
+                "elapsedMs": 141841,
+                "timeoutMs": 180000
+              }
+            },
+            {
+              "id": "tool-calls-nonzero-or-reference-child",
+              "pass": true,
+              "disposition": "evaluated",
+              "detail": {
+                "toolCallCount": 0,
+                "toolCountAuthority": "rendered-rows-only",
+                "referenceChildInvoked": true,
+                "referenceChildInvocationAuthority": "rendered-slash-receipt",
+                "childMapRequests": 6,
+                "childReduceRequests": 0
+              }
+            },
+            {
+              "id": "visible-analysis-within-10m",
+              "pass": false,
+              "disposition": "hold",
+              "detail": {
+                "hasVisibleAnalysis": false,
+                "firstVisibleNarrativeText": "[Henüz ara cevap yok (zamanı gelmedi); okuma sürüyor.]",
+                "referencePartial": true,
+                "referenceFailed": false,
+                "referenceTypedUnavailable": true,
+                "referencePreDispatchUnavailable": false,
+                "elapsedMs": 141841,
+                "timeoutMs": 180000
+              }
+            },
+            {
+              "id": "no-fake-context-checkpoint-first-20-tools",
+              "pass": true,
+              "detail": {
+                "toolCallCount": 0,
+                "tokenPressureCheckpointCount": 0,
+                "measurementAuthority": "exact"
+              }
+            },
+            {
+              "id": "7114-first-visible-narrative-10s",
+              "pass": false,
+              "disposition": "evaluated",
+              "detail": {
+                "firstVisibleNarrativeMs": 58380,
+                "referencePartial": true,
+                "referenceFailed": false,
+                "limitMs": 10000
+              }
+            },
+            {
+              "id": "7114-interim-deliverable-bound",
+              "pass": false,
+              "disposition": "hold",
+              "detail": {
+                "firstInterimDeliverableMs": null,
+                "toolCallCount": 0,
+                "referenceIngressExercised": true,
+                "referencePartial": true,
+                "referenceFailed": false,
+                "holdReason": "reference-program-no-interim-nudge-actual-product-hold",
+                "limits": {
+                  "ms": 90000,
+                  "toolCalls": 12
+                }
+              }
+            },
+            {
+              "id": "standard-readonly-approval-posture",
+              "pass": true,
+              "detail": {
+                "approvalMode": "suggest",
+                "approvalCount": 0
+              }
+            },
+            {
+              "id": "measurement-authority-exact",
+              "pass": true,
+              "detail": {
+                "measurementAuthority": "exact"
+              }
+            }
+          ],
+          "overall": "fail",
+          "failedIds": [
+            "7114-first-visible-narrative-10s"
+          ],
+          "holdIds": [
+            "visible-analysis-within-10m",
+            "7114-interim-deliverable-bound"
+          ]
+        },
+        "exitCode": null,
+        "firstToolLines": [],
+        "observation": {
+          "firstVisibleNarrativeMs": 58380,
+          "firstVisibleNarrativeText": "[Henüz ara cevap yok (zamanı gelmedi); okuma sürüyor.]"
+        },
+        "observationPath": "/tmp/deckent-battery-l7JieX/pty-observations.json",
+        "observationSha256": "61610c93e4e71533f563eb3e8e6dfb82d8a9723df6c409ce98beb4a10ec9334d",
+        "firstVisibleNarrativePreview": "[Henüz ara cevap yok (zamanı gelmedi); okuma sürüyor.]",
+        "scrollbackPreview": "› /context\n● deckent\nBağlam\n  son isteğin penceresi: 32768 token\n  son gerçek istek: tur · kabul edildi · 9278 token (o istek penceresinin %28 kadarı) · kesin\n  sağlayıcı/model: local-llm · Qwen3.8-27B-Q4_K_M\n  ölçüm: 9278 token · kesin\n  istek kapasitesi: 28672 kullanılabilir · 32768 pencere\n  ölçüm kaynağı: llama.cpp-apply-template-tokenize\n  istek özeti: 592196ae0fc70c635dcbedc6ea10a5a61e4119fcc7283d42af3a02cc25f9b111\n  sağlayıcı bildirimleri: girdi 51349 · çıktı 9573 · bildirim 5\n  bağlam epoch: 1\n  mesaj: 0 · checkpoint önsözü: 0\n  checkpoint: empty\n  otomatik sıkıştırma pencerenin %75 doluluğunda\n  ön metin: 4157/4915 bütçe (pencerenin %13 kadarı) · 3 araç şeması\n  ölçüm otoritesi: kesin\n  ara teslimat: son teslimattan bu yana 0/12 araç çağrısı · 143/90 sn · teslim edilen 0 · host isteği 0\n  tur araç bütçesi: 0/40 çağrı · kalan host isteği 3\n  referans özeti: docs/MASTER-PLAN.md · kısmi\n  kaynak: 1.2 MiB · doğrulanan 32.0 KiB · bölüm 1/5\n  alt istek: 6 map · 0 reduce (üst sınır 12) · kullanım 51349 giriş / 9573 çıkış token\n  saklanan özet: bilinmiyor tokenin bilinmiyor kadarı (pencere bilinmiyor)\n  kalan süre: 7 sn · günlük: reference-journal:06b8fec746569281b474bba73fd0c8c70736157d23d7218252ea71f788801503\n  son hata: süre sınırına ulaşıldı\n⏱ 0.0s\n[Çalıştır]\nkimlik doğrulama: bilinmiyor\n✓ hazır · sıra sende · son gerçek istek: tur · kabul edildi · 9278 token (o istek penceresinin %28 kadarı) · kesin\n╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮\n│ › |                                                                                                                  │\n╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯\ndeckent  local-llm · Qwen3.8-27B-Q4_K_M  /tmp/deckent-battery-l7JieX  · Σ 9573 tok\n[Çalıştır]\nkimlik doğrulama: bilinmiyor\n✓ hazır · sıra sende · son gerçek istek: tur · kabul edildi · 9278 token (o istek penceres…  · çıkmak için tekrar Ctrl-C\n╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮\n│ › |                                                                                                                  │\n╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯\ndeckent  local-llm · Qwen3.8-27B-Q4_K_M  /tmp/deckent-battery-l7JieX  · Σ 9573 tok",
+        "skipped": false,
+        "skipReason": null
+      }
+    ],
+    "evidence": {
+      "jsonPath": "/tmp/deckent-terminal-integration-astra-20260910/docs/execution/evidence/7107/battery-2026-09-10T051642132Z.json",
+      "mdPath": "/tmp/deckent-terminal-integration-astra-20260910/docs/execution/evidence/7107/battery-2026-09-10T051642132Z.md"
+    }
+  },
+  "jsonPath": "/tmp/deckent-terminal-integration-astra-20260910/docs/execution/evidence/7107/battery-2026-09-10T051642132Z.json",
+  "mdPath": "/tmp/deckent-terminal-integration-astra-20260910/docs/execution/evidence/7107/battery-2026-09-10T051642132Z.md",
+  "lang": "tr"
+}

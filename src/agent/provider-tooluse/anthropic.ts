@@ -89,6 +89,10 @@ export function createAnthropicAdapter(opts: AnthropicAdapterOptions): ProviderA
   return {
     name: 'anthropic',
     async *send(req: ProviderRequest): AsyncIterable<ProviderEvent> {
+      // 7113-E — this transport has no schema-enforcement mechanism. Refusing
+      // is the contract: a dropped directive would send an unenforced request
+      // that looks enforced to the caller.
+      if (req.structuredOutput) throw new Error('anthropic transport cannot enforce a response schema');
       const v = validateProviderRequest(req);
       if (v) throw new Error(`invalid provider request: ${v}`);
 

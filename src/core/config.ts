@@ -1,4 +1,5 @@
 import { mkdir } from 'node:fs/promises';
+import { DEFAULT_NATIVE_AGENT_BUDGET } from './execution-budget-policy.js';
 import { createHash } from 'node:crypto';
 import {
   copyFileSync,
@@ -2073,8 +2074,16 @@ export function createDefaultConfig(): DeckentConfig {
         authMode: 'none',
         executionCostClass: 'local',
         models: ['Qwen3.8-27B'],
+        // 7113-E — per-served-model evidence, explicitly "none declared".
+        structuredOutputControl: 'unknown',
       }],
     },
+    // 7113-E — the honest default, written down instead of left missing: no
+    // evidence that the native endpoint enforces a response schema. It is NOT a
+    // claim of support; the reference program holds on it. Owner evidence
+    // replaces it here, or per served model via
+    // providers.registry[...].structuredOutputControl.
+    native_structured_output_control: 'unknown',
     provider_overrides: undefined,
     cost_optimization: false,
     // claude_backend removed (Sprint 150 Decision 3 — use spawn_backend instead)
@@ -2111,6 +2120,15 @@ export function createDefaultConfig(): DeckentConfig {
         },
       },
       landing: { reserve_ratio: 0.25 },
+      // 7114-b — the three owner-facing bounds behind the host's deliverable
+      // promise are canonical defaults, not resolver-only values: an operator
+      // can read and change them in the written config, and the config-truth
+      // projection carries them like every other authored leaf.
+      native_agent: {
+        maxInterimRequestsPerTurn: DEFAULT_NATIVE_AGENT_BUDGET.maxInterimRequestsPerTurn,
+        maxToolCallsPerTurn: DEFAULT_NATIVE_AGENT_BUDGET.maxToolCallsPerTurn,
+        maxConsecutiveFailuresPerTarget: DEFAULT_NATIVE_AGENT_BUDGET.maxConsecutiveFailuresPerTarget,
+      },
     },
     auth_mode: 'subscription',
     evaluation: { tsc_settlement_gate: true },
@@ -2775,6 +2793,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     native_provider: config.native_provider,
     native_model: config.native_model,
     native_context_tokens: config.native_context_tokens,
+    native_structured_output_control: config.native_structured_output_control,
     openai_base_url: config.openai_base_url,
     bot_agent: config.bot_agent,
     // Memory

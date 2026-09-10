@@ -13,6 +13,7 @@ import type {
   ModelDefinition,
   ParametricResolveOptions,
   ReasoningControlDescriptor,
+  StructuredOutputControlDescriptor,
 } from './model-registry-types.js';
 
 declare module './model-registry-types.js' {
@@ -1068,6 +1069,9 @@ export interface LocalLlmModelFacts {
   /** 7108: reasoning-control evidence for the served model — owner config or a
    *  live server-template probe. Absent = the honest `unknown` descriptor. */
   reasoningControl?: ReasoningControlDescriptor;
+  /** 7113-E: schema-enforcement evidence for the served model — owner config
+   *  only. Absent = the honest `unknown` descriptor. */
+  structuredOutputControl?: StructuredOutputControlDescriptor;
 }
 
 /** The honest no-evidence descriptor attached to every local identity that
@@ -1076,6 +1080,12 @@ export interface LocalLlmModelFacts {
 const UNKNOWN_LOCAL_REASONING_CONTROL: ReasoningControlDescriptor = Object.freeze({
   toggle: Object.freeze({ kind: 'unknown' as const }),
   sharesCompletionBudget: 'unknown' as const,
+  provenance: 'unknown' as const,
+});
+
+/** The same honest default for schema enforcement. */
+const UNKNOWN_LOCAL_STRUCTURED_OUTPUT_CONTROL: StructuredOutputControlDescriptor = Object.freeze({
+  toggle: Object.freeze({ kind: 'unknown' as const }),
   provenance: 'unknown' as const,
 });
 
@@ -1123,6 +1133,13 @@ export function ensureLocalLlmModelRegistered(
       && facts.reasoningControl.provenance !== 'unknown') {
       registry.register({ ...existing, reasoningControl: facts.reasoningControl });
     }
+    // 7113-E: identical rule for schema-enforcement evidence.
+    const upgraded = registry.get(modelId) ?? existing;
+    if (facts.structuredOutputControl
+      && (upgraded.structuredOutputControl === undefined || upgraded.structuredOutputControl.toggle.kind === 'unknown')
+      && facts.structuredOutputControl.toggle.kind !== 'unknown') {
+      registry.register({ ...upgraded, structuredOutputControl: facts.structuredOutputControl });
+    }
     return;
   }
   registry.register({
@@ -1136,6 +1153,7 @@ export function ensureLocalLlmModelRegistered(
       register: false,
     }),
     reasoningControl: facts.reasoningControl ?? UNKNOWN_LOCAL_REASONING_CONTROL,
+    structuredOutputControl: facts.structuredOutputControl ?? UNKNOWN_LOCAL_STRUCTURED_OUTPUT_CONTROL,
   });
 }
 

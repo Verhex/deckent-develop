@@ -64,6 +64,22 @@ export interface ReasoningControlDescriptor {
   readonly provenance: ReasoningControlProvenance;
 }
 
+/** 7113-E — a wire mechanism that makes the SERVER enforce a response schema.
+ *  Dialects are not assumed equivalent: a llama.cpp GBNF grammar is a different
+ *  mechanism with different semantics and is deliberately absent until there is
+ *  real evidence for it. */
+export type StructuredOutputToggleDescriptor =
+  | { readonly kind: 'openai.response_format.json_schema' }
+  /** The transport was asked and answered: this endpoint enforces nothing. */
+  | { readonly kind: 'none' }
+  /** No evidence either way. */
+  | { readonly kind: 'unknown' };
+
+export interface StructuredOutputControlDescriptor {
+  readonly toggle: StructuredOutputToggleDescriptor;
+  readonly provenance: 'configured' | 'registry' | 'unknown';
+}
+
 export interface ModelDefinition {
   id: string;
   apiId: string;
@@ -81,6 +97,10 @@ export interface ModelDefinition {
   /** 7108: how hidden reasoning is controlled on the wire (see
    *  {@link ReasoningControlDescriptor}). Absent = no evidence = `unknown`. */
   reasoningControl?: ReasoningControlDescriptor;
+  /** 7113-E: whether the server enforces a response schema, and by which wire
+   *  mechanism (see {@link StructuredOutputControlDescriptor}). Absent = no
+   *  evidence = `unknown`; it is never inferred from the model's name. */
+  structuredOutputControl?: StructuredOutputControlDescriptor;
   /**
    * Marks this model as the current generation's answer for its
    * (provider, tier) pair — the one tier-equivalence should resolve to.

@@ -6,7 +6,7 @@ Deckent authored JSON configuration üç layer taşır: built-in defaults, platf
 
 Effective merged görünümü yazdırmak için `deckent config`, project JSON için `deckent config --raw`, tek dot path için `deckent config get <path>`, project override persist etmek için `deckent config set <path> <value>` kullan. `config show` subcommand'ı yoktur: hem `config show` hem `config show --json` çalıştırıldı ve exit 1 verdi. [Kanıt: gerçek-binary çıktıları, 2026-08-01; `src/cli/commands/config.ts:72-108`]
 
-Güncel local effective snapshot [Configuration](../configuration.md) içinde kayıtlıdır; aşağıdaki tablo local effective result değil, eksiksiz **default schema**dır. Owner'ın `npm run build:all` çalıştırmasından sonra built `createDefaultConfig()` üzerinden okunan 164 recursive leaf içerir. `unset`, optional field'ın default değeri olmadığı anlamına gelir; her effective config'in onu omit ettiği anlamına gelmez. [Kanıt: built-artifact introspection, 2026-08-01; `src/core/config.ts:1613-1784`]
+Güncel local effective snapshot [Configuration](../configuration.md) içinde kayıtlıdır; aşağıdaki tablo local effective result değil, eksiksiz **default schema**dır. Owner'ın `npm run build:all` çalıştırmasından sonra built `createDefaultConfig()` üzerinden okunan 165 recursive leaf içerir. `unset`, optional field'ın default değeri olmadığı anlamına gelir; her effective config'in onu omit ettiği anlamına gelmez. [Kanıt: built-artifact introspection, 2026-08-01; `src/core/config.ts:1613-1784`]
 
 ## Grup semantics
 
@@ -51,6 +51,7 @@ Güncel local effective snapshot [Configuration](../configuration.md) içinde ka
 | `providers.brain` | `"claude"` | `string` |
 | `providers.worker` | `"claude"` | `string` |
 | `provider_overrides` | `unset` | `undefined` |
+| `native_structured_output_control` | `"unknown"` | `string` |
 | `cost_optimization` | `false` | `boolean` |
 | `spawn_backend` | `"docker"` | `string` |
 | `auth_mode` | `"subscription"` | `string` |
@@ -220,3 +221,52 @@ Dört built-in mode preset'i ve verified local effective projection [Configurati
 - ⚠️ `CONFIG_METADATA` complete schema authority değildir: yalnız root'ların bir altkümesini temsil eder; en az mode, memory budget ve decay default'ları `createDefaultConfig()` ile drift etmiştir. Generated config reference reconcile edilmeden runtime introspection'ın yerini almamalıdır. [Kanıt: `src/core/config.ts:2485-2819`; built default introspection, 2026-08-01]
 - ⚠️ Global reader platform-aware'dır; `saveGlobalConfig` hâlâ legacy location'a yazar. OQ-15 bunun transitional policy olup olmadığını izler. [Kanıt: `src/core/config.ts:1829-1862,2350-2378`; OQ-15]
 - ⚠️ `loadConfig` ve bare `deckent config` compatibility repair/migration persist edebilir; koşulsuz pure read değildir. [Kanıt: `src/core/config.ts:1913-1955`; `src/cli/commands/config.ts:89-101`]
+
+## native_structured_output_control (7113-E)
+
+Native transport'un **endpoint**'inin yanıt şemasını sunucu tarafında zorladığının bilinip bilinmediği ve hangi wire mekanizmasıyla zorladığı. Anahtar bilinçli olarak provider-neutral'dır: seçili endpoint'i tanımlar, bu yüzden aynı anahtar hem yerel sunucu hem hosted OpenAI-uyumlu endpoint için cevap verir. Served model başına kanıt bunun yerine `providers.registry[...].structuredOutputControl` üzerinde durur ve bu anahtar kanıt bildirmediğinde kullanılır.
+
+| Değer | Anlamı |
+|---|---|
+| `"unknown"` | Default. Kanıt bildirilmemiş. Destek iddiası DEĞİLDİR: large-reference digest programı hiçbir istek göndermeden `REFERENCE_STRUCTURED_OUTPUT_UNAVAILABLE` ile durur. |
+| `"none"` | Bu endpoint'in hiçbir şey zorlamadığına dair POZİTİF kanıt. Aynı tipli hold, farklı sebep; katalog girdisini de ezer. |
+| `"openai.response_format.json_schema"` | Endpoint şemayı `response_format.json_schema` + `strict: true` ile zorlar. |
+| başka herhangi bir şey | Provider resolution'da yüksek sesle reddedilir (`invalid-structured-output-control`), asla `"unknown"`a düşürülmez. |
+
+Object formu `{ "toggle": "<değer>" }` aynı üç değer için kabul edilir. Bu build'in ifade edemediği bir lehçe (örneğin llama.cpp GBNF grammar) yaklaşık olarak temsil edilmek yerine bilinçli olarak yoktur. Zorlama bildirmek host tarafı doğrulamayı gevşetmez: her yanıt yine digest payload validator'ından geçer, citation'ları verilen byte aralıklarına çözülmek zorundadır ve bozuk JSON hiçbir yerde onarılmaz veya fence'ten çıkarılmaz.
+
+## execution_budget.native_agent.largeReference (7113)
+
+Büyük referanslar aynı native session, okuma izinleri, içerik deposu ve kullanım bütçesini kullanır. Terminal kabulüne kadar özellik varsayılan kapalıdır. Tam isteğe sığan küçük referansların inline gösterimi korunur. Büyük ham kaynak ana transcript içine eklenmez.
+
+| Key | Default | Sözleşme |
+|---|---:|---|
+| `enabled` | false | Boolean |
+| `maxSourceBytes` | 8388608 | 1..8388608 bytes; total per turn |
+| `maxReferences` | 5 | 1..5 |
+| `maxWallTimeMs` | 600000 | Positive integer; native remaining wall time also applies |
+| `maxRequests` | 96 | 1..100000; native remaining rounds also apply |
+| `maxDepth` | 8 | Positive integer; reduce fan-in >=2 |
+| `maxMapOutputTokens` | 2048 | Positive integer |
+| `maxReduceOutputTokens` | 4096 | Positive integer |
+| `finalAnswerReserveTokens` | 4096 | Positive integer; protected before child admission |
+| `concurrencyCap` | 1 | Positive integer; upper bound for native child requests |
+| `firstPartBytes` | 32768 | YALNIZ ilk outline parçasının baytı (>= 4); kapsama, bütçe ve hiçbir tavanı değiştirmeyen gecikme şekli |
+
+Alt çağrıların provider-reported kullanımı request kimliğiyle kalıcı kaydedilir ve aynı native çalışma/maliyet sayaçlarını günceller. Sonucu belirsiz istek sessizce tekrarlanmaz. Kaynak ve node kayıtları mevcut scratch recovery alanında tutulur; süresi geçmiş, değişmiş veya yabancı kapsam kurtarmayı reddeder. Native Windows kaynak snapshot adapterı doğrulanana kadar açık unsupported sonucu üretir. `ANSWERING`, hazır digest anlamına gelir; kullanıcı yanıtının tamamlandığı anlamına gelmez.
+
+## execution_budget.native_agent teslim sınırları (7114 / 7114-b)
+
+Host, uzun otonom turun yine de cevap vermesini zorunlu kılar. Teslim, **araç çağrısı içermeyen** esaslı bir cevaptır; bir sonraki grubu tanıtan anlatım asla teslim sayılmaz ve duvar saati son gerçek teslimden işler. Sınırı aşmasına rağmen hâlâ akan bir round "gecikti" olarak bildirilir — host, kullanıcının turunu iptal etmeden sağlayıcı akışını kesemez — turun kendi `maxWallTimeMs` değeri sert sınır olarak kalır ve artık round içinde de uygulanır.
+
+| Anahtar | Varsayılan | Sözleşme |
+|---|---:|---|
+| `progressNoteEveryToolCalls` | 5 | Pozitif tamsayı; <= `interimAnswerAfterToolCalls` |
+| `interimAnswerAfterToolCalls` | 12 | Pozitif tamsayı; son teslimden bu yana araç çağrısı |
+| `interimAnswerAfterMs` | 90000 | Pozitif tamsayı; son teslimden bu yana milisaniye |
+| `interimAnswerMinChars` | 200 | Pozitif tamsayı; TEK turluk cevabın alt sınırı, turlar arası toplanmaz |
+| `maxInterimRequestsPerTurn` | 3 | Pozitif tamsayı; bundan sonra host sormayı bırakır |
+| `maxToolCallsPerTurn` | 40 | Pozitif tamsayı; >= `interimAnswerAfterToolCalls`; sonraki çağrılar reddedilir ve tek dürüst final cevap istenir |
+| `maxConsecutiveFailuresPerTarget` | 3 | Pozitif tamsayı; aynı exact hedefte (araç + birincil kaynak) ardışık başarısızlık o yolu kapatır |
+
+Reddedilen çağrı transcript'te typed bir sonuçla eşlenir, böylece sonraki istek geçerli kalır. Final isteği "tamamlandı" iddiasını yasaklar. `/context` canlı sayaçları, tur araç bütçesini, kalan host isteklerini, gecikmiş cevabı ve kapatılmış hedefi gösterir.

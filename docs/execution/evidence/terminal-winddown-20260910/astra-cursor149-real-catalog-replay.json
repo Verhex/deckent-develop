@@ -1,0 +1,966 @@
+{
+  "capturedAt": "2026-09-10T06:28:56.431Z",
+  "outcomeId": "7107-c",
+  "script": {
+    "path": "/tmp/deckent-terminal-integration-astra-20260910/scripts/terminal-acceptance-battery.mjs",
+    "sha256": "6130247154b57b44638594294dd8c538cb68c91728d3f78841ccc6166680f49a"
+  },
+  "replays": [
+    {
+      "id": "partial-e32768",
+      "ok": true,
+      "legacyActual": {
+        "source": "/tmp/deckent-terminal-integration-astra-20260910/proof/fixtures/e-first-actual-metrics.json",
+        "firstVisibleNarrativeMs": 11,
+        "firstVisibleNarrativeText": "› @docs/MASTER-PLAN.md dokümanını oku ve analiz et",
+        "hasVisibleAnalysis": true,
+        "falsePromptNarrativePass": true,
+        "falseTypedFailureAnalysisPass": false,
+        "legacyFalseAnalysisPass": false,
+        "legacyFalseInterimSkipNarrative": false,
+        "legacyFalseRequestInterimMs": false,
+        "legacyFalseInterimHold": false
+      },
+      "metrics": {
+        "firstVisibleNarrativeMs": null,
+        "firstVisibleNarrativeText": null,
+        "hasVisibleAnalysis": false,
+        "referencePartial": true,
+        "referenceFailed": false,
+        "referenceTypedUnavailable": true,
+        "referencePreDispatchUnavailable": false,
+        "referenceChildInvoked": true,
+        "referenceChildInvocationAuthority": "rendered-slash-receipt",
+        "interimDeliverableSeen": false,
+        "childMapRequests": 1
+      },
+      "acceptance": {
+        "checks": [
+          {
+            "id": "scenario-provider-match",
+            "pass": true,
+            "detail": {
+              "expectedProvider": "local-llm",
+              "expectedModel": "Qwen3.8-27B-Q4_K_M",
+              "bootProviderModelSeen": true,
+              "measurementExactSeen": true,
+              "providerMatch": true
+            }
+          },
+          {
+            "id": "prompt-sent-and-echoed",
+            "pass": true,
+            "detail": {
+              "promptSent": true,
+              "promptEchoed": true
+            }
+          },
+          {
+            "id": "turn-completed-before-timeout",
+            "pass": true,
+            "detail": {
+              "turnCompleted": true,
+              "turnEndMs": 106300,
+              "elapsedMs": 167549,
+              "timeoutMs": 600000
+            }
+          },
+          {
+            "id": "tool-calls-nonzero-or-reference-child",
+            "pass": true,
+            "disposition": "evaluated",
+            "detail": {
+              "toolCallCount": 0,
+              "toolCountAuthority": "rendered-rows-only",
+              "referenceChildInvoked": true,
+              "referenceChildInvocationAuthority": "rendered-slash-receipt",
+              "childMapRequests": 1,
+              "childReduceRequests": 0
+            }
+          },
+          {
+            "id": "visible-analysis-within-10m",
+            "pass": false,
+            "disposition": "hold",
+            "detail": {
+              "hasVisibleAnalysis": false,
+              "firstVisibleNarrativeText": null,
+              "referencePartial": true,
+              "referenceFailed": false,
+              "referenceTypedUnavailable": true,
+              "referencePreDispatchUnavailable": false,
+              "elapsedMs": 167549,
+              "timeoutMs": 600000
+            }
+          },
+          {
+            "id": "no-fake-context-checkpoint-first-20-tools",
+            "pass": true,
+            "detail": {
+              "toolCallCount": 0,
+              "tokenPressureCheckpointCount": 0,
+              "measurementAuthority": "exact"
+            }
+          },
+          {
+            "id": "7114-first-visible-narrative-10s",
+            "pass": false,
+            "disposition": "hold",
+            "detail": {
+              "firstVisibleNarrativeMs": null,
+              "referencePartial": true,
+              "referenceFailed": false,
+              "limitMs": 10000
+            }
+          },
+          {
+            "id": "7114-interim-deliverable-bound",
+            "pass": false,
+            "disposition": "hold",
+            "detail": {
+              "firstInterimDeliverableMs": null,
+              "toolCallCount": 0,
+              "referenceIngressExercised": true,
+              "referencePartial": true,
+              "referenceFailed": false,
+              "holdReason": "reference-program-no-interim-nudge-actual-product-hold",
+              "limits": {
+                "ms": 90000,
+                "toolCalls": 12
+              }
+            }
+          },
+          {
+            "id": "standard-readonly-approval-posture",
+            "pass": true,
+            "detail": {
+              "approvalMode": "suggest",
+              "approvalCount": 0
+            }
+          },
+          {
+            "id": "measurement-authority-exact",
+            "pass": true,
+            "detail": {
+              "measurementAuthority": "exact"
+            }
+          }
+        ],
+        "overall": "hold",
+        "failedIds": [],
+        "holdIds": [
+          "visible-analysis-within-10m",
+          "7114-first-visible-narrative-10s",
+          "7114-interim-deliverable-bound"
+        ]
+      },
+      "fixtures": {
+        "observation": {
+          "path": "/tmp/deckent-terminal-integration-astra-20260910/proof/fixtures/pty-observations-e32768.json",
+          "sha256": "9113a1e08c9da52beec7892e3b298bcc608147876e89da6bcf070021252c6600"
+        },
+        "legacyActual": {
+          "path": "/tmp/deckent-terminal-integration-astra-20260910/proof/fixtures/e-first-actual-metrics.json",
+          "sha256": "4d4f8b6106dbd451cb36d323ea4eac9230086ca54a1d602140ce926cfac61d2f"
+        }
+      }
+    },
+    {
+      "id": "failed-ref-gdn39Q",
+      "ok": true,
+      "legacyActual": {
+        "source": "/tmp/deckent-terminal-integration-astra-20260910/proof/fixtures/e-diag-failed-ref-result.json",
+        "firstVisibleNarrativeMs": 67570,
+        "firstVisibleNarrativeText": "[Referans analizi tamamlanamadı: model geçersiz bir özet döndürdü. Tam analiz iddiası yok.]",
+        "hasVisibleAnalysis": true,
+        "falsePromptNarrativePass": false,
+        "falseTypedFailureAnalysisPass": true,
+        "legacyFalseAnalysisPass": false,
+        "legacyFalseInterimSkipNarrative": false,
+        "legacyFalseRequestInterimMs": false,
+        "legacyFalseInterimHold": true
+      },
+      "metrics": {
+        "firstVisibleNarrativeMs": null,
+        "firstVisibleNarrativeText": null,
+        "hasVisibleAnalysis": false,
+        "referencePartial": false,
+        "referenceFailed": true,
+        "referenceTypedUnavailable": true,
+        "referencePreDispatchUnavailable": false,
+        "referenceChildInvoked": null,
+        "referenceChildInvocationAuthority": "unknown-no-slash-receipt",
+        "interimDeliverableSeen": false,
+        "childMapRequests": 0
+      },
+      "acceptance": {
+        "checks": [
+          {
+            "id": "scenario-provider-match",
+            "pass": true,
+            "detail": {
+              "expectedProvider": "local-llm",
+              "expectedModel": "Qwen3.8-27B-Q4_K_M",
+              "bootProviderModelSeen": true,
+              "measurementExactSeen": true,
+              "providerMatch": true
+            }
+          },
+          {
+            "id": "prompt-sent-and-echoed",
+            "pass": true,
+            "detail": {
+              "promptSent": true,
+              "promptEchoed": true
+            }
+          },
+          {
+            "id": "turn-completed-before-timeout",
+            "pass": true,
+            "detail": {
+              "turnCompleted": true,
+              "turnEndMs": 70400,
+              "elapsedMs": 68235,
+              "timeoutMs": 600000
+            }
+          },
+          {
+            "id": "tool-calls-nonzero-or-reference-child",
+            "pass": false,
+            "disposition": "hold",
+            "detail": {
+              "toolCallCount": 0,
+              "toolCountAuthority": "rendered-rows-only",
+              "referenceChildInvoked": null,
+              "referenceChildInvocationAuthority": "unknown-no-slash-receipt",
+              "childMapRequests": 0,
+              "childReduceRequests": 0
+            }
+          },
+          {
+            "id": "visible-analysis-within-10m",
+            "pass": false,
+            "disposition": "evaluated",
+            "detail": {
+              "hasVisibleAnalysis": false,
+              "firstVisibleNarrativeText": null,
+              "referencePartial": false,
+              "referenceFailed": true,
+              "referenceTypedUnavailable": true,
+              "referencePreDispatchUnavailable": false,
+              "elapsedMs": 68235,
+              "timeoutMs": 600000
+            }
+          },
+          {
+            "id": "no-fake-context-checkpoint-first-20-tools",
+            "pass": true,
+            "detail": {
+              "toolCallCount": 0,
+              "tokenPressureCheckpointCount": 0,
+              "measurementAuthority": "exact"
+            }
+          },
+          {
+            "id": "7114-first-visible-narrative-10s",
+            "pass": false,
+            "disposition": "evaluated",
+            "detail": {
+              "firstVisibleNarrativeMs": null,
+              "referencePartial": false,
+              "referenceFailed": true,
+              "limitMs": 10000
+            }
+          },
+          {
+            "id": "7114-interim-deliverable-bound",
+            "pass": false,
+            "disposition": "hold",
+            "detail": {
+              "firstInterimDeliverableMs": null,
+              "toolCallCount": 0,
+              "referenceIngressExercised": true,
+              "referencePartial": false,
+              "referenceFailed": true,
+              "holdReason": "reference-program-no-interim-nudge-actual-product-hold",
+              "limits": {
+                "ms": 90000,
+                "toolCalls": 12
+              }
+            }
+          },
+          {
+            "id": "standard-readonly-approval-posture",
+            "pass": true,
+            "detail": {
+              "approvalMode": "suggest",
+              "approvalCount": 0
+            }
+          },
+          {
+            "id": "measurement-authority-exact",
+            "pass": true,
+            "detail": {
+              "measurementAuthority": "exact"
+            }
+          }
+        ],
+        "overall": "fail",
+        "failedIds": [
+          "visible-analysis-within-10m",
+          "7114-first-visible-narrative-10s"
+        ],
+        "holdIds": [
+          "tool-calls-nonzero-or-reference-child",
+          "7114-interim-deliverable-bound"
+        ]
+      },
+      "fixtures": {
+        "observation": {
+          "path": "/tmp/deckent-terminal-integration-astra-20260910/proof/fixtures/pty-observations-gdn39Q-failed-ref.json",
+          "sha256": "4498b05f188c2af38aca48ce3e76409c4d322d83b59b28965e719fb106a66a25"
+        },
+        "legacyActual": {
+          "path": "/tmp/deckent-terminal-integration-astra-20260910/proof/fixtures/e-diag-failed-ref-result.json",
+          "sha256": "1eae8862f9dc44f146d6abf99a5773da00ee0bc12581f39536e1bcdccdb96f5f"
+        }
+      }
+    },
+    {
+      "id": "schema-unavailable-eYMqKL",
+      "ok": true,
+      "legacyActual": {
+        "source": "/tmp/deckent-terminal-integration-astra-20260910/proof/fixtures/e-schema-result.json",
+        "firstVisibleNarrativeMs": 74,
+        "firstVisibleNarrativeText": "[Referans analizi tamamlanamadı: bu uç noktanın yanıt şemasını zorladığı bildirilmemiş. Endpoint'in zorladığı",
+        "hasVisibleAnalysis": true,
+        "falsePromptNarrativePass": false,
+        "falseTypedFailureAnalysisPass": true,
+        "legacyFalseAnalysisPass": true,
+        "legacyFalseInterimSkipNarrative": false,
+        "legacyFalseRequestInterimMs": false,
+        "legacyFalseInterimHold": false
+      },
+      "metrics": {
+        "firstVisibleNarrativeMs": null,
+        "firstVisibleNarrativeText": null,
+        "hasVisibleAnalysis": false,
+        "referencePartial": false,
+        "referenceFailed": false,
+        "referenceTypedUnavailable": true,
+        "referencePreDispatchUnavailable": true,
+        "referenceChildInvoked": false,
+        "referenceChildInvocationAuthority": "rendered-slash-receipt",
+        "interimDeliverableSeen": false,
+        "childMapRequests": 0
+      },
+      "acceptance": {
+        "checks": [
+          {
+            "id": "scenario-provider-match",
+            "pass": true,
+            "detail": {
+              "expectedProvider": "local-llm",
+              "expectedModel": "Qwen3.8-27B-Q4_K_M",
+              "bootProviderModelSeen": true,
+              "measurementExactSeen": true,
+              "providerMatch": true
+            }
+          },
+          {
+            "id": "prompt-sent-and-echoed",
+            "pass": true,
+            "detail": {
+              "promptSent": true,
+              "promptEchoed": true
+            }
+          },
+          {
+            "id": "turn-completed-before-timeout",
+            "pass": true,
+            "detail": {
+              "turnCompleted": true,
+              "turnEndMs": 100,
+              "elapsedMs": 5009,
+              "timeoutMs": 600000
+            }
+          },
+          {
+            "id": "tool-calls-nonzero-or-reference-child",
+            "pass": false,
+            "disposition": "evaluated",
+            "detail": {
+              "toolCallCount": 0,
+              "toolCountAuthority": "rendered-rows-only",
+              "referenceChildInvoked": false,
+              "referenceChildInvocationAuthority": "rendered-slash-receipt",
+              "childMapRequests": 0,
+              "childReduceRequests": 0
+            }
+          },
+          {
+            "id": "visible-analysis-within-10m",
+            "pass": false,
+            "disposition": "evaluated",
+            "detail": {
+              "hasVisibleAnalysis": false,
+              "firstVisibleNarrativeText": null,
+              "referencePartial": false,
+              "referenceFailed": false,
+              "referenceTypedUnavailable": true,
+              "referencePreDispatchUnavailable": true,
+              "elapsedMs": 5009,
+              "timeoutMs": 600000
+            }
+          },
+          {
+            "id": "no-fake-context-checkpoint-first-20-tools",
+            "pass": true,
+            "detail": {
+              "toolCallCount": 0,
+              "tokenPressureCheckpointCount": 0,
+              "measurementAuthority": "exact"
+            }
+          },
+          {
+            "id": "7114-first-visible-narrative-10s",
+            "pass": false,
+            "disposition": "evaluated",
+            "detail": {
+              "firstVisibleNarrativeMs": null,
+              "referencePartial": false,
+              "referenceFailed": false,
+              "limitMs": 10000
+            }
+          },
+          {
+            "id": "7114-interim-deliverable-bound",
+            "pass": false,
+            "disposition": "hold",
+            "detail": {
+              "firstInterimDeliverableMs": null,
+              "toolCallCount": 0,
+              "referenceIngressExercised": true,
+              "referencePartial": false,
+              "referenceFailed": false,
+              "holdReason": "reference-program-no-interim-nudge-actual-product-hold",
+              "limits": {
+                "ms": 90000,
+                "toolCalls": 12
+              }
+            }
+          },
+          {
+            "id": "standard-readonly-approval-posture",
+            "pass": true,
+            "detail": {
+              "approvalMode": "suggest",
+              "approvalCount": 0
+            }
+          },
+          {
+            "id": "measurement-authority-exact",
+            "pass": true,
+            "detail": {
+              "measurementAuthority": "exact"
+            }
+          }
+        ],
+        "overall": "fail",
+        "failedIds": [
+          "tool-calls-nonzero-or-reference-child",
+          "visible-analysis-within-10m",
+          "7114-first-visible-narrative-10s"
+        ],
+        "holdIds": [
+          "7114-interim-deliverable-bound"
+        ]
+      },
+      "fixtures": {
+        "observation": {
+          "path": "/tmp/deckent-terminal-integration-astra-20260910/proof/fixtures/pty-observations-eYMqKL-schema-unavailable.json",
+          "sha256": "bfcfac29d7ad78d3bac0d0da5cd5d928307b21f57c67bbe77e367a86b908b6c8"
+        },
+        "legacyActual": {
+          "path": "/tmp/deckent-terminal-integration-astra-20260910/proof/fixtures/e-schema-result.json",
+          "sha256": "55f8b488d7777cc7cc42f394d5bcb5b62baebcc5ec121b7185bc25f7af7d45c9"
+        }
+      }
+    },
+    {
+      "id": "boundary-Hs9vsd",
+      "ok": true,
+      "legacyActual": {
+        "source": "/tmp/deckent-terminal-integration-astra-20260910/proof/fixtures/e-boundary-result.json",
+        "firstVisibleNarrativeMs": 105803,
+        "firstVisibleNarrativeText": "[ara yanıt istendi — son görünür sonuçtan bu yana 0 araç çağrısı / 106 sn; asistan şimdi bilinen · kalan · sonraki adımı",
+        "hasVisibleAnalysis": true,
+        "falsePromptNarrativePass": false,
+        "falseTypedFailureAnalysisPass": false,
+        "legacyFalseAnalysisPass": false,
+        "legacyFalseInterimSkipNarrative": false,
+        "legacyFalseRequestInterimMs": true,
+        "legacyFalseInterimHold": false
+      },
+      "metrics": {
+        "firstVisibleNarrativeMs": 106633,
+        "firstVisibleNarrativeText": "Alperen approved receipt GR-2026-07-26-MASTER-01 to rebuild the canonical MASTER with a two-file commit, and approved",
+        "hasVisibleAnalysis": true,
+        "referencePartial": true,
+        "referenceFailed": false,
+        "referenceTypedUnavailable": true,
+        "referencePreDispatchUnavailable": false,
+        "referenceChildInvoked": true,
+        "referenceChildInvocationAuthority": "rendered-slash-receipt",
+        "interimDeliverableSeen": true,
+        "childMapRequests": 6
+      },
+      "acceptance": {
+        "checks": [
+          {
+            "id": "scenario-provider-match",
+            "pass": true,
+            "detail": {
+              "expectedProvider": "local-llm",
+              "expectedModel": "Qwen3.8-27B-Q4_K_M",
+              "bootProviderModelSeen": true,
+              "measurementExactSeen": true,
+              "providerMatch": true
+            }
+          },
+          {
+            "id": "prompt-sent-and-echoed",
+            "pass": true,
+            "detail": {
+              "promptSent": true,
+              "promptEchoed": true
+            }
+          },
+          {
+            "id": "turn-completed-before-timeout",
+            "pass": true,
+            "detail": {
+              "turnCompleted": true,
+              "turnEndMs": 150100,
+              "elapsedMs": 141527,
+              "timeoutMs": 600000
+            }
+          },
+          {
+            "id": "tool-calls-nonzero-or-reference-child",
+            "pass": true,
+            "disposition": "evaluated",
+            "detail": {
+              "toolCallCount": 0,
+              "toolCountAuthority": "rendered-rows-only",
+              "referenceChildInvoked": true,
+              "referenceChildInvocationAuthority": "rendered-slash-receipt",
+              "childMapRequests": 6,
+              "childReduceRequests": 0
+            }
+          },
+          {
+            "id": "visible-analysis-within-10m",
+            "pass": true,
+            "disposition": "evaluated",
+            "detail": {
+              "hasVisibleAnalysis": true,
+              "firstVisibleNarrativeText": "Alperen approved receipt GR-2026-07-26-MASTER-01 to rebuild the canonical MASTER with a two-file commit, and approved",
+              "referencePartial": true,
+              "referenceFailed": false,
+              "referenceTypedUnavailable": true,
+              "referencePreDispatchUnavailable": false,
+              "elapsedMs": 141527,
+              "timeoutMs": 600000
+            }
+          },
+          {
+            "id": "no-fake-context-checkpoint-first-20-tools",
+            "pass": true,
+            "detail": {
+              "toolCallCount": 0,
+              "tokenPressureCheckpointCount": 0,
+              "measurementAuthority": "exact"
+            }
+          },
+          {
+            "id": "7114-first-visible-narrative-10s",
+            "pass": false,
+            "disposition": "evaluated",
+            "detail": {
+              "firstVisibleNarrativeMs": 106633,
+              "referencePartial": true,
+              "referenceFailed": false,
+              "limitMs": 10000
+            }
+          },
+          {
+            "id": "7114-interim-deliverable-bound",
+            "pass": false,
+            "disposition": "evaluated",
+            "detail": {
+              "firstInterimDeliverableMs": 106633,
+              "toolCallCount": 0,
+              "referenceIngressExercised": true,
+              "referencePartial": true,
+              "referenceFailed": false,
+              "holdReason": null,
+              "limits": {
+                "ms": 90000,
+                "toolCalls": 12
+              }
+            }
+          },
+          {
+            "id": "standard-readonly-approval-posture",
+            "pass": true,
+            "detail": {
+              "approvalMode": "suggest",
+              "approvalCount": 0
+            }
+          },
+          {
+            "id": "measurement-authority-exact",
+            "pass": true,
+            "detail": {
+              "measurementAuthority": "exact"
+            }
+          }
+        ],
+        "overall": "fail",
+        "failedIds": [
+          "7114-first-visible-narrative-10s",
+          "7114-interim-deliverable-bound"
+        ],
+        "holdIds": []
+      },
+      "fixtures": {
+        "observation": {
+          "path": "/tmp/deckent-terminal-integration-astra-20260910/proof/fixtures/pty-observations-Hs9vsd-boundary.json",
+          "sha256": "41fece55bb2116038b973da05da8afc67747426167c20a3501531fc70f5d8328"
+        },
+        "legacyActual": {
+          "path": "/tmp/deckent-terminal-integration-astra-20260910/proof/fixtures/e-boundary-result.json",
+          "sha256": "e50fbfdca92aee3beff66dfaab91ab387b7a64aac4e2d2c552e9c0d21a8b2226"
+        }
+      }
+    },
+    {
+      "id": "interim-skipped-l7JieX",
+      "ok": true,
+      "legacyActual": {
+        "source": "/tmp/deckent-terminal-integration-astra-20260910/proof/fixtures/e-interim-result.json",
+        "firstVisibleNarrativeMs": 58380,
+        "firstVisibleNarrativeText": "[Henüz ara cevap yok (zamanı gelmedi); okuma sürüyor.]",
+        "hasVisibleAnalysis": false,
+        "falsePromptNarrativePass": false,
+        "falseTypedFailureAnalysisPass": false,
+        "legacyFalseAnalysisPass": false,
+        "legacyFalseInterimSkipNarrative": true,
+        "legacyFalseRequestInterimMs": false,
+        "legacyFalseInterimHold": false
+      },
+      "metrics": {
+        "firstVisibleNarrativeMs": null,
+        "firstVisibleNarrativeText": null,
+        "hasVisibleAnalysis": false,
+        "referencePartial": true,
+        "referenceFailed": false,
+        "referenceTypedUnavailable": true,
+        "referencePreDispatchUnavailable": false,
+        "referenceChildInvoked": true,
+        "referenceChildInvocationAuthority": "rendered-slash-receipt",
+        "interimDeliverableSeen": false,
+        "childMapRequests": 6
+      },
+      "acceptance": {
+        "checks": [
+          {
+            "id": "scenario-provider-match",
+            "pass": true,
+            "detail": {
+              "expectedProvider": "local-llm",
+              "expectedModel": "Qwen3.8-27B-Q4_K_M",
+              "bootProviderModelSeen": true,
+              "measurementExactSeen": true,
+              "providerMatch": true
+            }
+          },
+          {
+            "id": "prompt-sent-and-echoed",
+            "pass": true,
+            "detail": {
+              "promptSent": true,
+              "promptEchoed": true
+            }
+          },
+          {
+            "id": "turn-completed-before-timeout",
+            "pass": true,
+            "detail": {
+              "turnCompleted": true,
+              "turnEndMs": 150100,
+              "elapsedMs": 141543,
+              "timeoutMs": 600000
+            }
+          },
+          {
+            "id": "tool-calls-nonzero-or-reference-child",
+            "pass": true,
+            "disposition": "evaluated",
+            "detail": {
+              "toolCallCount": 0,
+              "toolCountAuthority": "rendered-rows-only",
+              "referenceChildInvoked": true,
+              "referenceChildInvocationAuthority": "rendered-slash-receipt",
+              "childMapRequests": 6,
+              "childReduceRequests": 0
+            }
+          },
+          {
+            "id": "visible-analysis-within-10m",
+            "pass": false,
+            "disposition": "hold",
+            "detail": {
+              "hasVisibleAnalysis": false,
+              "firstVisibleNarrativeText": null,
+              "referencePartial": true,
+              "referenceFailed": false,
+              "referenceTypedUnavailable": true,
+              "referencePreDispatchUnavailable": false,
+              "elapsedMs": 141543,
+              "timeoutMs": 600000
+            }
+          },
+          {
+            "id": "no-fake-context-checkpoint-first-20-tools",
+            "pass": true,
+            "detail": {
+              "toolCallCount": 0,
+              "tokenPressureCheckpointCount": 0,
+              "measurementAuthority": "exact"
+            }
+          },
+          {
+            "id": "7114-first-visible-narrative-10s",
+            "pass": false,
+            "disposition": "hold",
+            "detail": {
+              "firstVisibleNarrativeMs": null,
+              "referencePartial": true,
+              "referenceFailed": false,
+              "limitMs": 10000
+            }
+          },
+          {
+            "id": "7114-interim-deliverable-bound",
+            "pass": false,
+            "disposition": "hold",
+            "detail": {
+              "firstInterimDeliverableMs": null,
+              "toolCallCount": 0,
+              "referenceIngressExercised": true,
+              "referencePartial": true,
+              "referenceFailed": false,
+              "holdReason": "reference-program-no-interim-nudge-actual-product-hold",
+              "limits": {
+                "ms": 90000,
+                "toolCalls": 12
+              }
+            }
+          },
+          {
+            "id": "standard-readonly-approval-posture",
+            "pass": true,
+            "detail": {
+              "approvalMode": "suggest",
+              "approvalCount": 0
+            }
+          },
+          {
+            "id": "measurement-authority-exact",
+            "pass": true,
+            "detail": {
+              "measurementAuthority": "exact"
+            }
+          }
+        ],
+        "overall": "hold",
+        "failedIds": [],
+        "holdIds": [
+          "visible-analysis-within-10m",
+          "7114-first-visible-narrative-10s",
+          "7114-interim-deliverable-bound"
+        ]
+      },
+      "fixtures": {
+        "observation": {
+          "path": "/tmp/deckent-terminal-integration-astra-20260910/proof/fixtures/pty-observations-l7JieX-interim-skipped.json",
+          "sha256": "61610c93e4e71533f563eb3e8e6dfb82d8a9723df6c409ce98beb4a10ec9334d"
+        },
+        "legacyActual": {
+          "path": "/tmp/deckent-terminal-integration-astra-20260910/proof/fixtures/e-interim-result.json",
+          "sha256": "45907a07ae3ee9e7888ed11b9d8231c7cfc492df7598435d725cd5a47cd388ac"
+        }
+      }
+    },
+    {
+      "id": "e-first-answer-4bDbes",
+      "ok": true,
+      "legacyActual": {
+        "source": "/tmp/deckent-terminal-integration-astra-20260910/proof/fixtures/e-first-answer-result.json",
+        "firstVisibleNarrativeMs": 60243,
+        "firstVisibleNarrativeText": "Based on the verified digest, Deckent is a provider-neutral, local-first Agent OS where the MASTER-PLAN.md serves as the",
+        "hasVisibleAnalysis": true,
+        "falsePromptNarrativePass": false,
+        "falseTypedFailureAnalysisPass": false,
+        "legacyFalseAnalysisPass": false,
+        "legacyFalseInterimSkipNarrative": false,
+        "legacyFalseRequestInterimMs": false,
+        "legacyFalseInterimHold": true
+      },
+      "metrics": {
+        "firstVisibleNarrativeMs": 60243,
+        "firstVisibleNarrativeText": "Based on the verified digest, Deckent is a provider-neutral, local-first Agent OS where the MASTER-PLAN.md serves as the",
+        "hasVisibleAnalysis": true,
+        "referencePartial": true,
+        "referenceFailed": false,
+        "referenceTypedUnavailable": true,
+        "referencePreDispatchUnavailable": false,
+        "referenceChildInvoked": true,
+        "referenceChildInvocationAuthority": "rendered-slash-receipt",
+        "interimDeliverableSeen": true,
+        "childMapRequests": 5
+      },
+      "acceptance": {
+        "checks": [
+          {
+            "id": "scenario-provider-match",
+            "pass": true,
+            "detail": {
+              "expectedProvider": "local-llm",
+              "expectedModel": "Qwen3.8-27B-Q4_K_M",
+              "bootProviderModelSeen": true,
+              "measurementExactSeen": true,
+              "providerMatch": true
+            }
+          },
+          {
+            "id": "prompt-sent-and-echoed",
+            "pass": true,
+            "detail": {
+              "promptSent": true,
+              "promptEchoed": true
+            }
+          },
+          {
+            "id": "turn-completed-before-timeout",
+            "pass": true,
+            "detail": {
+              "turnCompleted": true,
+              "turnEndMs": 150100,
+              "elapsedMs": 141427,
+              "timeoutMs": 600000
+            }
+          },
+          {
+            "id": "tool-calls-nonzero-or-reference-child",
+            "pass": true,
+            "disposition": "evaluated",
+            "detail": {
+              "toolCallCount": 0,
+              "toolCountAuthority": "rendered-rows-only",
+              "referenceChildInvoked": true,
+              "referenceChildInvocationAuthority": "rendered-slash-receipt",
+              "childMapRequests": 5,
+              "childReduceRequests": 0
+            }
+          },
+          {
+            "id": "visible-analysis-within-10m",
+            "pass": true,
+            "disposition": "evaluated",
+            "detail": {
+              "hasVisibleAnalysis": true,
+              "firstVisibleNarrativeText": "Based on the verified digest, Deckent is a provider-neutral, local-first Agent OS where the MASTER-PLAN.md serves as the",
+              "referencePartial": true,
+              "referenceFailed": false,
+              "referenceTypedUnavailable": true,
+              "referencePreDispatchUnavailable": false,
+              "elapsedMs": 141427,
+              "timeoutMs": 600000
+            }
+          },
+          {
+            "id": "no-fake-context-checkpoint-first-20-tools",
+            "pass": true,
+            "detail": {
+              "toolCallCount": 0,
+              "tokenPressureCheckpointCount": 0,
+              "measurementAuthority": "exact"
+            }
+          },
+          {
+            "id": "7114-first-visible-narrative-10s",
+            "pass": false,
+            "disposition": "evaluated",
+            "detail": {
+              "firstVisibleNarrativeMs": 60243,
+              "referencePartial": true,
+              "referenceFailed": false,
+              "limitMs": 10000
+            }
+          },
+          {
+            "id": "7114-interim-deliverable-bound",
+            "pass": true,
+            "disposition": "evaluated",
+            "detail": {
+              "firstInterimDeliverableMs": 60243,
+              "toolCallCount": 0,
+              "referenceIngressExercised": true,
+              "referencePartial": true,
+              "referenceFailed": false,
+              "holdReason": null,
+              "limits": {
+                "ms": 90000,
+                "toolCalls": 12
+              }
+            }
+          },
+          {
+            "id": "standard-readonly-approval-posture",
+            "pass": true,
+            "detail": {
+              "approvalMode": "suggest",
+              "approvalCount": 0
+            }
+          },
+          {
+            "id": "measurement-authority-exact",
+            "pass": true,
+            "detail": {
+              "measurementAuthority": "exact"
+            }
+          }
+        ],
+        "overall": "fail",
+        "failedIds": [
+          "7114-first-visible-narrative-10s"
+        ],
+        "holdIds": []
+      },
+      "fixtures": {
+        "observation": {
+          "path": "/tmp/deckent-terminal-integration-astra-20260910/proof/fixtures/pty-observations-4bDbes-e-first-answer.json",
+          "sha256": "441813f8f079b596868fa141785407da3e3c93a3c0f1bba71f003e94af97fcc0"
+        },
+        "legacyActual": {
+          "path": "/tmp/deckent-terminal-integration-astra-20260910/proof/fixtures/e-first-answer-result.json",
+          "sha256": "a97987ec693dc2158391aedc79234fdde157c798155675aea81144f25d301838"
+        }
+      }
+    }
+  ],
+  "ok": true
+}

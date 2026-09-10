@@ -25,6 +25,7 @@ import { ToolRegistry, type NativeToolSchema } from './tools/registry.js';
 import type { ToolResult } from './tools/types.js';
 import { Transcript } from './transcript.js';
 import type {
+  ProviderEvent,
   ProviderAdapter, ProviderMessage, ProviderRequest, ProviderToolCall, RequestMeasurement,
 } from './provider-tooluse/types.js';
 import {
@@ -54,6 +55,10 @@ import {
 } from './context-budget.js';
 import type { BudgetCheckpointPressure } from './events.js';
 import { previewBytesFromTokenShare } from './tool-result-broker.js';
+import {
+  canEmitMeasuredWindowCheckpoint,
+  shrinkOldestRetainedResults,
+} from './tool-result-retention.js';
 import { matchRule } from './permission-types.js';
 import type {
   NativePermissionBinding,
@@ -65,11 +70,64 @@ import { ALL_APPROVAL_RISKS, ALL_APPROVAL_SCOPES } from '../core/approval-contra
 import {
   INTERIM_CONTINUE_INSTRUCTION,
   INTERIM_DELIVERABLE_INSTRUCTION,
+  INTERIM_FAILURE_STOP_INSTRUCTION,
+  INTERIM_FINAL_INSTRUCTION,
+  TOOL_BUDGET_EXHAUSTED_RESULT,
   type InterimDeliverableTracker,
 } from './interim-deliverable.js';
 import type { ComposeOptions } from './identity.js';
 
 const MAX_OUTPUT_CONTINUATIONS = 2;
+
+/** 7114-b — an in-flight round that crosses the interim wall-clock bound while
+ *  the provider is still streaming (or hanging). The host cannot preempt a
+ *  non-cooperative stream without cancelling the user's turn, so it does the
+ *  honest thing instead: it reports ONCE that the answer is overdue, keeps the
+ *  same pending read alive, and leaves termination to the turn's own budgets.
+ *  Without a tracker (or once reported) this is a byte-identical pass-through. */
+type StreamItem = ProviderEvent | { readonly type: 'interim-overdue' } | { readonly type: 'wall-timeout' };
+async function* withInterimDeadline(
+  source: AsyncIterable<ProviderEvent>,
+  tracker: InterimDeliverableTracker | undefined,
+  hardDeadlineAtMs: number | undefined,
+  nowMs: () => number = Date.now,
+): AsyncIterable<StreamItem> {
+  if (!tracker && hardDeadlineAtMs === undefined) { yield* source; return; }
+  const iterator = source[Symbol.asyncIterator]();
+  let pending: Promise<IteratorResult<ProviderEvent>> | undefined;
+  try {
+    for (;;) {
+      pending ??= iterator.next();
+      // Two independent bounds. The soft one only REPORTS (the answer is late);
+      // the hard one ENDS the wait, because a provider that never resolves and
+      // never honours its abort signal would otherwise hold the user's turn
+      // open forever — the between-rounds budget check can never run.
+      const softInMs = tracker && !tracker.snapshot().overdue ? tracker.msUntilDue() : undefined;
+      const hardInMs = hardDeadlineAtMs === undefined ? undefined : Math.max(0, hardDeadlineAtMs - nowMs());
+      const races: Promise<IteratorResult<ProviderEvent> | 'overdue' | 'wall-timeout'>[] = [pending];
+      const timers: ReturnType<typeof setTimeout>[] = [];
+      if (softInMs !== undefined) {
+        races.push(new Promise((resolve) => { timers.push(setTimeout(() => resolve('overdue'), softInMs)); }));
+      }
+      if (hardInMs !== undefined) {
+        races.push(new Promise((resolve) => { timers.push(setTimeout(() => resolve('wall-timeout'), hardInMs)); }));
+      }
+      let item: IteratorResult<ProviderEvent> | 'overdue' | 'wall-timeout';
+      try { item = await Promise.race(races); }
+      finally { for (const timer of timers) clearTimeout(timer); }
+      if (item === 'overdue') { yield { type: 'interim-overdue' }; continue; }
+      if (item === 'wall-timeout') { yield { type: 'wall-timeout' }; return; }
+      pending = undefined;
+      if (item.done) return;
+      yield item.value;
+    }
+  } finally {
+    // Give the adapter its abort chance, but NEVER await it: a non-cooperative
+    // iterator whose return() also hangs must not hold the turn open.
+    void Promise.resolve(iterator.return?.()).catch(() => undefined);
+  }
+}
+
 
 /** 7108-b — carries an UNRELATED fault thrown by the preamble authority while
  *  the exhaustion retry is being re-prepared inside the provider try/catch, so
@@ -398,8 +456,10 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       );
       return measurement;
     };
+    const measuredAdmissionTotal = (measure: RequestMeasurement): number =>
+      measure.inputTokens + outputCeilingTokens + contextSafetyReserveTokens;
     const measureMessages = async (source: readonly ProviderMessage[]): Promise<number> =>
-      (await measureRequest(source)).inputTokens + outputCeilingTokens + contextSafetyReserveTokens;
+      measuredAdmissionTotal(await measureRequest(source));
     const tokenPressureJustification = (
       retainedTokens: number,
       capTokens: number,
@@ -457,16 +517,19 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       if (pressureTranscript !== lastPressureTranscript) {
         lastPressureTranscript = pressureTranscript;
         const admissionMeasure = await measureRequest(transcript.toProviderMessages());
-        yield {
-          type: 'budget-checkpoint-request', reason: 'token-pressure',
-          rounds: budgetState?.rounds ?? iterations, toolCalls: budgetState?.toolCalls ?? 0,
-          pressure: tokenPressureJustification(
-            fitted.requiredTokens,
-            Math.floor(rawBudget! * (deps.nativeBudget?.contextHighWaterRatio ?? DEFAULT_NATIVE_AGENT_BUDGET.contextHighWaterRatio)),
-            admissionMeasure.quality,
-            'full-request',
-          ),
-        };
+        if (canEmitMeasuredWindowCheckpoint(admissionMeasure)) {
+          const admissionTotal = measuredAdmissionTotal(admissionMeasure);
+          yield {
+            type: 'budget-checkpoint-request', reason: 'token-pressure',
+            rounds: budgetState?.rounds ?? iterations, toolCalls: budgetState?.toolCalls ?? 0,
+            pressure: tokenPressureJustification(
+              admissionTotal,
+              Math.floor(rawBudget! * (deps.nativeBudget?.contextHighWaterRatio ?? DEFAULT_NATIVE_AGENT_BUDGET.contextHighWaterRatio)),
+              admissionMeasure.quality,
+              'full-request',
+            ),
+          };
+        }
       }
       // Re-fit silently: a consumer that ignored the checkpoint would otherwise
       // get the identical compaction notice twice for one round.
@@ -496,6 +559,9 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       ...(transportRetry ? { transportRetry } : {}),
     };
     let assistantText = '';
+    // 7114-b — set when the hard in-round wall bound ended a stream that the
+    // provider never finished; the turn closes honestly instead of hanging.
+    let wallTimedOut = false;
     // 7114 — exactly the text this round already PUT ON THE USER'S SCREEN
     // (every yielded text-delta, continuation de-dup included). On a clean
     // round it equals `assistantText`; on an interrupt it is the only carrier,
@@ -524,12 +590,35 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
           yield { type: 'turn-end' };
           return;
         }
-        for await (const ev of adapter.send(segmentRequest)) {
+        // The hard bound is the turn's own remaining wall budget — the same
+        // ceiling evaluateNativeBudget applies between rounds, now also
+        // enforced INSIDE a round.
+        const hardDeadlineAtMs = budgetState && deps.nativeBudget
+          ? budgetState.startedAtMs + deps.nativeBudget.maxWallTimeMs
+          : undefined;
+        for await (const ev of withInterimDeadline(adapter.send(segmentRequest), interim, hardDeadlineAtMs)) {
         // Mid-stream cancel(): stop consuming further provider events instead of
         // running the in-flight turn to completion (breaking a for-await triggers
         // the adapter's iterator.return(), giving it a chance to abort cleanly).
         if (deps.isCancelled?.()) break;
-        if (ev.type === 'request-measurement') {
+        if (ev.type === 'wall-timeout') {
+          // Typed, bounded termination: whatever already streamed stays on the
+          // user's screen and in the transcript; nothing claims completion.
+          wallTimedOut = true;
+          break;
+        }
+        else if (ev.type === 'interim-overdue') {
+          // Reported once per bound crossing, while the round is still open.
+          // The sentinel can only reach here when a tracker was supplied.
+          if (interim?.markOverdue()) {
+            const snap = interim!.snapshot();
+            yield {
+              type: 'interim-deliverable', phase: 'overdue',
+              toolCalls: snap.toolCallsSinceDeliverable, elapsedMs: snap.elapsedMsSinceDeliverable,
+            };
+          }
+        }
+        else if (ev.type === 'request-measurement') {
           yield Object.freeze({ type: 'request-measurement', decision: ev.decision, purpose: 'turn' });
         }
         else if (ev.type === 'text-delta') {
@@ -546,7 +635,6 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         }
         else if (ev.type === 'tool-call') { segmentCalls.push(ev); }
         else if (ev.type === 'usage') {
-          yield { type: 'usage', inputTokens: ev.inputTokens, outputTokens: ev.outputTokens };
           if (budgetState) {
             // Fresh-token accounting: each round's reported input re-counts the
             // WHOLE resent context, so summing raw input grows quadratically and
@@ -558,8 +646,10 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
             budgetState.lastInputTokens = ev.inputTokens;
             budgetState.cumulativeTokens += freshInput + ev.outputTokens;
           }
+          if (deps.costGuard) accrue(deps.costGuard, { inputTokens: ev.inputTokens, outputTokens: ev.outputTokens });
+          // Durable session consumers must observe the counters for this usage event.
+          yield { type: 'usage', inputTokens: ev.inputTokens, outputTokens: ev.outputTokens };
           if (deps.costGuard) {
-            accrue(deps.costGuard, { inputTokens: ev.inputTokens, outputTokens: ev.outputTokens });
             const c = costExceeded(deps.costGuard);
             if (c.exceeded) {
               yield { type: 'error', message: `${c.reason}: ~$${c.spentUsd.toFixed(4)}` };
@@ -773,12 +863,25 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       return;
     }
 
-    // 7114 — a visible answer of at least the configured size is a deliverable:
-    // the counters reset whether the model volunteered it (narration contract)
-    // or the host asked for it (interim turn below).
+    // 7114-b — the provider never finished this round inside the turn's wall
+    // budget. Keep exactly what the user already saw (same retention contract
+    // as an interrupt), name the reason with a typed code, and end the turn.
+    // No completion is claimed and no further round is started.
+    if (wallTimedOut) {
+      if (streamedText !== '') transcript.appendAssistant(streamedText);
+      yield { type: 'error', code: 'native-budget.walltime-exhausted', message: 'native-budget.walltime-exhausted' };
+      yield { type: 'turn-end' };
+      return;
+    }
+
+    // 7114-b — only a REAL answer settles the round: a substantive response to
+    // the host's outstanding ask, or the turn's own answer (no further calls).
+    // Narration that introduces the next batch is not a deliverable, and short
+    // lines are never summed into one — that is exactly what made the measured
+    // incident silent for 1092 s while the counters kept resetting.
     if (interim) {
-      interim.observeAssistantText(assistantText);
-      if (interim.settleRound()) {
+      const outcome = interim.settleRound({ text: assistantText, toolCalls: calls.length });
+      if (outcome === 'delivered') {
         const snap = interim.snapshot();
         yield { type: 'interim-deliverable', phase: 'delivered', toolCalls: snap.toolCallsSinceDeliverable, elapsedMs: snap.elapsedMsSinceDeliverable };
       }
@@ -817,18 +920,22 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         singleCapTokens * calls.length,
         Math.floor(turnCapTokens * deps.nativeBudget.contextHighWaterRatio),
       );
-      const retainedMeasure = await measureRetainedToolResultTokens(
+      let retainedMeasure = await measureRetainedToolResultTokens(
         transcript.toProviderMessages(),
         measureRequest,
       );
-      if (retainedMeasure.retainedTokens > 0 && turnCapTokens - retainedMeasure.retainedTokens < desiredTokens) {
-        yield {
-          type: 'budget-checkpoint-request', reason: 'token-pressure',
-          rounds: budgetState?.rounds ?? iterations, toolCalls: budgetState?.toolCalls ?? 0,
-          pressure: tokenPressureJustification(
-            retainedMeasure.retainedTokens, turnCapTokens, retainedMeasure.quality, 'tool-results',
-          ),
-        };
+      if (deps.contentStore && retainedMeasure.retainedTokens > 0 && turnCapTokens - retainedMeasure.retainedTokens < desiredTokens) {
+        const needFree = desiredTokens - Math.max(0, turnCapTokens - retainedMeasure.retainedTokens);
+        const shrink = await shrinkOldestRetainedResults({
+          transcript,
+          store: deps.contentStore,
+          nativeBudget: deps.nativeBudget,
+          rawBudget,
+          tokensPerUtf8Byte: lastTokensPerUtf8Byte,
+          measureRequest,
+          targetFreeTokens: needFree,
+        });
+        if (shrink.shrunkCount > 0) retainedMeasure = shrink.retainedMeasure;
       }
     }
     if (assistantText !== '' || calls.length > 0) {
@@ -870,6 +977,14 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       // cancel() stops the rest of the in-flight batch (incl. auto-tier calls),
       // not just subsequent ask-tier ones (review follow-up #1).
       if (deps.isCancelled?.()) { cancelledAt = callIndex; break; }
+      // 7114-b — the turn's tool budget is spent: refuse the call honestly and
+      // let the required final answer be the only way forward. The result is
+      // paired in the transcript, so the next request stays valid.
+      if (interim?.isToolBudgetExhausted()) {
+        yield { type: 'tool-result', id: call.id, tool: call.name, ok: false, output: TOOL_BUDGET_EXHAUSTED_RESULT };
+        transcript.appendToolResult(call.id, TOOL_BUDGET_EXHAUSTED_RESULT);
+        continue;
+      }
       const def = deps.registry.get(call.name);
       if (!def) {
         const output = `[unknown tool: ${call.name}]`;
@@ -1097,6 +1212,10 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       // A handler may attach a typed `meta.code` (7110: replay-served, content-ref
       // refusals) — surfaced on the event so the view localizes it; never on the wire.
       const resultCode = typeof result.meta?.['code'] === 'string' ? result.meta['code'] : undefined;
+      // 7114-b — the same-target failure guard reads the EXACT target of this
+      // call (tool + primary resource), so a run of failures against one file
+      // or command closes that line while different work is never implicated.
+      interim?.observeToolOutcome({ tool: call.name, target: primaryResource(call.args), ok: result.ok });
       yield { type: 'tool-result', id: call.id, tool: call.name, ok: result.ok, output: result.output, ...(resultCode ? { code: resultCode } : {}) };
       transcript.appendToolResult(call.id, result.output);
     }
@@ -1119,25 +1238,47 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
     // through settleRound() above once that answer lands.
     if (interim) {
       interim.observeToolCalls(calls.length);
-      const requirement = interim.evaluate();
-      if (requirement) {
-        interim.markRequested(requirement.trigger);
+      const demand = interim.evaluate();
+      if (demand) {
+        interim.markRequested(demand);
         yield {
-          type: 'interim-deliverable', phase: 'required', trigger: requirement.trigger,
-          toolCalls: requirement.toolCallsSinceDeliverable, elapsedMs: requirement.elapsedMsSinceDeliverable,
+          type: 'interim-deliverable', phase: 'required', demand: demand.kind,
+          ...(demand.trigger ? { trigger: demand.trigger } : {}),
+          ...(demand.target ? { target: demand.target } : {}),
+          ...(demand.attempts !== undefined ? { attempts: demand.attempts } : {}),
+          toolCalls: demand.toolCallsSinceDeliverable, elapsedMs: demand.elapsedMsSinceDeliverable,
+          toolCallsThisTurn: interim.snapshot().toolCallsThisTurn,
         };
-        transcript.appendHostUser(INTERIM_DELIVERABLE_INSTRUCTION);
+        transcript.appendHostUser(demand.kind === 'final'
+          ? INTERIM_FINAL_INSTRUCTION
+          : demand.kind === 'failure-stop' ? INTERIM_FAILURE_STOP_INSTRUCTION : INTERIM_DELIVERABLE_INSTRUCTION);
       }
     }
     if (deps.nativeBudget && rawBudget !== undefined && rawBudget > 0) {
       const highWater = deps.nativeBudget.contextHighWaterRatio ?? DEFAULT_NATIVE_AGENT_BUDGET.contextHighWaterRatio;
-      const turnCapTokens = Math.floor(rawBudget * (deps.nativeBudget.maxTurnToolResultShareOfContext ?? DEFAULT_NATIVE_AGENT_BUDGET.maxTurnToolResultShareOfContext));
       const highWaterWindow = Math.floor(rawBudget * highWater);
-      const highWaterRetained = Math.floor(turnCapTokens * highWater);
-      const messages = transcript.toProviderMessages();
-      const totalMeasured = await measureMessages(messages);
-      const retainedMeasure = await measureRetainedToolResultTokens(messages, measureRequest);
-      if (totalMeasured >= highWaterWindow || retainedMeasure.retainedTokens >= highWaterRetained) {
+      let messages = transcript.toProviderMessages();
+      let admissionMeasure = await measureRequest(messages);
+      let admissionTotal = measuredAdmissionTotal(admissionMeasure);
+      if (deps.contentStore && admissionTotal < highWaterWindow) {
+        const retainedMeasure = await measureRetainedToolResultTokens(messages, measureRequest);
+        const turnCapTokens = Math.floor(rawBudget * (deps.nativeBudget.maxTurnToolResultShareOfContext ?? DEFAULT_NATIVE_AGENT_BUDGET.maxTurnToolResultShareOfContext));
+        const highWaterRetained = Math.floor(turnCapTokens * highWater);
+        if (retainedMeasure.retainedTokens >= highWaterRetained) {
+          await shrinkOldestRetainedResults({
+            transcript,
+            store: deps.contentStore,
+            nativeBudget: deps.nativeBudget,
+            rawBudget,
+            tokensPerUtf8Byte: lastTokensPerUtf8Byte,
+            measureRequest,
+          });
+          messages = transcript.toProviderMessages();
+          admissionMeasure = await measureRequest(messages);
+          admissionTotal = measuredAdmissionTotal(admissionMeasure);
+        }
+      }
+      if (canEmitMeasuredWindowCheckpoint(admissionMeasure) && admissionTotal >= highWaterWindow) {
         const pressureTranscript = digestProviderRequest({ system, messages, tools: toolSchemas, model });
         if (pressureTranscript !== lastPressureTranscript) {
           lastPressureTranscript = pressureTranscript;
@@ -1145,7 +1286,10 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
             type: 'budget-checkpoint-request', reason: 'token-pressure',
             rounds: budgetState?.rounds ?? iterations, toolCalls: budgetState?.toolCalls ?? 0,
             pressure: tokenPressureJustification(
-              retainedMeasure.retainedTokens, highWaterRetained, retainedMeasure.quality, 'tool-results',
+              admissionTotal,
+              highWaterWindow,
+              admissionMeasure.quality,
+              'full-request',
             ),
           };
         }

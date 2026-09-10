@@ -14,7 +14,7 @@ import {
   writeFileSync,
   writeSync,
 } from 'node:fs';
-import { open } from 'node:fs/promises';
+import { open, rename, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
@@ -186,7 +186,20 @@ export function isContentRefReader(value: unknown): value is ContentRefReader {
   return !!value && typeof value === 'object'
     && typeof (value as { readContentRef?: unknown }).readContentRef === 'function';
 }
+export interface ReferenceContentPin {
+  source: { detailRef: string; sha256: string };
+  nodeRefs: string[];
+}
 export interface SessionToolContentStore extends ContentWriter, ContentRefReader {
+  /** Host-only recovery index; reads still pass the same digest/identity guard. */
+  /** 7113-C-PIN-CANCEL-FIX — the pin now carries the caller's composed signal.
+   *  A Node fs syscall cannot be physically cancelled, so the contract is
+   *  narrower and honest: every await is followed by an abort/custody check,
+   *  and an ABORTED attempt never publishes — the canonical rename is skipped
+   *  and the attempt's own temporary file is removed. A late completion of an
+   *  aborted attempt therefore leaves no durable trace. */
+  pinReferenceContent?(pinId: string, pin: ReferenceContentPin, expiresAt: number, signal?: AbortSignal): Promise<void>;
+  restoreReferenceContent?(pinId: string, signal?: AbortSignal): Promise<ReferenceContentPin | null>;
   beginCapture(input: {
     channel: ToolContentChannel;
     maxStoredBytes?: number;
@@ -394,8 +407,96 @@ export function createSessionToolContentStore(
       await file?.close().catch(() => undefined);
     }
   };
+  async function pinReadback(row: StoredRow, signal?: AbortSignal): Promise<void> {
+    const read = await readVerifiedRange(row, 0, Math.min(1, row.bytes), () => true, signal);
+    if (read.kind !== 'loaded') throw new Error('REFERENCE_STORE_FAILED');
+  }
   return {
     write: legacyWrite,
+    async pinReferenceContent(pinId, pin, expiresAt, signal) {
+      // 7113-C-PIN-CANCEL-FIX — one guard used after EVERY await: an aborted
+      // attempt, a closed store or a root that moved under us all mean the same
+      // thing, and none of them may publish.
+      const stillOurs = (): boolean => !signal?.aborted && !closed && rootMatches();
+      if (!isDigest(pinId) || !Number.isSafeInteger(expiresAt) || expiresAt <= Date.now()
+        || !DETAIL_REF_RE.test(pin.source.detailRef) || !isDigest(pin.source.sha256)
+        || pin.nodeRefs.length > 100_000 || pin.nodeRefs.some(ref => !isDigest(ref))) throw new Error('REFERENCE_STORE_FAILED');
+      if (!stillOurs()) throw new Error('REFERENCE_STORE_FAILED');
+      const dir = ensure();
+      const source = refs.get(pin.source.detailRef);
+      if (!source || !source.complete || source.sha !== pin.source.sha256) throw new Error('REFERENCE_STORE_FAILED');
+      await pinReadback(source);
+      if (!stillOurs()) throw new Error('REFERENCE_STORE_FAILED');
+      for (const ref of pin.nodeRefs) {
+        const row = contentRefs.get(ref);
+        if (!row) throw new Error('REFERENCE_STORE_FAILED');
+        await pinReadback(row);
+        if (!stillOurs()) throw new Error('REFERENCE_STORE_FAILED');
+      }
+      const payload = JSON.stringify({ schemaVersion: 1, expiresAt, pin });
+      const envelope = JSON.stringify({ payload, sha256: createHash('sha256').update(payload).digest('hex') });
+      const target = join(dir, `reference-pin-${pinId}.json`);
+      const temporary = join(dir, `.reference-pin-${pinId}-${randomBytes(8).toString('hex')}.tmp`);
+      const file = await open(temporary, 'wx', 0o600);
+      let durable = false;
+      try {
+        try { await file.writeFile(envelope); await file.sync(); } finally { await file.close(); }
+        // The rename IS the publication. A late-finishing aborted attempt stops
+        // here, so no canonical pin ever appears for it.
+        if (!stillOurs()) throw new Error('REFERENCE_STORE_FAILED');
+        await rename(temporary, target);
+        durable = true;
+      } finally {
+        // The temporary belongs to THIS attempt: clean it up on every exit that
+        // did not publish, whether the cause was abort, custody loss or an fs
+        // failure. Never touch another attempt's file.
+        if (!durable) await unlink(temporary).catch(() => undefined);
+      }
+      contentRefs.set(source.sha, source);
+    },
+    async restoreReferenceContent(pinId, signal) {
+      if (!isDigest(pinId) || closed || !constants.O_NOFOLLOW) throw new Error('REFERENCE_STORE_FAILED');
+      const dir = ensure(), target = join(dir, `reference-pin-${pinId}.json`);
+      let file: Awaited<ReturnType<typeof open>>;
+      try { file = await open(target, constants.O_RDONLY | constants.O_NOFOLLOW); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw error; }
+      let envelope: { payload: string; sha256: string };
+      try {
+        const st = await file.stat(); if (!st.isFile() || st.size > 16 * 1024 * 1024) throw new Error('REFERENCE_STORE_FAILED');
+        const bytes = Buffer.alloc(st.size); let offset = 0;
+        while (offset < bytes.length) {
+          if (signal?.aborted) throw new Error('REFERENCE_STORE_FAILED');
+          const read = await file.read(bytes, offset, bytes.length - offset, offset);
+          if (!read.bytesRead) throw new Error('REFERENCE_STORE_FAILED'); offset += read.bytesRead;
+        }
+        if ((await file.stat()).size !== st.size) throw new Error('REFERENCE_STORE_FAILED');
+        envelope = JSON.parse(bytes.toString('utf8')) as typeof envelope;
+      }
+      finally { await file.close(); }
+      if (createHash('sha256').update(envelope.payload).digest('hex') !== envelope.sha256) throw new Error('REFERENCE_STORE_FAILED');
+      const record = JSON.parse(envelope.payload) as { schemaVersion: number; expiresAt: number; pin: ReferenceContentPin };
+      const pin = record.pin;
+      if (record.schemaVersion !== 1 || !Number.isSafeInteger(record.expiresAt) || record.expiresAt <= Date.now()
+        || !DETAIL_REF_RE.test(pin.source.detailRef) || !isDigest(pin.source.sha256)
+        || !Array.isArray(pin.nodeRefs) || pin.nodeRefs.length > 100_000 || pin.nodeRefs.some(ref => !isDigest(ref))) throw new Error('REFERENCE_STORE_FAILED');
+      const rows: [string, StoredRow][] = [];
+      for (const [id, digest, name] of [[pin.source.detailRef, pin.source.sha256, `capture-${pin.source.detailRef}.bin`],
+        ...pin.nodeRefs.map(ref => [ref, ref, `content-${ref}.bin`])] as [string,string,string][]) {
+        if (signal?.aborted || !rootMatches()) throw new Error('REFERENCE_STORE_FAILED');
+        const path = join(dir, name), st = lstatSync(path);
+        if (!st.isFile() || st.isSymbolicLink() || st.size > sessionLimit) throw new Error('REFERENCE_STORE_FAILED');
+        const row = { path, sha: digest, bytes: st.size, complete: true, dev: st.dev, ino: st.ino };
+        await pinReadback(row, signal); rows.push([id, row]);
+      }
+      const restoredSource = rows[0]![1];
+      const newCapture = !refs.has(pin.source.detailRef);
+      if (newCapture && (retained + 1 > retainedLimit || sessionBytes + restoredSource.bytes > sessionLimit)) throw new Error('REFERENCE_STORE_FAILED');
+      // Restored captures consume the same retention/byte allowance as live captures.
+      if (newCapture) { retained++; sessionBytes += restoredSource.bytes; }
+      // Publish only after EVERY member was verified; corrupt pins grant no partial custody.
+      for (const [id, row] of rows) { if (id === pin.source.detailRef) refs.set(id, row); contentRefs.set(row.sha, row); }
+      return pin;
+    },
     beginCapture({ channel, maxStoredBytes, previewBytes }) {
       if (channel !== 'stdout' && channel !== 'stderr')
         throw new Error('invalid capture channel');
@@ -704,7 +805,7 @@ export function createSessionToolContentStore(
       const dir = root;
       if (
         !dir ||
-        row.path !== join(dir, `content-${input.sha256}.bin`) ||
+        (row.path !== join(dir, `content-${input.sha256}.bin`) && ![...refs.values()].some(capture => capture === row && capture.sha === input.sha256)) ||
         !row.path.startsWith(`${dir}${sep}`)
       )
         return { kind: 'hold', reasonCode: 'CONTENT_REF_DENIED' };

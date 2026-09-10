@@ -36,6 +36,15 @@ import {
   gitWorkflowCommit,
   GIT_DIFF_TEXT_CAP,
 } from '../../orchestra/git-workflow-service.js';
+import {
+  DEFAULT_GREP_MAX_BYTES_PER_LINE,
+  DEFAULT_GREP_MAX_FILE_BYTES,
+  DEFAULT_GREP_MAX_HITS,
+  formatGrepOutput,
+  scanFileForGrep,
+  type GrepHit,
+  type GrepSkippedFile,
+} from '../repl/native-grep.js';
 
 // ─── 583/N2 — pure-Node file walkers for the silent READ tools ───────────────
 
@@ -497,23 +506,38 @@ export function createToolExecDispatcher(opts: ToolExecOptions = {}): McpToolDis
             const grepTarget = String(args['path'] ?? '.');
             const startAbs = grepTarget === '.' || grepTarget === '' ? resolveCwd() : inScope(grepTarget);
             if (!startAbs) return `[mcp-error] deckent_grep: path out of scope or invalid`;
-            const hits: string[] = [];
+            const hits: GrepHit[] = [];
+            const skipped: GrepSkippedFile[] = [];
             let capped = false;
+            let filesScanned = 0;
             const grepIgnore = readIgnoredDirs(resolveCwd());
             walkProjectFiles(startAbs, (fileAbs) => {
-              if (hits.length >= 200) { capped = true; return false; }
-              let text: string;
-              try { text = readFileSync(fileAbs, 'utf-8'); } catch { return true; }
-              if (text.length > 1_000_000 || text.includes('\u0000')) return true; // big/binary skip
-              const rel = relative(startAbs, fileAbs) || fileAbs;
-              const fileLines = text.split('\n');
-              for (let i = 0; i < fileLines.length && hits.length < 200; i++) {
-                if (re.test(fileLines[i]!)) hits.push(`${rel}:${i + 1}:${fileLines[i]!.slice(0, 300)}`);
+              if (hits.length >= DEFAULT_GREP_MAX_HITS) { capped = true; return false; }
+              const rel = relative(startAbs, fileAbs).split(sep).join('/') || fileAbs;
+              const remaining = DEFAULT_GREP_MAX_HITS - hits.length;
+              const result = scanFileForGrep({
+                fileAbs,
+                rel,
+                re,
+                maxBytesPerLine: DEFAULT_GREP_MAX_BYTES_PER_LINE,
+                maxFileBytes: DEFAULT_GREP_MAX_FILE_BYTES,
+                maxHitsRemaining: remaining,
+              });
+              if (result.skipped) {
+                skipped.push(result.skipped);
+                return true;
+              }
+              filesScanned++;
+              for (const hit of result.hits) {
+                hits.push(hit);
+              }
+              if (result.hitCapReached || hits.length >= DEFAULT_GREP_MAX_HITS) {
+                capped = true;
+                return false;
               }
               return true;
             }, grepIgnore);
-            if (hits.length === 0) return '[deckent] no matches';
-            return hits.join('\n') + (capped ? '\n[deckent] truncated (200 hits cap)' : '');
+            return formatGrepOutput({ hits, skipped, filesScanned, capped });
           }
           case 'deckent_glob': {
             const pattern = String(args['pattern'] ?? '');

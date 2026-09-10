@@ -1,0 +1,406 @@
+{
+  "utc": "2026-09-10T06:28:56.390756+00:00",
+  "base": "df1130b27",
+  "worktree": "/tmp/deckent-terminal-integration-astra-20260910",
+  "files": [
+    {
+      "path": "docs/en/reference/configuration-schema.md",
+      "sha256": "20da2733d487cc206fd64f74e443f4b5416175214666c6efcd5364930c1b9ef4",
+      "bytes": 20873
+    },
+    {
+      "path": "docs/tr/reference/configuration-schema.md",
+      "sha256": "981bf4d02c97689ebea56e4eed0e9c1c97b54f0146b2fb690af75b9e294f031c",
+      "bytes": 21188
+    },
+    {
+      "path": "proof/7107-c-harness-replay.mjs",
+      "sha256": "d10040ecceca30c09fba8195822f5d4f4365dc99b991b8b46efbb32d6f99849b",
+      "bytes": 17373
+    },
+    {
+      "path": "proof/fixtures/e-boundary-result.json",
+      "sha256": "e50fbfdca92aee3beff66dfaab91ab387b7a64aac4e2d2c552e9c0d21a8b2226",
+      "bytes": 12097
+    },
+    {
+      "path": "proof/fixtures/e-diag-failed-ref-result.json",
+      "sha256": "1eae8862f9dc44f146d6abf99a5773da00ee0bc12581f39536e1bcdccdb96f5f",
+      "bytes": 11414
+    },
+    {
+      "path": "proof/fixtures/e-first-actual-metrics.json",
+      "sha256": "4d4f8b6106dbd451cb36d323ea4eac9230086ca54a1d602140ce926cfac61d2f",
+      "bytes": 527
+    },
+    {
+      "path": "proof/fixtures/e-first-answer-result.json",
+      "sha256": "a97987ec693dc2158391aedc79234fdde157c798155675aea81144f25d301838",
+      "bytes": 11998
+    },
+    {
+      "path": "proof/fixtures/e-interim-result.json",
+      "sha256": "45907a07ae3ee9e7888ed11b9d8231c7cfc492df7598435d725cd5a47cd388ac",
+      "bytes": 11791
+    },
+    {
+      "path": "proof/fixtures/e-schema-result.json",
+      "sha256": "55f8b488d7777cc7cc42f394d5bcb5b62baebcc5ec121b7185bc25f7af7d45c9",
+      "bytes": 12064
+    },
+    {
+      "path": "proof/fixtures/pty-observations-4bDbes-e-first-answer.json",
+      "sha256": "441813f8f079b596868fa141785407da3e3c93a3c0f1bba71f003e94af97fcc0",
+      "bytes": 23578
+    },
+    {
+      "path": "proof/fixtures/pty-observations-Hs9vsd-boundary.json",
+      "sha256": "41fece55bb2116038b973da05da8afc67747426167c20a3501531fc70f5d8328",
+      "bytes": 24805
+    },
+    {
+      "path": "proof/fixtures/pty-observations-e32768.json",
+      "sha256": "9113a1e08c9da52beec7892e3b298bcc608147876e89da6bcf070021252c6600",
+      "bytes": 20114
+    },
+    {
+      "path": "proof/fixtures/pty-observations-eYMqKL-schema-unavailable.json",
+      "sha256": "bfcfac29d7ad78d3bac0d0da5cd5d928307b21f57c67bbe77e367a86b908b6c8",
+      "bytes": 12147
+    },
+    {
+      "path": "proof/fixtures/pty-observations-gdn39Q-failed-ref.json",
+      "sha256": "4498b05f188c2af38aca48ce3e76409c4d322d83b59b28965e719fb106a66a25",
+      "bytes": 17129
+    },
+    {
+      "path": "proof/fixtures/pty-observations-l7JieX-interim-skipped.json",
+      "sha256": "61610c93e4e71533f563eb3e8e6dfb82d8a9723df6c409ce98beb4a10ec9334d",
+      "bytes": 24405
+    },
+    {
+      "path": "scripts/terminal-acceptance-battery.mjs",
+      "sha256": "6130247154b57b44638594294dd8c538cb68c91728d3f78841ccc6166680f49a",
+      "bytes": 68085
+    },
+    {
+      "path": "src/agent/checkpoint-trail.ts",
+      "sha256": "9c08479e5d7ce457bb401b13e981f116fec1f019b56f6818e0a5d5a3ef7159c2",
+      "bytes": 21173
+    },
+    {
+      "path": "src/agent/events.ts",
+      "sha256": "9b997d1d273c20e35cdb8e0eced506372567b539d446cde89a030c79f51b13f3",
+      "bytes": 8056
+    },
+    {
+      "path": "src/agent/identity.ts",
+      "sha256": "29a18fcf9911654dd067f8321207f8c8564366d4ff2582426875b05bb7b56153",
+      "bytes": 7927
+    },
+    {
+      "path": "src/agent/interim-deliverable.ts",
+      "sha256": "9c45034a7b752b8d7488aded690b6e2fdb63f67c4ba61eea1e2254420ae9bb59",
+      "bytes": 16121
+    },
+    {
+      "path": "src/agent/loop.ts",
+      "sha256": "3f7ceee33cb83e310ad0afefef15113b6dece8171e6da6e934de8504614a249d",
+      "bytes": 67207
+    },
+    {
+      "path": "src/agent/provider-tooluse/anthropic.ts",
+      "sha256": "9538a7cddcb1528b60fee5ab18f23f0730b5d03f43829eae9a73cd266d660452",
+      "bytes": 9886
+    },
+    {
+      "path": "src/agent/provider-tooluse/openai.ts",
+      "sha256": "c5637b06a6bf0f18b9d80ec2397840108f1221fd82c7759ebb36776d7cf27f0c",
+      "bytes": 19563
+    },
+    {
+      "path": "src/agent/provider-tooluse/types.ts",
+      "sha256": "998f11c39b5e4cc5b0a51a4443873cb4d1a0b6a9704b9547c48563a699c798df",
+      "bytes": 10855
+    },
+    {
+      "path": "src/agent/reference-digest-journal.ts",
+      "sha256": "4cb0c1f8c62feb4d29356e7612bcebed65e1aa4d074a47e13631a9b9660ebc42",
+      "bytes": 2000
+    },
+    {
+      "path": "src/agent/reference-digest-runner-types.ts",
+      "sha256": "7db7a3d8167a1a88c689e0762ddd95d588aec910e58bc109c1e6f51990c4f6ed",
+      "bytes": 13744
+    },
+    {
+      "path": "src/agent/reference-digest-runner.ts",
+      "sha256": "e06bc0586691b77d5d048bd4a3b35914da91307616fafac311a3ab3e61192376",
+      "bytes": 54041
+    },
+    {
+      "path": "src/agent/reference-digest-types.ts",
+      "sha256": "84a3b65bcbde2f0cda5377e49791a44bd797561407603ec3efa21ec41b9a2349",
+      "bytes": 7106
+    },
+    {
+      "path": "src/agent/reference-digest-validation.ts",
+      "sha256": "75f0765455b4a0b5e54b6f8f6baa8fdfd89cb3bf7415926432efa33179096161",
+      "bytes": 3308
+    },
+    {
+      "path": "src/agent/reference-native-ledger.ts",
+      "sha256": "040052aab3d35b7be31acd7a54a509e6ad9feb746ea153aed058a672c0492cee",
+      "bytes": 8811
+    },
+    {
+      "path": "src/agent/reference-outline.ts",
+      "sha256": "30c81bab16c0a4011612c0860eebc7c3f5ec476d2a17c10e147120db08a07ad6",
+      "bytes": 6419
+    },
+    {
+      "path": "src/agent/reference-session.ts",
+      "sha256": "90f070fdb751bf5065677a567106159c742ad0e56c6e74982ad39e84e1275a9f",
+      "bytes": 15123
+    },
+    {
+      "path": "src/agent/session-tool-content.ts",
+      "sha256": "785de0ba72fccd566fe3c91e17b08a284ed3eb83d2df84462db2552a210a6a87",
+      "bytes": 36863
+    },
+    {
+      "path": "src/agent/session.ts",
+      "sha256": "5c5704b3654c0d37cac828694e3136147bf019bc0818ab2e0fcbe8e0a323a761",
+      "bytes": 89450
+    },
+    {
+      "path": "src/agent/structured-output-control.ts",
+      "sha256": "a6bd61a9fe4c4a24ae468a264dcf67292b9b7250c772d65e528ba5f3d98f0fb5",
+      "bytes": 3726
+    },
+    {
+      "path": "src/agent/tool-result-retention.ts",
+      "sha256": "e7230af6cf232c2c5814844a249f11c733e96fa317cd54d39c6637d6b60345d4",
+      "bytes": 5586
+    },
+    {
+      "path": "src/agent/transcript.ts",
+      "sha256": "2053dbb0a691979018e2a58fd6351e5a180c26941ddb086e9ef1c84c9c116a27",
+      "bytes": 12783
+    },
+    {
+      "path": "src/cli/commands/chat-tool-exec.ts",
+      "sha256": "c3aa09dc20ab6942cae55e4ec9cc132376c4ced63066c8b530dfd8dc3091c86c",
+      "bytes": 34335
+    },
+    {
+      "path": "src/cli/commands/chat.ts",
+      "sha256": "dcd9d7cf05c8477638f50d8fc23c710d3fa6616863f669c82031a3eb6bc9bd32",
+      "bytes": 27890
+    },
+    {
+      "path": "src/cli/helpers/message-catalog/cli-terminal-slash.ts",
+      "sha256": "dc3f01210e018b57e90e736c5b9c40e94a13e72e5aea019b679c4aaf9e3f5fa3",
+      "bytes": 53815
+    },
+    {
+      "path": "src/cli/helpers/messages.ts",
+      "sha256": "d451fa131357532e8fa6bc1cd651272eeb6535ecc16fde5cf41233d00209c56b",
+      "bytes": 603823
+    },
+    {
+      "path": "src/cli/repl/app.tsx",
+      "sha256": "d657430b9ade0e6f503ba6126095f9c32a52795cfce601f0149278fcfe3f2c1f",
+      "bytes": 196363
+    },
+    {
+      "path": "src/cli/repl/native-agent-bridge.ts",
+      "sha256": "e44fab6f0dd68c17c9291eb8f0b429db93142eda69b06629d0d880accf9f23b3",
+      "bytes": 84817
+    },
+    {
+      "path": "src/cli/repl/native-grep.ts",
+      "sha256": "2d8d45aac4007db50a968d2641755f4804414d126f502f4ed922270e0a5de9f0",
+      "bytes": 6320
+    },
+    {
+      "path": "src/cli/repl/native-transport.ts",
+      "sha256": "ebf4b224ede5cefbe90cacd3924177d7411ac79087679de57a6f8bd3fd5c773e",
+      "bytes": 58821
+    },
+    {
+      "path": "src/cli/repl/run.tsx",
+      "sha256": "576a0a446d87258b0b9cb86ef2d689f22642eaf6bcb2b0588180926b29b832fc",
+      "bytes": 148177
+    },
+    {
+      "path": "src/core/config-types.ts",
+      "sha256": "b51812aeeae435afb6d05ca002c666f9d3e6a450f49cd7f7f6587bef9bb9210a",
+      "bytes": 138237
+    },
+    {
+      "path": "src/core/config.ts",
+      "sha256": "4f5bdfa990d96ee3b7ee28335f50e9847ebbc98360daea8ed3f7709e882b8442",
+      "bytes": 183102
+    },
+    {
+      "path": "src/core/execution-budget-policy.ts",
+      "sha256": "88b700c601ada09bb3e66bb28bd00aa46bc3e23afe107be0de84014c79e50c58",
+      "bytes": 47528
+    },
+    {
+      "path": "src/core/large-reference-policy.ts",
+      "sha256": "93860ff64177179e278f0f5c9f1426624f44b7132b8848cd256f16639ff4f74a",
+      "bytes": 2959
+    },
+    {
+      "path": "src/core/model-registry-types.ts",
+      "sha256": "ac0121a78e2e3d778552c279438e8d1a0ee4b433dd8851529bc4d0a8f947b96e",
+      "bytes": 8447
+    },
+    {
+      "path": "src/core/model-registry.ts",
+      "sha256": "2b83d2f74dc312c7a505e9021afe399167b60e6946dfd41f5744b8d6a6895757",
+      "bytes": 54391
+    },
+    {
+      "path": "src/core/provider.ts",
+      "sha256": "1f93541265586d051327a5c61e7a9aa2a9199cdd67416a7ff54381c8c47e2b15",
+      "bytes": 84703
+    },
+    {
+      "path": "src/core/structured-output-control.ts",
+      "sha256": "893caf48d713bc7e64424cbbf3332000d06c62cfc0fa2fd3047dd29d6578c3dc",
+      "bytes": 5697
+    },
+    {
+      "path": "tests/agent/checkpoint-trail.test.ts",
+      "sha256": "46a326cdf5837ef3309a269faf4395412da173f39b4e65689c9fc40224a82389",
+      "bytes": 17364
+    },
+    {
+      "path": "tests/agent/interim-deliverable.test.ts",
+      "sha256": "b59bd1b149ae25b4a8581631c2142fcd5bef94533e7ed2065b38f580f85f2ddd",
+      "bytes": 31092
+    },
+    {
+      "path": "tests/agent/loop.test.ts",
+      "sha256": "30c114b1d09d4e7d62515603d07a91581a93134d80586bf9b5ae5d9d042f84ff",
+      "bytes": 25137
+    },
+    {
+      "path": "tests/agent/reference-digest-progress.test.ts",
+      "sha256": "6fb4cc402c9a7cb00c07c19e10fe9710fdb33b5a156abca508872f6698d75df1",
+      "bytes": 8800
+    },
+    {
+      "path": "tests/agent/reference-digest-runner.test.ts",
+      "sha256": "2a5bb3dc0871e58aae2b7b96a6be358f859d3f93464cb1675ea9bbbe378a9dbe",
+      "bytes": 19744
+    },
+    {
+      "path": "tests/agent/reference-first-answer.test.ts",
+      "sha256": "2474e5442a29fd47cc029ecacd0f4dcebe8d9238c99ab330389b2f8e49a65321",
+      "bytes": 16109
+    },
+    {
+      "path": "tests/agent/reference-interim-delivery.test.ts",
+      "sha256": "f60d15798affdeec2564f5371e2ed6771745f0e19496a2b4cf4b8e066d5e28b4",
+      "bytes": 7440
+    },
+    {
+      "path": "tests/agent/reference-interim.test.ts",
+      "sha256": "82964a826dda1a4ebb40036845c2c82a057b572a07d3c369b935814c73838e13",
+      "bytes": 24768
+    },
+    {
+      "path": "tests/agent/reference-invalid-diagnostics.test.ts",
+      "sha256": "2802e84bd69b320efc984c2ad2ab4826a2d4bceab8d303b2a866167002f49970",
+      "bytes": 13031
+    },
+    {
+      "path": "tests/agent/reference-length-recovery.test.ts",
+      "sha256": "1967aa9e393d6c1378456954b99567686590ef4c2ff3f2239ac20e2b03f59325",
+      "bytes": 18364
+    },
+    {
+      "path": "tests/agent/reference-pin-cancel.test.ts",
+      "sha256": "4e1f70d2372ec737ac8ed4914f09a1425cf06a4b5406e49bbede75c3c9beb58a",
+      "bytes": 9814
+    },
+    {
+      "path": "tests/agent/reference-progress-session.test.ts",
+      "sha256": "03524ec09688d7a69e7d5583fce360aea32516996c34e871e4908e6bf05ca7d9",
+      "bytes": 8664
+    },
+    {
+      "path": "tests/agent/reference-recovery.test.ts",
+      "sha256": "a2a03a5db1e52fbf48388259fa7a91cf3089d17cd1c11df233ee57500ada78f2",
+      "bytes": 6827
+    },
+    {
+      "path": "tests/agent/reference-session.test.ts",
+      "sha256": "3edada71a7e7d1124ef9c7c23ed0bf5cf5abbf1431296ac998a0f457a820754a",
+      "bytes": 13969
+    },
+    {
+      "path": "tests/agent/reference-structured-output.test.ts",
+      "sha256": "6ac3aee982bf10578ba36dc15317c187cf96a9b8311b0c6ebc57d86ab777ba49",
+      "bytes": 26838
+    },
+    {
+      "path": "tests/agent/tool-budget-units.test.ts",
+      "sha256": "9dc3400d8f544d5218ef98cb17a9cd901eee28338427b3f01f2d85e573ab8952",
+      "bytes": 9798
+    },
+    {
+      "path": "tests/agent/tool-result-retention.test.ts",
+      "sha256": "a44e949d1965cb29d1f33132c2251cf0139d319d1f4ef8b7eb3ef1962c360f80",
+      "bytes": 9146
+    },
+    {
+      "path": "tests/cli/chat-tool-exec-read-surface.test.ts",
+      "sha256": "f645e11b60b6ab6449aea7a9a97a9d006a8ad072342a1cb2947509c3f061f8b1",
+      "bytes": 6258
+    },
+    {
+      "path": "tests/cli/native-grep.test.ts",
+      "sha256": "3d91fbbc5bae7d7a51d0ebd082a653d6330b945101a9c661e2732a9b0df73227",
+      "bytes": 6097
+    },
+    {
+      "path": "tests/cli/native-transport-measurement-root.test.ts",
+      "sha256": "8652ec999ea5b55adda53f10c7d1fdb4cbc188beb6fc48535ad8b9e2d99e96ae",
+      "bytes": 18230
+    },
+    {
+      "path": "tests/cli/repl/reference-progress-bridge.test.ts",
+      "sha256": "ff1cdbfed134fb8741f0e0d4155908fd4ae99791b2c0fe2958c236d74351886a",
+      "bytes": 8448
+    },
+    {
+      "path": "tests/cli/repl/reference-progress-view.test.ts",
+      "sha256": "9788bc1ae1ab3c8c235d3eba667d84de23317c4d1d1758d818984085692c2902",
+      "bytes": 7198
+    },
+    {
+      "path": "tests/cli/repl/reference-signal-localization.test.ts",
+      "sha256": "b962952ae50946f392a4f0cc1985e9c15b2d78000fc9c56cd94dedc4b6c390e8",
+      "bytes": 5718
+    },
+    {
+      "path": "tests/core/config-execution-budget-policy.test.ts",
+      "sha256": "0b7aadab32b3527dca1a2422c0920fc56da8123d04f04e7337e25724fe416ef0",
+      "bytes": 5002
+    },
+    {
+      "path": "tests/scripts/terminal-acceptance-battery.test.ts",
+      "sha256": "a7cea6be0774c23096c83d3d1bfb1db7e6e195691186c5d12799ad063c941aa7",
+      "bytes": 45803
+    }
+  ],
+  "status": "PREPARED_PRIVATE_NOT_LANDED",
+  "mainUnrelatedDirtyFilesExcluded": true,
+  "latestAddition": "interim safe-boundary rev4",
+  "productDone": false
+}

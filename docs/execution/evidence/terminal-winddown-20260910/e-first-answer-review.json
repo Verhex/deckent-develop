@@ -1,0 +1,37 @@
+{
+  "utc": "2026-09-10T06:25:23.490651+00:00",
+  "decision": "Scoped first answer and interrupted timing verified; first10s FAIL; coverage and durable settlement HOLD; harness interim false negative pending offline correction",
+  "tests": "53/53 exit0",
+  "tsc": "exit0",
+  "privateEmit": "exit0",
+  "assets": "exit0",
+  "actualE": "exit1",
+  "firstActualProseMs": 60243,
+  "hostRequestMs": 59356,
+  "priorActualProseMs": 106633,
+  "parserFirstInterimMs": null,
+  "directRealCatalogDeriveFirstInterimMs": 60243,
+  "phase": "PARTIAL",
+  "failure": "REFERENCE_DEADLINE",
+  "issued": 6,
+  "settled": 5,
+  "usage": {
+    "inputTokens": 30725,
+    "outputTokens": 7239
+  },
+  "interruptedStreamMs": 30667,
+  "journal": "/tmp/deckent-terminal-integration-astra-20260910/proof/e-first-answer-final-journal.json",
+  "journalSha256": "970186b69b5b508e494db352d9fc87e9dde88f62afff97b5fe531319ce07c1cc",
+  "pty": "/tmp/deckent-battery-4bDbes/pty-observations.json",
+  "ptySha256": "441813f8f079b596868fa141785407da3e3c93a3c0f1bba71f003e94af97fcc0",
+  "weeklyRemainingPercent": 7,
+  "offlineCorrection": {
+    "utc": "2026-09-10T06:29:31.998874+00:00",
+    "entry": 149,
+    "firstInterimDeliverableMs": 60243,
+    "interim90sGate": "PASS for this recorded run",
+    "firstNarrative10sGate": "FAIL",
+    "evidence": "/tmp/deckent-terminal-integration-astra-20260910/proof/astra-cursor149-real-catalog-replay.json",
+    "sha256": "311b57b1b8b4fa0e9e03d9984a780533e0b4c294f63403e12288ea92bd0e1f1b"
+  }
+}

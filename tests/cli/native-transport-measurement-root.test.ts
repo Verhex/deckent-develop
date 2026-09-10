@@ -181,6 +181,184 @@ describe('llama.cpp measurement wire parity (real-binary evidence, b10398 router
   });
 });
 
+describe('7109-c llama.cpp measurement reasoning wire parity', () => {
+  const reasoningConfig = {
+    local_llm: {
+      endpoint: 'http://127.0.0.1:8080/v1',
+      reasoningControl: {
+        toggle: 'chat_template_kwargs.enable_thinking',
+        sharesCompletionBudget: true,
+      },
+    },
+  };
+
+  function capture() {
+    const calls: Array<{ url: string; body: Record<string, any> }> = [];
+    const fetchFn = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
+      const url = String(input);
+      calls.push({ url, body: bodyOf(init) });
+      if (url.endsWith('/apply-template')) return new Response(JSON.stringify({ prompt: 'rendered' }), { status: 200 });
+      if (url.endsWith('/tokenize')) return new Response(JSON.stringify({ count: 4 }), { status: 200 });
+      return new Response('{}', { status: 404 });
+    });
+    return { calls, fetchFn };
+  }
+
+  it('apply-template carries chat_template_kwargs.enable_thinking=false when reasoning is off', async () => {
+    const { calls, fetchFn } = capture();
+    const resolved = resolveNativeSelection(
+      { provider: 'local-llm', model: 'Qwen3.8-27B' },
+      { projectRoot: process.cwd(), env: {}, config: reasoningConfig, fetchFn },
+    );
+    if ('error' in resolved) throw new Error(resolved.error);
+    await resolved.adapter.requestMeasurement!.measure({
+      model: 'Qwen3.8-27B',
+      system: 'SYS',
+      messages: [{ role: 'user', content: 'hi' }],
+      tools: [],
+      reasoning: { mode: 'off' },
+    }, new AbortController().signal);
+    const template = calls.find((c) => c.url.endsWith('/apply-template'))!;
+    expect(template.body['chat_template_kwargs']).toEqual({ enable_thinking: false });
+  });
+
+  it('apply-template carries chat_template_kwargs.enable_thinking=true when reasoning is on', async () => {
+    const { calls, fetchFn } = capture();
+    const resolved = resolveNativeSelection(
+      { provider: 'local-llm', model: 'Qwen3.8-27B' },
+      { projectRoot: process.cwd(), env: {}, config: reasoningConfig, fetchFn },
+    );
+    if ('error' in resolved) throw new Error(resolved.error);
+    await resolved.adapter.requestMeasurement!.measure({
+      model: 'Qwen3.8-27B',
+      system: 'SYS',
+      messages: [{ role: 'user', content: 'hi' }],
+      tools: [],
+      reasoning: { mode: 'on' },
+    }, new AbortController().signal);
+    const template = calls.find((c) => c.url.endsWith('/apply-template'))!;
+    expect(template.body['chat_template_kwargs']).toEqual({ enable_thinking: true });
+  });
+
+  it('leaves chat_template_kwargs off when no reasoningControl authority exists', async () => {
+    const { calls, fetchFn } = capture();
+    const resolved = resolveNativeSelection(
+      { provider: 'local-llm', model: 'Qwen3.8-27B' },
+      { projectRoot: process.cwd(), env: {}, config: { local_llm: { endpoint: 'http://127.0.0.1:8080/v1' } }, fetchFn },
+    );
+    if ('error' in resolved) throw new Error(resolved.error);
+    await resolved.adapter.requestMeasurement!.measure({
+      model: 'Qwen3.8-27B',
+      system: 'SYS',
+      messages: [{ role: 'user', content: 'hi' }],
+      tools: [],
+      reasoning: { mode: 'off' },
+    }, new AbortController().signal);
+    const template = calls.find((c) => c.url.endsWith('/apply-template'))!;
+    expect('chat_template_kwargs' in template.body).toBe(false);
+  });
+
+  it('boot probe apply-template uses the same reasoning-off wire fields', async () => {
+    const { calls, fetchFn } = capture();
+    const resolved = resolveNativeSelection(
+      { provider: 'local-llm', model: 'Qwen3.8-27B' },
+      { projectRoot: process.cwd(), env: {}, config: reasoningConfig, fetchFn },
+    );
+    if ('error' in resolved) throw new Error(resolved.error);
+    await probeRequestMeasurementAuthority({
+      providerName: 'local-llm',
+      endpoint: 'http://127.0.0.1:8080/v1',
+      model: 'Qwen3.8-27B',
+      fetchFn,
+      reasoningControl: resolved.adapter.reasoningControl,
+    });
+    const template = calls.find((c) => c.url.endsWith('/apply-template'))!;
+    expect(template.body['chat_template_kwargs']).toEqual({ enable_thinking: false });
+    expect(calls.filter((c) => c.url.endsWith('/apply-template'))).toHaveLength(1);
+  });
+
+  it('boot probe bounds cooperative reasoningControl reject-on-abort within deadline', async () => {
+    const reasoningControl = vi.fn(async (_model, signal) => {
+      await new Promise<void>((_resolve, reject) => {
+        if (signal?.aborted) {
+          reject(new DOMException('Aborted', 'AbortError'));
+          return;
+        }
+        signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+      });
+      return { toggle: 'chat_template_kwargs.enable_thinking', sharesCompletionBudget: true };
+    });
+    const fetchFn = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/apply-template')) {
+        return new Response(JSON.stringify({ prompt: 'probe' }), { status: 200 });
+      }
+      if (url.includes('/tokenize')) {
+        return new Response(JSON.stringify({ count: 2 }), { status: 200 });
+      }
+      return new Response('{}', { status: 404 });
+    });
+    const started = Date.now();
+    await expect(probeRequestMeasurementAuthority({
+      providerName: 'local-llm',
+      endpoint: 'http://127.0.0.1:8080/v1',
+      model: 'Qwen3.8-27B',
+      fetchFn,
+      timeoutMs: 80,
+      reasoningControl,
+    })).resolves.toMatchObject({ state: 'exact-available' });
+    expect(Date.now() - started).toBeLessThan(1_500);
+    expect(reasoningControl).toHaveBeenCalledTimes(1);
+    expect(fetchFn).toHaveBeenCalled();
+  });
+
+  it('boot probe times out when fetch ignores abort until the probe deadline', async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockImplementation((_input, init) => new Promise((_resolve, reject) => {
+      const signal = init?.signal;
+      if (signal?.aborted) reject(new DOMException('Aborted', 'AbortError'));
+      signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+    }));
+    const started = Date.now();
+    await expect(probeRequestMeasurementAuthority({
+      providerName: 'local-llm',
+      endpoint: 'http://127.0.0.1:8080/v1',
+      model: 'Qwen3.8-27B',
+      fetchFn,
+      timeoutMs: 80,
+    })).resolves.toEqual({ state: 'unavailable', reason: 'timeout' });
+    expect(Date.now() - started).toBeLessThan(1_500);
+  });
+
+  it('boot probe returns within deadline when reasoningControl never resolves and ignores abort', async () => {
+    const reasoningControl = vi.fn(() => new Promise<never>(() => {}));
+    const fetchFn = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/apply-template')) {
+        return new Response(JSON.stringify({ prompt: 'probe' }), { status: 200 });
+      }
+      if (url.includes('/tokenize')) {
+        return new Response(JSON.stringify({ count: 2 }), { status: 200 });
+      }
+      return new Response('{}', { status: 404 });
+    });
+    const started = Date.now();
+    await expect(probeRequestMeasurementAuthority({
+      providerName: 'local-llm',
+      endpoint: 'http://127.0.0.1:8080/v1',
+      model: 'Qwen3.8-27B',
+      fetchFn,
+      timeoutMs: 80,
+      reasoningControl,
+    })).resolves.toMatchObject({ state: 'exact-available' });
+    expect(Date.now() - started).toBeLessThan(1_500);
+    expect(reasoningControl).toHaveBeenCalledTimes(1);
+    expect(fetchFn).toHaveBeenCalled();
+    const template = fetchFn.mock.calls.find(([input]) => String(input).includes('/apply-template'));
+    const body = JSON.parse(String((template?.[1] as RequestInit)?.body));
+    expect('chat_template_kwargs' in body).toBe(false);
+  });
+});
+
 describe('deriveMeasurementAuthority', () => {
   const boot404 = { state: 'unavailable' as const, reason: 'http-404' as const };
   const bootExact = { state: 'exact-available' as const, provenance: 'llama.cpp-apply-template-tokenize' };

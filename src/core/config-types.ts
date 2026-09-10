@@ -825,6 +825,23 @@ export interface ReasoningControlConfig {
   sharesCompletionBudget: boolean;
 }
 
+/**
+ * Owner-authored structured-output facts for a served model (7113-E). Validated
+ * by `core/structured-output-control.ts` (`validateStructuredOutputControlConfig`);
+ * Four distinct states, none collapsed into another:
+ *   `openai.response_format.json_schema` — the server enforces, by that dialect;
+ *   `none`                               — POSITIVE evidence that it does not;
+ *   `unknown`                            — no evidence declared (the default);
+ *   anything else                        — a typo, refused loudly.
+ * `unknown` is not a claim of support: it resolves to a typed HOLD before any
+ * request is dispatched, exactly as an absent key does.
+ */
+export type StructuredOutputControlConfig =
+  | 'openai.response_format.json_schema'
+  | 'none'
+  | 'unknown'
+  | { toggle: 'openai.response_format.json_schema' | 'none' | 'unknown' };
+
 /** Owner-authored launch authority for a directly managed OpenAI-compatible local model server. */
 export interface LocalLlmLaunchConfig {
   serverBinary: string;
@@ -948,6 +965,7 @@ export interface ExecutionBudgetPolicyConfig {
 /** Owner-authored overrides for the native-agent session budget (all optional,
  *  positive safe integers or explicit fractional context shares; unknown keys fail loudly). */
 export interface NativeAgentBudgetConfig {
+  largeReference?: Partial<import('./large-reference-policy.js').LargeReferencePolicy>;
   /** Target measured system/tool preamble share; an irreducible floor may exceed it while preserving reserves. */
   maxPreambleShareOfContext?: number;
   /** Minimum transcript room, additional to output/safety reserves. */
@@ -995,6 +1013,16 @@ export interface NativeAgentBudgetConfig {
   /** 7114 — visible assistant characters that count as a deliverable and reset
    *  the counters. Positive integer; default 200. */
   interimAnswerMinChars?: number;
+  /** 7114-b — host interim requests per turn before the host stops nudging.
+   *  Positive integer; default 3. */
+  maxInterimRequestsPerTurn?: number;
+  /** 7114-b — tool calls one turn may execute before the host requires an
+   *  honest answer and refuses further calls (>= interimAnswerAfterToolCalls).
+   *  Positive integer; default 40. */
+  maxToolCallsPerTurn?: number;
+  /** 7114-b — consecutive failures against the same exact target before that
+   *  line of attack is closed. Positive integer; default 3. */
+  maxConsecutiveFailuresPerTarget?: number;
 }
 
 /**
@@ -1115,6 +1143,9 @@ export interface ProviderDefinition {
   /** 7108: reasoning-control facts attached to every model this provider
    *  registers (type='openai-compatible'); absent → live evidence or `unknown`. */
   reasoningControl?: ReasoningControlConfig;
+  /** 7113-E: schema-enforcement facts attached to every model this provider
+   *  registers; absent → `unknown`, and the reference program holds. */
+  structuredOutputControl?: StructuredOutputControlConfig;
 }
 
 /**
@@ -1439,6 +1470,13 @@ export interface DeckentConfig {
   /** Prompt-side context budget for the native agent (estimated tokens).
    *  Unset → per-provider default (ollama 24k · claude 160k · else 100k). */
   native_context_tokens?: number;
+  /** 7113-E — whether the native transport's ENDPOINT enforces a response
+   *  schema. Provider-neutral on purpose: the same key answers for a local
+   *  server and a hosted OpenAI-compatible one, because it describes the
+   *  endpoint that is actually selected. Per-served-model evidence belongs on
+   *  `providers.registry[...].structuredOutputControl` instead. Default
+   *  `'unknown'` = no evidence, which HOLDS rather than claiming support. */
+  native_structured_output_control?: StructuredOutputControlConfig;
   /** OpenAI-compatible base URL (OpenAI/OpenRouter/vLLM). */
   openai_base_url?: string;
   /** BOT-1 bot-agent — humanizes/summarizes connector (Telegram/Discord) messages. */
@@ -2345,6 +2383,7 @@ export interface ResolvedConfig {
   native_provider?: string;
   native_model?: string;
   native_context_tokens?: number;
+  native_structured_output_control?: StructuredOutputControlConfig;
   openai_base_url?: string;
   bot_agent?: BotAgentConfig;
   /** Notify on sprint completion (passed through). */

@@ -1,3 +1,12 @@
+import { prepareReferenceDigests, type ReferenceSessionCapability } from './reference-session.js';
+import { openReferenceNativeLedger } from './reference-native-ledger.js';
+import { digestReferenceValue } from './reference-digest-validation.js';
+import { ReferenceDigestError } from './reference-digest-types.js';
+import type { SessionToolContentStore } from './session-tool-content.js';
+import type { ReferenceDigestResult } from './reference-digest-runner-types.js';
+import type { ReferenceDigestProgress } from './reference-digest-types.js';
+import { decide, resolveTier } from './permission.js';
+import { classifyNativeToolApproval } from './native-tool-approval.js';
 // src/agent/session.ts
 // ═══ AgentSession — the core's public API (SP-1 §9) ═════════════════════════
 // Commands (view→core): send · respondPermission · cancel · setApprovalMode.
@@ -60,6 +69,8 @@ import { createPreambleBudgeter, PreambleBudgetError, type PreambleSnapshot } fr
 import { composeSystemPrompt, type ComposeOptions } from './identity.js';
 import {
   createInterimDeliverableTracker,
+  REFERENCE_INTERIM_INSTRUCTION,
+  type InterimDemand,
   type InterimDeliverableSnapshot,
   type InterimDeliverableTracker,
 } from './interim-deliverable.js';
@@ -129,6 +140,8 @@ export type NestedPermissionRequestResult =
 
 /** Identity of one referenced artifact — never its payload. */
 export interface TurnReference {
+  /** Verified digest node retained by the host, independent of model summaries. */
+  digestRef?: string;
   /** Canonical (project-relative) path exactly as the user referenced it. */
   path: string;
   /** sha256 of the FULL referenced payload — identity that survives compaction. */
@@ -145,6 +158,8 @@ export interface TurnReference {
 
 /** The three separately-carried halves of one user turn. */
 export interface StructuredTurnInput {
+  /** Host-parsed requests; source text markers never grant reference authority. */
+  referenceRequests?: readonly string[];
   /** Exactly what the user typed. */
   rawIntent: string;
   /** What actually goes on the wire this turn (intent + expanded references). */
@@ -239,6 +254,7 @@ function normalizeTurnInput(input: TurnInput): StructuredTurnInput {
 }
 
 export interface AgentSessionDeps {
+  referenceCapability?: ReferenceSessionCapability;
   adapter: ProviderAdapter;
   registry: ToolRegistry;
   policy: PermissionPolicy;
@@ -351,6 +367,13 @@ export interface AgentSession {
 
 /** TERMINAL-TOOLS-010 — `/context` read model (see AgentSession.contextSnapshot). */
 export interface ContextSnapshot {
+  referenceDigest?: ReferenceDigestResult;
+  /** 7113 D — live host progress of the current/last reference-digest program. */
+  referenceProgress?: ReferenceDigestProgress;
+  /** 7113-E B-2 rev3 — interim usage that never reconciled: an OPEN completion
+   *  and cost closure. Present means no settlement claim can be made, even when
+   *  the reading itself finished. */
+  referenceUsageHold?: { readonly path: string; readonly requestIds: readonly string[]; readonly journalRef: string };
   preambleBudget?: PreambleSnapshot;
   window: number | undefined;
   measuredInputTokens: number | undefined;
@@ -385,6 +408,8 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   // 7114 — one tracker per turn (fresh on every send()); kept after the turn
   // so `/context` reports the counters the last turn ended with.
   let interimTracker: InterimDeliverableTracker | undefined;
+  /** 7113-E B-2 rev3 — open cost closure from the last reference program. */
+  let referenceUsageHold: { readonly path: string; readonly requestIds: readonly string[]; readonly journalRef: string } | undefined;
   const nowMs = (): number => (deps.now?.() ?? new Date()).getTime();
   /** 7114 — the SAME compose options the loop uses, so measurement and
    *  admission price the narration contract the request actually carries. */
@@ -718,6 +743,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   function hostCheckpointState(): HostCheckpointState {
     return {
       objective: epochObjective(),
+      ...(referenceEvidenceRefs.size ? { evidenceRefs: [...referenceEvidenceRefs] } : {}),
       toolTrail: trail.entries(),
       toolTrailRef: trail.persistTrail(),
       lastAssistantText: currentLastAssistantText(),
@@ -862,6 +888,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
           providerReportedUsage.outputTokens += response.outputTokens;
           providerReportedUsage.reports++;
           if (nativeBudgetState) nativeBudgetState.cumulativeTokens += response.inputTokens + response.outputTokens;
+          if (referenceLedger) await referenceLedger.checkpoint();
         } else if (response.type === 'done') truncated = response.stopReason === 'length';
       }
       if (tooLarge) throw new CheckpointFailure('CHECKPOINT_RESPONSE_TOO_LARGE');
@@ -912,7 +939,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       const host = hostCheckpointState();
       const payload: ScratchCheckpointPayload = {
         schemaVersion: SCRATCH_CHECKPOINT_SCHEMA_VERSION, objective: host.objective, findings: [],
-        evidenceRefs: [`sha256:${digest}`], decisions: [], unresolved: [reasonCode],
+        evidenceRefs: [`sha256:${digest}`, ...(host.evidenceRefs ?? [])], decisions: [], unresolved: [reasonCode],
         nextActions: [], inspectedAreas: [], toolResultDigests: [digest],
         cumulativeCounters: { deterministicFallback: 1, ...host.counters },
         createdAt: host.createdAt,
@@ -1064,6 +1091,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       if ((usage.inputTokens > 0 || usage.outputTokens > 0) && deps.costGuard) {
         accrue(deps.costGuard, usage);
       }
+      if (referenceLedger) await referenceLedger.checkpoint();
     }
     if (usage.inputTokens > 0 || usage.outputTokens > 0) {
       yield { type: 'usage', inputTokens: usage.inputTokens, outputTokens: usage.outputTokens };
@@ -1159,6 +1187,19 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     }
   }
 
+  let referenceLedger: Awaited<ReturnType<typeof openReferenceNativeLedger>> | undefined;
+  let referenceDigest: ReferenceDigestResult | undefined;
+  /** 7113 D — the last host progress projection of the current (or last)
+   *  reference-digest program; `/context` reads it live. */
+  let referenceProgress: ReferenceDigestProgress | undefined;
+  const referenceEvidenceRefs = new Set<string>();
+  async function ensureReferenceLedger(): Promise<void> {
+    if (referenceLedger || !deps.nativeBudget?.largeReference?.enabled) return;
+    if (!scratch || !nativeBudgetState) throw new ReferenceDigestError('REFERENCE_STORE_FAILED');
+    referenceLedger = await openReferenceNativeLedger({ root: scratch.info.root,
+      scopeDigest: digestReferenceValue([scratchDeps?.tenantId, scratchDeps?.projectId, scratchDeps?.sessionId]),
+      state: nativeBudgetState, budget: deps.nativeBudget, usage: providerReportedUsage, ...(deps.costGuard ? { cost: deps.costGuard } : {}) });
+  }
   async function* runWithCheckpoints(
     input: StructuredTurnInput,
     turnId: string,
@@ -1170,6 +1211,8 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       yield { type: 'turn-end' };
       return;
     }
+    try { await ensureReferenceLedger(); if (referenceLedger) await referenceLedger.checkpoint(); }
+    catch { yield { type: 'error', code: 'native.reference.unavailable', message: 'native.reference.unavailable', vars: { reason: 'REFERENCE_STORE_FAILED' } }; yield { type: 'turn-end' }; return; }
     lastRawIntent = input.rawIntent;
     for (const reference of input.references) rememberReference(reference);
     // 7110: the trail and the replay guard are per turn.
@@ -1183,6 +1226,190 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       yield {type: 'error', code: error.code, message: error.code};
       yield {type: 'turn-end'};
       return;
+    }
+    if (input.referenceRequests?.length) {
+      try {
+        if (!deps.nativeBudget?.largeReference?.enabled || !deps.referenceCapability || !scratch || !scratchDeps || !nativeBudgetState || !referenceLedger) throw new ReferenceDigestError('REFERENCE_SCOPE_REFUSED');
+        if (input.referenceRequests.length > deps.nativeBudget.largeReference.maxReferences) throw new ReferenceDigestError('REFERENCE_SOURCE_TOO_LARGE');
+        const def = deps.registry.get('deckent_read_file');
+        if (!def) throw new ReferenceDigestError('REFERENCE_SCOPE_REFUSED');
+        const authorized = new Map<string, ReturnType<typeof resolveTier>>();
+        const permissionFor = (path: string) => decide(def.name, path, resolveTier(def, deps.policy), {
+          rules: deps.ruleStore.activeRules(), denies: deps.ruleStore.activeDenies(), policy: deps.policy, mode });
+        for (const path of new Set(input.referenceRequests)) {
+          const decision = permissionFor(path);
+          if (decision === 'deny') throw new ReferenceDigestError('REFERENCE_SCOPE_REFUSED');
+          if (decision === 'ask') {
+            const rawArgs = { path };
+            const approval = classifyNativeToolApproval(def.approval, rawArgs, path);
+            if ('reasonCode' in approval) throw new ReferenceDigestError('REFERENCE_SCOPE_REFUSED');
+            const request = turnLoopDeps.issuePermission({ callId: `reference-${digestReferenceValue(path)}`, tool: def.name,
+              rawArgs, resource: path, tier: resolveTier(def, deps.policy), elevated: false, nested: false, approval });
+            yield request;
+            const response = await turnLoopDeps.requestPermission(request);
+            if (response.decision === 'deny' || response.decision === 'hold' || permissionFor(path) === 'deny'
+              || !turnLoopDeps.validatePermission(request, response, rawArgs)
+              || !turnLoopDeps.claimPermissionEffect(request, response, rawArgs)) throw new ReferenceDigestError('REFERENCE_SCOPE_REFUSED');
+            authorized.set(path, resolveTier(def, deps.policy));
+          }
+        }
+        const adapter = deps.getAdapter?.() ?? deps.adapter, model = deps.getModel?.() ?? deps.model;
+        const window = deps.getContextBudgetTokens?.();
+        if (!window) throw new ReferenceDigestError('REFERENCE_BUDGET_INSUFFICIENT');
+        // 7113 D — the digest program publishes while it runs; its events reach
+        // the view during the program, never as an end-of-run batch. A bounded
+        // hand-off queue feeds this generator, and the program's promise is
+        // settled up front so a rejection is never unhandled while we drain.
+        // 7113-E B-2 rev2 — enqueueing is NOT delivery. A queued event that the
+        // consumer never dequeues (abandonment, early return, cancel) never
+        // reached anyone, so anything that counts as delivered must wait for the
+        // drain loop to actually yield it. `afterYield` is that boundary.
+        const queue: { event: AgentEvent; afterYield?: () => void }[] = [];
+        let wake: (() => void) | undefined;
+        const emit = (event: AgentEvent, afterYield?: () => void): void => {
+          queue.push(afterYield ? { event, afterYield } : { event });
+          wake?.(); wake = undefined;
+        };
+        let programDone = false;
+        let drained = false;
+        const beforeUsage = { ...providerReportedUsage };
+        const program = prepareReferenceDigests({ turn: input, scope: { tenantId: scratchDeps.tenantId, projectId: scratchDeps.projectId,
+            sessionId: scratchDeps.sessionId, policyDigest: digestReferenceValue([deps.policy, deps.nativeBudget.largeReference]) },
+            capability: deps.referenceCapability,
+            authorizeRead: path => !turnLoopDeps.isCancelled?.() && permissionFor(path) !== 'deny'
+              && (permissionFor(path) === 'allow' || authorized.get(path) === resolveTier(def, deps.policy)),
+            adapter, context: { provider: adapter.name, model, contextWindowTokens: window, contextProvenance: 'configured-narrowing' },
+            budget: deps.nativeBudget, state: nativeBudgetState, store: deps.contentStore as SessionToolContentStore,
+            scratch: scratch.info, ledger: referenceLedger.ledger, signal: turnLoopDeps.getTurnSignal!()!,
+            fits: async payload => {
+              const measured = await measureContext([{ role: 'user', content: payload }]);
+              return measured !== undefined
+                && measured.inputTokens + Math.max(measured.outputCeilingTokens, deps.nativeBudget!.largeReference.finalAnswerReserveTokens)
+                  + nativeBudgetState!.cumulativeTokens <= deps.nativeBudget!.maxCumulativeTokens
+                && decideProviderAdmission(measured.measurement,
+                Math.max(measured.outputCeilingTokens, deps.nativeBudget!.largeReference.finalAnswerReserveTokens), contextBudget.contextSafetyReserveTokens).admitted;
+            },
+            measureTokens: async payload => (await measureContext([{ role: 'user', content: payload }]))?.measurement.inputTokens,
+            onMeasurement: event => { lastRequestMeasurement = event; emit(event); },
+            onDigestProgress: progress => { referenceProgress = progress; emit({ type: 'reference-progress', progress }); },
+            onProgress: result => { referenceDigest = result; },
+            onUsageHold: hold => {
+              referenceUsageHold = hold;
+              emit({ type: 'notice', code: 'native.reference.usage-hold',
+                message: 'native.reference.usage-hold', vars: { count: String(hold.requestIds.length) } });
+            },
+            // 7113-E B-2 — the measured gap this closes: the reference program
+            // runs BEFORE the agent loop, so the turn's deliverable tracker was
+            // never consulted and 150 s could pass with zero answers. The
+            // program now asks the SAME tracker, on the SAME cadence and the
+            // SAME per-turn ask budget, and a delivery is counted only after
+            // the text has actually reached output AND the transcript.
+            ...(interimTracker ? { interim: {
+              instruction: REFERENCE_INTERIM_INSTRUCTION,
+              // No new budget knob: the interim answer is bounded by the
+              // reduce ceiling the owner already configured for this program.
+              outputCeilingTokens: deps.nativeBudget!.largeReference.maxReduceOutputTokens,
+              claim: (): boolean => {
+                if (turnLoopDeps.isCancelled?.()) return false;
+                // Two independent reasons to speak, one shared finite budget:
+                // the ordinary cadence, or "this turn has said nothing yet and
+                // real validated material now exists". The runner only calls
+                // this when it HAS such material, so the first answer is never
+                // manufactured out of nothing.
+                const cadence = interimTracker!.evaluate();
+                const demand: InterimDemand | undefined = cadence?.kind === 'interim'
+                  ? cadence
+                  : interimTracker!.firstAnswerDue()
+                    ? { kind: 'interim', trigger: 'elapsed',
+                        toolCallsSinceDeliverable: interimTracker!.snapshot().toolCallsSinceDeliverable,
+                        elapsedMsSinceDeliverable: interimTracker!.snapshot().elapsedMsSinceDeliverable }
+                    : undefined;
+                if (!demand) return false;
+                interimTracker!.markRequested(demand);
+                // `markRequested` arms the loop's "keep going" nudge, which
+                // exists for a MODEL that answered mid-task. This answer comes
+                // from the reference program before the loop has started, so
+                // leaving it armed would make the loop inject a continuation
+                // for something it never did (measured: the reference turn's
+                // last request became the nudge instead of the digest turn).
+                // The budget accounting above still stands.
+                interimTracker!.consumeContinuation();
+                const snapshot = interimTracker!.snapshot();
+                emit({ type: 'interim-deliverable', phase: 'required', demand: 'interim',
+                  toolCalls: snapshot.toolCallsSinceDeliverable, elapsedMs: snapshot.elapsedMsSinceDeliverable,
+                  trigger: demand.trigger });
+                return true;
+              },
+              deliver: async ({ text }): Promise<void> => {
+                // A late event after cancellation is a lie about what the user saw.
+                if (turnLoopDeps.isCancelled?.()) return;
+                // Count ONLY after the text was really handed to the consumer.
+                // If the turn is abandoned or cancelled before the drain reaches
+                // it, this resolves `false` and nothing is counted.
+                const reached = await new Promise<boolean>(resolve => {
+                  let settled = false;
+                  const finish = (value: boolean): void => { if (!settled) { settled = true; resolve(value); } };
+                  const signal = turnLoopDeps.getTurnSignal?.();
+                  signal?.addEventListener('abort', () => finish(false), { once: true });
+                  if (signal?.aborted) { finish(false); return; }
+                  emit({ type: 'text-delta', text: `${text}\n` }, () => finish(true));
+                });
+                if (!reached) return;
+                transcript.appendAssistant(text);
+                const outcome = interimTracker!.settleRound({ text, toolCalls: 0 });
+                const after = interimTracker!.snapshot();
+                emit({ type: 'interim-deliverable',
+                  phase: outcome === 'delivered' ? 'delivered' : 'continued', demand: 'interim',
+                  toolCalls: after.toolCallsSinceDeliverable, elapsedMs: after.elapsedMsSinceDeliverable });
+              },
+              skipped: (reason): void => {
+                // The cadence simply not having arrived is the NORMAL state and
+                // is now evaluated at every safe boundary; printing it would be
+                // noise, and it was already being miscounted as narration.
+                if (reason === 'not-due') return;
+                emit({ type: 'notice', code: 'native.reference.interim-skipped',
+                  message: 'native.reference.interim-skipped', vars: { reason } });
+              },
+            } } : {}),
+          }).then(value => ({ value }), (error: unknown) => ({ error }))
+            .then(outcome => { programDone = true; wake?.(); wake = undefined; return outcome; });
+        try {
+          for (;;) {
+            while (queue.length) {
+              const item = queue.shift()!;
+              yield item.event;
+              // Reached only when the consumer actually took the event: a
+              // `return()`/`throw()` into this generator resumes at the yield
+              // and unwinds, so an abandoned event never acknowledges.
+              item.afterYield?.();
+            }
+            if (programDone) break;
+            await new Promise<void>(resolve => { wake = resolve; });
+          }
+          drained = true;
+          const outcome = await program;
+          const inputTokens = providerReportedUsage.inputTokens - beforeUsage.inputTokens;
+          const outputTokens = providerReportedUsage.outputTokens - beforeUsage.outputTokens;
+          if (inputTokens || outputTokens) yield { type: 'usage', inputTokens, outputTokens };
+          if ('error' in outcome) throw outcome.error;
+          input = outcome.value;
+        } finally {
+          // Abandonment (the consumer returns or throws mid-drain) must not leave
+          // the digest program running unowned: it rides the SAME turn abort seam
+          // the user's cancel uses, and we wait for its settlement before leaving.
+          if (!drained) { turnAbort?.abort(); await program; }
+        }
+        nativeBudgetState.lastCheckpointRound = nativeBudgetState.rounds;
+        await referenceLedger.checkpoint();
+        for (const reference of input.references) {
+          rememberReference(reference);
+          if (reference.digestRef) { referenceEvidenceRefs.add(`sha256:${reference.digest}`); referenceEvidenceRefs.add(`sha256:${reference.digestRef}`); }
+        }
+      } catch (error) {
+        yield { type: 'error', code: 'native.reference.unavailable', message: 'native.reference.unavailable',
+          vars: { reason: error instanceof ReferenceDigestError ? error.code : 'REFERENCE_STORE_FAILED' } };
+        yield { type: 'turn-end' }; return;
+      }
     }
     // The recovery turn drops the expansion and rides intent + lineage instead —
     // re-sending the payload that just overflowed would be a doomed second call.
@@ -1201,6 +1428,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
           providerReportedUsage.inputTokens += event.inputTokens;
           providerReportedUsage.outputTokens += event.outputTokens;
           providerReportedUsage.reports++;
+          if (referenceLedger) await referenceLedger.checkpoint();
         }
         // 7110: derive the host trail from the loop's own events.
         if (event.type === 'text-delta') assistantTextBuffer += event.text;
@@ -1259,6 +1487,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
         yield* takeContextEpoch(turnId, attributionGeneration);
         if (event.reason === 'token-pressure' && event.pressure) lastCheckpointPressure = event.pressure;
       }
+      if (referenceLedger) await referenceLedger.checkpoint();
       if (!retry) return;
       yield {
         type: 'notice',
@@ -1367,6 +1596,9 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
             interimAnswerAfterToolCalls: contextBudget.interimAnswerAfterToolCalls,
             interimAnswerAfterMs: contextBudget.interimAnswerAfterMs,
             interimAnswerMinChars: contextBudget.interimAnswerMinChars,
+            maxInterimRequestsPerTurn: contextBudget.maxInterimRequestsPerTurn,
+            maxToolCallsPerTurn: contextBudget.maxToolCallsPerTurn,
+            maxConsecutiveFailuresPerTarget: contextBudget.maxConsecutiveFailuresPerTarget,
           }, nowMs)
         : undefined;
       return runWithCheckpoints(
@@ -1379,7 +1611,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     renewBudgetEpoch(): { epoch: number } {
       budgetEpoch++;
       exhausted = undefined;
-      if (deps.nativeBudget) nativeBudgetState = createNativeBudgetState();
+      if (deps.nativeBudget) { nativeBudgetState = createNativeBudgetState(); referenceLedger?.rebindState(nativeBudgetState); }
       // Cumulative billing/cost/usage is NOT touched here — `deps.costGuard` and
       // every emitted usage total stay exactly as they were; only the WORKING
       // budget restarts. The context epoch is refreshed safely on the next send
@@ -1441,6 +1673,8 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     async contextSnapshot(): Promise<ContextSnapshot> {
       const decision = lastRequestMeasurement?.decision;
       return {
+        ...(referenceDigest ? { referenceDigest } : {}),
+        ...(referenceProgress ? { referenceProgress } : {}),
         window: decision?.measurement.identity.contextWindowTokens,
         measuredInputTokens: decision?.measurement.inputTokens,
         ...(lastRequestMeasurement
@@ -1461,6 +1695,9 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
           return authority ? { measurementAuthority: authority } : {};
         })()),
         ...(interimTracker ? { interimDeliverable: interimTracker.snapshot() } : {}),
+        // 7113-E B-2 rev3 — an open cost closure survives the turn on /context:
+        // the reading may have finished, the settlement has not.
+        ...(referenceUsageHold ? { referenceUsageHold } : {}),
       };
     },
     clearLastRequestMeasurement(): void {

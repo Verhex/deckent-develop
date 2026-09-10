@@ -117,6 +117,35 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
   'native-context.slash.refresh_planned': { en: 'a compaction is planned for the next turn', tr: 'bir sonraki tur için sıkıştırma planlandı' },
   // 7114 — interim-deliverable counters (session tracker; last turn's values).
   'native-context.slash.interim_deliverable': { en: 'interim deliverable: {calls}/{callsLimit} tool calls · {elapsed}/{elapsedLimit} s since the last one · delivered {delivered} · host-requested {requested}', tr: 'ara teslimat: son teslimattan bu yana {calls}/{callsLimit} araç çağrısı · {elapsed}/{elapsedLimit} sn · teslim edilen {delivered} · host isteği {requested}' },
+  // 7114-b — the honest bounds behind the interim promise.
+  'native-context.slash.interim_budget': {
+    en: 'turn tool budget: {calls}/{callsLimit} calls · host asks left {requestsLeft}',
+    tr: 'tur araç bütçesi: {calls}/{callsLimit} çağrı · kalan host isteği {requestsLeft}',
+  },
+  'native-context.slash.interim_overdue': {
+    en: 'the interim answer is overdue: the model is still streaming, the host cannot cut a provider stream short',
+    tr: 'ara yanıt gecikti: model hâlâ yazıyor, host sağlayıcı akışını yarıda kesemez',
+  },
+  'native-context.slash.interim_exhausted': {
+    en: 'the turn tool budget is spent; only an answer may follow',
+    tr: 'tur araç bütçesi doldu; bundan sonrası yalnız cevap olabilir',
+  },
+  'native-context.slash.interim_stopped_target': {
+    en: 'closed after repeated failures: {target}',
+    tr: 'tekrarlanan başarısızlık sonrası kapatıldı: {target}',
+  },
+  'native.interim_deliverable_final': {
+    en: 'Tool budget for this turn is spent after {toolCalls} calls — answering with what is in hand.',
+    tr: '{toolCalls} çağrıdan sonra bu turun araç bütçesi doldu — eldekiyle yanıtlanıyor.',
+  },
+  'native.interim_deliverable_failure_stop': {
+    en: '{attempts} attempts against {target} failed — that line is closed; answering with what is known.',
+    tr: '{target} hedefinde {attempts} deneme başarısız — bu yol kapatıldı; bilinenlerle yanıtlanıyor.',
+  },
+  'native.interim_deliverable_overdue': {
+    en: 'The interim answer is {elapsed} s overdue; the model is still streaming.',
+    tr: 'Ara yanıt {elapsed} sn gecikti; model hâlâ yazıyor.',
+  },
   'native-context.slash.interim_deliverable_pending': { en: 'an interim answer is outstanding (host-requested, not yet delivered)', tr: 'bekleyen bir ara yanıt var (host istedi, henüz teslim edilmedi)' },
   'native-context.slash.unknown': { en: 'unknown', tr: 'bilinmiyor' },
   'native-context.slash.unavailable': { en: '/context is not available on this engine (legacy loop) — no context authority to read', tr: '/context bu motorda yok (eski döngü) — okunacak bağlam otoritesi yok' },
@@ -254,6 +283,13 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
   'native.boot.invalid-reasoning-control': {
     en: 'native engine not started — {detail} is invalid: toggle must be "chat_template_kwargs.enable_thinking", "none" or { kind: "reasoning_effort", on, off } and sharesCompletionBudget a boolean; fix .deckent/config.json, then restart Deckent.',
     tr: 'native motor başlatılmadı — {detail} geçersiz: toggle "chat_template_kwargs.enable_thinking", "none" veya { kind: "reasoning_effort", on, off } olmalı; sharesCompletionBudget boolean olmalı; .deckent/config.json dosyasını düzeltip Deckent\'i yeniden başlatın.',
+  },
+  // 7113-E — a new typed boot code needs its own sentence, or the terminal
+  // prints a missing-key warning and the raw code (measured in the rev4 real
+  // ingress run, repl.invalid case).
+  'native.boot.invalid-structured-output-control': {
+    en: 'native engine not started — {detail} is invalid: it must be "openai.response_format.json_schema", "none" or "unknown" (or { toggle: <one of those> }); fix .deckent/config.json, then restart Deckent.',
+    tr: 'native motor başlatılmadı — {detail} geçersiz: "openai.response_format.json_schema", "none" veya "unknown" olmalı (ya da { toggle: <bunlardan biri> }); .deckent/config.json dosyasını düzeltip Deckent\'i yeniden başlatın.',
   },
   'native.boot.missing-native-model': {
     en: 'native engine not started — local-llm needs an exact model ID: set {detail} (deckent config set native_model <id>) to one of the endpoint\'s published /models IDs, then restart Deckent.',
@@ -491,6 +527,75 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
   'tui.tool_read.field': { en: '{key}: {value}', tr: '{key}: {value}' },
   'tui.tool_read.reason': { en: 'reason: {code}', tr: 'neden: {code}' },
   'tui.resize.failed': { en: 'Terminal resize could not be rendered safely ({code}).', tr: 'Terminal boyut değişikliği güvenli biçimde çizilemedi ({code}).' },
+  // ── 7113 D — large-reference digest progress ──────────────────────────────
+  // The Workline's single line and the /context detail block. Every value is a
+  // host projection; an absent one renders as "unknown", never as zero.
+  'tui.native_reference_active': {
+    en: 'reading {source} · {phase} · {sections} sections · {bytes} · {elapsed}s',
+    tr: '{source} okunuyor · {phase} · {sections} bölüm · {bytes} · {elapsed}sn',
+  },
+  'tui.native_reference_active_compact': { en: '{phase} {sections}', tr: '{phase} {sections}' },
+  // 7113-E B-2 — why a long reading produced no interim answer at an
+  // opportunity. Never silent, never invented.
+  // 7113-E B-2 rev3 — the reading finished but its cost did not reconcile.
+  // Typed and explicit: no receipt is implied for the unresolved requests.
+  'native.reference.usage-hold': {
+    en: 'The reading finished, but {count} interim request(s) never reported confirmed usage; the cost for those is not settled.',
+    tr: 'Okuma tamamlandı, ancak {count} ara istek doğrulanmış kullanım bildirmedi; onların maliyeti kapatılmadı.',
+  },
+  'native.reference.interim-skipped': {
+    en: 'No interim answer yet ({reason}); the reading is still in progress.',
+    tr: 'Henüz ara cevap yok ({reason}); okuma sürüyor.',
+  },
+  'native.reference.interim-skip.not-due': { en: 'not due yet', tr: 'zamanı gelmedi' },
+  'native.reference.interim-skip.budget-refused': { en: 'the remaining budget cannot admit another request', tr: 'kalan bütçe bir istek daha kaldırmıyor' },
+  'native.reference.interim-skip.unconfirmed-reservation': { en: 'an earlier interim request has unconfirmed usage', tr: 'önceki ara istekte kullanım doğrulanmadı' },
+  'native.reference.interim-skip.empty-answer': { en: 'the model returned nothing substantive', tr: 'model anlamlı bir şey döndürmedi' },
+  'native.reference.interim-skip.invalid-answer': { en: 'the response breached the stream contract', tr: 'yanıt akış sözleşmesini ihlal etti' },
+  'native.reference.interim-skip.seam-closed': { en: 'interim answers stopped after an earlier breach', tr: 'önceki ihlalden sonra ara cevaplar durduruldu' },
+  'native.reference.interim-skip.stopped': { en: 'the turn was cancelled or the time ceiling was reached', tr: 'tur iptal edildi veya süre sınırına ulaşıldı' },
+  'native.reference.unknown': { en: 'unknown', tr: 'bilinmiyor' },
+  'native.reference.phase.admitting': { en: 'admitting', tr: 'kabul ediliyor' },
+  'native.reference.phase.snapshotting': { en: 'verifying source', tr: 'kaynak doğrulanıyor' },
+  'native.reference.phase.mapping': { en: 'mapping', tr: 'haritalanıyor' },
+  'native.reference.phase.reducing': { en: 'reducing', tr: 'birleştiriliyor' },
+  'native.reference.phase.answering': { en: 'digest ready', tr: 'özet hazır' },
+  'native.reference.phase.complete': { en: 'complete', tr: 'tamamlandı' },
+  'native.reference.phase.partial': { en: 'partial', tr: 'kısmi' },
+  'native.reference.phase.failed': { en: 'failed', tr: 'başarısız' },
+  'native.reference.phase.cancelled': { en: 'cancelled', tr: 'iptal edildi' },
+  'native.reference.failure.reference_scope_refused': { en: 'reading this reference is not authorized', tr: 'bu referansı okuma yetkisi yok' },
+  'native.reference.failure.reference_source_changed': { en: 'the source changed while it was being read', tr: 'kaynak okunurken değişti' },
+  'native.reference.failure.reference_source_unsupported': { en: 'this source type is not supported', tr: 'bu kaynak türü desteklenmiyor' },
+  'native.reference.failure.reference_encoding_invalid': { en: 'the source is not valid UTF-8 text', tr: 'kaynak geçerli UTF-8 metin değil' },
+  'native.reference.failure.reference_source_too_large': { en: 'the source exceeds the configured size ceiling', tr: 'kaynak yapılandırılmış boyut sınırını aşıyor' },
+  'native.reference.failure.reference_budget_invalid': { en: 'the resolved budget is not usable', tr: 'çözülen bütçe kullanılabilir değil' },
+  'native.reference.failure.reference_budget_insufficient': { en: 'the remaining turn budget is too small for this source', tr: 'kalan tur bütçesi bu kaynak için yetersiz' },
+  'native.reference.failure.reference_cancelled': { en: 'cancelled', tr: 'iptal edildi' },
+  'native.reference.failure.reference_output_invalid': { en: 'the model returned an invalid digest', tr: 'model geçersiz bir özet döndürdü' },
+  'native.reference.failure.reference_usage_uncertain': { en: 'usage accounting is uncertain; nothing is claimed', tr: 'kullanım muhasebesi belirsiz; iddia yok' },
+  'native.reference.failure.reference_thinking_control_unavailable': { en: 'this model exposes no reasoning switch', tr: 'bu model düşünme anahtarı sunmuyor' },
+  'native.reference.failure.reference_structured_output_unavailable': {
+    en: 'this endpoint is not declared to enforce a response schema',
+    tr: 'bu uç noktanın yanıt şemasını zorladığı bildirilmemiş',
+  },
+  // The remedy is a separate line: the failure phrase above also renders inside
+  // the one-line Workline indicator, where a full instruction would not fit.
+  'native.reference.remedy.reference_structured_output_unavailable': {
+    en: 'Once the endpoint is known to enforce it, declare it: native_structured_output_control for this endpoint, or providers.registry[...].structuredOutputControl for one served model.',
+    tr: 'Endpoint\'in zorladığı doğrulandığında bildirin: bu endpoint için native_structured_output_control, tek bir served model için providers.registry[...].structuredOutputControl.',
+  },
+  'native.reference.failure.reference_provider_failed': { en: 'the provider call failed', tr: 'sağlayıcı çağrısı başarısız oldu' },
+  'native.reference.failure.reference_deadline': { en: 'the time ceiling was reached', tr: 'süre sınırına ulaşıldı' },
+  'native.reference.failure.reference_store_failed': { en: 'durable storage failed', tr: 'kalıcı depolama başarısız oldu' },
+  'native.reference.failure.reference_range_invalid': { en: 'the coverage ranges are inconsistent', tr: 'kapsama aralıkları tutarsız' },
+  'native.reference.failure.reference_journal_mismatch': { en: 'the journal identity does not match', tr: 'günlük kimliği eşleşmiyor' },
+  'native-context.slash.reference_header': { en: 'reference digest: {source} · {phase}', tr: 'referans özeti: {source} · {phase}' },
+  'native-context.slash.reference_source': { en: 'source: {bytes} · verified {coveredBytes} · sections {sections}', tr: 'kaynak: {bytes} · doğrulanan {coveredBytes} · bölüm {sections}' },
+  'native-context.slash.reference_requests': { en: 'child requests: {map} map · {reduce} reduce (ceiling {cap}) · usage {input} in / {output} out tokens', tr: 'alt istek: {map} map · {reduce} reduce (üst sınır {cap}) · kullanım {input} giriş / {output} çıkış token' },
+  'native-context.slash.reference_retained': { en: 'retained digest: {digest} of {cap} tokens (window {window})', tr: 'saklanan özet: {cap} tokenin {digest} kadarı (pencere {window})' },
+  'native-context.slash.reference_deadline': { en: 'time left: {seconds} s · journal: {journal}', tr: 'kalan süre: {seconds} sn · günlük: {journal}' },
+  'native-context.slash.reference_failure': { en: 'last failure: {failure}', tr: 'son hata: {failure}' },
   'tui.slash.desc.clear': { en: 'Clear the screen', tr: 'Ekranı temizle' },
   'tui.slash.desc.exit': { en: 'Leave the REPL (alias: /quit)', tr: "REPL'den çık (takma ad: /quit)" },
   'tui.slash.desc.quit': { en: 'Alias of /exit', tr: '/exit takma adı' },

@@ -191,6 +191,13 @@ describe('renderToolTrail', () => {
 });
 
 describe('hostStampCheckpoint', () => {
+  it('retains host-verified reference evidence even when the model omits it', () => {
+    const ref = `sha256:${sha('source')}`;
+    const stamped = hostStampCheckpoint({ objective: 'continue', findings: [], evidenceRefs: [], decisions: [], unresolved: [], nextActions: [], inspectedAreas: [], toolResultDigests: [], cumulativeCounters: {} },
+      { objective: 'host', toolTrail: [], toolTrailRef: null, lastAssistantText: '', createdAt: new Date().toISOString(), counters: {}, evidenceRefs: [ref] });
+    expect(stamped?.evidenceRefs).toEqual([ref]);
+  });
+
   const host = { objective: 'host objective', toolTrail: [entry(1), entry(2)], toolTrailRef: sha('trail'), lastAssistantText: 'la', createdAt: '2026-09-09T12:00:00.000Z', counters: { toolCalls: 2 } };
   it('host-stamps createdAt, installs the host trail over any model-authored one and merges counters (host wins)', () => {
     const stamped = hostStampCheckpoint({

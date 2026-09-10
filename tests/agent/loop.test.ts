@@ -247,7 +247,16 @@ describe('runAgentTurn', () => {
 
 
 describe('measured request and retained tool context', () => {
-  const budget = resolveNativeAgentBudget({ policy: { roles: {}, native_agent: { outputReserveTokens: 1, contextSafetyReserveTokens: 1 } } });
+  const budget = resolveNativeAgentBudget({
+    policy: {
+      roles: {},
+      native_agent: {
+        outputReserveTokens: 1,
+        contextSafetyReserveTokens: 1,
+        maxToolResultShareOfContext: 0.008,
+      },
+    },
+  });
   it('uses the selected adapter measurement before dropping old context', async () => {
     const { adapter, requests } = scriptedAdapter([[{ type: 'text-delta', text: 'ok' }, { type: 'done' }]]);
     const measuredRequests: ProviderRequest[] = [];
@@ -278,7 +287,17 @@ describe('measured request and retained tool context', () => {
       events.push(event);
       if (event.type === 'budget-checkpoint-request') {
         expect(requests).toHaveLength(1);
-        expect(event).toMatchObject({ reason: 'token-pressure', rounds: 1 });
+        expect(event).toMatchObject({
+          reason: 'token-pressure',
+          rounds: 1,
+          pressure: {
+            retainedTokens: 7602,
+            capTokens: 7500,
+            windowTokens: 10000,
+            quality: 'exact',
+            scope: 'full-request',
+          },
+        });
         transcript.replaceForContextEpoch([{ role: 'user', content: 'summary of tool result' }], 'next-epoch');
       }
     }
@@ -312,7 +331,10 @@ describe('measured request and retained tool context', () => {
       }
     }
     expect(events.some(event => event.type === 'error')).toBe(false);
-    expect(checkpoints).toBeGreaterThanOrEqual(1);
+    const retainedShrunk = transcript.toProviderMessages().some(
+      (message) => message.role === 'tool' && message.content.includes('[deckent] tool-result truncated'),
+    );
+    expect(checkpoints >= 1 || retainedShrunk).toBe(true);
     expect(requests).toHaveLength(3);
     const fullOutput = `echoed:${'x'.repeat(12000)}`;
     const stored = [...content.values()];
@@ -357,8 +379,8 @@ describe('large tool batch context allocation', () => {
 });
 
 
-describe('checkpoint before publishing an incoming tool batch', () => {
-  it('compacts old retained results before owning new calls, then emits every paired result within budget', async () => {
+describe('retention shrink before publishing an incoming tool batch (7109-d)', () => {
+  it('shrinks old retained results before owning new calls, then emits every paired result within budget', async () => {
     const incoming = ['incoming-one', 'incoming-two'];
     const batch: ProviderEvent[] = incoming.map(id => ({ type: 'tool-call', id, name: 'echo', args: { v: `${id}:` + 'evidence'.repeat(2000) } }));
     const { adapter, requests } = scriptedAdapter([
@@ -372,7 +394,7 @@ describe('checkpoint before publishing an incoming tool batch', () => {
     const budget = resolveNativeAgentBudget({ policy: { roles: {}, native_agent: { outputReserveTokens: 1, contextSafetyReserveTokens: 1 } } });
     const stored = new Map<string, Buffer>();
     const events: AgentEvent[] = [];
-    let checkpoints = 0;
+    let priorShrunkBeforeExecute = false;
     for await (const event of runAgentTurn(baseDeps({ adapter: measured, nativeBudget: budget, getContextBudgetTokens: () => 100000,
       contentStore: { write(bytes) {
         const sha256 = createHash('sha256').update(bytes).digest('hex');
@@ -382,22 +404,20 @@ describe('checkpoint before publishing an incoming tool batch', () => {
       } },
     }), transcript, 'continue with the next inspection')) {
       events.push(event);
-      if (event.type === 'budget-checkpoint-request') {
-        checkpoints++;
-        expect(requests).toHaveLength(1);
-        expect(events.some(previous => previous.type === 'tool-executing')).toBe(false);
-        const duringCheckpoint = transcript.toProviderMessages();
-        expect(duringCheckpoint.some(message => message.toolCallId === 'prior-result')).toBe(true);
-        expect(duringCheckpoint.flatMap(message => message.toolCalls ?? []).map(call => call.id)).not.toEqual(expect.arrayContaining(incoming));
+      if (event.type === 'tool-executing' && !priorShrunkBeforeExecute) {
+        priorShrunkBeforeExecute = transcript.getToolResultContent('prior-result')?.includes('[deckent] tool-result truncated') ?? false;
+        const duringShrink = transcript.toProviderMessages();
+        expect(duringShrink.some(message => message.toolCallId === 'prior-result')).toBe(true);
         for (const id of incoming) {
-          expect(duringCheckpoint.some(message => message.toolCallId === id || message.toolCalls?.some(call => call.id === id))).toBe(false);
+          expect(duringShrink.some(message => message.role === 'tool' && message.toolCallId === id)).toBe(false);
         }
-        transcript.replaceForContextEpoch([{ role: 'user', content: 'original objective and verified previous result summary' }], 'pre-batch-epoch');
       }
     }
-    expect(checkpoints).toBe(1);
+    expect(priorShrunkBeforeExecute).toBe(true);
+    expect(events.filter(event => event.type === 'budget-checkpoint-request' && event.reason === 'token-pressure')).toHaveLength(0);
     expect(events.some(event => event.type === 'error')).toBe(false);
-    const results = events.filter(event => event.type === 'tool-result');
+    const results = events.filter((event): event is Extract<AgentEvent, { type: 'tool-result' }> =>
+      event.type === 'tool-result' && incoming.includes(event.id));
     expect(results.map(result => result.id)).toEqual(incoming);
     expect(results.reduce((sum, result) => sum + Buffer.byteLength(result.output), 0)).toBeLessThanOrEqual(80_000);
     for (const result of results) {
@@ -409,7 +429,9 @@ describe('checkpoint before publishing an incoming tool batch', () => {
     }
     expect(requests).toHaveLength(2);
     const continued = requests[1]!.messages;
-    expect(continued.flatMap(message => message.toolCalls ?? []).map(call => call.id)).toEqual(incoming);
-    expect(continued.filter(message => message.role === 'tool').map(message => message.toolCallId)).toEqual(incoming);
+    const latestAssistant = [...continued].reverse().find(message => message.role === 'assistant');
+    expect(latestAssistant?.toolCalls?.map(call => call.id)).toEqual(incoming);
+    expect(continued.filter(message => message.role === 'tool').map(message => message.toolCallId))
+      .toEqual(['prior-result', ...incoming]);
   });
 });

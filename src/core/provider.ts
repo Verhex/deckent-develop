@@ -15,6 +15,8 @@ import {
   type ModelRegistry,
 } from './model-registry.js';
 import { probeOpenAICompatReasoningControl, validateReasoningControlConfig } from './reasoning-control.js';
+import { validateStructuredOutputControlConfig } from './structured-output-control.js';
+import type { StructuredOutputControlDescriptor } from './model-registry-types.js';
 import { resolveNativeAgentBudget } from './execution-budget-policy.js';
 import { resolveActiveModelPolicy, emptyModelActivationPolicy } from './model-activation-store.js';
 import type { TokenUsage } from './token-usage.js';
@@ -1339,6 +1341,9 @@ export interface OpenAICompatCandidate {
   /** 7108: owner-authored reasoning-control facts for every served model
    *  (validated at candidate resolution; typed failure, never silent). */
   reasoningControl?: ReasoningControlDescriptor;
+  /** 7113-E: owner-authored schema-enforcement facts for every served model
+   *  (same discipline: validated loudly, never silently downgraded). */
+  structuredOutputControl?: StructuredOutputControlDescriptor;
 }
 
 /**
@@ -1399,6 +1404,9 @@ export function resolveOpenAICompatCandidates(
         executionCostClass: def.executionCostClass,
         ...(def.reasoningControl !== undefined
           ? { reasoningControl: validateReasoningControlConfig(def.reasoningControl, `providers.registry[${name}].reasoningControl`) }
+          : {}),
+        ...(def.structuredOutputControl !== undefined
+          ? { structuredOutputControl: validateStructuredOutputControlConfig(def.structuredOutputControl, `providers.registry[${name}].structuredOutputControl`) }
           : {}),
       };
       const idx = merged.findIndex(c => c.name === name);
@@ -1681,7 +1689,10 @@ export async function bootstrapProviders(
                 : null);
             ensureLocalLlmModelRegistered(
               modelId,
-              { ...LOCAL_LLM_MODEL_FACTS, ...(reasoningControl ? { reasoningControl } : {}) },
+              { ...LOCAL_LLM_MODEL_FACTS, ...(reasoningControl ? { reasoningControl } : {}),
+                // 7113-E — owner config only: no probe, because acceptance of the
+                // field is not proof that the schema is enforced.
+                ...(candidate.structuredOutputControl ? { structuredOutputControl: candidate.structuredOutputControl } : {}) },
               { modelIds, healthy, checkedAtMs },
               _hooks?.mr ?? globalModelRegistry,
             );
