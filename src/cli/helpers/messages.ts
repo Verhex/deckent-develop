@@ -3609,6 +3609,18 @@ const BASE_MESSAGES: MessageMap = {
     en: 'ran command',
     tr: 'komut çalıştırıldı',
   },
+  'tool.list_dir': {
+    en: 'listed directory',
+    tr: 'dizin listelendi',
+  },
+  'tool.grep': {
+    en: 'searched',
+    tr: 'aramada',
+  },
+  'tool.glob': {
+    en: 'globbed',
+    tr: 'glob arandı',
+  },
   'native.run_tool': {
     en: 'Run tool',
     tr: 'Aracı çalıştır',

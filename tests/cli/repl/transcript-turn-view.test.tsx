@@ -33,17 +33,24 @@ describe('TranscriptTurnView — user vs deckent separation', () => {
     expect(frame).toContain('world');
   });
 
-  it('shows assistant header hint and rail on segment text', () => {
+  it('shows a minimal assistant header and indented segment text (no vertical rail)', () => {
     const head = mount({ id: 2, role: 'head', text: '' });
-    expect(head).toContain(labels.transcriptAssistantHint);
+    expect(head).toContain(labels.transcriptAssistant);
+    expect(head).not.toContain(labels.transcriptAssistantHint);
     const seg = mount({ id: 3, role: 'seg', text: 'reply body' });
     expect(seg).toContain('reply body');
-    expect(seg).toMatch(/[│|]/);
+    expect(seg).not.toMatch(/^[│|]/m);
   });
 
-  it('uses ASCII rail in ascii glyph mode', () => {
-    const seg = mount({ id: 4, role: 'seg', text: 'ascii reply' }, true);
-    expect(seg).toContain('|');
-    expect(seg).not.toContain('│');
+  it('renders tool lines as verb + target without internal tool id', () => {
+    const frame = mount({
+      id: 5,
+      role: 'tool',
+      text: '',
+      tool: { verb: 'read file', target: 'src/a.ts', note: '12 ms' },
+    });
+    expect(frame).toContain('read file');
+    expect(frame).toContain('src/a.ts');
+    expect(frame).not.toContain('deckent_');
   });
 });

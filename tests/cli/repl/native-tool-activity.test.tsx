@@ -112,6 +112,7 @@ describe('mounted native tool activity', () => {
     const engine = Object.assign(async (_input: string, cbs: Parameters<ReplEngine>[1]) => {
       cbs.onToolActivity?.({
         kind: 'executing', id: 'call-1', tool: 'deckent_bash\u202Eunsafe',
+        action: 'Run command unsafe',
         label: getMessage('tui.native_tool_executing', 'en'),
         compactLabel: getMessage('tui.native_tool_executing_compact', 'en'),
         cancelRequestedLabel: getMessage('tui.native_tool_cancel_requested', 'en'),
@@ -126,11 +127,11 @@ describe('mounted native tool activity', () => {
     try {
       stdin.write('go\r');
       await tick();
-      expect(lastFrame() ?? '').toContain('executing deckent_bash\\u202eunsafe');
+      expect(lastFrame() ?? '').toContain('executing Run command unsafe');
       stdin.write('\x03');
       await tick();
       expect(engine.cancelTurn).toHaveBeenCalledTimes(1);
-      expect(lastFrame() ?? '').toContain('cancel requested for deckent_bash\\u202eunsafe');
+      expect(lastFrame() ?? '').toContain('cancel requested for Run command unsafe');
       expect(lastFrame() ?? '').not.toContain('provider stream was aborted');
       release?.();
       await tick();

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { decide, resolveTier } from '../../../../../src/agent/permission.js';
 import { SAFE_DEFAULT_POLICY } from '../../../../../src/agent/permission-policy.js';
 import { classifyNativeToolApproval } from '../../../../../src/agent/native-tool-approval.js';
-import { permissionResource } from '../../../../../src/agent/loop.js';
+import { permissionResource } from '../../../../../src/agent/native-permission-resource.js';
 import { buildNativeToolRegistry } from '../../../../../src/cli/repl/native-tool-registry.js';
 import { classifyShellCommand } from '../../../../../src/agent/guards/shell-risk.js';
 import { resolveShellDialectForPlatform } from '../../../../../src/core/shell-readonly-classifier.js';
@@ -149,6 +149,35 @@ describe('P4 permission RCA probe', () => {
     expect(r.decision).toBe('ask');
     expect('reasonCode' in r.approval).toBe(false);
     expect(r.askGuard).toBe('would-prompt');
+  });
+
+  it('grep explicit path "." keeps resource "." under deny(.) (pattern must not override)', () => {
+    const args = { path: '.', pattern: 'needle' };
+    const resource = permissionResource('deckent_grep', args);
+    expect(resource).toBe('.');
+    const r = resolvePermissionLikeLoop({
+      tool: 'deckent_grep',
+      args,
+      cwd,
+      mode: 'suggest',
+      policy: {
+        ...SAFE_DEFAULT_POLICY,
+        // ruleStore denies injected via decide input below — extend helper if needed
+      },
+    });
+    const denied = decide('deckent_grep', resource, r.tier, {
+      rules: [],
+      denies: [{ tool: 'deckent_grep', pattern: '.' }],
+      policy: SAFE_DEFAULT_POLICY,
+      mode: 'suggest',
+    });
+    expect(denied).toBe('deny');
+    expect(resolvePermissionLikeLoop({
+      tool: 'deckent_grep',
+      args: { pattern: 'needle' },
+      cwd,
+      mode: 'suggest',
+    }).resource).toBe('needle');
   });
 
   it('deckent_bash: empty cmd yields reasonCode on ask path', () => {

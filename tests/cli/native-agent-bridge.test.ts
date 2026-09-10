@@ -251,6 +251,7 @@ describe('createNativeEngine', () => {
       expect(activity).toEqual([
         expect.objectContaining({
           kind: 'executing', id: 'write-1', tool: 'deckent_write_file',
+          action: expect.stringContaining('out.txt'),
           label: 'executing {tool} · {elapsed}',
           compactLabel: 'executing · {elapsed} · {tool}',
           cancelRequestedLabel: 'cancel requested for {tool} · waiting for the tool to end ({elapsed})',

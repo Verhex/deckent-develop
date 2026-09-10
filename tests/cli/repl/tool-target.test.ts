@@ -1,7 +1,13 @@
 // tests/cli/repl/tool-target.test.ts
 // 7114 — bounded, secret-free tool-line target + elapsed helper.
 import { describe, it, expect } from 'vitest';
-import { describeToolTarget, toolElapsedMs, TOOL_TARGET_MAX_CHARS } from '../../../src/cli/repl/tool-target.js';
+import {
+  describeToolTarget,
+  formatToolActivityDisplay,
+  formatToolTranscriptVerb,
+  toolElapsedMs,
+  TOOL_TARGET_MAX_CHARS,
+} from '../../../src/cli/repl/tool-target.js';
 
 describe('describeToolTarget', () => {
   it('file read: path + inclusive line range / legacy offset+limit / outline+search modes', () => {
@@ -41,6 +47,26 @@ describe('describeToolTarget', () => {
     const long = describeToolTarget('deckent_read_file', { path: `${'d/'.repeat(80)}f.md` });
     expect(Array.from(long).length).toBe(TOOL_TARGET_MAX_CHARS);
     expect(long.endsWith('…')).toBe(true);
+  });
+});
+
+describe('formatToolTranscriptVerb', () => {
+  const t = (key: string) => key;
+  it('maps native read/exec tools to compact i18n verbs', () => {
+    expect(formatToolTranscriptVerb('deckent_read_file', t)).toBe('tool.read_file');
+    expect(formatToolTranscriptVerb('deckent_grep', t)).toBe('tool.grep');
+    expect(formatToolTranscriptVerb('deckent_bash', t)).toBe('tool.ran_cmd');
+    expect(formatToolTranscriptVerb('deckent_plan', t)).toBe('native.run_tool');
+  });
+});
+
+describe('formatToolActivityDisplay', () => {
+  const t = (key: string) => key;
+  it('joins verb and target without exposing the raw tool id', () => {
+    expect(formatToolActivityDisplay('deckent_read_file', { path: 'src/a.ts' }, t))
+      .toBe('tool.read_file src/a.ts');
+    expect(formatToolActivityDisplay('deckent_bash', { cmd: 'npm test' }, t))
+      .toBe('tool.ran_cmd npm test');
   });
 });
 

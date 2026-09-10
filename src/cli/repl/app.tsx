@@ -1784,7 +1784,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const [busy, setBusy] = useState(false);
   const [working, setWorking] = useState(false); // a turn is in progress (streaming)
   const [nativeToolActivity, setNativeToolActivity] = useState<{
-    turnId: number; id: string; tool: string; label: string;
+    turnId: number; id: string; tool: string; action?: string; label: string;
     compactLabel: string; cancelRequestedLabel: string; cancelRequestedCompactLabel: string;
     statusLabel: string; cancelRequested: boolean; startedAt: number; generation: number;
   } | null>(null);
@@ -2554,7 +2554,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
             setNativeToolActivity((current) => {
               if (current !== null && current.generation > generation) return current;
               return {
-                turnId, id: event.id, tool: event.tool, label: event.label,
+                turnId, id: event.id, tool: event.tool, action: event.action, label: event.label,
                 compactLabel: event.compactLabel,
                 cancelRequestedLabel: event.cancelRequestedLabel,
                 cancelRequestedCompactLabel: event.cancelRequestedCompactLabel,
@@ -3374,7 +3374,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const nativeToolActivityText = nativeToolActivity && replSurfaceEnabled
     ? (() => {
       const elapsed = `${Math.max(0, Math.floor((nativeToolNow - nativeToolActivity.startedAt) / 1000))}${liveFooterLabels.unitSeconds}`;
-      const tool = formatSessionIdForTerminal(nativeToolActivity.tool);
+      const tool = formatSessionIdForTerminal(nativeToolActivity.action ?? nativeToolActivity.tool);
       const rich = (nativeToolActivity.cancelRequested ? nativeToolActivity.cancelRequestedLabel : nativeToolActivity.label)
         .replace('{tool}', tool).replace('{elapsed}', elapsed);
       const compact = (nativeToolActivity.cancelRequested
@@ -3427,6 +3427,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           key={turn.id}
           turn={turn}
           hyperlinks={props.hyperlinks === true}
+          terminalColumns={columns}
           labels={{
             transcriptUser: labels.transcriptUser,
             transcriptAssistant: labels.transcriptAssistant,

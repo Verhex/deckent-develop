@@ -18,7 +18,7 @@ import {
   type NativePermissionDecisionCallback,
 } from '../../agent/session.js';
 import { approximateReasoningTokens } from '../../agent/reasoning-control.js';
-import { describeToolTarget, toolElapsedMs } from './tool-target.js';
+import { describeToolTarget, formatToolActivityDisplay, formatToolTranscriptVerb, toolElapsedMs } from './tool-target.js';
 import type { CheckpointTrailLabels } from '../../agent/checkpoint-trail.js';
 import { CONTENT_REF_CODE_PREFIX, CONTENT_REF_REASON_CODES } from '../../agent/tools/content-ref-tool.js';
 import type { ReferenceDigestProgress } from '../../agent/reference-digest-types.js';
@@ -197,6 +197,8 @@ export interface ReplEngine {
 export type NativeToolActivityEvent =
   | {
       readonly kind: 'executing'; readonly id: string; readonly tool: string;
+      /** Localized verb (+ bounded target) for `{tool}` placeholders in footer labels. */
+      readonly action?: string;
       readonly label: string; readonly compactLabel: string;
       readonly cancelRequestedLabel: string; readonly cancelRequestedCompactLabel: string;
       readonly statusLabel: string;
@@ -858,7 +860,7 @@ export function createParityExecImpl(ctx: ParityExecContext) {
     // too, nested-marked so it reads distinctly from a top-level tool-result.
     const handlerToolResult = asToolResult(handlerResult);
     ctx.toolSink?.({
-      verb: `${name} — ${ctx.t('native.tool_ran')}`,
+      verb: formatToolTranscriptVerb(name, ctx.t),
       target: resource,
       note: '[nested]',
       ...(handlerToolResult && !handlerToolResult.ok ? { failed: true } : {}),
@@ -1288,7 +1290,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
             ...(elapsedMs !== undefined ? [t(TOOL_ELAPSED_KEY).replace('{ms}', String(elapsedMs))] : []),
           ];
           deps.toolSink({
-            verb: `${ev.tool} — ${t('native.tool_ran')}`,
+            verb: formatToolTranscriptVerb(ev.tool, t),
             target,
             ...(notes.length > 0 ? { note: notes.join(' · ') } : {}),
             ...(ev.ok ? {} : { failed: true }),
@@ -1304,6 +1306,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           executingSince.set(ev.id, nowMs());
           cbs.onToolActivity?.({
             kind: 'executing', id: ev.id, tool: ev.tool,
+            action: formatToolActivityDisplay(ev.tool, proposedArgs.get(ev.id), t),
             label: t('tui.native_tool_executing'),
             compactLabel: t('tui.native_tool_executing_compact'),
             cancelRequestedLabel: t('tui.native_tool_cancel_requested'),

@@ -101,7 +101,11 @@ describe('permissionResource parity with read classifiers', () => {
     expect(permissionResource('deckent_list_dir', { path: 'src' })).toBe('src');
     expect(permissionResource('deckent_list_dir', { path: '  private  ' })).toBe('  private  ');
     expect(permissionResource('deckent_list_dir', { file_path: 'docs' })).toBe('.');
+    expect(permissionResource('deckent_list_dir', { path: 42 })).toBe('42');
+    expect(permissionResource('deckent_grep', { pattern: 'x', path: 42 })).toBe('42');
     expect(permissionResource('deckent_grep', { pattern: 'foo', path: 'src' })).toBe('src');
+    expect(permissionResource('deckent_grep', { path: '.', pattern: 'needle' })).toBe('.');
+    expect(permissionResource('deckent_grep', { pattern: 'needle' })).toBe('needle');
     expect(permissionResource('deckent_glob', { pattern: '**/*.ts' })).toBe('**/*.ts');
     expect(permissionResource('deckent_grep', { pattern: 'find-me' })).toBe('find-me');
   });
@@ -209,6 +213,25 @@ describe('native read approval — buildNativeToolRegistry + runAgentTurn', () =
     }));
   });
 
+  it('prompts on confirm tier for numeric list_dir path with resource "42" (not cwd ".")', async () => {
+    const cwd = fixtureCwd();
+    mkdirSync(join(cwd, '42'), { recursive: true });
+    writeFileSync(join(cwd, '42', 'n.txt'), 'n\n');
+    const session = sessionFor(
+      cwd,
+      [
+        [{ type: 'tool-call', id: 'ld5', name: 'deckent_list_dir', args: { path: 42 } }, { type: 'done' }],
+        [{ type: 'done' }],
+      ],
+      { ...SAFE_DEFAULT_POLICY, tierMap: { deckent_list_dir: 'confirm' } },
+    );
+    const iterator = session.send('go')[Symbol.asyncIterator]();
+    const request = await nextPermission(iterator);
+    expect(request.resource).toBe('42');
+    expect(session.respondPermission(request, bound(request))).toEqual({ ok: true });
+    await drain(iterator);
+  });
+
   it('fail-closes list_dir file_path alias on confirm tier (dispatcher uses path only)', async () => {
     const cwd = fixtureCwd();
     const session = sessionFor(
@@ -282,6 +305,26 @@ describe('native read approval — buildNativeToolRegistry + runAgentTurn', () =
     expect(events.some((e) => e.type === 'tool-result' && e.id === 'g4' && e.ok === true)).toBe(false);
   });
 
+  it('denies deckent_grep when explicit path "." matches a deny rule (no handler run)', async () => {
+    const cwd = fixtureCwd();
+    const session = createAgentSession({
+      adapter: scripted([
+        [{ type: 'tool-call', id: 'gd', name: 'deckent_grep', args: { path: '.', pattern: 'find-me' } }, { type: 'done' }],
+        [{ type: 'done' }],
+      ]),
+      registry: buildNativeToolRegistry({ cwd: () => cwd }),
+      policy: SAFE_DEFAULT_POLICY,
+      ruleStore: rules({ activeDenies: () => [{ tool: 'deckent_grep', pattern: '.' }] }),
+      cwd,
+      model: 'm',
+    });
+    const events = await drain(session.send('go')[Symbol.asyncIterator]());
+    expect(events.some((e) => e.type === 'permission-request')).toBe(false);
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'tool-result', id: 'gd', ok: false, output: '[denied by policy]',
+    }));
+  });
+
   it('runs deckent_grep and deckent_glob silently when args classify', async () => {
     const cwd = fixtureCwd();
     const session = sessionFor(cwd, [
@@ -343,6 +386,21 @@ describe('nested call_tool parity — read resource identity', () => {
       }),
     });
   }
+
+  it('nested parity denies deckent_grep when explicit path "." matches deny glob', async () => {
+    const cwd = fixtureCwd();
+    const reg = buildNativeToolRegistry({ cwd: () => cwd });
+    const exec = createParityExecImpl({
+      registry: reg,
+      policy: SAFE_DEFAULT_POLICY,
+      ruleStore: rules({ activeDenies: () => [{ tool: 'deckent_grep', pattern: '.' }] }),
+      getMode: () => 'suggest',
+      cwd,
+      t: (k) => k,
+    });
+    await expect(exec({ name: 'deckent_grep', args: { path: '.', pattern: 'find-me' } }))
+      .rejects.toThrow(/denied by policy/);
+  });
 
   it('fail-closes file_path alias on nested list_dir (same as direct loop)', async () => {
     const cwd = fixtureCwd();

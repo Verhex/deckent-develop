@@ -4,6 +4,10 @@ import {
   nativeBuiltinApprovalClassifier,
 } from '../../src/agent/native-tool-approval.js';
 import { permissionResource } from '../../src/agent/native-permission-resource.js';
+import { decide, resolveTier } from '../../src/agent/permission.js';
+import { SAFE_DEFAULT_POLICY } from '../../src/agent/permission-policy.js';
+import { buildNativeToolRegistry } from '../../src/cli/repl/native-tool-registry.js';
+import { tmpdir } from 'node:os';
 
 describe('native tool approval producer metadata', () => {
   it('classifies actual builtin arguments', () => {
@@ -39,6 +43,35 @@ describe('native tool approval producer metadata', () => {
       { file_path: 'docs' },
       permissionResource('deckent_list_dir', { file_path: 'docs' }),
     )).toEqual({ reasonCode: 'NATIVE_PERMISSION_CLASSIFICATION_UNAVAILABLE' });
+  });
+
+  it('coerces list_dir path like chat-tool-exec String(args.path ?? ".")', () => {
+    expect(permissionResource('deckent_list_dir', { path: 42 })).toBe('42');
+    expect(classifyNativeToolApproval(
+      nativeBuiltinApprovalClassifier('deckent_list_dir'),
+      { path: 42 },
+      '42',
+    )).toMatchObject({ scope: 'file-read', resource: '42' });
+    expect(classifyNativeToolApproval(
+      nativeBuiltinApprovalClassifier('deckent_list_dir'),
+      { path: 42 },
+      '.',
+    )).toEqual({ reasonCode: 'NATIVE_PERMISSION_CLASSIFICATION_UNAVAILABLE' });
+  });
+
+  it('grep explicit path "." stays resource "." so deny(.) holds (not pattern fallback)', () => {
+    const args = { path: '.', pattern: 'needle' };
+    expect(permissionResource('deckent_grep', args)).toBe('.');
+    expect(classifyNativeToolApproval(nativeBuiltinApprovalClassifier('deckent_grep'), args, '.'))
+      .toMatchObject({ scope: 'file-read', resource: '.' });
+    const def = buildNativeToolRegistry({ cwd: () => tmpdir() }).get('deckent_grep')!;
+    expect(decide('deckent_grep', '.', resolveTier(def, SAFE_DEFAULT_POLICY), {
+      rules: [],
+      denies: [{ tool: 'deckent_grep', pattern: '.' }],
+      policy: SAFE_DEFAULT_POLICY,
+      mode: 'suggest',
+    })).toBe('deny');
+    expect(permissionResource('deckent_grep', { pattern: 'needle' })).toBe('needle');
   });
 
   it('preserves whitespace in list_dir path resource identity (no trim)', () => {

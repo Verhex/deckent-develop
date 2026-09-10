@@ -83,6 +83,8 @@ export interface RenderMarkdownOptions {
   hyperlinks?: boolean;
   /** Render only Deckent-authored decoration with the closed ASCII glyph set. */
   ascii?: boolean;
+  /** When set, wide markdown tables degrade to compact list rows instead of boxed grids. */
+  maxTerminalWidth?: number;
 }
 
 /**
@@ -167,8 +169,19 @@ function renderCodeBlock(lang: string, code: string, s: Styles, glyphs: Terminal
   return [top, ...mid, bottom].join('\n');
 }
 
+function tableBoxedWidth(widths: number[], glyphs: TerminalGlyphs): number {
+  const edge = visibleWidth(glyphs.ascii ? '|' : '│');
+  const sep = 3; // ` edge ` between cells
+  return edge + 1 + widths.reduce((sum, w) => sum + w + sep, 0) - sep + 1 + edge;
+}
+
 /** A markdown table block (header + separator + rows) → aligned, boxed ANSI. */
-function renderTable(block: string[], s: Styles, glyphs: TerminalGlyphs): string {
+function renderTable(
+  block: string[],
+  s: Styles,
+  glyphs: TerminalGlyphs,
+  maxTerminalWidth?: number,
+): string {
   const cells = (line: string): string[] =>
     line.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map((c) => c.trim());
   const header = cells(block[0] as string);
@@ -180,6 +193,12 @@ function renderTable(block: string[], s: Styles, glyphs: TerminalGlyphs): string
   const cols = header.length;
   const widths = Array.from({ length: cols }, (_, i) =>
     Math.max(visibleWidth(header[i] ?? ''), ...rows.map((r) => visibleWidth(r[i] ?? ''))));
+  if (maxTerminalWidth !== undefined && tableBoxedWidth(widths, glyphs) > maxTerminalWidth) {
+    return rows.map((r) => {
+      const pairs = header.map((h, i) => `${h}: ${r[i] ?? ''}`).join(` ${glyphs.separator} `);
+      return `${style(s.muted, `${glyphs.bullet} `)}${pairs}`;
+    }).join('\n');
+  }
   const pad = (text: string, i: number): string => {
     const w = widths[i] ?? 0; const gap = w - visibleWidth(text);
     const a = aligns[i] ?? 'left';
@@ -226,6 +245,7 @@ export function renderMarkdown(text: string, tty?: boolean, opts: RenderMarkdown
   const s = resolveStyles(suppressionTier());
   const links = opts.hyperlinks === true;
   const glyphs = resolveTerminalGlyphs(opts.ascii === true);
+  const maxTerminalWidth = opts.maxTerminalWidth;
 
   const blocks: string[] = [];
   const stash = (rendered: string): string => { blocks.push(rendered); return `\x00B${blocks.length - 1}\x00`; };
@@ -247,7 +267,7 @@ export function renderMarkdown(text: string, tty?: boolean, opts: RenderMarkdown
         const blk = [cur, next];
         let j = i + 2;
         while (j < lines.length && (lines[j] as string).includes('|') && (lines[j] as string).trim() !== '') { blk.push(lines[j] as string); j++; }
-        out.push(stash(renderTable(blk, s, glyphs)));
+        out.push(stash(renderTable(blk, s, glyphs, maxTerminalWidth)));
         i = j - 1;
       } else { out.push(cur); }
     }

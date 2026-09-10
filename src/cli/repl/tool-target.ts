@@ -89,3 +89,33 @@ export function toolElapsedMs(startedAtMs: number | undefined, nowMs: number): n
   if (startedAtMs === undefined) return undefined;
   return Math.max(0, Math.round(nowMs - startedAtMs));
 }
+
+const TRANSCRIPT_VERB_KEYS: Record<string, string> = {
+  deckent_read_file: 'tool.read_file',
+  deckent_write_file: 'tool.wrote_file',
+  deckent_edit_file: 'tool.edited_file',
+  deckent_bash: 'tool.ran_cmd',
+  deckent_list_dir: 'tool.list_dir',
+  deckent_grep: 'tool.grep',
+  deckent_glob: 'tool.glob',
+};
+
+/** Human verb for the transcript tool line — no internal tool id or "tool ran" suffix. */
+export function formatToolTranscriptVerb(tool: string, t: (key: string) => string): string {
+  const key = TRANSCRIPT_VERB_KEYS[tool];
+  if (key) return t(key);
+  if (tool.startsWith('deckent_')) return t('native.run_tool');
+  return t('native.tool_ran');
+}
+
+/** Workline footer / status — verb + bounded target, never a raw tool id. */
+export function formatToolActivityDisplay(
+  tool: string,
+  args: Readonly<Record<string, unknown>> | undefined,
+  t: (key: string) => string,
+): string {
+  const verb = formatToolTranscriptVerb(tool, t);
+  const target = describeToolTarget(tool, args);
+  const line = target ? `${verb} ${target}` : verb;
+  return clip(line);
+}

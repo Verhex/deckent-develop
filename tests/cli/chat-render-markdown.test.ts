@@ -90,6 +90,16 @@ describe('renderMarkdown — ASCII-owned decoration', () => {
     expect(plain).toContain('|');
   });
 
+  it('degrades wide tables to compact bullet rows when maxTerminalWidth is set', () => {
+    const table = '| Scenario | Expected | Notes |\n| --- | --- | --- |\n| A | pass | long note here |';
+    const wide = stripAnsi(renderMarkdown(table, true, { ascii: true }));
+    expect(wide.split('\n').length).toBeGreaterThan(3);
+    const narrow = stripAnsi(renderMarkdown(table, true, { ascii: true, maxTerminalWidth: 32 }));
+    expect(narrow).toContain('Scenario: A');
+    expect(narrow).toContain('Expected: pass');
+    expect(narrow.split('\n').length).toBe(1);
+  });
+
   it('aligns authored code/table frames by display cells for CJK and emoji', () => {
     const plain = stripAnsi(renderMarkdown('```txt\n東京😀\nx\n```', true, { ascii: true }));
     const framed = plain.split('\n');

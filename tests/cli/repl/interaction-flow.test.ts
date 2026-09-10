@@ -76,7 +76,7 @@ describe('narration rendering — live, before the tool result', () => {
     expect(toolAt).toBeGreaterThan(narrationAt);
     // (2) the tool line names the bounded target and the elapsed time
     const tool = (h.log[toolAt] as { kind: 'tool'; info: ToolInfo }).info;
-    expect(tool.verb).toBe(`deckent_read_file — ${getMessage('native.tool_ran', lang)}`);
+    expect(tool.verb).toBe(getMessage('tool.read_file', lang));
     expect(tool.target).toBe('plan.md:1-2');
     expect(tool.note).toBe(getMessage('native.tool_elapsed', lang).replace('{ms}', '0'));
     expect(tool.failed).toBeUndefined();
