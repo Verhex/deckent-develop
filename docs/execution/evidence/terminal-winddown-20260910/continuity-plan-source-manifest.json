@@ -1,0 +1,42 @@
+{
+  "utc": "2026-09-10T09:33:47.946292+00:00",
+  "head": "aaf6bd6816b5362d97e975801d733152a068f73b",
+  "files": [
+    {
+      "path": "src/core/execution-budget-policy.ts",
+      "sha256": "88b700c601ada09bb3e66bb28bd00aa46bc3e23afe107be0de84014c79e50c58"
+    },
+    {
+      "path": "src/agent/session.ts",
+      "sha256": "5c5704b3654c0d37cac828694e3136147bf019bc0818ab2e0fcbe8e0a323a761"
+    },
+    {
+      "path": "src/agent/loop.ts",
+      "sha256": "3f7ceee33cb83e310ad0afefef15113b6dece8171e6da6e934de8504614a249d"
+    },
+    {
+      "path": "src/agent/tool-result-broker.ts",
+      "sha256": "bdc0ea2d16d4432d6c9503709c7c79e0e387e50a757cdb9f4e2ce6bae71861f8"
+    },
+    {
+      "path": "src/agent/session-tool-content.ts",
+      "sha256": "785de0ba72fccd566fe3c91e17b08a284ed3eb83d2df84462db2552a210a6a87"
+    },
+    {
+      "path": "src/agent/reference-session.ts",
+      "sha256": "90f070fdb751bf5065677a567106159c742ad0e56c6e74982ad39e84e1275a9f"
+    },
+    {
+      "path": "src/agent/identity.ts",
+      "sha256": "29a18fcf9911654dd067f8321207f8c8564366d4ff2582426875b05bb7b56153"
+    },
+    {
+      "path": "src/cli/commands/chat-slash-registry.ts",
+      "sha256": "00115aa998b23ee48851a70ac7cb89a26d4f43f2fd701ea7778afa7644a2fd25"
+    },
+    {
+      "path": "scripts/clean.mjs",
+      "sha256": "a12f6465044d11137a22d52a8961de03d1ba9896398917cec65eb8cbf0b07d1c"
+    }
+  ]
+}
