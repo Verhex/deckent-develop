@@ -3,7 +3,7 @@ import { stripAnsi } from '../helpers/output.js';
 import { roleSgrAt, suppressionTier, type ColorTier } from '../helpers/theme.js';
 import type { PaletteRole } from '../helpers/generated/palette.js';
 import { resolveTerminalGlyphs, type TerminalGlyphs } from '../helpers/terminal-glyphs.js';
-import { displayWidth } from '../repl/cursor-model.js';
+import { displayWidth, segmentGraphemes } from '../repl/cursor-model.js';
 
 // TERMINAL-READABILITY-001 — every color here is a palette ROLE resolved for
 // the tier the color gate admits (helpers/theme.ts): host-theme-mapped 16-color
@@ -56,6 +56,49 @@ function resolveStyles(tier: ColorTier): Styles {
 
 /** Visible (printable) width of a string, ignoring ANSI escapes. */
 function visibleWidth(s: string): number { return displayWidth(stripAnsi(s)); }
+
+/** Break plain text into lines that fit `maxWidth` display cells (word-aware, then grapheme-hard). */
+function wrapPlainDisplayWidth(text: string, maxWidth: number): string[] {
+  const limit = Math.max(1, maxWidth);
+  if (visibleWidth(text) <= limit) return [text];
+  const out: string[] = [];
+  let line = '';
+  const flush = (): void => {
+    if (line.length > 0) { out.push(line); line = ''; }
+  };
+  for (const token of text.split(/(\s+)/)) {
+    if (token === '') continue;
+    const candidate = line + token;
+    if (visibleWidth(candidate) <= limit) {
+      line = candidate;
+      continue;
+    }
+    flush();
+    if (visibleWidth(token) <= limit) {
+      line = token.trimStart();
+      continue;
+    }
+    let chunk = '';
+    for (const g of segmentGraphemes(token)) {
+      const next = chunk + g;
+      if (chunk.length > 0 && visibleWidth(next) > limit) {
+        out.push(chunk);
+        chunk = g;
+      } else {
+        chunk = next;
+      }
+    }
+    line = chunk;
+  }
+  flush();
+  return out.length > 0 ? out : [''];
+}
+
+function wrapStyledPrefix(prefix: string, plainLines: string[]): string[] {
+  if (plainLines.length === 0) return [];
+  const indent = ' '.repeat(visibleWidth(prefix));
+  return plainLines.map((l, i) => (i === 0 ? `${prefix}${l}` : `${indent}${l}`));
+}
 
 /** Wrap text in a style; an empty style (default foreground) leaves the text untouched. */
 function style(open: string, text: string): string {
@@ -194,10 +237,18 @@ function renderTable(
   const widths = Array.from({ length: cols }, (_, i) =>
     Math.max(visibleWidth(header[i] ?? ''), ...rows.map((r) => visibleWidth(r[i] ?? ''))));
   if (maxTerminalWidth !== undefined && tableBoxedWidth(widths, glyphs) > maxTerminalWidth) {
-    return rows.map((r) => {
-      const pairs = header.map((h, i) => `${h}: ${r[i] ?? ''}`).join(` ${glyphs.separator} `);
-      return `${style(s.muted, `${glyphs.bullet} `)}${pairs}`;
-    }).join('\n');
+    const bulletPrefix = style(s.muted, `${glyphs.bullet} `);
+    const bulletCells = visibleWidth(bulletPrefix);
+    const rowBlocks = rows.map((r) => {
+      const cellLines: string[] = [];
+      for (let i = 0; i < header.length; i++) {
+        const plain = `${header[i]}: ${r[i] ?? ''}`;
+        const wrapped = wrapPlainDisplayWidth(plain, Math.max(1, maxTerminalWidth - bulletCells));
+        cellLines.push(...wrapStyledPrefix(bulletPrefix, wrapped));
+      }
+      return cellLines.join('\n');
+    });
+    return rowBlocks.join('\n');
   }
   const pad = (text: string, i: number): string => {
     const w = widths[i] ?? 0; const gap = w - visibleWidth(text);

@@ -14,12 +14,17 @@ const labels = {
   transcriptAssistantHint: getMessage('tui.transcript.assistant_hint', 'en'),
 };
 
-function mount(turn: Turn, ascii = false): string {
+function mount(turn: Turn, ascii = false, columns = 100, terminalColumns?: number): string {
   const ui = render(
     <TerminalGlyphProvider glyphs={resolveTerminalGlyphs(ascii)}>
-      <TranscriptTurnView turn={turn} hyperlinks={false} labels={labels} />
+      <TranscriptTurnView
+        turn={turn}
+        hyperlinks={false}
+        labels={labels}
+        terminalColumns={terminalColumns ?? columns}
+      />
     </TerminalGlyphProvider>,
-    { columns: 100 },
+    { columns },
   );
   return ui.lastFrame() ?? '';
 }
@@ -40,6 +45,20 @@ describe('TranscriptTurnView — user vs deckent separation', () => {
     const seg = mount({ id: 3, role: 'seg', text: 'reply body' });
     expect(seg).toContain('reply body');
     expect(seg).not.toMatch(/^[│|]/m);
+  });
+
+  it('shows every compact-table cell on a narrow TTY including the last column sentinel', () => {
+    const lastCol = 'LAST_COL_SENTINEL_181';
+    const table = [
+      '| Scenario | Expected | Notes |',
+      '| --- | --- | --- |',
+      `| A | pass | ${lastCol} |`,
+    ].join('\n');
+    const frame = mount({ id: 6, role: 'seg', text: table }, false, 28, 28);
+    expect(frame).toContain('Scenario: A');
+    expect(frame).toContain('Expected: pass');
+    expect(frame).toContain('Notes:');
+    expect(frame).toContain(lastCol);
   });
 
   it('renders tool lines as verb + target without internal tool id', () => {

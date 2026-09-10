@@ -101,7 +101,7 @@ export function TranscriptTurnView({
   }
 
   const markdownWidth = terminalColumns !== undefined
-    ? Math.max(20, terminalColumns - bodyIndent)
+    ? Math.max(1, terminalColumns - bodyIndent)
     : undefined;
   const rendered = renderMarkdown(turn.text, true, {
     hyperlinks,
@@ -111,7 +111,7 @@ export function TranscriptTurnView({
   return (
     <Box flexDirection="column" marginTop={1} paddingLeft={bodyIndent}>
       {rendered.split('\n').map((line, i) => (
-        <Text key={i} wrap="truncate-end">
+        <Text key={i} wrap="wrap">
           {line}
         </Text>
       ))}

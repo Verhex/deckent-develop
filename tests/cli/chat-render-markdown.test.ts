@@ -90,14 +90,23 @@ describe('renderMarkdown — ASCII-owned decoration', () => {
     expect(plain).toContain('|');
   });
 
-  it('degrades wide tables to compact bullet rows when maxTerminalWidth is set', () => {
+  it('degrades wide tables to one bullet line per cell when maxTerminalWidth is set', () => {
     const table = '| Scenario | Expected | Notes |\n| --- | --- | --- |\n| A | pass | long note here |';
     const wide = stripAnsi(renderMarkdown(table, true, { ascii: true }));
     expect(wide.split('\n').length).toBeGreaterThan(3);
     const narrow = stripAnsi(renderMarkdown(table, true, { ascii: true, maxTerminalWidth: 32 }));
     expect(narrow).toContain('Scenario: A');
     expect(narrow).toContain('Expected: pass');
-    expect(narrow.split('\n').length).toBe(1);
+    expect(narrow).toContain('Notes: long note here');
+    expect(narrow.split('\n').length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('wraps an overlong compact cell value across display-width lines', () => {
+    const table = '| Key | Value |\n| --- | --- |\n| x | ' + 'W'.repeat(40) + ' |';
+    const narrow = stripAnsi(renderMarkdown(table, true, { ascii: true, maxTerminalWidth: 18 }));
+    const lines = narrow.split('\n');
+    expect(lines.length).toBeGreaterThan(1);
+    expect((narrow.match(/W/g) ?? []).length).toBe(40);
   });
 
   it('aligns authored code/table frames by display cells for CJK and emoji', () => {
