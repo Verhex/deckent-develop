@@ -140,6 +140,33 @@ function basenameOf(path: string): string {
  * (deterministic — deliberately not localeCompare). Empty query → the first
  * `limit` candidates as provided. Pure — pinned by tests/cli/at-ref.test.ts.
  */
+function deprioritizeAtWalkPath(rel: string): number {
+  if (rel.startsWith('.deckent/') || rel.startsWith('.brain/') || rel.includes('/archive/')) return 1;
+  return 0;
+}
+
+/**
+ * Resolve a typed `@token` to a repo-relative candidate when the menu was skipped
+ * (Enter submit). Basename-aware; well-known aliases (e.g. master-plan → docs/MASTER-PLAN.md).
+ */
+export function resolveAtRefCandidate(token: string, candidates: readonly string[]): string {
+  if (candidates.includes(token)) return token;
+  const lcToken = token.toLowerCase();
+  const exactPath = candidates.find((c) => c.toLowerCase() === lcToken);
+  if (exactPath) return exactPath;
+  const base = basenameOf(token);
+  const q = base.replace(/\.md$/i, '');
+  const matches = filterAtPaths(candidates, q, 32);
+  const basenameMatches = matches.filter((m) => basenameOf(m).toLowerCase() === base.toLowerCase());
+  if (basenameMatches.length === 1) return basenameMatches[0] as string;
+  if (matches.length === 1) return matches[0] as string;
+  if (base.toLowerCase() === 'master-plan.md' || lcToken === 'master-plan') {
+    const canonical = candidates.find((c) => c === 'docs/MASTER-PLAN.md');
+    if (canonical) return canonical;
+  }
+  return token;
+}
+
 export function filterAtPaths(candidates: readonly string[], query: string, limit = 8): string[] {
   const q = query.toLowerCase();
   if (q.length === 0) return candidates.slice(0, limit);
@@ -276,8 +303,11 @@ export function createCachedPathLister(
       }
       return files.length < cap; // visitor-false stops the whole walk (cap)
     });
-    const entries = [...files, ...dirs]
-      .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+    files.sort((a, b) => deprioritizeAtWalkPath(a) - deprioritizeAtWalkPath(b) || (a < b ? -1 : a > b ? 1 : 0));
+    const cappedFiles = files.slice(0, cap);
+    const dirList = [...dirs].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    const entries = [...cappedFiles, ...dirList]
+      .sort((a, b) => deprioritizeAtWalkPath(a) - deprioritizeAtWalkPath(b) || (a < b ? -1 : a > b ? 1 : 0))
       .slice(0, cap);
     cache = { at, root, entries };
     return entries;

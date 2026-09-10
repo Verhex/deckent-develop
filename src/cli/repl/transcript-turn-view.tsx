@@ -39,7 +39,7 @@ export function TranscriptTurnView({
         <Text>
           <Text {...palette.muted}>{`${glyphs.separator} `}</Text>
           <Text {...palette.focus}>{` ${labels.transcriptUser} `}</Text>
-          <Text {...palette.muted}>{`${glyphs.separator} ${labels.transcriptUserHint}`}</Text>
+          <Text {...palette.muted}>{`${glyphs.separator} `}</Text>
         </Text>
         <Box paddingLeft={bodyIndent} flexDirection="column">
           {turn.text.split('\n').map((line, i) => (

@@ -224,7 +224,8 @@ import {
   type CliStructuredActionRequest,
 } from '../helpers/cli-tool-capture.js';
 import { createToolExecDispatcher, walkProjectFiles, readIgnoredDirs, resolveRealPathLenient } from '../commands/chat-tool-exec.js';
-import { createCachedPathLister, isScopedRelPath, expandAtRefs } from './at-ref.js';
+import { createCachedPathLister, isScopedRelPath, resolveAtRefCandidate } from './at-ref.js';
+import { formatToolActivityDisplay } from './tool-target.js';
 import { REFERENCE_FAILURE_CODES } from '../../agent/reference-digest-types.js';
 import { formatReferenceBytes } from './native-agent-bridge.js';
 import { createPermissionStore } from '../commands/chat-permissions.js';
@@ -584,12 +585,16 @@ export function buildLiveFooterLabels(t: (key: string) => string): LiveFooterLab
  * expandAtRefs turns that into an honest `[@ref] … unreadable` prompt note.
  * Exported + cwd-injectable so tests exercise it hermetically (tmpdir).
  */
-export function createScopedAtRefReader(resolveCwd: () => string): (rel: string) => string | null {
+export function createScopedAtRefReader(
+  resolveCwd: () => string,
+  resolveCandidate?: (token: string) => string,
+): (rel: string) => string | null {
   return (rel) => {
     try {
-      if (!isScopedRelPath(rel)) return null;
+      const scoped = resolveCandidate ? resolveCandidate(rel) : rel;
+      if (!isScopedRelPath(scoped)) return null;
       const cwd = resolveCwd();
-      const abs = resolve(cwd, rel);
+      const abs = resolve(cwd, scoped);
       const relCheck = relative(cwd, abs);
       if (relCheck === '' || relCheck.startsWith('..') || isAbsolute(relCheck)) return null;
       const realRel = relative(resolveRealPathLenient(cwd), resolveRealPathLenient(abs));
@@ -721,6 +726,7 @@ export function buildNativePermissionIntentLabels(t: (key: string) => string): N
     sessionConsequence: t('native_permission.intent_session_consequence'),
     alwaysConsequence: t('native_permission.intent_always_consequence'),
     cancel: t('native_permission.intent_cancel'),
+    cancelDynamic: t('native_permission.intent_cancel_dynamic'),
     // 7111 — round-scoped grouped intent.
     roundTitle: t('native_permission.round_title'),
     roundItem: t('native_permission.round_item'),
@@ -2089,6 +2095,8 @@ export async function runInkRepl(
         actorId: nativePermissionActor,
         tenantId: nativePermissionTenant,
         summary: (tool) => terminalLabel('native_permission.request_summary').replace('{tool}', tool),
+        toolLabel: (tool, maskedArgs) =>
+          formatToolActivityDisplay(tool, maskedArgs ?? undefined, terminalLabel),
         retireLocalRequest: (requestId) => retireNativeApproval?.(requestId),
       })
     : undefined;
@@ -2612,7 +2620,10 @@ export async function runInkRepl(
     (root, visit) => walkProjectFiles(root, visit, readIgnoredDirs(root)),
     () => process.cwd(),
   );
-  const atRefReader = createScopedAtRefReader(() => process.cwd());
+  const atRefReader = createScopedAtRefReader(
+    () => process.cwd(),
+    (token) => resolveAtRefCandidate(token, atRefPathProvider('')),
+  );
 
   // TERMINAL-PROVIDER-EVIDENCE-001 — the host (legacy proxy) surface gets its
   // own store over the registry universe: subscription CLIs via the auth

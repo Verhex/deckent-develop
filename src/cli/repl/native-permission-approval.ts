@@ -41,6 +41,8 @@ export interface NativePermissionRound {
 export interface NativePermissionIntent {
   readonly invocation: NativePermissionInvocation;
   readonly tool: string;
+  /** Human-facing tool line when wired by the bridge (falls back to `tool`). */
+  readonly toolLabel?: string;
   readonly resource: string;
   readonly actorId: string;
   readonly lifetimes: readonly NativePermissionLifetime[];
@@ -62,6 +64,7 @@ export interface NativePermissionApprovalServiceOptions {
   readonly actorId: string;
   readonly tenantId: string;
   readonly summary: (tool: string) => string;
+  readonly toolLabel?: (tool: string, maskedArgs: Readonly<Record<string, unknown>> | null) => string;
   readonly retireLocalRequest?: (requestId: string) => void;
   readonly now?: () => Date;
   readonly id?: () => string;
@@ -88,9 +91,11 @@ export function createNativePermissionApprovalService(options: NativePermissionA
       || lifetimes.some((lifetime, index) => lifetime !== canonicalLifetimes[index])) {
       return { decision: 'hold', reasonCode: 'NATIVE_PERMISSION_STALE' };
     }
+    const toolLabel = options.toolLabel?.(request.tool, maskedArgs) ?? request.tool;
     const intentPromise = options.intentController.request({
       invocation: request.invocation,
       tool: request.tool,
+      toolLabel,
       resource: redactSensitive(classification.resource),
       actorId: options.actorId,
       lifetimes,

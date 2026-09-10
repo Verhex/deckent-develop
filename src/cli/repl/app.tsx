@@ -593,7 +593,7 @@ export function buildSegmentTurns(
 ): { turns: Turn[]; nextId: number } {
   const turns: Turn[] = [];
   let id = nextId;
-  if (!headAlreadyPushed) turns.push({ id: id++, role: 'head', text: '' });
+  void headAlreadyPushed; // legacy seam — assistant reply no longer inserts a head chrome row
   turns.push({ id: id++, role: 'seg', text: markdown });
   return { turns, nextId: id };
 }

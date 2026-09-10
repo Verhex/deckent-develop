@@ -99,35 +99,29 @@ describe('confirmKeyToAnswer — confirm-modal key mapping (360-009 FIX-1)', () 
 
 // ─── FIX-2: buildSegmentTurns — head-once append, pure by construction ───────
 
-describe('buildSegmentTurns — head-once segment append (360-009 FIX-2)', () => {
-  it('emits the head exactly once, before the first segment', () => {
+describe('buildSegmentTurns — calm assistant segments (no head chrome row)', () => {
+  it('emits only the segment on first push', () => {
     const first = buildSegmentTurns(false, 10, 'hello');
-    expect(first.turns).toEqual([
-      { id: 10, role: 'head', text: '' },
-      { id: 11, role: 'seg', text: 'hello' },
-    ]);
-    expect(first.nextId).toBe(12);
+    expect(first.turns).toEqual([{ id: 10, role: 'seg', text: 'hello' }]);
+    expect(first.nextId).toBe(11);
   });
 
-  it('appends only the segment once the head is already pushed', () => {
+  it('appends only the segment when headAlreadyPushed is true', () => {
     const later = buildSegmentTurns(true, 12, 'world');
     expect(later.turns).toEqual([{ id: 12, role: 'seg', text: 'world' }]);
     expect(later.nextId).toBe(13);
   });
 
-  it('is deterministic — a re-invoked updater cannot duplicate or drop the head', () => {
-    // The pre-fix pushSegment mutated headPushed/idRef INSIDE the setTurns
-    // updater; React may re-invoke an updater, so the second run saw mutated
-    // refs and skipped the head. Pure build = identical output on every run.
+  it('is deterministic — a re-invoked updater cannot duplicate segments', () => {
     const a = buildSegmentTurns(false, 1, 'seg');
     const b = buildSegmentTurns(false, 1, 'seg');
     expect(a).toEqual(b);
 
     const base: Turn[] = [{ id: 0, role: 'user', text: 'q' }];
     const applyOnce = [...base, ...a.turns];
-    const applyAgain = [...base, ...a.turns]; // simulated updater re-run
+    const applyAgain = [...base, ...a.turns];
     expect(applyAgain).toEqual(applyOnce);
-    expect(applyAgain.filter((t) => t.role === 'head')).toHaveLength(1);
+    expect(applyAgain.filter((t) => t.role === 'head')).toHaveLength(0);
   });
 });
 

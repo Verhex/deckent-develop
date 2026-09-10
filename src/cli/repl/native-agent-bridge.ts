@@ -35,7 +35,7 @@ import type { ContentWriter } from '../../agent/tool-result-broker.js';
 import type { ToolRegistry } from '../../agent/tools/registry.js';
 import { classifyNativeToolApproval } from '../../agent/native-tool-approval.js';
 import { createToolExposure } from '../../agent/tools/exposure.js';
-import { permissionResource, writeTargets, type PermissionResponse } from '../../agent/loop.js';
+import { mutationTargetsForSelfMod, permissionResource, type PermissionResponse } from '../../agent/loop.js';
 import { decide, resolveTier } from '../../agent/permission.js';
 import { checkSelfModifying } from '../../agent/guards/self-modifying.js';
 import { classifyShellCommand } from '../../agent/guards/shell-risk.js';
@@ -805,7 +805,7 @@ export function createParityExecImpl(ctx: ParityExecContext) {
       ? (args as Record<string, unknown>)
       : {};
     const resource = permissionResource(name, callArgs);
-    const elevated = checkSelfModifying(ctx.cwd, writeTargets(callArgs)).elevated;
+    const elevated = checkSelfModifying(ctx.cwd, mutationTargetsForSelfMod(tool, callArgs)).elevated;
     let tier = resolveTier(def, ctx.policy);
     if (elevated) tier = 'always';
     let decision = decide(name, resource, tier, {
@@ -842,7 +842,7 @@ export function createParityExecImpl(ctx: ParityExecContext) {
         }
       } else throw new Error(`${PARITY_POLICY_DENIAL_PREFIX} ${name}`);
     }
-    const currentElevated = checkSelfModifying(ctx.cwd, writeTargets(callArgs)).elevated;
+    const currentElevated = checkSelfModifying(ctx.cwd, mutationTargetsForSelfMod(tool, callArgs)).elevated;
     let currentTier = resolveTier(def, ctx.policy);
     if (currentElevated) currentTier = 'always';
     const currentDecision = decide(name, resource, currentTier, {
@@ -926,7 +926,7 @@ export function projectNativePermissionRoundItem(
   const def = deps.registry.get(call.tool);
   if (!def) return null;
   const resource = permissionResource(call.tool, call.args);
-  const elevated = checkSelfModifying(deps.cwd, writeTargets(call.args)).elevated;
+  const elevated = checkSelfModifying(deps.cwd, mutationTargetsForSelfMod(call.name, call.args)).elevated;
   let tier = resolveTier(def, deps.policy);
   const isShellTool = call.tool === 'bash' || call.tool.endsWith('_bash');
   if (isShellTool) {

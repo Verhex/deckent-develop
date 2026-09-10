@@ -33,7 +33,7 @@ describe('TranscriptTurnView — user vs deckent separation', () => {
   it('labels the user block and indents body (unicode rail)', () => {
     const frame = mount({ id: 1, role: 'user', text: 'hello\nworld' });
     expect(frame).toContain(labels.transcriptUser);
-    expect(frame).toContain(labels.transcriptUserHint);
+    expect(frame).not.toContain(labels.transcriptUserHint);
     expect(frame).toContain('hello');
     expect(frame).toContain('world');
   });

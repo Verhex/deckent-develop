@@ -49,6 +49,8 @@ export interface NativePermissionIntentLabels {
   readonly sessionConsequence: string;
   readonly alwaysConsequence: string;
   readonly cancel: string;
+  /** `{keys}` = dynamic 1/2/3/4 subset actually shown. */
+  readonly cancelDynamic: string;
   /** 7111 — round-scoped grouped intent (one card per model round). */
   readonly roundTitle: string;
   readonly roundItem: string;
@@ -67,6 +69,19 @@ export interface NativePermissionIntentLabels {
 
 /** Bound on rendered round rows — the rest collapses into one `roundMore` line. */
 export const NATIVE_PERMISSION_ROUND_MAX_ROWS = 12;
+
+/** Keys shown on the intent card — only lifetimes that are actually offered. */
+export function nativePermissionChoiceKeys(
+  lifetimes: readonly ('once' | 'session' | 'always')[],
+  roundAvailable: boolean,
+): string {
+  const keys: string[] = [];
+  if (lifetimes.includes('once')) keys.push('1');
+  if (lifetimes.includes('session')) keys.push('2');
+  if (lifetimes.includes('always')) keys.push('3');
+  if (roundAvailable) keys.push('4');
+  return keys.join('/');
+}
 
 /** Pure row builder for the round list (unit-testable without Ink). */
 export function buildNativePermissionRoundRows(
@@ -119,12 +134,15 @@ export function NativePermissionIntentCard(props: {
   ].filter((row): row is string => row !== null);
   const roundRows = buildNativePermissionRoundRows(intent, labels);
   return <Box borderStyle={glyphs.borderStyle} flexDirection="column" paddingX={1}>
-    <Text bold>{labels.title.replace('{tool}', intent.tool)}</Text>
+    <Text bold>{labels.title.replace('{tool}', intent.toolLabel ?? intent.tool)}</Text>
     <Text>{labels.actor.replace('{actor}', intent.actorId)}</Text>
     <Text>{labels.resource.replace('{resource}', intent.resource)}</Text>
     {roundRows.map((row, index) => <Text key={`round-${index}`} dimColor={index > 0}>{row}</Text>)}
     {rows.map((row) => <Text key={row}>{row}</Text>)}
-    <Text dimColor>{roundAvailable ? labels.cancelRound : labels.cancel}</Text>
+    <Text dimColor>
+      {(roundAvailable ? labels.cancelRound : labels.cancelDynamic)
+        .replace('{keys}', nativePermissionChoiceKeys(intent.lifetimes, roundAvailable))}
+    </Text>
   </Box>;
 }
 

@@ -190,16 +190,41 @@ function codeTheme(s: Styles): HighlightTheme {
 }
 
 /** A fenced code block → syntax-highlighted, framed box with a language label. */
-function renderCodeBlock(lang: string, code: string, s: Styles, glyphs: TerminalGlyphs): string {
+function renderCodeBlock(
+  lang: string,
+  code: string,
+  s: Styles,
+  glyphs: TerminalGlyphs,
+  maxTerminalWidth?: number,
+): string {
   const body = code.replace(/\n$/, '');
-  let highlighted = body;
+  const label = lang || 'code';
+  const boxBudget = maxTerminalWidth !== undefined
+    ? Math.max(12, maxTerminalWidth - 2)
+    : undefined;
+  let prepared = body;
+  if (boxBudget !== undefined) {
+    prepared = body.split('\n').flatMap((line) => {
+      if (displayWidth(line) <= boxBudget - 2) return [line];
+      const chunks: string[] = [];
+      let rest = line;
+      while (rest.length > 0) {
+        let take = rest.length;
+        while (take > 1 && displayWidth(rest.slice(0, take)) > boxBudget - 2) take -= 1;
+        chunks.push(rest.slice(0, take));
+        rest = rest.slice(take);
+      }
+      return chunks;
+    }).join('\n');
+  }
+  let highlighted = prepared;
   try {
     const theme = codeTheme(s);
-    highlighted = highlight(body, lang ? { language: lang, ignoreIllegals: true, theme } : { ignoreIllegals: true, theme });
-  } catch { highlighted = body; }
+    highlighted = highlight(prepared, lang ? { language: lang, ignoreIllegals: true, theme } : { ignoreIllegals: true, theme });
+  } catch { highlighted = prepared; }
   const lines = highlighted.split('\n');
-  const label = lang || 'code';
-  const inner = Math.max(visibleWidth(label) + 2, ...lines.map(visibleWidth));
+  let inner = Math.max(visibleWidth(label) + 2, ...lines.map(visibleWidth));
+  if (boxBudget !== undefined) inner = Math.min(inner, boxBudget);
   const topLeft = glyphs.ascii ? `+${glyphs.horizontal}` : '╭─';
   const topRight = glyphs.ascii ? '+' : '╮';
   const bottomLeft = glyphs.ascii ? '+' : '╰';
@@ -304,7 +329,8 @@ export function renderMarkdown(text: string, tty?: boolean, opts: RenderMarkdown
   let result = text;
 
   // 1. Fenced code blocks → cli-highlight + framed box (stash to protect).
-  result = result.replace(/```(\w*)[^\n]*\n([\s\S]*?)```/g, (_, lang: string, code: string) => stash(renderCodeBlock(lang, code, s, glyphs)));
+  result = result.replace(/```(\w*)[^\n]*\n([\s\S]*?)```/g, (_, lang: string, code: string) =>
+    stash(renderCodeBlock(lang, code, s, glyphs, maxTerminalWidth)));
 
   // 2. Tables (header + |---| separator + rows) → aligned boxed table (stash).
   const isSep = (l: string): boolean => /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?\s*$/.test(l) && l.includes('-');

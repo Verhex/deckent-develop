@@ -274,10 +274,11 @@ export interface LoopDeps {
 }
 
 import { primaryResource, permissionResource } from './native-permission-resource.js';
+import { mutationTargetsForSelfMod } from './tool-mutation-targets.js';
 export { primaryResource, permissionResource } from './native-permission-resource.js';
+export { mutationTargetsForSelfMod } from './tool-mutation-targets.js';
 
-/** Candidate write-target paths for the self-modifying guard. Exported for the
- *  call_tool parity resolver (born-607) — same rationale as primaryResource. */
+/** Legacy name: path fields from args (any tool). Prefer mutationTargetsForSelfMod in loop/bridge. */
 export function writeTargets(args: Record<string, unknown>): string[] {
   const out: string[] = [];
   for (const k of ['path', 'file_path']) if (typeof args[k] === 'string') out.push(args[k] as string);
@@ -989,7 +990,7 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       }
       const resolveCurrentPermission = () => {
         const resource = permissionResource(call.name, call.args);
-        const elevated = checkSelfModifying(deps.cwd, writeTargets(call.args)).elevated;
+        const elevated = checkSelfModifying(deps.cwd, mutationTargetsForSelfMod(call.name, call.args)).elevated;
         let tier = resolveTier(def, deps.policy);
         const isShellTool = call.name === 'bash' || call.name.endsWith('_bash');
         const rawShellCommand = call.args['command'] ?? call.args['cmd'] ?? resource;
@@ -1198,10 +1199,11 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
           }) };
         } catch (error) {
           if (!(error instanceof ToolResultContextBudgetError)) throw error;
-          for (const pending of calls.slice(callIndex)) transcript.appendToolResult(pending.id, '[context-budget-hold]');
-          yield { type: 'error', code: error.code, message: error.code };
-          yield { type: 'turn-end' };
-          return;
+          result = {
+            ok: false,
+            output: '[deckent] tool-result context budget exhausted; use outline, search, or smaller ranges',
+            meta: { code: 'TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED' },
+          };
         }
       }
       // A handler may attach a typed `meta.code` (7110: replay-served, content-ref

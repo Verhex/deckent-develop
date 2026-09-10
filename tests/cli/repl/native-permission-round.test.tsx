@@ -110,7 +110,7 @@ describe('7111 — NativePermissionIntentCard round rendering', () => {
       expect(frame).toContain(labels.scope['file-read']);
       expect(frame).toContain(labels.risk['high']);
       expect(frame).toContain(`4  ${labels.round}`);
-      expect(frame).toContain(labels.cancelRound);
+      expect(frame).toContain(labels.cancelRound.replace('{keys}', '1/2/3/4'));
       view.stdin.write('4');
       await expect(pending).resolves.toEqual({ kind: 'selected', lifetime: 'once' });
     } finally { view.unmount(); }
@@ -127,7 +127,7 @@ describe('7111 — NativePermissionIntentCard round rendering', () => {
     const view = render(<NativePermissionIntentCard intent={controller.current()} controller={controller} labels={labels} isActive />);
     try {
       expect(view.lastFrame()).not.toContain(`4  ${labels.round}`);
-      expect(view.lastFrame()).toContain(labels.cancel);
+      expect(view.lastFrame()).toContain(labels.cancelDynamic.replace('{keys}', '1/2/3'));
     } finally { view.unmount(); controller.cancel(); }
   });
 });

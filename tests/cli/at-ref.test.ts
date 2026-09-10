@@ -20,6 +20,7 @@ import {
   completeAtToken,
   isScopedRelPath,
   createCachedPathLister,
+  resolveAtRefCandidate,
   AT_REF_MAX_REFS,
   AT_REF_MAX_CHARS,
 } from '../../src/cli/repl/at-ref.js';
@@ -109,6 +110,22 @@ describe('expandAtRefs — prompt injection', () => {
     ]);
     expect(r.prompt).toContain('[@ref] gone.ts — unreadable');
     expect(r.prompt).toContain('[@ref] a.ts:');
+  });
+});
+
+describe('resolveAtRefCandidate — basename and aliases', () => {
+  const candidates = [
+    'docs/MASTER-PLAN.md',
+    'src/cli/repl/app.tsx',
+    '.deckent/archive/old/MASTER-PLAN.md',
+  ];
+
+  it('maps master-plan.md to docs/MASTER-PLAN.md', () => {
+    expect(resolveAtRefCandidate('master-plan.md', candidates)).toBe('docs/MASTER-PLAN.md');
+  });
+
+  it('resolves by basename when unique', () => {
+    expect(resolveAtRefCandidate('app.tsx', candidates)).toBe('src/cli/repl/app.tsx');
   });
 });
 
