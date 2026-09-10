@@ -264,3 +264,10 @@ Main preflight komutu `inspectActiveExecutions(projectRoot)` **exit0**, fakat ad
 Bu nedenle `npm run build` başlatılmadı; build exit kodu yok, **NOT_RUN**. Canlı botu öldürme, guard bypass, clean/auth/runtime mutation yapılmadı. Main `dist/` yeni ürün commit'inin build'i olarak sunulamaz. Main source hazır; kullanıcı tarafından raporlanan terminal problemleri bu turda düzeltilmedi. Ürün kaynakları önceki landing'de toplandı; eski ilgisiz dirty çalışma ayrıca korunuyor. Yeni test/provider benchmark yapılmadı: bu teslim araştırma ve plan değişikliğidir.
 
 Son hesap kontrolü: 2026-09-10T09:33:34.187Z, `account/rateLimits/read`, haftalık kalan %6, modelCalls0. %5 rezerv politikası sürüyor; bu planı teslim ettikten sonra yeni implementation/provider işi açılmayacak.
+
+
+## 2026-09-10 — owner onaylı worktree temizliği
+
+7 bitmiş worktree, 65 diskte olmayan worktree kaydı ve 33 boş test tmp dizini temizlendi. Kanıtlar kalıcı yerel arşivde korundu; 37 worktree (main dahil) kaldı. Tam silinen/korunan/devam listesi ve arşiv digestleri: [WORKTREE-CLEANUP.md](docs/execution/evidence/terminal-winddown-20260910/WORKTREE-CLEANUP.md). Önceki listelerde artık kaldırılmış 7111/7111c, 7113-design, effect-diag, receipt-t4 ve archived-absence yolları yerine bu son harita kullanılır. Branch commitleri korunuyor.
+
+Main/remote eşit değil; eski dirty kaynaklar da duruyor. Canlı telegram-bot build guard HOLD sebebi olmaya devam ediyor. Build NOT_RUN; ürün tamamlandı veya yeni binary hazır denmedi.
