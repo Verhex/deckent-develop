@@ -1,0 +1,21 @@
+
+> deckent@0.100.0 lint:i18n
+> node scripts/lint-i18n-hardcode.mjs
+
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ i18n Hardcode Lint (gate)                                              │
+└────────────────────────────────────────────────────────────────────────┘
+
+  Files scanned  : 130  (117 src/cli/commands + 13 src/desktop/src/main)
+  Description scan: 164 .description() targets (117 src/cli/commands + 1 src/cli/index.ts + 46 src/mcp/tools), 46 description: targets (src/mcp/tools), 117 desc: targets (src/cli/commands slash catalog)
+  Hits (gated)   : 0  (+30 allowlisted)
+  Surface scan   : 118 .option/.argument/.helpOption/.addHelpText targets — 0 literal(s), ratchet ceiling 370
+
+────────────────────────────────────────────────────────────────────────
+  ✓ No hardcoded natural-language strings found in CLI commands or desktop main.
+
+────────────────────────────────────────────────────────────────────────
+  ✓ i18n gate clean.
+────────────────────────────────────────────────────────────────────────
+

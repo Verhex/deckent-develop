@@ -70,6 +70,42 @@ describe('resolveContextSlash — read-only snapshot lines', () => {
     expect(await resolveContextSlash('/context', fakeEngine(), labels)).toBe(labels.unavailable);
   });
 
+  it('renders REPL selection vs last admitted measurement (not inference proof)', async () => {
+    const engine = fakeEngine({ contextSnapshot: async () => snapshot });
+    const aligned = await resolveContextSlash('/context', engine, labels, {
+      activeSelection: { provider: 'openai', model: 'model-a' },
+    });
+    expect(aligned).toContain('REPL selection');
+    expect(aligned).toContain('last measured request');
+    expect(aligned).toContain('not dispatch/response proof');
+
+    const mismatch = await resolveContextSlash('/context', engine, labels, {
+      activeSelection: { provider: 'anthropic', model: 'claude-opus' },
+    });
+    expect(mismatch).toContain('provider mismatch');
+
+    const denied = await resolveContextSlash('/context', engine, labels, {
+      activeSelection: { provider: 'openai', model: 'model-a' },
+    });
+    expect(denied).toBeDefined();
+  });
+
+  it('does not claim alignment for denied last measurement', async () => {
+    const deniedSnapshot: ContextSnapshot = {
+      ...snapshot,
+      lastRequestMeasurement: {
+        ...snapshot.lastRequestMeasurement!,
+        decision: { ...snapshot.lastRequestMeasurement!.decision, admitted: false },
+      },
+    };
+    const engine = fakeEngine({ contextSnapshot: async () => deniedSnapshot });
+    const text = await resolveContextSlash('/context', engine, labels, {
+      activeSelection: { provider: 'openai', model: 'model-a' },
+    });
+    expect(text).toContain('not performed');
+    expect(text).not.toContain('not dispatch/response proof');
+  });
+
   it('renders the cached last actual request, not a synthetic current-occupancy percentage', async () => {
     const engine = fakeEngine({ contextSnapshot: async () => snapshot });
     const text = await resolveContextSlash('  /CONTEXT ', engine, labels);

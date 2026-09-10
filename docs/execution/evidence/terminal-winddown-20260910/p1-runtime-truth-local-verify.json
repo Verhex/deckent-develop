@@ -1,0 +1,40 @@
+{
+  "schema": "terminal-winddown-p1-runtime-truth-local-verify",
+  "at": "2026-09-10T20:25:00Z",
+  "scope": "P1 identity truth slice — REPL selection vs last admitted request measurement on /context (not dispatch/response proof)",
+  "astraScopedAcceptance": {
+    "entry": 162,
+    "receipt": "p1-astra-accepted-161.json",
+    "verdict": "SCOPED_CODE_REVIEW_ACCEPTED_RUNTIME_CLOSURE_HOLD"
+  },
+  "producer": "src/cli/repl/native-runtime-truth.ts",
+  "wiring": [
+    "src/cli/repl/run.tsx:formatContextSnapshot",
+    "src/cli/repl/run.tsx:withContextSlashes(getActiveSelection)"
+  ],
+  "i18n": "src/cli/helpers/message-catalog/cli-terminal-slash.ts (native-context.runtime.*)",
+  "localVerification": {
+    "command": "npx vitest run tests/cli/repl/native-runtime-truth.test.ts tests/cli/repl/context-slashes.test.tsx",
+    "exitCode": 0,
+    "tests": 41
+  },
+  "revise160": {
+    "comparisonStates": [
+      "pending_no_measurement",
+      "pending_no_selection",
+      "not_admitted_no_compare",
+      "unknown_default_model",
+      "aligned",
+      "provider_mismatch",
+      "model_mismatch"
+    ],
+    "lint": "npm run lint exit0 after tsc fix"
+  },
+  "notRun": ["npm run build", "owner PTY/binary battery", "provider calls"],
+  "holdReason": "E_CLEAN_BOT_ACTIVE sprint build policy",
+  "outOfScopeThisSlice": [
+    "status bar / header parity",
+    "native read tool export",
+    "session vs job vs account budget separation"
+  ]
+}

@@ -93,6 +93,57 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
   'tui.slash.desc.context': { en: 'Show context usage (window, tokens in use, epoch, checkpoint)', tr: 'Bağlam kullanımını göster (pencere, kullanılan token, epoch, checkpoint)' },
   'tui.slash.desc.compact': { en: 'Compact the context now (bounded checkpoint, one provider call)', tr: 'Bağlamı şimdi sıkıştır (sınırlı checkpoint, tek sağlayıcı çağrısı)' },
   'native-context.slash.header': { en: 'Context', tr: 'Bağlam' },
+  'native-context.runtime.session_selection': {
+    en: 'REPL selection (status bar): {provider} · {model}',
+    tr: 'REPL seçimi (durum çubuğu): {provider} · {model}',
+  },
+  'native-context.runtime.last_measured_request': {
+    en: 'last measured request ({purpose}, {admission}): {provider} · {model}',
+    tr: 'son ölçülen istek ({purpose}, {admission}): {provider} · {model}',
+  },
+  'native-context.runtime.comparison_aligned': {
+    en: 'selection matches last admitted measurement identity (not dispatch/response proof)',
+    tr: 'seçim, son kabul edilmiş ölçüm kimliğiyle uyumlu (gönderim/yanıt kanıtı değil)',
+  },
+  'native-context.runtime.comparison_provider_mismatch': {
+    en: 'selection differs from last admitted measurement — provider mismatch',
+    tr: 'seçim son kabul edilmiş ölçümden farklı — sağlayıcı uyuşmazlığı',
+  },
+  'native-context.runtime.comparison_model_mismatch': {
+    en: 'selection differs from last admitted measurement — model mismatch',
+    tr: 'seçim son kabul edilmiş ölçümden farklı — model uyuşmazlığı',
+  },
+  'native-context.runtime.inference_pending': {
+    en: 'last request measurement: none cached yet',
+    tr: 'son istek ölçümü: henüz önbellekte yok',
+  },
+  'native-context.runtime.comparison_pending_no_measurement': {
+    en: 'comparison: pending (no measurement to compare)',
+    tr: 'karşılaştırma: bekliyor (karşılaştırılacak ölçüm yok)',
+  },
+  'native-context.runtime.comparison_pending_no_selection': {
+    en: 'comparison: pending (no REPL selection — cannot verify match)',
+    tr: 'karşılaştırma: bekliyor (REPL seçimi yok — eşleşme doğrulanamaz)',
+  },
+  'native-context.runtime.comparison_not_admitted': {
+    en: 'comparison: not performed (last measurement was not admitted — no served-request claim)',
+    tr: 'karşılaştırma: yapılmadı (son ölçüm kabul edilmedi — sunulan istek iddiası yok)',
+  },
+  'native-context.runtime.comparison_unknown_default_model': {
+    en: 'comparison: unknown (REPL model is provider default — exact model match cannot be verified)',
+    tr: 'karşılaştırma: bilinmiyor (REPL modeli sağlayıcı varsayılanı — kesin model eşleşmesi doğrulanamaz)',
+  },
+  'native-context.runtime.purpose_reference_map': { en: 'reference map', tr: 'referans map' },
+  'native-context.runtime.purpose_reference_reduce': { en: 'reference reduce', tr: 'referans reduce' },
+  'native-context.runtime.purpose_reference_interim': { en: 'reference interim', tr: 'referans interim' },
+  'native-context.runtime.session_unknown': {
+    en: 'unknown (no REPL selection)',
+    tr: 'bilinmiyor (REPL seçimi yok)',
+  },
+  'native-context.runtime.model_default': {
+    en: 'provider default',
+    tr: 'sağlayıcı varsayılanı',
+  },
   'native-context.slash.window': { en: 'last request window: {window} tokens', tr: 'son isteğin penceresi: {window} token' },
   'native-context.request.last': { en: 'last actual request: {purpose} · {decision} · {tokens} tokens ({percent}% of that request window) · {quality}', tr: 'son gerçek istek: {purpose} · {decision} · {tokens} token (o istek penceresinin %{percent} kadarı) · {quality}' },
   'native-context.request.purpose_turn': { en: 'turn', tr: 'tur' },

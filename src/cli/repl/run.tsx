@@ -43,6 +43,11 @@ import {
   formatNativeRequestMetricDetail,
   type NativeRequestMetricLabels,
 } from './native-request-metrics.js';
+import {
+  buildNativeRuntimeTruth,
+  formatNativeRuntimeTruthLines,
+  type NativeRuntimeTruthFormatLabels,
+} from './native-runtime-truth.js';
 import type { ShortcutsPanel } from './input-bar.js';
 export type { ShortcutsPanel } from './input-bar.js';
 
@@ -852,7 +857,7 @@ export function withRenewSlash(engine: ReplEngine, labels: RenewSlashLabels): Re
 // (`native-context.slash.*`, `native-context.compact.*`); an engine without
 // the seam (legacy loop) gets the honest "not available" line.
 
-export interface ContextSlashLabels extends NativeRequestMetricLabels {
+export interface ContextSlashLabels extends NativeRequestMetricLabels, NativeRuntimeTruthFormatLabels {
   header: string;         // "Context"
   window: string;         // "window: {window} tokens"
   epoch: string;          // "epoch: {epoch}"
@@ -906,6 +911,21 @@ export interface ContextSlashLabels extends NativeRequestMetricLabels {
 export function buildContextSlashLabels(t: (key: string) => string): ContextSlashLabels {
   return {
     header: t('native-context.slash.header'),
+    sessionSelection: t('native-context.runtime.session_selection'),
+    lastMeasuredRequest: t('native-context.runtime.last_measured_request'),
+    comparisonAligned: t('native-context.runtime.comparison_aligned'),
+    comparisonProviderMismatch: t('native-context.runtime.comparison_provider_mismatch'),
+    comparisonModelMismatch: t('native-context.runtime.comparison_model_mismatch'),
+    inferencePending: t('native-context.runtime.inference_pending'),
+    comparisonPendingNoMeasurement: t('native-context.runtime.comparison_pending_no_measurement'),
+    comparisonPendingNoSelection: t('native-context.runtime.comparison_pending_no_selection'),
+    comparisonNotAdmitted: t('native-context.runtime.comparison_not_admitted'),
+    comparisonUnknownDefaultModel: t('native-context.runtime.comparison_unknown_default_model'),
+    sessionUnknown: t('native-context.runtime.session_unknown'),
+    modelDefault: t('native-context.runtime.model_default'),
+    purposeReferenceMap: t('native-context.runtime.purpose_reference_map'),
+    purposeReferenceReduce: t('native-context.runtime.purpose_reference_reduce'),
+    purposeReferenceInterim: t('native-context.runtime.purpose_reference_interim'),
     window: t('native-context.slash.window'),
     epoch: t('native-context.slash.epoch'),
     messages: t('native-context.slash.messages'),
@@ -975,9 +995,22 @@ export function buildContextSlashLabels(t: (key: string) => string): ContextSlas
   };
 }
 
+export interface FormatContextSnapshotOptions {
+  /** REPL picker / status-bar selection — compared to last-request inference identity. */
+  activeSelection?: ActiveSelection | undefined;
+}
+
 /** Pure formatter for a snapshot (exported for tests). */
-export function formatContextSnapshot(snapshot: ContextSnapshot, labels: ContextSlashLabels): string {
+export function formatContextSnapshot(
+  snapshot: ContextSnapshot,
+  labels: ContextSlashLabels,
+  options?: FormatContextSnapshotOptions,
+): string {
   const lines = [labels.header];
+  const runtimeTruth = buildNativeRuntimeTruth(options?.activeSelection, snapshot.lastRequestMeasurement);
+  for (const line of formatNativeRuntimeTruthLines(runtimeTruth, labels, labels.unknown)) {
+    lines.push(`  ${line}`);
+  }
   lines.push(`  ${labels.window.replace('{window}', snapshot.window === undefined ? labels.unknown : String(snapshot.window))}`);
   // `lastRequestMeasurement` is cached at the admission boundary. Never use
   // the compatibility fields as a synthetic "current transcript" count.
@@ -1102,15 +1135,20 @@ export function formatContextSnapshot(snapshot: ContextSnapshot, labels: Context
   return lines.join('\n');
 }
 
+export interface ResolveContextSlashOptions {
+  activeSelection?: ActiveSelection | undefined;
+}
+
 export async function resolveContextSlash(
   trimmed: string,
   engine: Pick<ReplEngine, 'contextSnapshot'> | undefined,
   labels: ContextSlashLabels,
+  options?: ResolveContextSlashOptions,
 ): Promise<string | undefined> {
   if (trimmed.trim().toLowerCase() !== '/context') return undefined;
   const snapshot = engine?.contextSnapshot;
   if (!snapshot) return labels.unavailable;
-  return formatContextSnapshot(await snapshot(), labels);
+  return formatContextSnapshot(await snapshot(), labels, { activeSelection: options?.activeSelection });
 }
 
 export async function resolveCompactSlash(
@@ -1134,16 +1172,25 @@ export async function resolveCompactSlash(
   return labels.compactUnavailable;
 }
 
+export interface WithContextSlashesOptions {
+  getActiveSelection?: () => ActiveSelection | undefined;
+}
+
 /** Wrap an engine so `/context` and `/compact` are answered locally; every
  *  other input passes through; every engine member is forwarded. */
-export function withContextSlashes(engine: ReplEngine, labels: ContextSlashLabels): ReplEngine {
+export function withContextSlashes(
+  engine: ReplEngine,
+  labels: ContextSlashLabels,
+  options?: WithContextSlashesOptions,
+): ReplEngine {
   // 7113 D — the structured turn (referenceRequests) is the THIRD argument.
   // run.tsx wraps every native engine, so a wrapper that drops it silently
   // disables the whole large-reference path in production while unit tests
   // that call the session directly stay green.
   const wrapped: ReplEngine = async (input, cbs, referenceInput) => {
     let compactUsage: { inputTokens: number; outputTokens: number } | undefined;
-    const line = (await resolveContextSlash(input, engine, labels)) ?? (await resolveCompactSlash(input, engine, labels, {
+    const activeSelection = options?.getActiveSelection?.();
+    const line = (await resolveContextSlash(input, engine, labels, { activeSelection })) ?? (await resolveCompactSlash(input, engine, labels, {
       ...(cbs.onRequestMeasurement ? { onRequestMeasurement: cbs.onRequestMeasurement } : {}),
       onOutcome: (outcome) => { compactUsage = outcome.usage; },
     }));
@@ -2504,7 +2551,11 @@ export async function runInkRepl(
   if (nativeEngine) nativeEngine = withRenewSlash(nativeEngine, buildRenewSlashLabels(terminalLabel));
   // TERMINAL-TOOLS-010 — `/context` · `/compact` on the native path only (the
   // legacy loop has no engine here and therefore no seam to answer them).
-  if (nativeEngine) nativeEngine = withContextSlashes(nativeEngine, buildContextSlashLabels(terminalLabel));
+  if (nativeEngine) {
+    nativeEngine = withContextSlashes(nativeEngine, buildContextSlashLabels(terminalLabel), {
+      getActiveSelection: () => nativeSelection ?? switcher.current(),
+    });
+  }
 
   // Alternate-screen mode (OPT-IN: DECKENT_ALTSCREEN=1). It fixed the WSL
   // drift/blank but REMOVES native scrollback — long replies couldn't be scrolled
