@@ -39,6 +39,7 @@ import {
   formatNativeRequestMetricSummary,
   type NativeRequestMetricLabels,
 } from './native-request-metrics.js';
+import { formatSessionLifecycleLines, type SessionLifecyclePresentLabels } from './native-session-lifecycle-present.js';
 import type { ProviderMessage } from '../../agent/provider-tooluse/types.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { listLedgerSessions, readLedgerSessionForResume, type LedgerStoreOptions } from './session-ledger.js';
@@ -1074,6 +1075,7 @@ export interface ReplLabels {
   statusInspectHint: string;
   /** Caller-owned labels for the privacy-safe, last actual native request. */
   requestMetric: NativeRequestMetricLabels;
+  sessionLifecycle: SessionLifecyclePresentLabels;
   busyQueueStatus: string; // "queue: {count} background · {state}"
   busyStateBusy: string;   // "busy"
   busyStateIdle: string;   // "idle"
@@ -2266,6 +2268,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (!replSurfaceEnabled) return localChatContext(false);
     const local = localChatContext(false);
     const snapshot = nativeEngine?.contextSnapshot ? await nativeEngine.contextSnapshot() : undefined;
+    const lifecycle = snapshot?.sessionLifecycle
+      ? formatSessionLifecycleLines(snapshot.sessionLifecycle, labels.sessionLifecycle).join('\n')
+      : undefined;
     const request = snapshot
       ? formatNativeRequestMetricDetail({
         event: snapshot.lastRequestMeasurement,
@@ -2273,7 +2278,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         labels: labels.requestMetric,
       }).join('\n')
       : undefined;
-    return [local, request].filter((line): line is string => line !== undefined).join('\n') || undefined;
+    return [local, lifecycle, request].filter((line): line is string => line !== undefined).join('\n') || undefined;
   };
   const busyCtl = useRef<BusyControlsState>(initialBusyControlsState());
 

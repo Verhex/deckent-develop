@@ -90,6 +90,36 @@ describe('resolveContextSlash — read-only snapshot lines', () => {
     expect(denied).toBeDefined();
   });
 
+  it('renders native work budget lines when the snapshot includes them', () => {
+    const labels = buildContextSlashLabels(tFor('en'));
+    const text = formatContextSnapshot({
+      ...snapshot,
+      sessionLifecycle: {
+        conversation: 'open',
+        operation: 'idle',
+        turnSequence: 3,
+        userIdleMs: 120_000,
+        userIdleTracked: true,
+        permissionPending: false,
+        budgetBlocked: false,
+        workBudget: {
+          budgetEpoch: 1,
+          elapsedWorkMs: 90_000,
+          maxWallTimeMs: 2_700_000,
+          rounds: 2,
+          maxModelRounds: 120,
+          toolCalls: 5,
+          maxToolCalls: 400,
+          cumulativeTokens: 10_000,
+          maxCumulativeTokens: 2_000_000,
+        },
+      },
+    }, labels);
+    expect(text).toContain('not user idle TTL');
+    expect(text).toContain('90');
+    expect(text).toContain('2 / 120');
+  });
+
   it('does not claim alignment for denied last measurement', async () => {
     const deniedSnapshot: ContextSnapshot = {
       ...snapshot,

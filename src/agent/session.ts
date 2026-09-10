@@ -64,6 +64,11 @@ import {
 } from './checkpoint-trail.js';
 import { CONTENT_REF_TOOL_NAME } from './tools/content-ref-tool.js';
 import { createNativeBudgetState, evaluateNativeBudget, type NativeBudgetState } from './guards/recursion.js';
+import {
+  buildSessionLifecycleSnapshot,
+  trackSessionOperation,
+  type SessionLifecycleSnapshot,
+} from './session-lifecycle-snapshot.js';
 import { containToolResult, renderToolResultEnvelope, type ContentWriter } from './tool-result-broker.js';
 import { createPreambleBudgeter, PreambleBudgetError, type PreambleSnapshot } from './preamble-budget.js';
 import { composeSystemPrompt, type ComposeOptions } from './identity.js';
@@ -391,6 +396,8 @@ export interface ContextSnapshot {
   measurementAuthority?: RequestMeasurementAuthorityStatus;
   /** 7114 — interim-deliverable counters of the current (or last) turn. */
   interimDeliverable?: InterimDeliverableSnapshot;
+  /** P2 — conversation/operation/idle vs work budget (read-only). */
+  sessionLifecycle?: SessionLifecycleSnapshot;
 }
 
 export function createAgentSession(deps: AgentSessionDeps): AgentSession {
@@ -446,6 +453,8 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   }
   let activePermissionTurn: PermissionTurn | undefined;
   let budgetEpoch = 1;
+  let inflightOperation: 'none' | 'turn' | 'compact' = 'none';
+  let lastUserActivityAtMs: number | undefined;
   let exhausted: { code: NativeBudgetTerminalCode; at: number; epoch: number } | undefined;
   let lastRequestMeasurement: RequestMeasurementEvent | undefined;
   let requestAttributionGeneration = 0;
@@ -485,6 +494,35 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   const REPLAY_SERVED_CODE = 'native.checkpoint.replay-served';
   const PRESSURE_SUPPRESSED_CODE = 'native.checkpoint.pressure-suppressed';
   const hostNow = (): string => (deps.now?.() ?? new Date()).toISOString();
+
+  function touchUserActivity(nowMs: number = Date.now()): void {
+    lastUserActivityAtMs = nowMs;
+  }
+
+  function permissionPendingNow(): boolean {
+    const turn = activePermissionTurn;
+    if (!turn || turn.retired) return false;
+    for (const record of turn.issued.values()) {
+      if (record.state === 'issued') return true;
+    }
+    return false;
+  }
+
+  function lifecycleSnapshot(nowMs: number = Date.now()): SessionLifecycleSnapshot {
+    return buildSessionLifecycleSnapshot({
+      closed,
+      inflightOperation,
+      turnSequence,
+      lastUserActivityAtMs,
+      permissionPending: permissionPendingNow(),
+      ...(exhausted ? { exhausted: { code: exhausted.code, epoch: exhausted.epoch } } : {}),
+      ...(referenceProgress ? { referenceProgress } : {}),
+      ...(deps.nativeBudget ? { nativeBudget: deps.nativeBudget } : {}),
+      ...(nativeBudgetState ? { nativeBudgetState } : {}),
+      budgetEpoch,
+      nowMs,
+    });
+  }
 
   const hold = (reasonCode: string): PermissionResponse => Object.freeze({ decision: 'hold', reasonCode });
 
@@ -1213,6 +1251,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     }
     try { await ensureReferenceLedger(); if (referenceLedger) await referenceLedger.checkpoint(); }
     catch { yield { type: 'error', code: 'native.reference.unavailable', message: 'native.reference.unavailable', vars: { reason: 'REFERENCE_STORE_FAILED' } }; yield { type: 'turn-end' }; return; }
+    touchUserActivity();
     lastRawIntent = input.rawIntent;
     for (const reference of input.references) rememberReference(reference);
     // 7110: the trail and the replay guard are per turn.
@@ -1601,12 +1640,13 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
             maxConsecutiveFailuresPerTarget: contextBudget.maxConsecutiveFailuresPerTarget,
           }, nowMs)
         : undefined;
-      return runWithCheckpoints(
+      touchUserActivity();
+      return trackSessionOperation('turn', (kind) => { inflightOperation = kind; }, runWithCheckpoints(
         normalizeTurnInput(userInput),
         turnId,
         attributionGeneration,
         createTurnLoopDeps(turn),
-      );
+      ));
     },
     renewBudgetEpoch(): { epoch: number } {
       budgetEpoch++;
@@ -1695,6 +1735,7 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
           return authority ? { measurementAuthority: authority } : {};
         })()),
         ...(interimTracker ? { interimDeliverable: interimTracker.snapshot() } : {}),
+        sessionLifecycle: lifecycleSnapshot(),
         // 7113-E B-2 rev3 — an open cost closure survives the turn on /context:
         // the reading may have finished, the settlement has not.
         ...(referenceUsageHold ? { referenceUsageHold } : {}),
@@ -1724,7 +1765,8 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       turnAbort = new AbortController();
       lastContextTrigger = 'manual';
       lastCheckpointPressure = undefined;
-      return takeContextEpoch(`compact-${compactSequence}`, attributionGeneration);
+      touchUserActivity();
+      return trackSessionOperation('compact', (kind) => { inflightOperation = kind; }, takeContextEpoch(`compact-${compactSequence}`, attributionGeneration));
     },
     close(options = {}): void {
       closed = true;

@@ -136,6 +136,82 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
   'native-context.runtime.purpose_reference_map': { en: 'reference map', tr: 'referans map' },
   'native-context.runtime.purpose_reference_reduce': { en: 'reference reduce', tr: 'referans reduce' },
   'native-context.runtime.purpose_reference_interim': { en: 'reference interim', tr: 'referans interim' },
+  'native-context.lifecycle.conversation_open': {
+    en: 'conversation: open',
+    tr: 'konuşma: açık',
+  },
+  'native-context.lifecycle.conversation_closed': {
+    en: 'conversation: closed',
+    tr: 'konuşma: kapalı',
+  },
+  'native-context.lifecycle.operation_idle': {
+    en: 'operation: idle (no in-flight turn, compact, or reference program)',
+    tr: 'operasyon: boşta (devam eden tur, compact veya referans programı yok)',
+  },
+  'native-context.lifecycle.operation_turn': {
+    en: 'operation: turn in flight',
+    tr: 'operasyon: tur devam ediyor',
+  },
+  'native-context.lifecycle.operation_compact': {
+    en: 'operation: compaction in flight',
+    tr: 'operasyon: sıkıştırma devam ediyor',
+  },
+  'native-context.lifecycle.operation_reference': {
+    en: 'operation: reference digest program active',
+    tr: 'operasyon: referans digest programı aktif',
+  },
+  'native-context.lifecycle.operation_permission_wait': {
+    en: 'operation: waiting on permission approval',
+    tr: 'operasyon: izin onayı bekleniyor',
+  },
+  'native-context.lifecycle.operation_budget_blocked': {
+    en: 'operation: blocked — working budget exhausted (/renew to continue work budget)',
+    tr: 'operasyon: bloklu — çalışma bütçesi doldu (çalışma bütçesi için /renew)',
+  },
+  'native-context.lifecycle.turn_sequence': {
+    en: 'attempt counter (turn sequence): {sequence}',
+    tr: 'deneme sayacı (tur sırası): {sequence}',
+  },
+  'native-context.lifecycle.user_idle': {
+    en: 'user idle: {seconds}s since last user activity (does not consume work wall budget)',
+    tr: 'kullanıcı boşta: son kullanıcı etkinliğinden {seconds} sn (çalışma duvar bütçesini tüketmez)',
+  },
+  'native-context.lifecycle.user_idle_untracked': {
+    en: 'user idle: not tracked yet (no user turn or compact in this session)',
+    tr: 'kullanıcı boşta: henüz izlenmiyor (bu oturumda kullanıcı turu veya compact yok)',
+  },
+  'native-context.lifecycle.permission_pending': {
+    en: 'permission: pending approval on an issued request',
+    tr: 'izin: verilmiş bir istekte onay bekleniyor',
+  },
+  'native-context.lifecycle.budget_blocked': {
+    en: 'working budget stop: {code}',
+    tr: 'çalışma bütçesi durdu: {code}',
+  },
+  'native-context.lifecycle.reference_phase': {
+    en: 'reference program phase: {phase}',
+    tr: 'referans program fazı: {phase}',
+  },
+  'native-context.slash.work_budget_epoch': {
+    en: 'working budget epoch: {epoch} (resets on /renew — not billing totals)',
+    tr: 'çalışma bütçesi epoch: {epoch} (/renew ile sıfırlanır — faturalama toplamları değil)',
+  },
+  'native-context.slash.work_budget_wall': {
+    en: 'active work time: {elapsed}s / {limit}s wall budget (not user idle TTL)',
+    tr: 'aktif çalışma süresi: {elapsed}/{limit} sn duvar bütçesi (kullanıcı boşta TTL değil)',
+  },
+  'native-context.slash.work_budget_rounds': {
+    en: 'model rounds: {used} / {limit}',
+    tr: 'model turları: {used} / {limit}',
+  },
+  'native-context.slash.work_budget_tools': {
+    en: 'tool calls: {used} / {limit}',
+    tr: 'araç çağrıları: {used} / {limit}',
+  },
+  'native-context.slash.work_budget_tokens': {
+    en: 'cumulative session tokens (working budget): {used} / {limit}',
+    tr: 'oturum birikim token (çalışma bütçesi): {used} / {limit}',
+  },
   'native-context.runtime.session_unknown': {
     en: 'unknown (no REPL selection)',
     tr: 'bilinmiyor (REPL seçimi yok)',

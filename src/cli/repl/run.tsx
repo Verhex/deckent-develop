@@ -48,6 +48,10 @@ import {
   formatNativeRuntimeTruthLines,
   type NativeRuntimeTruthFormatLabels,
 } from './native-runtime-truth.js';
+import {
+  formatSessionLifecycleLines,
+  type SessionLifecyclePresentLabels,
+} from './native-session-lifecycle-present.js';
 import type { ShortcutsPanel } from './input-bar.js';
 export type { ShortcutsPanel } from './input-bar.js';
 
@@ -407,6 +411,7 @@ export function buildReplLabels(t: (key: string) => string): ReplLabels {
     statusInspectTitle: t('tui.status_inspect.title'),
     statusInspectHint: t('tui.status_inspect.hint'),
     requestMetric: buildContextSlashLabels(t),
+    sessionLifecycle: buildSessionLifecycleLabels(t),
     // busy-controls: /queue /interrupt /steer (renderBusyDecision, app.tsx).
     busyQueueStatus: t('tui.busy_queue_status'),
     busyStateBusy: t('tui.busy_state_busy'),
@@ -857,7 +862,7 @@ export function withRenewSlash(engine: ReplEngine, labels: RenewSlashLabels): Re
 // (`native-context.slash.*`, `native-context.compact.*`); an engine without
 // the seam (legacy loop) gets the honest "not available" line.
 
-export interface ContextSlashLabels extends NativeRequestMetricLabels, NativeRuntimeTruthFormatLabels {
+export interface ContextSlashLabels extends NativeRequestMetricLabels, NativeRuntimeTruthFormatLabels, SessionLifecyclePresentLabels {
   header: string;         // "Context"
   window: string;         // "window: {window} tokens"
   epoch: string;          // "epoch: {epoch}"
@@ -906,6 +911,30 @@ export interface ContextSlashLabels extends NativeRequestMetricLabels, NativeRun
   compactUnavailable: string; // "/compact is not available — no scratch store on this engine"
   errorOverflow: string;
   errorAuthorityUnavailable: string;
+}
+
+export function buildSessionLifecycleLabels(t: (key: string) => string): SessionLifecyclePresentLabels {
+  return {
+    conversationOpen: t('native-context.lifecycle.conversation_open'),
+    conversationClosed: t('native-context.lifecycle.conversation_closed'),
+    operationIdle: t('native-context.lifecycle.operation_idle'),
+    operationTurn: t('native-context.lifecycle.operation_turn'),
+    operationCompact: t('native-context.lifecycle.operation_compact'),
+    operationReference: t('native-context.lifecycle.operation_reference'),
+    operationPermissionWait: t('native-context.lifecycle.operation_permission_wait'),
+    operationBudgetBlocked: t('native-context.lifecycle.operation_budget_blocked'),
+    turnSequence: t('native-context.lifecycle.turn_sequence'),
+    userIdle: t('native-context.lifecycle.user_idle'),
+    userIdleUntracked: t('native-context.lifecycle.user_idle_untracked'),
+    permissionPending: t('native-context.lifecycle.permission_pending'),
+    budgetBlocked: t('native-context.lifecycle.budget_blocked'),
+    referencePhase: t('native-context.lifecycle.reference_phase'),
+    workBudgetEpoch: t('native-context.slash.work_budget_epoch'),
+    workBudgetWall: t('native-context.slash.work_budget_wall'),
+    workBudgetRounds: t('native-context.slash.work_budget_rounds'),
+    workBudgetTools: t('native-context.slash.work_budget_tools'),
+    workBudgetTokens: t('native-context.slash.work_budget_tokens'),
+  };
 }
 
 export function buildContextSlashLabels(t: (key: string) => string): ContextSlashLabels {
@@ -971,6 +1000,7 @@ export function buildContextSlashLabels(t: (key: string) => string): ContextSlas
     interimExhausted: t('native-context.slash.interim_exhausted'),
     interimStoppedTarget: t('native-context.slash.interim_stopped_target'),
     interimDeliverablePending: t('native-context.slash.interim_deliverable_pending'),
+    ...buildSessionLifecycleLabels(t),
     unknown: t('native-context.slash.unknown'),
     unavailable: t('native-context.slash.unavailable'),
     compacted: t('native-context.compact.compacted'),
@@ -1068,6 +1098,9 @@ export function formatContextSnapshot(
     lines.push(`  ${labels.measurementAuthority.replace('{state}', stateLabel).replace('{reason}', reasonSuffix)}`);
   }
   if (snapshot.refreshPlanned) lines.push(`  ${labels.refreshPlanned}`);
+  for (const line of formatSessionLifecycleLines(snapshot.sessionLifecycle, labels)) {
+    lines.push(`  ${line}`);
+  }
   // 7114 — what the host-enforced interim deliverable currently sees.
   if (snapshot.interimDeliverable && labels.interimDeliverable) {
     const interim = snapshot.interimDeliverable;

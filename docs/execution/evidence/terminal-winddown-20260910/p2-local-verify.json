@@ -1,0 +1,19 @@
+{
+  "schema": "terminal-winddown-p2-session-lifecycle-local-verify",
+  "at": "2026-09-10T20:38:00Z",
+  "scope": "P2 session lifecycle read model — conversation/operation/idle vs work budget; /context + /status",
+  "producers": [
+    "src/agent/session-lifecycle-snapshot.ts",
+    "src/agent/work-budget-snapshot.ts",
+    "src/agent/session.ts:contextSnapshot",
+    "src/cli/repl/native-session-lifecycle-present.ts"
+  ],
+  "localVerification": {
+    "command": "npx vitest run tests/agent/session-lifecycle-snapshot.test.ts tests/agent/work-budget-snapshot.test.ts tests/cli/repl/native-session-lifecycle-present.test.ts tests/cli/repl/context-slashes.test.tsx tests/cli/repl/native-runtime-truth.test.ts",
+    "exitCode": 0,
+    "tests": 46
+  },
+  "notRun": ["npm run build", "owner PTY/binary battery", "formal job projector", "lease checkpoint resume (P3-bound)"],
+  "holdReason": "E_CLEAN_BOT_ACTIVE sprint build policy",
+  "note": "Job/attempt/operation full projector deferred; native session exposes turn sequence + phase truth only."
+}
