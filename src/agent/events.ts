@@ -7,6 +7,7 @@ import type { NativeToolApprovalClassification, ToolPermissionTier } from './too
 import type { ApprovalMode } from './permission-types.js';
 import type { ProviderAdmissionDecision, RequestMeasurementQuality } from './provider-tooluse/types.js';
 import type { NativePermissionInvocation } from './native-permission-binding.js';
+import type { ToolResultDeliveryState } from './tool-result-retention.js';
 
 export interface TextDeltaEvent { type: 'text-delta'; text: string; }
 export interface ToolProposedEvent { type: 'tool-proposed'; id: string; tool: string; args: Record<string, unknown>; }
@@ -36,7 +37,18 @@ export interface PermissionAutoDecisionEvent {
   floor: boolean;
 }
 export interface ToolExecutingEvent { type: 'tool-executing'; id: string; tool: string; }
-export interface ToolResultEvent { type: 'tool-result'; id: string; tool: string; ok: boolean; output: string; code?: string; }
+export interface ToolResultEvent {
+  type: 'tool-result';
+  id: string;
+  tool: string;
+  ok: boolean;
+  output: string;
+  code?: string;
+  /** Handler truth when wire body was withheld from provider context. */
+  executedOk?: boolean;
+  delivery?: ToolResultDeliveryState;
+  resultRef?: string;
+}
 export interface TurnEndEvent { type: 'turn-end'; }
 export interface UsageEvent { type: 'usage'; inputTokens: number; outputTokens: number; }
 export interface RequestMeasurementEvent {

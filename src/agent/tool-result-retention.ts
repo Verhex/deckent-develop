@@ -1,4 +1,5 @@
 // 7109-d — retained tool-result shrink before measured-window checkpoint.
+import { createHash } from 'node:crypto';
 // Shrinks oldest inline tool bodies to preview+contentRef; never truncates without
 // a durable store write (failed store → byte-identical inline preserved).
 
@@ -134,6 +135,15 @@ export function canEmitMeasuredWindowCheckpoint(measure: RequestMeasurement): bo
 
 /** Delivery state when execution succeeded but context admission withheld the wire body. */
 export const TOOL_RESULT_DELIVERY_WITHHELD = 'undelivered' as const;
+export const TOOL_RESULT_DELIVERY_DELIVERED = 'delivered' as const;
+export type ToolResultDeliveryState =
+  | typeof TOOL_RESULT_DELIVERY_WITHHELD
+  | typeof TOOL_RESULT_DELIVERY_DELIVERED;
+
+export function parseToolResultDelivery(raw: unknown): ToolResultDeliveryState | undefined {
+  if (raw === TOOL_RESULT_DELIVERY_WITHHELD || raw === TOOL_RESULT_DELIVERY_DELIVERED) return raw;
+  return undefined;
+}
 
 export const TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED_CODE = 'TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED';
 
@@ -146,11 +156,13 @@ export function withholdToolResultFromContext(
   store: ContentWriter | undefined,
 ): ToolResult {
   const raw = typeof executed.output === 'string' ? executed.output : '';
+  const bytes = Buffer.from(raw, 'utf8');
+  const expectedSha256 = createHash('sha256').update(bytes).digest('hex');
   let resultRef: string | undefined;
-  if (store && raw.length > 0) {
+  if (store && bytes.byteLength > 0) {
     try {
-      const receipt = store.write(Buffer.from(raw, 'utf8'));
-      if (receipt.path.length > 0) resultRef = receipt.path;
+      const receipt = store.write(bytes);
+      if (receipt.sha256 === expectedSha256) resultRef = receipt.sha256;
     } catch {
       resultRef = undefined;
     }
@@ -161,9 +173,12 @@ export function withholdToolResultFromContext(
     delivery: TOOL_RESULT_DELIVERY_WITHHELD,
     executedOk: executed.ok,
   };
-  if (resultRef !== undefined) meta['resultRef'] = resultRef;
+  if (resultRef !== undefined) {
+    meta['resultRef'] = resultRef;
+    meta['spillSha256'] = resultRef;
+  }
   const output = resultRef !== undefined
-    ? `[deckent] tool-result withheld; ref ${resultRef}`
+    ? `[deckent] tool-result withheld; sha256:${resultRef}`
     : '[deckent] tool-result withheld; ref unavailable';
   return { ok: executed.ok, output, meta };
 }

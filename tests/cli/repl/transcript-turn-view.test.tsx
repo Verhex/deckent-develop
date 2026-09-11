@@ -72,4 +72,16 @@ describe('TranscriptTurnView — user vs deckent separation', () => {
     expect(frame).toContain('src/a.ts');
     expect(frame).not.toContain('deckent_');
   });
+
+  it('renders operator strip rows with the same shape as legacy tool rows', () => {
+    const frame = mount({
+      id: 7,
+      role: 'operator',
+      text: '',
+      tool: { verb: 'globbed', target: 'src/**/*.ts', note: '8 ms' },
+    });
+    expect(frame).toContain('globbed');
+    expect(frame).toContain('src/**/*.ts');
+    expect(frame).toContain('8 ms');
+  });
 });

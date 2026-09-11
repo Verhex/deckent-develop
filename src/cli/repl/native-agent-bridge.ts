@@ -22,8 +22,12 @@ import { describeToolTarget, formatToolActivityDisplay, formatToolTranscriptVerb
 import type { CheckpointTrailLabels } from '../../agent/checkpoint-trail.js';
 import { CONTENT_REF_CODE_PREFIX, CONTENT_REF_REASON_CODES } from '../../agent/tools/content-ref-tool.js';
 import type { ReferenceDigestProgress } from '../../agent/reference-digest-types.js';
-import type { RequestMeasurementEvent } from '../../agent/events.js';
+import type { RequestMeasurementEvent, ToolResultEvent } from '../../agent/events.js';
 import type { PermissionRequestEvent } from '../../agent/events.js';
+import {
+  TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED_CODE,
+  TOOL_RESULT_DELIVERY_WITHHELD,
+} from '../../agent/tool-result-retention.js';
 import { permittedNativePermissionLifetimes } from '../../agent/native-permission-binding.js';
 import type { NativeToolApprovalClassification } from '../../agent/tools/types.js';
 import { loadPolicy } from '../../agent/permission-policy.js';
@@ -744,6 +748,44 @@ export function localizeContextLifecycleClass(t: (key: string) => string, cls: C
 
 /** Resolve stable native-agent codes at the CLI boundary. Unknown codes retain
  * the mechanism-provided fallback instead of exposing an untranslated key. */
+/** Context admission withheld the wire body while execution may still have succeeded. */
+export function isToolResultContextWithheld(
+  ev: Pick<ToolResultEvent, 'delivery' | 'code'>,
+): boolean {
+  return ev.delivery === TOOL_RESULT_DELIVERY_WITHHELD
+    || ev.code === TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED_CODE;
+}
+
+/** Terminal consumer mapping: loop tool-result → operator signal + transcript sink. */
+export function mapToolResultToTranscript(
+  ev: Pick<ToolResultEvent, 'ok' | 'code' | 'delivery' | 'tool'>,
+  input: {
+    t: (key: string) => string;
+    target: string;
+    readOnlyNote: string | null;
+    elapsedMs?: number;
+  },
+): { operatorSignalLine: string | null; sink: { verb: string; target: string; note?: string; failed?: boolean } } {
+  const withheldFromContext = isToolResultContextWithheld(ev);
+  const operatorSignalLine = ev.code && (!ev.ok || withheldFromContext)
+    ? localizeNativeAgentSignal(input.t, ev.code, ev.code)
+    : null;
+  const notes = [
+    ...(input.readOnlyNote ? [input.readOnlyNote] : []),
+    ...(input.elapsedMs !== undefined ? [input.t(TOOL_ELAPSED_KEY).replace('{ms}', String(input.elapsedMs))] : []),
+    ...(withheldFromContext ? [input.t('native.tool_result_withheld')] : []),
+  ];
+  return {
+    operatorSignalLine,
+    sink: {
+      verb: formatToolTranscriptVerb(ev.tool, input.t),
+      target: input.target,
+      ...(notes.length > 0 ? { note: notes.join(' · ') } : {}),
+      ...(ev.ok ? {} : { failed: true }),
+    },
+  };
+}
+
 export function localizeNativeAgentSignal(
   t: (key: string) => string,
   code: string | undefined,
@@ -1276,26 +1318,21 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
         }
         case 'tool-result': {
           if (activeToolId === ev.id) clearActiveTool();
-          if (!ev.ok && ev.code) {
-            cbs.output(`\n${localizeNativeAgentSignal(t, ev.code, ev.code)}\n`);
-          }
           const readOnly = readOnlyMarker.consumeResult(ev);
           toolResultsThisTurn++;
-          // 7114 — the line names WHAT ran (bounded, secret-free target) and
-          // how long it took; both are data the engine already had.
           const elapsedMs = toolElapsedMs(executingSince.get(ev.id), nowMs());
           executingSince.delete(ev.id);
           const target = describeToolTarget(ev.tool, proposedArgs.get(ev.id));
           proposedArgs.delete(ev.id);
-          const notes = [
-            ...(readOnly ? [t('native.tool_read_only_marker')] : []),
-            ...(elapsedMs !== undefined ? [t(TOOL_ELAPSED_KEY).replace('{ms}', String(elapsedMs))] : []),
-          ];
-          deps.toolSink({
-            verb: formatToolTranscriptVerb(ev.tool, t),
+          const mapped = mapToolResultToTranscript(ev, {
+            t,
             target,
-            ...(notes.length > 0 ? { note: notes.join(' · ') } : {}),
-            ...(ev.ok ? {} : { failed: true }),
+            readOnlyNote: readOnly ? t('native.tool_read_only_marker') : null,
+            elapsedMs,
+          });
+          deps.toolSink({
+            ...mapped.sink,
+            ...(mapped.operatorSignalLine ? { budgetNotice: mapped.operatorSignalLine } : {}),
           });
           break;
         }

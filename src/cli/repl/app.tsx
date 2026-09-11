@@ -24,6 +24,11 @@ import {
   buildNervousOutput, buildInterrogateOutput, resolveNativeSlashText,
 } from '../commands/chat-native.js';
 import { TranscriptTurnView } from './transcript-turn-view.js';
+import {
+  buildCommittedOperatorTurn,
+  isOperatorStripTurnLive,
+  LiveOperatorStripView,
+} from './live-operator-strip.js';
 import { InputBar, type CaretStyle, type ShortcutsPanel } from './input-bar.js';
 import { StatusRow, formatSessionIdForTerminal } from './status-row.js';
 import { resolveCtrlC, CTRL_C_EXIT_WINDOW_MS } from './interrupt-policy.js';
@@ -1014,6 +1019,8 @@ export interface ToolInfo {
   added?: number;     // lines added → green
   removed?: number;   // lines removed → red
   note?: string;      // extra dim detail (e.g. truncated output)
+  /** Operator-only budget/withhold signal — never routed through model prose stream. */
+  budgetNotice?: string;
 }
 export type ToolSink = (info: ToolInfo) => void;
 
@@ -1724,7 +1731,7 @@ interface TurnStats { elapsedMs: number; tokens?: number; }
 // complete, then a 'foot' (⏱ stats). Each lands in scrollback immediately, so
 // the user reads in real time and the dynamic region stays tiny (no drift).
 // Exported for buildSegmentTurns' tests (360-009) — shape-only, no behavior.
-export interface Turn { id: number; role: 'user' | 'head' | 'seg' | 'foot' | 'tool' | 'bg'; text: string; tool?: ToolInfo; stats?: TurnStats; }
+export interface Turn { id: number; role: 'user' | 'head' | 'seg' | 'foot' | 'tool' | 'operator' | 'bg'; text: string; tool?: ToolInfo; stats?: TurnStats; }
 
 // TERMINAL-READABILITY-001 — no color literal in the App: every color is a
 // palette role (ink-palette-context) the host theme paints; emphasis is weight
@@ -1854,6 +1861,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
 
   const [sessionTok, setSessionTok] = useState(0);
   const idRef = useRef(1);
+  const [liveOperatorStrip, setLiveOperatorStripState] = useState<ToolInfo | null>(null);
+  const liveOperatorStripRef = useRef<ToolInfo | null>(null);
+  const setLiveOperatorStrip = (info: ToolInfo | null): void => {
+    liveOperatorStripRef.current = info;
+    setLiveOperatorStripState(info);
+  };
   const lastStats = useRef<TurnStats | null>(null);
   // REPL-CLEAR-ANSI (389-002): clearEpoch bumps on every clearScreen() call;
   // turnEpoch stamps the epoch the CURRENTLY in-flight turn started under
@@ -2287,6 +2300,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // inline `idRef.current++` / `headPushed.current` mutations inside it could
   // duplicate or drop rows (the '● deckent' head in particular).
   const pushTurn = (role: Turn['role'], text: string): void => {
+    if (role === 'user') setLiveOperatorStrip(null);
     const turn: Turn = { id: idRef.current++, role, text };
     setTurns((t) => [...t, turn]);
   };
@@ -2336,6 +2350,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     clearEpoch.current += 1;
     statusInspectGeneration.current += 1;
     invalidateSprintContext();
+    setLiveOperatorStrip(null);
     setTurns([]); setPartial(''); setStatusInspectLines(null); headPushed.current = false;
     wireStreamSegmenter();
   };
@@ -2372,17 +2387,14 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     });
   }, [registerActionGate]);
 
-  // Tool/change blocks: a completed tool action becomes a 'tool' turn in the
-  // history (rendered as ● verb target / ⎿ +added -removed). Finalize any live
-  // reply first so the block lands AFTER the text that requested it.
+  // Operator strip: live in the dynamic region (Ink Static never repaints updates).
   useEffect(() => {
     registerToolSink((info: ToolInfo) => {
       // 389-002: a stale (pre-clear) turn's tool-result block must not land
       // on the just-cleared screen either — same epoch guard as `output`.
-      if (!isTurnLive(turnEpoch.current, clearEpoch.current)) return;
+      if (!isOperatorStripTurnLive(turnEpoch.current, clearEpoch.current)) return;
       flushStreamedProse(); setPartial(''); // commit any in-flight reply first
-      const turn: Turn = { id: idRef.current++, role: 'tool', text: '', tool: info };
-      setTurns((t) => [...t, turn]); // pure updater — id consumed above (360-009)
+      setLiveOperatorStrip(info);
       // TERM-FLOW-UNIFY Sprint-4 mount (426-002): a completed tool call may
       // have been `deckent_propose_run` (native-tool-registry.ts) — sync the
       // card's preview from the controller's OWN context (single source of
@@ -2457,6 +2469,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     const finalizeReply = (): void => {
       flushStreamedProse();   // trailing partial line / open block + prose batch
       setPartial('');
+      const strip = liveOperatorStripRef.current;
+      if (strip) {
+        const opTurn = buildCommittedOperatorTurn(idRef.current++, strip);
+        setTurns((t) => [...t, opTurn]);
+        setLiveOperatorStrip(null);
+      }
       if (headPushed.current) {     // close the reply with a stats footer
         const stats = lastStats.current ?? undefined;
         lastStats.current = null;
@@ -3455,6 +3473,20 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         />
       )}</Static>
 
+      {liveOperatorStrip && replSurfaceEnabled && (
+        <LiveOperatorStripView
+          tool={liveOperatorStrip}
+          hyperlinks={props.hyperlinks === true}
+          terminalColumns={columns}
+          labels={{
+            transcriptUser: labels.transcriptUser,
+            transcriptAssistant: labels.transcriptAssistant,
+            transcriptUserHint: labels.transcriptUserHint,
+            transcriptAssistantHint: labels.transcriptAssistantHint,
+          }}
+        />
+      )}
+
       {/* In-progress (incomplete) line — the only streamed text in the dynamic
           region (one line). Completed lines/blocks already flowed into <Static>
           above (readable in real time, native scrollback, no tall re-render). */}
@@ -3615,7 +3647,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         {/* TERMINAL-TOOLS-013: while a card owns stdin the anchor SAYS so
             instead of promising "your turn" (textual carrier, not layout). */}
         {nativeToolActivityText
-          ? <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`${glyphs.separator} ${nativeToolActivityText}`}</Text></>
+          ? <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.warning}>{`${glyphs.separator} ${nativeToolActivityText}`}</Text></>
           : nativeReferenceActivityText
             ? <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`${glyphs.separator} ${nativeReferenceActivityText}`}</Text></>
           : phase === 'idle'

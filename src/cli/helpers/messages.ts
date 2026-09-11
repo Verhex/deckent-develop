@@ -3640,6 +3640,10 @@ const BASE_MESSAGES: MessageMap = {
     en: '{ms} ms',
     tr: '{ms} ms',
   },
+  'native.tool_result_withheld': {
+    en: 'result withheld from model context (full bytes in session store)',
+    tr: 'sonuç model bağlamına alınmadı (tam baytlar oturum deposunda)',
+  },
   'native.interim_deliverable_required': {
     en: 'interim answer requested — {toolCalls} tool calls / {elapsed} s since the last visible result; the assistant now reports known so far · remaining · next step, then continues',
     tr: 'ara yanıt istendi — son görünür sonuçtan bu yana {toolCalls} araç çağrısı / {elapsed} sn; asistan şimdi bilinen · kalan · sonraki adımı raporlayıp devam edecek',

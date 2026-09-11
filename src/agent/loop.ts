@@ -58,6 +58,7 @@ import { previewBytesFromTokenShare } from './tool-result-broker.js';
 import {
   canEmitMeasuredWindowCheckpoint,
   shrinkOldestRetainedResults,
+  parseToolResultDelivery,
   withholdToolResultFromContext,
 } from './tool-result-retention.js';
 import { matchRule } from './permission-types.js';
@@ -1268,11 +1269,24 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       // A handler may attach a typed `meta.code` (7110: replay-served, content-ref
       // refusals) — surfaced on the event so the view localizes it; never on the wire.
       const resultCode = typeof result.meta?.['code'] === 'string' ? result.meta['code'] : undefined;
+      const delivery = parseToolResultDelivery(result.meta?.['delivery']);
+      const executedOk = typeof result.meta?.['executedOk'] === 'boolean' ? result.meta['executedOk'] : undefined;
+      const resultRef = typeof result.meta?.['resultRef'] === 'string' ? result.meta['resultRef'] : undefined;
       // 7114-b — the same-target failure guard reads the EXACT target of this
       // call (tool + primary resource), so a run of failures against one file
       // or command closes that line while different work is never implicated.
       interim?.observeToolOutcome({ tool: call.name, target: primaryResource(call.args), ok: result.ok });
-      yield { type: 'tool-result', id: call.id, tool: call.name, ok: result.ok, output: result.output, ...(resultCode ? { code: resultCode } : {}) };
+      yield {
+        type: 'tool-result',
+        id: call.id,
+        tool: call.name,
+        ok: result.ok,
+        output: result.output,
+        ...(resultCode ? { code: resultCode } : {}),
+        ...(delivery !== undefined ? { delivery } : {}),
+        ...(executedOk !== undefined ? { executedOk } : {}),
+        ...(resultRef !== undefined ? { resultRef } : {}),
+      };
       transcript.appendToolResult(call.id, result.output);
     }
 

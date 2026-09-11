@@ -1,6 +1,6 @@
 # Deckent — limit yenilenince devam raporu
 
-Güncelleme: 2026-09-11T05:00:00+03:00 (owner: paket smoke + build geçti, commit/landing). Önceki wind-down durumu tarihsel; **2026-09-11** native Terminal diliminde CLI bridge + context custody rev3, `build:all` ve owner REPL smoke (MASTER-PLAN analizi) tamamlandı. **Ürün DONE değildir**; bu rapor devam noktasıdır, MASTER/closure-ledger authority değildir.
+Güncelleme: 2026-09-11T11:56:00+03:00 (ENTRY 190 ACK; docs/execution slim temizlik; context custody slice). Önceki wind-down durumu tarihsel; **2026-09-11** native Terminal diliminde CLI bridge + context custody rev3, `build:all` ve owner REPL smoke (MASTER-PLAN analizi) tamamlandı. **Ürün DONE değildir**; bu rapor devam noktasıdır, MASTER/closure-ledger authority değildir.
 
 ## Main ve yetki
 
@@ -482,10 +482,21 @@ Astra ENTRY188/189 source review: recover structured/_rest --force bypass kapal�
 
 Yarın: önce bu custody/control-budget proof'u ve gerçek deny S4; ardından owner'ın operator/model ayrımı. Tool telemetry tek canlı activity satırında, geçmişi istenince açılan kayıt; model cevabı normal prose. Thinking ile kullanıcıya yönelik ara bilgi metni yalnız typed provider/event provenance varsa ayrılır; sırf üsluba bakarak model metni silinmez. Yeni gece implementation ASSIGN yok.
 
-Temizlik: referanssız, untracked eski kanal kopyaları repo dışına SHA256 doğrulanarak arşivlendi. Kanıt/plan/receipt, aktif worktree, runtime/auth/memory ve henüz teslim edilmemiş kod silinmedi. Arşiv envanteri: docs/execution/evidence/terminal-winddown-20260910/astra-night-close-20260911.json.
+Temizlik: referanssız kanal kopyaları repo dışı arşivde (astra-night-close). **2026-09-11 Cursor:** `docs/execution` 124→61 dosya — terminal-winddown ara P0–P4 log/review/kanal MD, p4-permission-rca, evidence/3357|7099|7106 kaldırıldı; indeks: [terminal-winddown README](docs/execution/evidence/terminal-winddown-20260910/README.md). handoffs, active/, owner-decisions, settlement JSON'ları korundu.
 
 Main temizliği sınırı: kalan code/build/model-registry/test ve başka outcome değişiklikleri geçici dosya değildir; silinmedi veya toplu stage edilmedi. Main tamamen clean değildir.
 
 ### Main remainder toplandı — 2026-09-11
 
 Kod/test commit a9006d5d0; 436 hedefli test PASS, tsc exit0, MASTER ve operating-policy exit0. Hermeticity scanner stack overflow exit2 açık. Runtime fiziksel dosyaları korunup Git takibinden ayrıldı; local host kurulumu yerel ignore ile korundu. Fiyat/katalog değişikliği geri uygulanabilir repo-dışı patch olarak ayrıldı. Güncel envanter: docs/execution/evidence/terminal-winddown-20260910/MAIN-REMAINDER-20260911.md. Build/push yapılmadı; ürün DONE değil.
+
+### ENTRY 191 — 2026-09-11T08:59:48.235229+00:00
+
+Context custody (191–194) + operator paint: ENTRY197 **SCOPED ACCEPTED** (195/196 — Static dışı live strip, budgetNotice prose ayrımı; owner 8/8 PASS). Kapanmadı: App lifecycle clear/cancel/new-turn, tam tool geçmişi, measured control reserve, durable retry/no-dup E2E, PTY/journey — ürün DONE değil (2026-09-11).
+
+### ENTRY 194 review — 2026-09-11T09:12:08.676097+00:00
+
+REVISE: operator satırı Static içinde güncelleniyor; gerçek paint yenilenmez. Dynamic region ve sequential paint testi gerekli. Digest reader/withheld mapping ilerledi; kontrol rezervi ve durable retry HOLD. Astra test/build/commit yapmadı.
+
+
+- 2026-09-11T09:24:34.001634+00:00 Astra ENTRY196: dinamik operator strip dar kod kabulü; Static dışı wiring ve budgetNotice ayrımı doğrulandı. Owner 8/8 PASS çıktısı; Cursor exit0. Astra test/build çalıştırmadı. App lifecycle/PTY, measured control reserve ve durable retry HOLD; yalnız son tool scrollback’e ekleniyor. Ayrıntı: docs/execution/evidence/terminal-winddown-20260910/cursor-cli-bridge-context-package-20260911.md.

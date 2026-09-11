@@ -22,6 +22,8 @@ import {
   nativePermissionBindingsEqual,
 } from '../../src/agent/native-permission-binding.js';
 import type { PermissionRequestEvent } from '../../src/agent/events.js';
+import { TOOL_RESULT_DELIVERY_WITHHELD } from '../../src/agent/tool-result-retention.js';
+import { createSessionContentStore, isContentRefReader } from '../../src/agent/tool-result-broker.js';
 
 // A scripted adapter: yields a canned ProviderEvent[] per call, in order.
 function scriptedAdapter(scripts: ProviderEvent[][]): { adapter: ProviderAdapter; requests: ProviderRequest[] } {
@@ -437,13 +439,42 @@ describe('retention shrink before publishing an incoming tool batch (7109-d)', (
 });
 
 describe('per-call tool-result admission (Astra rev2/187 — custody + cap)', () => {
-  it('withholds wire body under zero allocation while preserving executedOk and spill', async () => {
-    const payload = `echoed:${'z'.repeat(4_000)}`;
+  it('does not re-invoke the handler when interceptToolCall serves replay (no duplicate effect)', async () => {
+    let handlerRuns = 0;
     const reg = new ToolRegistry();
     reg.register({
       name: 'echo', description: 'echo', inputSchema: { type: 'object' }, category: 'coding',
       tier: 'silent', source: 'builtin',
-      handler: async () => ({ ok: true, output: payload }),
+      handler: async () => {
+        handlerRuns += 1;
+        return { ok: true, output: 'live-body' };
+      },
+    });
+    const { adapter } = scriptedAdapter([
+      [{ type: 'tool-call', id: 'r1', name: 'echo', args: {} }, { type: 'done' }],
+      [{ type: 'text-delta', text: 'ok' }, { type: 'done' }],
+    ]);
+    const events = await drain(runAgentTurn({
+      ...baseDeps({ adapter }),
+      registry: reg,
+      interceptToolCall: () => ({ ok: true, output: 'trail-replay' }),
+    }, new Transcript(), 'go'));
+    expect(handlerRuns).toBe(0);
+    const result = events.find((e): e is Extract<AgentEvent, { type: 'tool-result' }> => e.type === 'tool-result');
+    expect(result?.output).toBe('trail-replay');
+  });
+
+  it('withholds wire body under zero allocation while preserving executedOk and spill', async () => {
+    const payload = `echoed:${'z'.repeat(4_000)}`;
+    let handlerRuns = 0;
+    const reg = new ToolRegistry();
+    reg.register({
+      name: 'echo', description: 'echo', inputSchema: { type: 'object' }, category: 'coding',
+      tier: 'silent', source: 'builtin',
+      handler: async () => {
+        handlerRuns += 1;
+        return { ok: true, output: payload };
+      },
     });
     const batch: ProviderEvent[] = [
       { type: 'tool-call', id: 't1', name: 'echo', args: {} },
@@ -469,34 +500,46 @@ describe('per-call tool-result admission (Astra rev2/187 — custody + cap)', ()
         },
       },
     });
-    const stored = new Map<string, Buffer>();
-    const events = await drain(runAgentTurn({
-      ...baseDeps({ adapter: measured, nativeBudget: budget, getContextBudgetTokens: () => rawBudget }),
-      registry: reg,
-      contentStore: {
-        write(bytes) {
-          const sha256 = createHash('sha256').update(bytes).digest('hex');
-          const path = `content:${sha256}`;
-          stored.set(path, bytes);
-          return { path, sha256 };
-        },
-      },
-    }, transcript, 'go'));
-    const withheld = events.filter(
-      (e): e is Extract<AgentEvent, { type: 'tool-result' }> =>
-        e.type === 'tool-result' && e.code === 'TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED',
-    );
-    expect(withheld.length).toBe(1);
-    expect(withheld[0]!.ok).toBe(true);
-    expect(withheld[0]!.output).toContain('withheld');
-    expect(Buffer.byteLength(withheld[0]!.output, 'utf8')).toBeLessThan(256);
-    const spill = [...stored.values()].find((buf) => buf.toString() === payload);
-    expect(spill).toBeDefined();
-    const t1Wire = transcript.getToolResultContent('t1');
-    expect(t1Wire).toBeDefined();
-    expect(t1Wire).toContain('withheld');
-    expect(Buffer.byteLength(t1Wire!, 'utf8')).toBeLessThan(256);
-    expect(events.some(e => e.type === 'error' && e.code === 'native-context.admission-denied')).toBe(false);
-    expect(requests.length).toBe(2);
+    const storeDir = mkdtempSync(join(tmpdir(), 'loop-withhold-store-'));
+    const store = createSessionContentStore({ dir: storeDir });
+    try {
+      const events = await drain(runAgentTurn({
+        ...baseDeps({ adapter: measured, nativeBudget: budget, getContextBudgetTokens: () => rawBudget }),
+        registry: reg,
+        contentStore: store,
+      }, transcript, 'go'));
+      const withheld = events.filter(
+        (e): e is Extract<AgentEvent, { type: 'tool-result' }> =>
+          e.type === 'tool-result' && e.code === 'TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED',
+      );
+      expect(withheld.length).toBe(1);
+      expect(withheld[0]!.ok).toBe(true);
+      expect(withheld[0]!.executedOk).toBe(true);
+      expect(withheld[0]!.delivery).toBe(TOOL_RESULT_DELIVERY_WITHHELD);
+      expect(withheld[0]!.resultRef).toMatch(/^[a-f0-9]{64}$/);
+      expect(withheld[0]!.output).toContain('withheld');
+      expect(withheld[0]!.output).not.toContain(payload.slice(0, 64));
+      expect(Buffer.byteLength(withheld[0]!.output, 'utf8')).toBeLessThan(256);
+      expect(handlerRuns).toBe(1);
+      expect(isContentRefReader(store)).toBe(true);
+      const read = await store.readContentRef({
+        sha256: withheld[0]!.resultRef!,
+        offset: 0,
+        limit: 256 * 1024,
+      });
+      expect(read.kind).toBe('loaded');
+      if (read.kind === 'loaded') {
+        expect(Buffer.from(read.bytes).toString('utf8')).toBe(payload);
+      }
+      const t1Wire = transcript.getToolResultContent('t1');
+      expect(t1Wire).toBeDefined();
+      expect(t1Wire).toContain('withheld');
+      expect(Buffer.byteLength(t1Wire!, 'utf8')).toBeLessThan(256);
+      expect(events.some(e => e.type === 'error' && e.code === 'native-context.admission-denied')).toBe(false);
+      expect(requests.length).toBe(2);
+    } finally {
+      store.close();
+      rmSync(storeDir, { recursive: true, force: true });
+    }
   });
 });

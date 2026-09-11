@@ -70,14 +70,15 @@ export function TranscriptTurnView({
     );
   }
 
-  if (turn.role === 'tool' && turn.tool) {
-    const { verb, target, added, removed, note, failed } = turn.tool;
-    const meta = [note, added !== undefined ? `+${added}` : '', removed !== undefined ? `-${removed}` : '']
+  if ((turn.role === 'tool' || turn.role === 'operator') && turn.tool) {
+    const { verb, target, added, removed, note, failed, budgetNotice } = turn.tool;
+    const meta = [budgetNotice, note, added !== undefined ? `+${added}` : '', removed !== undefined ? `-${removed}` : '']
       .filter((s) => s !== '')
       .join(' · ');
+    const tone = turn.role === 'operator' ? palette.warning : palette.muted;
     return (
       <Box flexDirection="row" marginTop={0} paddingLeft={assistantIndent}>
-        <Text {...palette.muted}>
+        <Text {...tone}>
           {failed ? <Text {...palette.error}>{`${glyphs.failure} `}</Text> : null}
           <Text>{verb}</Text>
           {target ? <Text> {target}</Text> : null}

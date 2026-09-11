@@ -3,7 +3,15 @@ import { describe, it, expect, vi } from 'vitest';
 import { tmpdir } from 'node:os';
 import { mkdtempSync, existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { createNativeEngine, createParityExecImpl, resolveCostCeilingUsd } from '../../src/cli/repl/native-agent-bridge.js';
+import {
+  createNativeEngine,
+  createParityExecImpl,
+  isToolResultContextWithheld,
+  localizeNativeAgentSignal,
+  mapToolResultToTranscript,
+  resolveCostCeilingUsd,
+} from '../../src/cli/repl/native-agent-bridge.js';
+import { TOOL_RESULT_DELIVERY_WITHHELD } from '../../src/agent/tool-result-retention.js';
 import { buildNativeToolRegistry, PARITY_POLICY_DENIAL_PREFIX } from '../../src/cli/repl/native-tool-registry.js';
 import type { ProviderAdapter, ProviderEvent } from '../../src/agent/provider-tooluse/types.js';
 import { bindNativePermissionIntent, createNativePermissionInvocation } from '../../src/agent/native-permission-binding.js';
@@ -24,11 +32,45 @@ function scripted(scripts: ProviderEvent[][]): ProviderAdapter {
   return { name: 'mock', async *send() { for (const e of (scripts[turn++] ?? [{ type: 'done' }])) yield e; } };
 }
 
+describe('isToolResultContextWithheld', () => {
+  it('matches canonical delivery and typed budget-exhausted code', () => {
+    expect(isToolResultContextWithheld({ delivery: TOOL_RESULT_DELIVERY_WITHHELD })).toBe(true);
+    expect(isToolResultContextWithheld({ code: 'TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED' })).toBe(true);
+    expect(isToolResultContextWithheld({ delivery: 'delivered' })).toBe(false);
+  });
+});
+
+describe('mapToolResultToTranscript — terminal consumer', () => {
+  const t = (key: string) => getMessage(key, 'en');
+
+  it('surfaces withheld delivery on a successful execution without marking failed', () => {
+    const mapped = mapToolResultToTranscript({
+      ok: true,
+      code: 'TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED',
+      delivery: TOOL_RESULT_DELIVERY_WITHHELD,
+      tool: 'deckent_read_file',
+    }, { t, target: 'src/a.ts', readOnlyNote: null, elapsedMs: 12 });
+    expect(mapped.sink.failed).toBeUndefined();
+    expect(mapped.sink.note).toContain(getMessage('native.tool_result_withheld', 'en'));
+    expect(mapped.operatorSignalLine).toBeTruthy();
+  });
+
+  it('does not emit operator signal for ordinary successful delivery', () => {
+    const mapped = mapToolResultToTranscript({
+      ok: true,
+      tool: 'deckent_read_file',
+    }, { t, target: 'src/a.ts', readOnlyNote: null });
+    expect(mapped.operatorSignalLine).toBeNull();
+    expect(mapped.sink.note).toBeUndefined();
+  });
+});
+
 describe('createNativeEngine', () => {
   it.each(['en', 'tr'] as const)('localizes terminal restoration HOLD guidance in %s without executing the tool', async (lang) => {
     const dir = mkdtempSync(join(tmpdir(), `nb-terminal-hold-${lang}-`));
     try {
       const output: string[] = [];
+      const sink: Array<{ budgetNotice?: string; failed?: boolean }> = [];
       const engine = createNativeEngine({
         adapter: scripted([[
           { type: 'tool-call', id: `terminal-hold-${lang}`, name: 'deckent_write_file', args: { path: 'held.txt', content: 'blocked' } },
@@ -39,7 +81,7 @@ describe('createNativeEngine', () => {
         model: 'm',
         lang,
         confirm: async () => 'y',
-        toolSink: () => {},
+        toolSink: (info) => sink.push(info),
         t: (key) => getMessage(key, lang),
         decidePermission: async () => ({
           decision: 'hold',
@@ -47,7 +89,9 @@ describe('createNativeEngine', () => {
         }),
       });
       await engine('write', { output: (text) => output.push(text), onTurnEnd: () => {} });
-      expect(output.join('')).toContain(getMessage('native.permission.terminal-unavailable', lang));
+      const holdLine = getMessage('native.permission.terminal-unavailable', lang);
+      expect(sink.some((row) => row.budgetNotice?.includes(holdLine) || row.budgetNotice === holdLine)).toBe(true);
+      expect(sink.some((row) => row.failed)).toBe(true);
       expect(existsSync(join(dir, 'held.txt'))).toBe(false);
     } finally {
       rmSync(dir, { recursive: true, force: true });
