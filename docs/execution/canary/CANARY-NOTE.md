@@ -9,3 +9,5 @@ host proof manifest. Previous note removed in 48bdd4cd2; recreated 2026-09-09 (e
 for the sprint728 accepted-result-reader class re-proof.
 
 ## Proof lines
+Recovery 7099 reader-class re-proof append 2026-09-09 run-5.
+Recovery 7099 reader-class re-proof append 2026-09-09 run-4.

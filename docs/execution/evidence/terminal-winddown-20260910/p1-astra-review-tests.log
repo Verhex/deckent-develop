@@ -1,0 +1,11 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/cli/repl/native-runtime-truth.test.ts (8 tests) 3ms
+ ✓ tests/cli/repl/context-slashes.test.tsx (30 tests) 179ms
+
+ Test Files  2 passed (2)
+      Tests  38 passed (38)
+   Start at  23:11:42
+   Duration  7.33s (transform 3.98s, setup 33ms, collect 6.04s, tests 182ms, environment 0ms, prepare 81ms)
+

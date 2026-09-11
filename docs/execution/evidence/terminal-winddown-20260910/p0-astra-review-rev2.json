@@ -1,0 +1,16 @@
+{
+  "utc": "2026-09-10T17:18:34.225720+00:00",
+  "entry": 154,
+  "inventorySha256": "e9504df47ddab836bea4f940f53d91a3b93e3bcb7bce90237968a57bbe259d07",
+  "verdict": "COUNTS_ACCEPTED_ANCHORS_REVISE",
+  "sourceDigests": "5/5 MATCH",
+  "generatorExitCode": 0,
+  "reproduction": "MATCH excluding UTC",
+  "remaining": [
+    "incorrect META_DISPATCH line anchors",
+    "missing handler digests",
+    "hardcoded native list provenance",
+    "Markdown parity not generated/asserted"
+  ],
+  "implementationStarted": false
+}

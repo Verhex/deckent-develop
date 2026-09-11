@@ -1,0 +1,1029 @@
+{
+  "schemaVersion": 3,
+  "kind": "p0-handler-inventory",
+  "generator": "docs/execution/evidence/terminal-winddown-20260910/p0-generate-handler-inventory.mjs",
+  "utc": "2026-09-10T17:26:53.201Z",
+  "head": "89fa9e4f61e33fcdef369c0ee204420d68c1cfd4",
+  "productLandingCommit": "e84ca824db95a5f4996d1d90c48b72aebe0a52e4",
+  "scopeNote": "P0 registry inventory only — full CLI subcommand baseline and owner battery remain open (Astra ENTRY 153).",
+  "sourceDigests": {
+    "src/cli/commands/chat-slash-registry.ts": "00115aa998b23ee48851a70ac7cb89a26d4f43f2fd701ea7778afa7644a2fd25",
+    "src/cli/repl/cli-bridge-tool-specs.ts": "e8869a795875aeebb594c6f11c529fab984781c8764850ac20f567c8e1796851",
+    "src/core/mcp-tool-catalog.ts": "ba6b53ed6e8970350dd4ad986753ebac2a2ead30ea454ef19515d501897580f3",
+    "src/cli/repl/native-tool-registry.ts": "cab358d998d4a339db0953e868201d94ace0b96206d917ddf5f91b3a21bd0614",
+    "src/cli/commands/chat-tool-bridge.ts": "987293c6cbb73467227696c1b42c6e1c474ebfb7c1010646d98d5358ccc262f2",
+    "src/cli/repl/app.tsx": "d657430b9ade0e6f503ba6126095f9c32a52795cfce601f0149278fcfe3f2c1f",
+    "src/cli/repl/run.tsx": "576a0a446d87258b0b9cb86ef2d689f22642eaf6bcb2b0588180926b29b832fc",
+    "src/cli/repl/busy-controls.ts": "1ecc465fdc8650ae86289762ffed48153b146cbcd9df55d3bc99a8b033da3f56",
+    "src/cli/commands/chat-native.ts": "f440e2ff52733e84b2d9d6f31e0f123539932a7c4e04aa42b5288f242bb9c328",
+    "src/cli/commands/chat-tool-exec.ts": "c3aa09dc20ab6942cae55e4ec9cc132376c4ced63066c8b530dfd8dc3091c86c"
+  },
+  "producerChains": {
+    "slashCatalog": {
+      "symbol": "SLASH_CATALOG",
+      "file": "src/cli/commands/chat-slash-registry.ts",
+      "linesVerified": [
+        136,
+        434
+      ]
+    },
+    "cliBridgeTools": {
+      "symbol": "CLI_BRIDGE_TOOLS",
+      "file": "src/cli/repl/cli-bridge-tool-specs.ts",
+      "linesVerified": [
+        37,
+        184
+      ]
+    },
+    "mcpToolCatalog": {
+      "symbol": "TOOL_CATALOG_SOURCE",
+      "file": "src/core/mcp-tool-catalog.ts",
+      "linesVerified": [
+        33,
+        85
+      ]
+    },
+    "nativeExecRegister": {
+      "symbol": "native exec register loop",
+      "file": "src/cli/repl/native-tool-registry.ts",
+      "linesVerified": [
+        887,
+        892
+      ]
+    },
+    "resourcesCliMapping": {
+      "symbol": "deckent_resources cliArgsFor",
+      "file": "src/cli/commands/chat-tool-bridge.ts",
+      "linesVerified": 359
+    },
+    "busyCommandParse": {
+      "symbol": "parseBusyCommand",
+      "file": "src/cli/repl/busy-controls.ts",
+      "linesVerified": 167
+    }
+  },
+  "counts": {
+    "slashCatalogRows": 48,
+    "slashAgenticRows": 26,
+    "slashAgenticUniqueTools": 24,
+    "slashMetaRows": 22,
+    "cliBridgeLiteralSpecs": 29,
+    "mcpToolCatalogEntries": 51,
+    "slashUniquePresentInMcpCatalog": 23,
+    "slashUniqueCliBridgeOnly": 1,
+    "mcpCatalogWithoutSlashAlias": 28
+  },
+  "parity": {
+    "slashUniqueToolsAllInCliBridge": true,
+    "slashUniqueToolsMissingFromCliBridge": [],
+    "slashUniqueToolsCliBridgeOnlyNotInMcpCatalog": [
+      "deckent_resources"
+    ],
+    "mcpToolsWithoutAnySlashAgenticAlias": [
+      "deckent_init",
+      "deckent_start",
+      "deckent_inspect",
+      "deckent_run",
+      "deckent_help",
+      "deckent_docs",
+      "deckent_watch",
+      "deckent_nervous_subscribe",
+      "deckent_nervous_accept",
+      "deckent_nervous_reject",
+      "deckent_nervous_status",
+      "deckent_nervous_config",
+      "deckent_truth",
+      "deckent_process",
+      "deckent_xverify",
+      "deckent_kpi",
+      "deckent_cost",
+      "deckent_agent_manage",
+      "deckent_skill_manage",
+      "deckent_memory_manage",
+      "deckent_autonomous_backlog",
+      "deckent_autonomous_status",
+      "deckent_nervous_edit",
+      "deckent_nervous_undo",
+      "deckent_autonomous_approve",
+      "deckent_autonomous_reject",
+      "deckent_execution_authority",
+      "deckent_approvals"
+    ]
+  },
+  "slashCommands": [
+    {
+      "name": "/help",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash",
+        "file": "src/cli/commands/chat-slash-registry.ts",
+        "linesVerified": [
+          808,
+          820
+        ]
+      }
+    },
+    {
+      "name": "/status",
+      "agenticTool": "deckent_status",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/recall",
+      "agenticTool": "deckent_memory_query",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/queue",
+      "agenticTool": null,
+      "requiresCapability": "busyControls",
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "parseBusyCommand→resolveQueueCommand",
+        "file": "src/cli/repl/app.tsx",
+        "linesVerified": [
+          3079,
+          3086
+        ],
+        "anchorNote": "parseBusyCommand @ busy-controls.ts:167"
+      }
+    },
+    {
+      "name": "/interrupt",
+      "agenticTool": null,
+      "requiresCapability": "interrupt",
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "parseBusyCommand→requestActiveTurnInterrupt",
+        "file": "src/cli/repl/app.tsx",
+        "linesVerified": [
+          3045,
+          3049
+        ],
+        "anchorNote": "parseBusyCommand @ busy-controls.ts:167"
+      }
+    },
+    {
+      "name": "/steer",
+      "agenticTool": null,
+      "requiresCapability": "busyControls",
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "parseBusyCommand→applySteer",
+        "file": "src/cli/repl/app.tsx",
+        "linesVerified": [
+          3082,
+          3090
+        ],
+        "anchorNote": "applySteer @ busy-controls.ts"
+      }
+    },
+    {
+      "name": "/plan",
+      "agenticTool": "deckent_plan",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/do",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "runReplDoSlash",
+        "file": "src/cli/repl/app.tsx",
+        "linesVerified": 3204
+      }
+    },
+    {
+      "name": "/sprint",
+      "agenticTool": "deckent_history",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/retro",
+      "agenticTool": "deckent_retro",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/doctor",
+      "agenticTool": "deckent_doctor",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/models",
+      "agenticTool": "deckent_models",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/analyze",
+      "agenticTool": "deckent_analyze_project",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/review",
+      "agenticTool": "deckent_review",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/explain",
+      "agenticTool": "deckent_explain",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/agents",
+      "agenticTool": "deckent_agent_list",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/agent",
+      "agenticTool": "deckent_agent_list",
+      "requiresCapability": null,
+      "discoverable": false,
+      "alias": {
+        "of": "deckent_agent_list",
+        "note": "compatibility alias; same tool as plural slash"
+      },
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/skills",
+      "agenticTool": "deckent_skill_list",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/skill",
+      "agenticTool": "deckent_skill_list",
+      "requiresCapability": null,
+      "discoverable": false,
+      "alias": {
+        "of": "deckent_skill_list",
+        "note": "compatibility alias; same tool as plural slash"
+      },
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/features",
+      "agenticTool": "deckent_feature_query",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/config",
+      "agenticTool": "deckent_config",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/nervous",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "buildNervousOutput",
+        "file": "src/cli/repl/app.tsx",
+        "linesVerified": [
+          1263,
+          1265
+        ],
+        "anchorNote": "chat-native.ts:638 legacy loop"
+      }
+    },
+    {
+      "name": "/interrogate",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "buildInterrogateOutput",
+        "file": "src/cli/repl/app.tsx",
+        "linesVerified": [
+          1267,
+          1268
+        ],
+        "anchorNote": "chat-native.ts:649 legacy loop"
+      }
+    },
+    {
+      "name": "/resume",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveResumeCommand",
+        "file": "src/cli/repl/app.tsx",
+        "linesVerified": [
+          3116,
+          3153
+        ],
+        "anchorNote": "task 358-006"
+      }
+    },
+    {
+      "name": "/runs",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "runInboxProvider",
+        "file": "src/cli/repl/app.tsx",
+        "linesVerified": [
+          3106,
+          3110
+        ],
+        "anchorNote": "SURF-3; legacy chat-native.ts branch"
+      }
+    },
+    {
+      "name": "/sync",
+      "agenticTool": "deckent_sync",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/checkpoint",
+      "agenticTool": "deckent_checkpoint",
+      "requiresCapability": null,
+      "discoverable": false,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/kill",
+      "agenticTool": "deckent_kill",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/cleanup",
+      "agenticTool": "deckent_cleanup",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/recover",
+      "agenticTool": "deckent_recover",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/autonomous",
+      "agenticTool": "deckent_autonomous",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/audit",
+      "agenticTool": "deckent_audit",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/usage",
+      "agenticTool": "deckent_usage",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/resources",
+      "agenticTool": "deckent_resources",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": 359,
+        "mcpCatalogEntry": false,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/directives",
+      "agenticTool": "deckent_set_directives",
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveSlash→createCliToolDispatcher",
+        "file": "src/cli/commands/chat-tool-bridge.ts",
+        "linesVerified": [
+          838,
+          857
+        ],
+        "mcpCatalogEntry": true,
+        "cliBridgeSpec": true
+      }
+    },
+    {
+      "name": "/mcp",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolveMcpSlash fallback",
+        "file": "src/cli/commands/chat-slash-registry.ts",
+        "linesVerified": [
+          782,
+          791
+        ],
+        "anchorNote": "live dispatch: repl/mcp-bridge.ts when configured"
+      }
+    },
+    {
+      "name": "/model",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolvePickerRequest+switch",
+        "file": "src/cli/repl/app.tsx",
+        "linesVerified": [
+          3007,
+          3023
+        ],
+        "anchorNote": "typed /model @3171+"
+      }
+    },
+    {
+      "name": "/provider",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolvePickerRequest+switch",
+        "file": "src/cli/repl/app.tsx",
+        "linesVerified": [
+          3007,
+          3023
+        ],
+        "anchorNote": "typed /provider @3171+"
+      }
+    },
+    {
+      "name": "/approve",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "resolvePickerRequest",
+        "file": "src/cli/repl/app.tsx",
+        "linesVerified": [
+          3007,
+          3023
+        ],
+        "anchorNote": "resolvePickerRequest @828"
+      }
+    },
+    {
+      "name": "/renew",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "withRenewSlash",
+        "file": "src/cli/repl/run.tsx",
+        "linesVerified": 824
+      }
+    },
+    {
+      "name": "/context",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "withContextSlashes",
+        "file": "src/cli/repl/run.tsx",
+        "linesVerified": 1139
+      }
+    },
+    {
+      "name": "/compact",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "withContextSlashes",
+        "file": "src/cli/repl/run.tsx",
+        "linesVerified": 1139
+      }
+    },
+    {
+      "name": "/term",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "parseTermCommand",
+        "file": "src/cli/repl/app.tsx",
+        "linesVerified": [
+          3059,
+          3076
+        ]
+      }
+    },
+    {
+      "name": "/cd",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "handleSubmit chdir",
+        "file": "src/cli/repl/app.tsx",
+        "linesVerified": [
+          3156,
+          3168
+        ]
+      }
+    },
+    {
+      "name": "/cancel",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "handleSubmit queue clear",
+        "file": "src/cli/repl/app.tsx",
+        "linesVerified": 3026
+      }
+    },
+    {
+      "name": "/clear",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "handleSubmit clearScreen",
+        "file": "src/cli/repl/app.tsx",
+        "linesVerified": 3033
+      }
+    },
+    {
+      "name": "/exit",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "handleSubmit exit",
+        "file": "src/cli/repl/app.tsx",
+        "linesVerified": 2931
+      }
+    },
+    {
+      "name": "/quit",
+      "agenticTool": null,
+      "requiresCapability": null,
+      "discoverable": true,
+      "alias": null,
+      "dispatch": {
+        "symbol": "handleSubmit exit",
+        "file": "src/cli/repl/app.tsx",
+        "linesVerified": 2931
+      }
+    }
+  ],
+  "cliBridgeToolNames": [
+    "deckent_status",
+    "deckent_history",
+    "deckent_retro",
+    "deckent_doctor",
+    "deckent_models",
+    "deckent_analyze_project",
+    "deckent_explain",
+    "deckent_agent_list",
+    "deckent_skill_list",
+    "deckent_feature_query",
+    "deckent_cost",
+    "deckent_kpi",
+    "deckent_memory_query",
+    "deckent_usage",
+    "deckent_resources",
+    "deckent_config",
+    "deckent_plan",
+    "deckent_review",
+    "deckent_sync",
+    "deckent_checkpoint",
+    "deckent_set_directives",
+    "deckent_autonomous",
+    "deckent_audit",
+    "deckent_start",
+    "deckent_run",
+    "deckent_process",
+    "deckent_kill",
+    "deckent_cleanup",
+    "deckent_recover"
+  ],
+  "mcpToolCatalogNames": [
+    "deckent_init",
+    "deckent_set_directives",
+    "deckent_plan",
+    "deckent_start",
+    "deckent_status",
+    "deckent_inspect",
+    "deckent_doctor",
+    "deckent_retro",
+    "deckent_history",
+    "deckent_analyze_project",
+    "deckent_sync",
+    "deckent_config",
+    "deckent_review",
+    "deckent_run",
+    "deckent_kill",
+    "deckent_cleanup",
+    "deckent_help",
+    "deckent_agent_list",
+    "deckent_skill_list",
+    "deckent_checkpoint",
+    "deckent_docs",
+    "deckent_explain",
+    "deckent_memory_query",
+    "deckent_watch",
+    "deckent_nervous_subscribe",
+    "deckent_nervous_accept",
+    "deckent_nervous_reject",
+    "deckent_nervous_status",
+    "deckent_nervous_config",
+    "deckent_feature_query",
+    "deckent_truth",
+    "deckent_audit",
+    "deckent_recover",
+    "deckent_models",
+    "deckent_autonomous",
+    "deckent_process",
+    "deckent_usage",
+    "deckent_xverify",
+    "deckent_kpi",
+    "deckent_cost",
+    "deckent_agent_manage",
+    "deckent_skill_manage",
+    "deckent_memory_manage",
+    "deckent_autonomous_backlog",
+    "deckent_autonomous_status",
+    "deckent_nervous_edit",
+    "deckent_nervous_undo",
+    "deckent_autonomous_approve",
+    "deckent_autonomous_reject",
+    "deckent_execution_authority",
+    "deckent_approvals"
+  ],
+  "nativeSessionTools": {
+    "execDispatcher": {
+      "extraction": "parsed_from_native-tool-registry_register_loop",
+      "tools": [
+        "deckent_read_file",
+        "deckent_list_dir",
+        "deckent_grep",
+        "deckent_glob",
+        "deckent_write_file",
+        "deckent_edit_file",
+        "deckent_bash",
+        "deckent_git_status",
+        "deckent_git_log",
+        "deckent_git_diff",
+        "deckent_git_add",
+        "deckent_git_commit"
+      ],
+      "registryFile": "src/cli/repl/native-tool-registry.ts",
+      "linesVerified": [
+        887,
+        892
+      ]
+    },
+    "optionalMeta": {
+      "extraction": "source_pattern_scan",
+      "flagGatedTools": [
+        "deckent_search_tools",
+        "deckent_describe_tool",
+        "deckent_call_tool",
+        "deckent_propose_run",
+        "deckent_skill_dispatch"
+      ]
+    }
+  },
+  "blockedFindings": [
+    {
+      "id": "P0-PARITY-001",
+      "class": "RELATED_BUT_NONBLOCKING",
+      "truth": "CLI-native-only surface difference",
+      "summary": "deckent_resources has CLI bridge + /resources slash + tests; not in MCP TOOL_CATALOG. Does not auto-open MCP registration work.",
+      "evidence": [
+        "src/cli/commands/chat-tool-bridge.ts:359",
+        "tests/cli/chat-slash-resources.test.ts:87",
+        "src/cli/repl/cli-bridge-tool-specs.ts:77-85"
+      ]
+    },
+    {
+      "id": "P0-META-001",
+      "class": "RELATED_BUT_NONBLOCKING",
+      "truth": "kanıtlanamadı (partial test map only)",
+      "summary": "P4 contract coverage for all meta slash commands is UNKNOWN; do not claim zero tests — e.g. tests/cli/repl/context-slashes.test.tsx covers /context,/compact,/renew path.",
+      "evidence": [
+        "tests/cli/repl/context-slashes.test.tsx",
+        "src/cli/commands/chat-slash-registry.ts:808-861"
+      ]
+    },
+    {
+      "id": "P0-CONTINUITY-001",
+      "class": "BLOCKS_CURRENT_DONE",
+      "truth": "kısmen çalışıyor",
+      "summary": "Outer owner continuity not met. Split: identity/context/usage → P1; renewal/liveness → P2; compaction → P3; handler contracts → P4.",
+      "evidence": [
+        "durum-raporu.md §A/C",
+        "src/agent/session.ts",
+        "src/cli/repl/run.tsx"
+      ]
+    }
+  ]
+}

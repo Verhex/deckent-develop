@@ -1,0 +1,19 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/cli/native-agent-bridge.test.ts (17 tests) 153ms
+ ✓ tests/cli/repl/transcript-turn-view.test.tsx (4 tests) 109ms
+ ✓ tests/cli/repl/interaction-flow.test.ts (13 tests) 89ms
+ ✓ tests/cli/repl/native-permission-round.test.tsx (9 tests) 148ms
+ ✓ tests/agent/native-read-approval-registry.test.ts (17 tests) 69ms
+ ✓ tests/agent/native-permission-session.test.ts (14 tests) 26ms
+ ✓ tests/agent/native-tool-approval.test.ts (10 tests) 9ms
+ ✓ tests/cli/chat-render-markdown.test.ts (11 tests) 12ms
+ ✓ tests/cli/repl/native-tool-activity.test.tsx (11 tests) 1011ms
+ ✓ tests/cli/repl/tool-target.test.ts (8 tests) 4ms
+
+ Test Files  10 passed (10)
+      Tests  114 passed (114)
+   Start at  01:55:24
+   Duration  7.69s (transform 4.66s, setup 84ms, collect 19.50s, tests 1.63s, environment 1ms, prepare 297ms)
+

@@ -1,0 +1,24 @@
+{
+  "utc": "2026-09-10T22:51:32.188408+00:00",
+  "entry": 180,
+  "entryDigestValid": true,
+  "actualBodyDigest": "2c90a40426b0b9800cb3e86881faf0bb17feda126860d1ea74f6f42d778b97d1",
+  "packageVerdict": "REVISE_NARROW_TABLE_CONTENT_VISIBILITY",
+  "p4": "SCOPED_CODE_ACCEPTED_RUNTIME_HOLD",
+  "tests": {
+    "files": 10,
+    "passed": 112,
+    "exitCode": 0
+  },
+  "sourceDigests": {
+    "src/agent/native-permission-resource.ts": "8b202f83f026e07ae4f6aadb6545b2a5a6bfe43962a90422f876145366126ebc",
+    "src/cli/commands/chat-render.ts": "61f36fb22c4517113d8d600f815a97a4a4e267c88cb4fd50e0fcaea13498703d",
+    "src/cli/repl/transcript-turn-view.tsx": "457f554a847b45220bd9113a5e68144be8c0e2d21b3576d07a6ff6bd2de7b24d",
+    "src/cli/repl/tool-target.ts": "a01ed362ff1131be97807b4586b6dee9a66fc9443aff57ad5dde00c69cf6ab8a",
+    "src/cli/repl/native-agent-bridge.ts": "ae8a4311264b1acf5e920700e54a21876790016d1019a483d777a689411472af"
+  },
+  "build": "NOT_RUN",
+  "formalXVerify": "NOT_PERFORMED",
+  "budgetRemainingPercent": 4,
+  "replyReadbackMatch": true
+}

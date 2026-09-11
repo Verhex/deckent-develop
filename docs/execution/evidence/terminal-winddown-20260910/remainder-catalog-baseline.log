@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/core/constants.test.ts (27 tests) 5ms
+ ✓ tests/core/model-registry.test.ts (93 tests) 17ms
+ ✓ tests/providers/codex.test.ts (80 tests) 30ms
+
+ Test Files  3 passed (3)
+      Tests  200 passed (200)
+   Start at  05:10:09
+   Duration  1.96s (transform 611ms, setup 71ms, collect 816ms, tests 51ms, environment 0ms, prepare 99ms)
+

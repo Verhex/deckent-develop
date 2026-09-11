@@ -46,6 +46,712 @@ Remaining: live-worker observer proof, CLI metadata/generator reconciliation and
 checkpoint list parity, Goal Docker/admission and multiworker→next Goal→settlement,
 platform matrix. No new MASTER admission or closure disposition;7099 staysVERIFY.
 
+### Previous checkpoint continuation — 2026-09-08T21:39Z
+
+Checkpoint adapter landed422dffda7, exact5source/testfiles. Main39/39tests6files,
+independent Codex reviewPASS (not XVerify), fullbuild11957exit0, source pre/post stable.
+Actual compiled main help4/4 and negative5/5PASS: exact positional identity/help,
+TR caller-local override, malformed/control input, missing/excess args and disabled
+authority refusal. NOT live human-auth decision, provider or settlement proof.
+No raw checkpoint write/new canonical command/policy/schema; canonical executor
+is shared, checkpoint origin and tenant checked before sweep/mirror/decision.
+Proof /tmp/deckent-7099-checkpoint-route-zDUAffyx; actual-checkpoint-help-3xLeE4,
+actual-checkpoint-negative-RoVW7Z. Bot784946stop→817258start/statusrunning.
+Cachedorigin29ahead/no push. Build includes inherited dirty source, not cleanHEAD.
+Metadata candidate source diagnostics now1violation(output/watch --logs), down3;
+261actual/7mappedhelp. Candidate metadata/generator NOTLANDED. Checkpoint list
+parity, output exact/live read wiring, autonomous Goal transport/admission and
+whole7099 closure remainOPEN. MASTER/closure ledger untouched.
+Durable archive /home/alperen/deckent-recovery-20260904/terminal-7099-checkpoint-main-Wk7bJDjZ:
+38checksums rootPASS; manifest83654618b52d5e7d529b27afedd2072e2e6a5433a49033fee5373dee1e25df8,
+SUMSae5971d75b38cbe493a9231abdca2adbbf81716e05b348527740166c6c0ee828.
+
+### Historical continuation — 2026-09-08T19:16Z
+
+Main now babae7b2f (26 ahead cached origin, no push); selected source20 landed
+f5bed84c0 (Cursor compatibility help16) +275a000f9 (Goal backend guard4).
+Main10/26targeted tests, independent source review, joined build58769exit0,
+current CLI28/28 and compiled Goal-v2 supportive PASS. V1 injected provider
+fixture failed before output; preserved as typed tool observation, not invented
+raw evidence. FullGoal/Docker/settlement remains OPEN; guard prevents fallback,
+does not implement missing exact Docker Goal execution or widen admission policy.
+Joined source193d8d38307e85423c5018d080c32f6ba4daab34e4358af827e729ffec67329c/1418,
+nativeef06f44…/7, pre/post stable. Bot canonical stop593010→start650161/statusrunning.
+Existing unrelated dirty source was part of build, NOT a clean-HEAD binary claim.
+Durable terminal-7099-joined-main-LHCvmuYm manifest
+c5caf71da1c692ca417782aab0ae8b7a55710d584ac9d57927bf6e0ad0c82a4a;
+1664checksums rootPASS. Goal candidate terminal-7099-goal-backend-candidate-tW1NDc97
+manifestd237b6492883e782d157e36a8b63138a88ca2d4be09f42d605decbc33aa73ba4.
+
+Cursor v4 actual session69366 terminalexit1:537cases487PASS6FAIL44HOLD;
+pins stable, no retained-unknown child. SixFAIL = model activate/deactivate
+required/optional drift in EN/TR +task settle reason-code text drift EN/TR.
+44HOLD =13live unmanifested paths and9virtual deprecated children, each EN/TR.
+No offline PASS rewrite. Source aliases are verified separately; wholeCLI is NOT.
+Runner source271cc8a4… unchanged across actual run; test now self-contained raw
+fixture, no proof/tmp dependency. Main22/22tests+script-registry gate PASS;
+babae7b2f lands runner/test and only own registry entry. Inherited memory observer
+registry addition remains unstaged. No broad matrix rerun/build for test-only change.
+MASTER readonly590rows/501active and Closure7event gates PASS, no ledger mutation.
+
+### Bounded continuation — canonical CLI contract reconciliation
+
+Output observation continuation (7099-L2/L4/L6; same owner-admitted manual recovery,
+not a new MASTER outcome): operator/dogfood both need exact task output, with
+live observation distinct from sealed terminal evidence. Base422dffda7; private
+checkout /tmp/deckent-7099-output-read-rK8QBKxH/checkout. Existing `output <taskId>`
+flags tail/follow/sprint-id/json must remain lossless. Canonical `watch output`
+child avoids parent's incompatible `--follow <taskId>`; no new execution authority.
+DAG: A exact project/tenant/task/sprint/attempt read capability from existing
+verified custody admission -> B bounded, cancellable live transport plus sealed
+artifact reader -> C shared CLI/legacy and API output projection -> D integration,
+negative/real-binary proof and bounded landing. A alone is UNWIRED/HOLD and is not
+eligible for DONE; no new receipt/artifact schema or admission policy in A/B.
+No implicit latest-attempt selection, guessed container/path, raw source fallback,
+provider execution, task/recovery mutation, raw DB/credential reads or same-provider
+XVerify. Existing legacy evidence stays explicitly legacy, never upgraded to exact.
+States: absent, ambiguous, not-dispatched, pending/unsealed, live-observed, sealed,
+unavailable, permission-denied and source-changed remain distinct; viewing EOF or
+closing a view never means task DONE/cancel. Non-TTY/JSON has no ANSI decorations;
+UTF-8/complete units, redaction and resource/cursor limits must not silently cut data.
+Same service truth for Terminal and API projections; native platform capability
+failure is typed, not a guessed POSIX fallback. Only accessible platforms gain proof.
+Writers: Sol A backend/read-service/tests; root C only after exported contract join;
+B assigned within same DAG after A contract review. One implementation/review pass,
+max two changed-fingerprint fixes per lane; no full matrix/build before fan-in.
+
+Checkpoint identity adapter continuation (7099-L2/L3, manual owner scope): exact
+two positional args `<sprintId> <phase>` -> existing federation ID
+`checkpoint-${sprintId}-${phase}` -> existing authenticated approvals executor.
+Private writer Sol, /tmp/deckent-7099-checkpoint-route-zDUAffyx/checkout,
+base43696cfa9. Write: checkpoint.ts (explicit approve/reject children on existing
+deprecated parent), approvals.ts (extract existing decision executor; optional
+caller language and required-origin constraint), related checkpoint/approval CLI
+tests only. No new canonical approve/reject commands, no raw checkpoint write,
+no config/DB/receipt/policy/schema/runtime mutation. Core federation unchanged.
+The adapter requires a fresh pending checkpoint-origin row inside the shared
+executor before expiry/mirror/decision effects; a same-ID broker item is not enough.
+Invalid args -> no decision; missing/stale/wrong origin -> typed refusal;
+non-TTY -> existing auth denial; real authorized decision -> existing settle-back.
+Language override stays caller-local; Desktop/MCP continue their existing broker
+authority, no new UI or approval protocol. Platform primitives unchanged;
+Linux compiled negative/help proof required, other live platform/TTY proof HOLD.
+Checkpoint list keeps current forwarding in this slice; its legacy pending/json
+option parity is an explicit unresolved dependency, not silently called complete.
+Root separately owns metadata candidate; actual registered children must undergo
+normal contract validation, not pretend to be virtual same-name approvals paths.
+One source pass + independent review; max two changed-fingerprint fixes, targeted
+tests+tsc then actual compiled proof. No new run until Goal prerequisites resolve.
+
+#### Existing confirmation runner landed — 2026-09-08T21:10Z
+
+Commit43696cfa9,7exact source/test files. Canonical approvals run and legacy
+forwarding use existing XVerify -> typed receipt/separate provider -> LLM
+composition -> settlement, with pre-provider tenant filtering and all statements.
+Success names approvals run; HOLD points at authenticated approvals decide.
+Main34/34tests (5files), tsc0. Root retained locale isolation in the migrated test.
+Main fullbuild53700exit0, pre/post source856d3c2a0e265359c9b9bf5a6433aad1df69202a687522be4ae84602ccd2c152/1419,
+nativeef06f44.../7. Build includes inherited dirty source, not a cleanHEADbuild.
+Bot730260 stop ->784946 start/status running. MCP reconnect NOT_VERIFIED.
+Actual main help4/4 EN/TR (result e12c4899e7c9726fe58d3191a6cc03f34ba7e697f0204f582b8ff29b48889975),
+empty inbox action2/2 canonicalEN/legacyTR (8e72e70d62340c85d65bcbac9f716d8ce87f2824f5d0436a61f2b64a5d777450).
+No paid provider/settlement/full-platform or whole7099 closure claim.
+Durable archive terminal-7099-approval-run-main-crCuU4MS under
+/home/alperen/deckent-recovery-20260904; manifest a86c85a70524, SUMS309057590dba.
+Retained failures: baseline suite0/8 (old test fixture lacked canonical registration),
+private build2998exit2 TS2307 then corrected46272exit0; initial helper4FAIL on wrapped
+description then whitespace-normalized4PASS. Actual text/flags were not weakened.
+Main staged diff-check clean. Unrelated memory-export whitespace and historical Git
+GC warning preserved; no prune/cleanup. MASTER unchanged VERIFY, no push.
+
+7099-L2/L3 existing-service repair: `confirmations run` forwards to missing
+`approvals run`; retained acceptance-service tests also import the removed handler.
+Under owner-approved manual 7099 continuation, restore this producer/consumer
+connection, not a new decision policy. Private sole writer Sol:
+`/tmp/deckent-7099-approval-run-QBsITiyx/checkout`, base809745720.
+Write scope: new `src/cli/commands/approval-confirmation-run.ts`, the registration
+only in `approvals.ts`, its providerAuthority argument at `src/cli/index.ts`,
+and exact related confirmations/approvals-run tests. The index argument must pass
+the existing runtime authority (as XVerify already does); it cannot open a second
+runtime or fabricate an authority. Other index behavior stays unchanged.
+Use existing localized confirmations labels and existing XVerify/composition;
+preserve cross-provider, durable receipt, settlement and tenant authority gates.
+No human approval bypass, raw confirmation/checkpoint write, core authority/schema,
+config/auth, MASTER, runtime or main source mutation. Root owns catalog integration:
+only the new approvals-run row and legacy-run effect classification in
+`src/core/cli-command-contract.ts` (process/apply/owner; this command can dispatch,
+not only read or locally edit). Other CLI metadata stays in its existing lane.
+One implementation and one independent review; changed-fingerprint fixes only.
+Targeted run/alias/negative tests first; actual compiled CLI proof before landing.
+No provider call in the worker proof. Full provider settlement and return to dogfood
+remain HOLD until the separate Goal admission/transport prerequisites are met.
+Checkpoint two-argument mapping and exact private-output reading remain separate
+open dependencies within this outcome; they are not admitted by this runner repair.
+
+Post-809745720 metadata continuation, same private writer/scope: fix readonly-array
+union narrowing in surface-contract.ts; explicitly registered hidden help [topic]
+at index.ts375 is not implicit chrome. Permit ONLY that registration's argument
+metadata binding and one localized EN/TR topic-description key in messages.ts,
+plus its exact core contract row/tests; existing handler/authority unchanged.
+Restore baseline checkpoint approve/reject rows (root diff census found both had
+been removed in the held candidate); no catalog path deletion to silence failures.
+Candidate-only baseline-path census must not add permanent /tmp/git-history test
+dependencies. Help forwarding shape may consume the real production resolver and
+actual bridge shape, but never claim action execution/settlement/tree registration
+from target presence. Missing output prefix and unsupported targets remain red.
+
+#### Child-help bounded main landing — 2026-09-08T20:15Z
+
+Durable seal: /home/alperen/deckent-recovery-20260904/terminal-7099-child-help-main-6mniPgNr,
+MANIFEST-v2 sha320f5fb938e9143ca80552d78c4d93d5a8da045f8f916008079a2db9a173b925;
+SHA256SUMS-v2 sha1499ed721cc39d5cd244efb354d69d649f3f8d13bb192c2fe6527bb74dea5f17,
+root96checksumsPASS. Original manifest and checksum retained; v2 corrects only
+the mislabeled file-count field (1418 is sourceTreeFileCount, not recordHash).
+Committed blobs and real run results are unchanged; no receipt/DONE is generated.
+
+809745720 lands ONLY compatibility-command-help.ts + its test; standalone source
+helper d0beef8f4a0dc121001b347a02842b1bc1d3f023c33ceec5e4c5931d27d586ce,
+test702f6e503682c678ca5310d8b630db2f0ee710048838a323d721b68c60b36e9a.
+Parsed child help resolves actual target; full outputHelp includes access-policy
+notices and snapshots/restores public output configuration even when help throws.
+Normal action forwarding unchanged. Main17/17 targeted tests PASS; root independent
+source review. Build-v3 session52017exit0 source stable
+200d4a071cb5bf0097ab3991b215a4f835e9b16ceb75563c2677b719e253568b/1418;
+includes inherited dirty source, NOT clean-HEAD build. Bot canonical stop721067
+then start730260/statusrunning verified; MCP reconnect still NOT_VERIFIED.
+Actual proof-v2 session72380exit0,6/6PASS: EN/TR autonomous-mission create-goal
+and confirmations list plus EN top aliases, compared to actual canonical help;
+12children, source/consumer pins stable, no provider/action/settlement claims.
+Result SHA cb380893713854c5834185a4c9c59415528b5beb0cee05e6138961aceef8caf0.
+Proof directory /tmp/deckent-7099-child-help-proof-Gb7il1. Historical build-v1 TS
+FAIL, actual-v1 4PASS/2FAIL missing footer and candidate capture-restore failures
+are retained, not rewritten. An old negative wall-clock duration is not performance
+proof. No broader metadata candidate landing, no MASTER DONE or authenticated receipt.
+Private metadata candidate also retains its own TS2339 surface-contract.ts finding;
+it is excluded from this commit. Remaining output/virtual/catalog/Goal/platform holds stay open.
+
+Historical admission (completed by the landing above): child-help consumer routing in compatibility helper
+only. Commander sets public command.args before help and passes command to
+addHelpText callback; current helper always prints target-parent help. Walk actual
+target children from those args, preserve top banner/help and normal action forwarding,
+no global argv, invented target, command-action/config/authority change. Exact EN/TR
+parseAsync help tests must prove no action called. Existing private sole writer;
+freeze-hold-v2 preserved. This does not close missing output/confirmations behavior.
+Prior HOLD/Windows FAIL evidence durable at terminal-7099-cli-windows-hold-B8dxbEIx
+under /home/alperen/deckent-recovery-20260904; manifest
+8aa5f272e8d66ae51c12a3803b8f4b031f6da15443048140014e03e5801d990f,
+35checksums root verified. Not a settlement receipt or source landing.
+
+2026-09-08T19:50Z result: candidate freeze-hold-v2 SHA
+a615dfe156023799bc161303489563d842b983a6b8743faf06cfecfcadb53536;
+root changed-source pins MATCH. Scoped59 tests:53pass/6fail,9typed diagnostics;
+no generated writes, build, main fan-in or synthetic closure. See private candidate
+proof/cli-contract-reconcile/result-hold-v2.json for exact failed test attribution.
+Windows native separate actual proof session49484 exit1: Windows Node24.15.0,
+launcher57112, child55128, EN --help timed out at20s with0stdout/0stderr bytes.
+Native-owned handle kill accepted, close SIGKILL proved; outer close0 is only
+launcher termination, NOT CLI success. Source/build pins stable. Result-v2 passed=false;
+hold=false denotes known process custody only. Semantic verdict FAIL, platform
+closure remains HOLD. No unchanged retry; root cause not yet identified.
+Private proof /tmp/deckent-7099-windows-native-version-v1-LRUMpW/result-v2.json.
+
+Root review 2026-09-08T19:46Z: candidate REVISE, not landed. Restore deleted
+`confirmations run` contract; target missing remains diagnostic. Do not treat
+target-tree presence as verified legacy invocation, and do not blanket-hide an
+explicitly registered `help` command. Preserve `output → watch --logs`; live watch
+has no --logs and bare watch opens tmux, so removing the prefix changes behavior.
+The old action defect was previously reported outside this metadata write scope;
+no logs-service/action amendment is inferred. Candidate may freeze as HOLD only;
+generator failure must not be bypassed or rewritten as production closure.
+Windows proof helper v1 remains UNRUN; one v2 custody correction is authorized in
+the private proof directory only, no product/runtime/auth writes or native run yet.
+
+Changed evidence 2026-09-08T19:23Z: six-case narrow candidate4tests PASS but canonical
+generator rejects GLOBAL E_CLI_DOC_CONTRACT_DRIFT before writing. Candidate remains
+private/frozen; no source-only landing or generated manual edit. Existing observed
+write chunk0cb4ed/checkc55529 exit1, test55fcbf exit0. Currentbase differs from old
+ef6 matrix: intelligence contract family already exists; do not replay old inventory.
+Exact observed families: missing skill attribution, memory recall/remember, audit verify,
+autonomous mission/create-list/create-goal/list, help; options/arguments/output drift
+status, retro, config migrate, recover, models list/activate/deactivate/active-set,
+limits, approvals list and deprecated forwarding aliases; nine virtual alias children
+are absent from the registered tree. All are BLOCKS_CURRENT_DONE within existing7099
+L2/L6+7085; no new MASTER identity and no runtime-policy widening.
+
+Root scope amendment for debt_wiring_review in SAME private checkout: reconcile this
+single producer→contract→verifier→generator chain. Allowed src/core/cli-command-contract.ts,
+src/cli/helpers/command-contract.ts, src/cli/helpers/compatibility-command-help.ts,
+src/cli/surface-contract.ts, scripts/generate-cli-docs.ts; directly relevant tests under
+tests/core/cli-command-contract.test.ts, tests/cli/compatibility-*.test.ts and new exact
+CLI contract/generator regression tests; canonical generated3docs and private proof.
+Existing command actions, runtime/approval/admission/settlement/config/auth/MASTER and
+all unrelated src remain READ_ONLY. One canonical forwarding source, no duplicate
+catalog, no regex gate relaxation, no undocumented removal/hiding of supported paths.
+Deprecated child help must remain truthful and accessible, not declared verified by
+skipping tree checks. If any necessary action or authority change cannot fit these
+bounds, report exact seam before editing it. Prove bidirectional canonical tree and
+forwarding/virtual contracts, negative drift cases, EN/TR generation/check, then root
+independent review and changed-family actual binary proof. Do not rerun537 while
+source/generator remains red; whole-matrix refresh only at the completed chain join.
+
+#### Superseded narrow attempt — retained evidence, not current write scope
+
+Continuation admission within existing7099L2/L6+7085: the six measured v4 FAIL
+cases are a bounded contract-reconciliation slice, not a new outcome. Private
+babae7b2f checkout /tmp/deckent-7099-cli-contract-fix-rHc68nq7/checkout; writer
+debt_wiring_review only src/core/cli-command-contract.ts (models activate/deactivate
+argument tokens), tests/core/cli-command-contract.test.ts and canonical generated
+docs/generated/cli-manifest.json +en/reference/cli.md +tr/reference/cli.md.
+Read real current command producers and generator; preserve interactive optional
+model selection and all routing/approval/settlement semantics. Regenerate through
+scripts/generate-cli-docs.ts, do not hand-edit generated enums or widen task reasons.
+Negative scope: all other src, config/auth/runtime/MASTER/ledger/channels/oldproof.
+One focused test plus source freeze, then exact changed-command real CLI proof;
+537matrix rerun excluded. Missing13live/9virtual paths remain separately explicit.
+Goal Docker/authority successor remains blocked by its own missing contract and
+is not declared complete by this independent help repair.
+
+Harness supplement terminal-7099-help-harness-main-pasqsGO1:
+manifestf97d35d92d15256a874eefd39f08e625956b4c1e29c307db93203353b1817c8b,
+13checksum rootPASS; committed3 exactblobs, main22tests, no matrix duplicate.
+
+### Prior continuation — 2026-09-08T18:40Z
+
+MAIN dfb4697e7 (23 ahead cached origin, no successful push). Goal consumer30files
+landed5d792f038: main212/212tests+tsc0; durable effect/checkpoint before accepted
+receipt, exact two-DB replay, atomic terminal/cancellation preservation. Evidence:
+terminal-7099-goal-main-integration-bt5wNm manifest26502712bbdcea94a28ebde68447d18a68fbc9a349422d89c11d53d2a83a1177,
+36checksumsPASS; candidateyDHPWx45checksumsPASS. Previous failed fixtures/terminal
+reactivation/replay reports retained, not rewritten as success. Fixture transport
+is NOT real-provider/outer settlement proof. Debt837e61636 main102tests/tsc proof
+terminal-7099-debt-holds-main-j5K9K2 remains retained.
+
+Fable syncv5 nine exactfiles landeddfb4697e7; main179/179tests+tsc0, candidate9realCLI
+and bounded ready/spawn suspension recovery proof. Root independent source/proof
+and Terra v5 delta review passed. terminal-7104-sync-main-lOyYT6 manifest
+1323901f51ee10d17d51a6838624133edea60559141f41e5b14ced8c06e9dec7,
+13checksums rootPASS; oldv1–v4 failures retained. No canonical XVerify receipt claimed.
+Main botstop405459→ALLOW→fullbuild58073exit0→botstart56277exit0/PID593010;
+readonly bot status running. Main source/build exactf8890c64d9578990f0446ff3bbf980fcb1adfa3a3366e60b59cb7af1211df70c/1417,
+nativeef06f44…/7. Build pre/post stable; generated19outputs rebuilt, no retained
+task/DB/receipt cleanup. Old long-lived MCP reconnect NOT_VERIFIED.
+Build artifacts /tmp/deckent-main-refresh-ax4XgH; no new Goal/worker/provider.
+Durable refresh archive terminal-7099-main-refresh-RyZPti manifest
+e9679dcc4b0542183f96a94c90e032f0762b2397d02fd0eacad95f0a02c1d49a,
+6checksum rootPASS; bot start/status evidence remains tool transcript, not invented raw logs.
+Push attempted with current full-access context but tool rejected BEFORE process
+creation: approval required by policy / AskForApproval Never. No bypass/retry.
+
+Next actual Goal admission BLOCKS_CURRENT_DONE: effectiveconfig enginev2/enabled,
+tenantmain codex/claude subscription/docker selectors omit runtimeFingerprint/
+executionProfileRef; purpose goal-authoring/acceptance absent, final_only_usage
+onlyworker. Budget config absence differs from product wiring: limits init accepts
+operator profileRef/null fingerprint, existing Docker inspectExactCrossVerifyRuntime
+CAN produce exact image/runtime/profile but is not consumed by Goal/limits init.
+Percent-only non-reservable subscription arm is XVerify-specific, not Goal admission.
+Goal transport currently createPlannerSpawn host subprocess, despite selection
+potentially naming Docker; actual backend/receipt identity must be bound, not bypassed.
+Fable ENTRY1055 requests one bounded reuse/DAG/authority-boundary second opinion;
+no default-on policy, invented refs/numeric quota, live-auth or signed state changes.
+
+Cursor v3 ENTRY31 digestverified: forwarding/obsolete-rewire fixed;492PASS/19HOLD
+not fullmatrix closure. Four exact runner blockers remain (real reap, complete
+consumer pins, actual configTR/envEN,14livepaths omitted). ENTRY33 stops Cursor
+writes; Codex Terra exclusive two runner/test files + newv4proof, production/v1–v3
+FROZEN. Focused tests first, root review then one actualmatrix; no new outcome.
+MASTER readonly590rows/501active, closure7event chainPASS;7099VERIFY unchanged.
+
+### Bounded continuation contract — Goal backend binding / 2026-09-08T18:46Z
+
+Same ACTIVE7099, owner manual ADR-D-007 execution grant; no new MASTER identity.
+Full result remains dependent multiworker + automatic next goal + durable settlement,
+not a subprocess guard alone. Source finding: Goal selected/reserved Docker backend
+is omitted from executeSelected input/result, whose default is host createPlannerSpawn.
+Safety foundation writer startup_review owns only goal-invocation-transport.ts,
+mission-store/goal-invocation-runtime.ts and their two tests plus necessary existing
+goal-consumer-crash-reopen.test.ts fixture adjustments, in private dfb4697e7 checkout
+/tmp/deckent-goal-backend-binding-K1TYMP/checkout. Root owns main fan-in.
+Pre-dispatch backend capability check, exact input/result identity and replay binding;
+unsupported selected backend typed HOLD, no host fallback, no fabricated usage/release.
+Core schemas/config/approval/ledger/MASTER/runtime/auth excluded. One implementation
+and independent verification pass; unchanged failure stops. Single-worker tests/tsc,
+bounded actual compiled negative/host-compatible proof after root review; no paid call.
+Closure DAG: this guard → genuine runtime-profile producer composition → exact Goal
+Docker execution/termination → owner-configured admission → actual multiworker proof.
+This foundation MUST NOT settle outer Goal or product COMPLETE while successors HOLD.
+
+Fable1056 opinion preserved/digest0615ad9687d3… in private proof. Two proposed
+authority amendments are NOT self-admitted: goal-scoped termination identity (no fake
+taskId to satisfy task-only schema), and purpose-specific non-reservable subscription
+Goal admission (no percent→tokens/usd or borrowed XVerify flag). Budget values and
+enablement are owner config, not code defaults. Existing receipt history stays valid.
+Root qualification to Fable point8: do NOT create a blanket per-invocation manual
+approval requirement; existing ingress has preflightUnattendedScope and unattended
+admission contracts. Autonomous must preserve policy-resolved unattended operation
+inside an admitted scope, with canonical approval only where effective policy requires
+it. A new goal approval subject, if existing scopes cannot bind the effect, needs an
+explicit authority decision; channel opinion alone cannot add that requirement.
+
+Cursor v4 runner is an independent existing7099L2/L6 lane. Terra owns only runner/test
+and v4proof;14production files/two CLI tests are FROZEN and independently reviewed by
+memory_ingress_proof. Root does not rerun a broad matrix until targeted assertions and
+pins/reap/config-precedence checks are sound. No additional product backlog is opened.
+
+### Prior continuation — 2026-09-08T17:11Z
+
+Goal candidate on fresh89e6 base:26 stable validation pins, typecheck and canonical
+private build:all exit0,12 files187 tests PASS. Independent output-artifact SQLite
+matrix29PASS, failed syntax/fixture records retained. Final joined report SHA
+02a2f558fd958f6994fe90fe1abbf519c4535400ca2912d3091b32d0063983d2.
+Root new source evidence: CLI settles goal consumer immediately after parsing,
+before advanceGoalMission durable enqueue/acceptance mutation; accepted receipt
+replay throws ALREADY_CONSUMED. Exact fault-injection review now assigned; candidate
+is not landed and this evidence does not establish autonomous restart closure.
+
+Fable1044 debt HOLD visibility finding accepted within current recovery package.
+XUOAiD candidate94PASS/type0 exposes persistence/CLI/MCP; root REVISE for core to
+orchestra dependency, absent historical evidence rendered as0, and identity/detail
+binding. Original candidate/failed first92-of94 test result retained. No DONE.
+
+Sync v2 fixed original parent-exit timeout but root actual disposable probe found
+streamsClosed:true/treeTerminated:true while descendant remains alive. Fable1046
+owns changed-input v3 correction; root only cleaned its disposable descendant.
+Durable counterexample terminal-7104-sync-tree-counterexample-Vum0D0,7checksums;
+manifest6a537c0a1f354a86c099116d3dd419a15353cfd9d5e4bc8cd2f7c620ea59dce7.
+No new main build/run/push or MASTER mutation in this continuation.
+
+### Prior continuation — 2026-09-08T16:51Z
+
+Controlled main runtime refresh performed under live owner build/restart authority:
+CLI bot stop PID9067 exit0; readonly active-execution admission ALLOW (no active
+worker/sprint/heartbeat); canonical npm run build:all handle38005 exit0; CLI bot
+start handle6711 exit0/PID405459, subsequent ownership OWNED. Current package
+build:all used clean/native/tsc/copy-assets/dashboard, not the pending transactional
+scripts/build.mjs entrypoint. Generated clean19 entries rebuilt; task/memory/retained
+runtime evidence untouched, disposedOrphans empty. Source identity independently
+recomputed equal build:748df792d4c005162e4098a6d6271a72f300a4424812f789ba8982519de90ef2
+over1410 files; nativeef06f44… over7. Main source/build aligned. Old long-lived MCP
+host reconnect NOT_VERIFIED; no cache freshness inferred. Vite large-chunk warning
+advisory, no publish/push. Actual compiled main inspect yielded805 records and
+current authoritative sprint728 ABORTED; raw140108 bytes retained, stderr empty.
+Archive terminal-7099-main-build-aR7mLt manifest
+f56b7ac9a1735ea6f5ee80af2800e4d3f7ca0b607ca8309b4fedfcd661ba57a9,
+8checksumsPASS. This is real read/build observation, not accepted worker settlement.
+
+New exact sync containment evidence overrides static source GO as a full closure
+claim: parent exits0 while descendant inherits stdout; adapter timeout100ms does
+not settle after500ms because terminate ignores exited parents; root test-group
+cleanup then yields incorrect ok:true507ms. Candidate source9b984cc0 unchanged.
+Repro82ac8f4072fe4ba846fda3c72c07eb321ba7cdcb797bfda6a79403c948a7ea07
+preserved in the same archive. Fable REVISE1043 owns helper/liveness correction;
+no main sync fan-in, no broad source takeover or unsupported-platform assertion.
+
+Goal v4 corrected artifact/reservation binding and typed receipt_unavailable;
+old157PASS and independent review retained. Final provider-field identity guard
+and negative no-settlement regression6/6 passed with fresh tsc. Final amendment
+freeze a321a7babe4bc67c9f4223c86666851fb3a62e689d215511dd457643fe82433c.
+Standalone private-SQLite matrix is still independently verifying; original parse
+and fixture failures retained. Goal source remains outside main;7099 VERIFY.
+
+### Prior continuation — 2026-09-08T16:41Z
+
+Runtime/finalizer bounded source integration committed as
+`89e6fe123e68ad9e07331a2d9daf3d951da22f40`:92 exact committed blob pins match;
+index empty. Nine remaining candidate files applied, prior83 byte-equal files
+preserved and MCP inspect joined with the already committed catalog. Unrelated
+dirty paths untouched. Candidate union48:1384PASS/1Docker-nativeSKIP/0FAIL;
+later three optional-property TypeScript annotations were type-only, not a new
+runtime union. Final candidate type/build:all passed. Main joined targeted27/27
+and MCP inspect/parity20/20 plus tsc passed. Original failed tests/typecheck remain.
+Terra independently reviewed original39 production deltas; root reviewed debt3.
+Fable1041 extra cross-provider final-proof review remains pending, not a signed
+XVerify or authority receipt. Four actual compiled inspect calls observed stale
+raw EXECUTING separate from canonical ORPHANED/active:false in a private fixture.
+Missing task produced typed code/exit1, not a proven JSON error envelope. No live
+provider, recovery mutation, accepted result or full terminal settlement claim.
+
+Durable archive: `terminal-7099-runtime-main-Y9YpZR`,132 payloads+manifest;
+manifest `ee2078c55dd7c319ce5cf2fe05129e8617c94073683547f84aaa7bd44aa5b27a`.
+Root verified133 checksums. Main-before pins, joined source, candidate manifests,
+failed/final tests, actual raw CLI streams and root proof retained. Supportive
+evidence only; no closure disposition/MASTER mutation. Whole-worktree diff-check
+reports pre-existing generated memory-export whitespace; selected92 paths clean.
+
+Goal v3 receipt/output/reservation replay candidate157/157+tsc is frozen for
+independent source and adversarial private-SQLite verification. Additive
+host-role admission runtime seam settles only the exact durable existing dispatch;
+no fabricated admission or replacement reservation is authorized. New standalone
+tamper matrix has one writer (startup_review); source is frozen for Terra review.
+Fable async sync349/349+9CLI delivered, independent source review GO; root fan-in
+still queued. No main build/restart/run/push; main dist stale.7099 remains VERIFY.
+
+### Prior continuation — 2026-09-08T16:18Z
+
+MCP field-catalog bounded landing: `2d0495e2962c41e49a78d47168c9a0e8aaf2685e`,
+34 exact committed files independently SHA-matched. Main targeted30/30 and
+inspect/parity38/38 tests, tsc and CLI-MCP parity gate passed.215/215 fields use
+the existing EN/TR catalog; no new literal/unknown field or baseline relaxation.
+Existing main inspect handler hunk remains unstaged and preserved, not absorbed.
+Independent source AST compared28 registrar files/31 calls; handlers and schema
+excluding descriptions remain unchanged. Actual candidate compiled MCP observed
+51 tools/215 fields through three initialize/tools-list-only captures; raw bytes
+retained. Original independent false verdict required EN/TR titles to be equal;
+separate offline amendment proves14 pre-existing localized titles and same-locale
+base→candidate title/annotation/schema stability. Original result is NOT rewritten.
+Helper success-path observation does not prove general overflow/timeout containment.
+Archive `terminal-7085-mcp-main-LyfkcN` under the durable recovery root:86 payloads,
+manifest `28daf0b240b7fbe21dc42c94021378462600fd82bacae742e732ded1f6c27cf3`,
+root87/87 checksums PASS. No tool action/provider/settlement/platform closure claim.
+
+Goal wiring candidate20files109/109+tsc foundation proof retained. Root source
+review identified post-claim transport failure truth and consumer-unsettled output
+replay gaps. Same7099 bounded continuation explicitly permits additive scoped
+role-invocation output custody in invocation-receipt/store + regression tests;
+no fabricated task identity, live DB/config/provider mutation or budget bypass.
+Debt origin valid/legacy/invalid disposition and privateDB roundtrip11/11 passed;
+brain mixed-hold plan regression208/208 passed. Runtime joined48suite handle50557
+is running; no final union result or runtime group landing yet.
+
+Fable new sync-async assignment1038: fresh ef6dc6b01 worktree U290BZ with private
+fullbuild PASS. Cursor26/27 combines runner correction and compatibility-help
+truth; deprecated aliases are intentional and will not restore old executors.
+Root main source differs from dist; bot owned/live, no active worker observed.
+No root rebuild/restart/run/cleanup/push or authenticated MASTER closure;7099 VERIFY.
+
+### Prior continuation — 2026-09-08T15:42Z
+
+Bounded main commits: accepted-goal restart containment `73a4d2dadd1951c7c27a16fad908da7446f101b8`
+and Cursor init consumer tests/docs `ef6dc6b012bdd54853e4cb5b97536a79120634f2`.
+Root inspected exact5path diff/acceptance consumer, main32/32 scoped tests and
+tsc passed. Independent init raw rendering adjudication8/8 is OFFLINE, not a
+new actual run; two original root helper FAIL reports remain unchanged. Restart
+actual CLI success is SUPPORTIVE_HOST_FIXTURE, not provider/live-auth settlement.
+Its timeout escalation path was not proven; helper success does not establish it.
+Archive `/home/alperen/deckent-recovery-20260904/terminal-7099-restart-init-8sCND6`,
+manifest `9e7fa5aa1d4e027839a721af67ac7cc23c48984c1249d2c6945858e96c0bd7e8`;
+root76/76 checksum PASS. MASTER unchanged;7099 VERIFY. Main index empty after commits.
+
+Runtime/finalizer candidate hNCOit clean build/type passed; first broad battery
+1253PASS/63FAIL/1SKIP. Root confirmed critical-debt producer/readContext/injector
+drops required V2 wiring authority. Candidate amendment63/63 supportive tests passed;
+Terra independently reviews source and roundtrip coverage. Wider changed-fixture
+run447/505 remains FAIL; verifier-asset/write overlap and V5 planner fixture defects
+are being corrected without weakening production guards. No clean-union claim yet.
+
+Goal invocation transport/runtime is still UNWIRED_HOLD. Existing execution_budget
+role/purpose/finalOnlyUsage authority will own budget derivation, not a parallel
+autonomous-only budget resolver. Percent-only subscription admission remains a
+real capability gap; metered-only execution cannot close the owner outcome.
+Fable1034 bounded source opinion supports this, not canonical XVerify. Fable MCP
+delivery awaiting narrow plan-mode description correction1035 and root review.
+
+Cursor next ASSIGN24 published: full public CLI HELP consumer EN/TR matrix,
+production READ_ONLY; fresh ef6dc6b01 worktree TXMVYz fullbuild passed with sourceTree
+ab2d81354e8fcd333ae0450cc360e3ffee31e8da5cec808268b800f91a0dff7a.
+Root source now differs from root dist; bot still owned/live, no root build/restart,
+worker dispatch, retained-state cleanup, push or authenticated closure in this slice.
+
+### Prior continuation — 2026-09-08T14:56Z
+
+G3 durable archive: `/home/alperen/deckent-recovery-20260904/terminal-7099-g3-20260908-m4DWAN`;
+manifest `f5ff72908b173135b717cf00451b7cda248c16d39853afc0014299ac2f81029b`.
+Root verified all156 SHA256SUMS entries (155payloads + manifest). New provider
+assignments actually published: Cursor ENTRY21/init consumer and Fable ENTRY1031/
+MCP field-description catalog. Both private worktrees are3e660-based and fullbuilt;
+provider session execution has not yet been observed. Exact scopes in current-flow.
+
+NEW BLOCKS_CURRENT_DONE source evidence: live v2 goal-role admission is not merely
+unproven. `src/cli/commands/autonomous.ts:781` constructs candidates={} and an
+unreachable reservation builder, then unconditionally throws GoalInvocationHeldError.
+`handleStart:1095` injects this guard into goal author/accept, so the production goal
+path cannot reach the planner even with healthy composition. The production call
+also omits acceptanceComplete; fallback:875 has no evaluator instance or invocation
+receipt, while mission-acceptance.ts:269 requires exact mission/tenant/project/role/
+purpose and terminally accepted receipt. Source SHA
+`8a2d59bf9754a34cca339b639046ba071162a8073c1e614f6c9b26fbbb4c9563`.
+This corrects the earlier hypothesis that only running the scenario remained.
+
+Root has assigned one bounded existing-authority wiring correction in an isolated
+checkout. No admission bypass, synthesized evidence, xverify-only non-reservable
+authority generalization, new MASTER work identity, or mode change is authorized.
+Remaining dirty terminal/finalizer dependency set is concurrently being frozen for
+clean-checkout targeted verification; three-file code review found no blocking bug
+within its scope, but that review is not tests, actual execution, or product GO.
+Root read-only runtime probe: no worker/sprint/lock, bot OWNED causes build HOLD;
+three retained run-flows STALE_DEAD and retained job projections remain unchanged.
+Next: exact dependency verification/landing + goal-call wiring, then real multiworker
+and automatic-next-round proof. No run, build, restart or cleanup occurred in this check.
+
+### L1 Terminal/Cursor/startup integration committed — 2026-09-08T14:36Z
+
+Current delivered74path group committed on main as
+`3e660a4dd0b99d135bdb5d59250854e50893c7fa`; tree
+`44b79d484124c5d84033b730351a0fb350f927f9`, parent431ceef42.
+Clean checkout /tmp/deckent-7099-g3-clean-20260908-TuwjZ6/checkout;
+prepared freeze74-v2 SHA d62aefe886015b4bbd1898c67ba82b5d90bf8e8ec3f346be5cb15da774d533a3.
+Root verified candidate/main74pins and14build inputs before staging; cached check
+PASS, only74paths staged, working files and MASTER preserved; index empty after commit.
+
+Canonical typecheck/build:all passed; sourceTree
+1913f6c834d854add4752791e6b1109d4ccfe819fadfc83433fcc6c5de37f293/1410.
+Verification proof/g3-verification-result.json SHA
+39ac2fffa308ceee5a4e8f1ee0d0362b1e426b7db3033be298fa616d6c4dff8b:
+union53files904PASS/0FAIL/3explicit Docker-runtime skips,237suites passed.
+Fresh actual compiled proofs, unchanged before/after pins and no retry:
+
+- /tmp/deckent-g3-do-vPKDQW/result.json SHA
+  5413ed61266f8e35337a3f95bbc13090486b9d30075c8baa37a811f002a77e07;
+  /do4cases, each10assertions; diagnostic provider shim, no worker execution.
+- /tmp/deckent-7099-cursor-root-proof-v4-12azhD/result.json SHA
+  4d0f141d6cbf6c2876fa1863bc6fc5f8e1dfb15378534a16ab0c28b0a0a1d59b;
+  13pipe/PTY/locale/color cases passed.
+- /tmp/deckent-g3-startup-2DTdlJ/result-v3.json SHA
+  9bea79b1af4b0c92b192ac189c0792d90b72ac2e99df3782a650c910de158d2b;
+  one logged-out REPL scenario,8assertions passed; installed Codex CLI with
+  private empty HOME/XDG, no login/user turn/generation; PID131379 exited0/dead.
+
+Existing Fable sync delivery995e781d0 and G2 recovery431ceef42 are committed;
+current Cursor/Terminal/startup delivery is now committed too. Other retained
+dirty main paths were not staged. Main working source/dist50ceffdf remain distinct
+from clean committed source1913; no clean-working-tree or whole-product claim.
+Push was rejected BEFORE Git process start by tool policy (approval required/Never).
+Local origin remains4432b172f, main ahead16; no bypass/retry or remote CI claim.
+New provider environments are being prepared from committed3e660 and their own
+canonical builds; no new provider task is assigned yet. Multiworker/next-goal/
+settlement, platform and authenticated MASTER closure remain open.
+
+### Historical checkpoints — canonical do / shared runtime join
+
+Latest fan-in checkpoint13:45Z: independent7104 C3 slice committed on main as
+`995e781d0ce17bfb0ea0b4dbc548c6b292930cb5` (20 files). Clean-base typecheck,
+333 scoped tests, canonical build and9actual CLI cases passed; original30pins
+stable. Only root-owned amendment removes trailing whitespace on3test lines,
+then that suite passed11/11. Original evidence archive:
+`/home/alperen/deckent-recovery-20260904/terminal-7104-g1-20260908-zY8iOF`,
+manifestSHA `6c59050737f489f66122895d18443b23b8c3f629c3c01e6e0103cf4409298841`.
+Landing amendment archive sibling `terminal-7104-g1-landing-20260908-Gv0jLJ`;
+landing.json SHA `e0e46c36bd96a9353bf1bed7b9095d5b30b786e60c8364e18c01ca5221281a1f`.
+Remaining Terminal/recovery join is uncommitted. Clean125 typecheck/fullbuild
+and46-file union814/814 passed; initial255/259 and missing-native failures remain
+preserved. Archive `terminal-7099-clean125-20260908-NTBiWa` under the same private
+recovery root; manifest d4c51243bc2813e3c58d256226e38ef5758ab74d80dcf2bf67351d2edb0b1396.
+14:08Z G2 exact49 projection also passed typecheck/build:all and2actual compiled
+image dry-run cases (Docker invocations0, not image readiness). Scoped703tests:
+699PASS/1FAIL/3SKIPPED; positive landing fixture hit host-mtime freshness barrier.
+14:16Z update: G2 committed as431ceef42ea230dead194f1caf4340c7866e5714
+(46changed/49verifiedpaths; treeeb57af88669c9025e627a4455b2cda03ad15f71c).
+Fixture-only ordered host/FS clocks retain stale rejection and valid acceptance;
+changed suite10/10PASS. First correction's future-mtime failure is also preserved.
+Combined evidence700PASS/3SKIP is not a claimed single703-pass run. Production
+freshness guard unchanged. Final amendment SHA1686ddb08e6d66e755889619af63837bf699c52f4052f4e16ac13b7e106139c9
+at /tmp/deckent-g2-clean-20260908/proof/g2-fixture-correction-amendment.json.
+Final durable extension: /home/alperen/deckent-recovery-20260904/terminal-7099-g2-landing-extension-6dx0NI;
+manifest a37c693b5f6b86389f58d82e7ee02126440b421c3cf5c836f4e9719792094922.
+Root checksum check and committed49blob identity match passed; index empty.
+Three provider Docker runtime tests are skipped, not PASS. Remaining74 Terminal/Cursor paths are blob-coupled
+through messages/app/run and remain a single coherent integration boundary.
+Main source/dist50ceffdf unchanged. No MASTER, XVerify or whole-outcome closure.
+The paragraphs below retain prior checkpoints, not current commit disposition.
+
+Selected `/tmp/deckent-7099-planner-selected-rj38ZB`, base `3a390f0aa`:
+`/do` foreground and detached postures now share canonical planning/snapshot
+authority; foreground uses the shared exact executor with autonomous/process.
+No `start.ts` capability gate removal or config default change. Persisted
+settlement precedes Flow publication; publication uncertainty stays typed HOLD.
+7103 startup and the reviewed Cursor ASCII consumer changes coexist in this
+candidate, not main. Real-provider/multiworker/next-goal proof remains open.
+
+Joined v5: typecheck exit0; 20 files, 201/201 tests PASS, none skipped; source
+and exact test pins unchanged. Source tree SHA256
+`99c5a83181072d119ac0a39f32c8377b2da5c98552a0e6779bb5a8eec95e77cd`.
+Evidence `/tmp/deckent-7099-planner-receipt-LfteLX/do-canonical-v5-result.json`,
+SHA256 `28a98f8a8acae3d032a268dc953bdb949903897df12a60ce8e35a77d7bacf992`.
+Earlier failures retained: missing causal lineage, missing real coordinator
+approval events, and ambient-locale fixture assumptions. Corrected fixtures
+exercise canonical events; production guards were not weakened. The focused
+exact runtime/service verification also passed 20/20 before this joined run.
+
+Cursor owner batch review: extra boundary tests accepted into selected only;
+CB2 proof needs semantic failure gates, deterministic environment and canonical
+build provenance; docs need FORCE_COLOR precedence. Owner-requested continuation
+CB4–CB11 assigned via iletisim ENTRY18, same isolated worktree/six product paths.
+Old captures retained as observational, not ten semantic PASS claims. Fable7104
+C3 changed source independently reviewed without a production blocker; the new
+enum helper still needs inclusion in joined actual execution pin coverage.
+
+Follow-on 12:46Z: selected-inputs-v4 freezes80paths (36source/44tests), SHA
+`5afebc3280d3bd84dd4cb66a37bfb9dc744d7b9d1f757e3b87db01c240caa5ba`.
+Canonical selected build:all-v5 passed with unchanged source/native inputs;
+result `selected-full-build-v5-result.json` SHA
+`188b1e246f966721bf1bf5c867afb71716df397fd20e804cb54ed9ce0ec0db57`.
+The preceding fullbuild failed at missing Dashboard toolchain after CLI/native
+success. Matching-lockfile dependencies copied to the private tree with distinct
+inodes; full build rerun, no gate bypass. Fresh selected real Ink logged-out
+startup passed8/8; PID4159634 exited0 and was reaped. Result
+`/tmp/deckent-7099-selected-startup-CHhFwv/result-v3.json`, SHA
+`56235e51e4159826e3b61072645b4253b62f543028b4b276507ad2ac573404e7`.
+This exercises the merged entry/run/app, not native-agent generation or workers.
+Fable7104C3 real CLI9/9 rerun also passed with all30freeze pins checked before
+and after, including the new enum; `fable-c3-root-actual-v1-result.json` SHA
+`c7c4f5d0305d38dacc7653d36f758638d1ba6a66ff6b639a3f9b1475b2a605cc`.
+
+Follow-on13:10Z: actual compiled /do diagnostic4/4 passed with one planner and
+one classifier call per case, accepted planner receipt, preview/decline/EOF
+truth and zero worker dispatch. The provider executable is a private shim;
+this is not paid-provider or worker settlement proof. Result
+`/tmp/deckent-7099-do-entry-v3-jDnvP0/result.json`, SHA
+`2ce63708e361490ed0f80c7a85435793268157e80b3f76b446dd9dd376b141cd`.
+Cursor fresh selected CLI13/13 also passed with source/build pins unchanged;
+`/tmp/deckent-7099-cursor-root-proof-v4-VGL1BO/result.json`, SHA
+`69770aa1faf8bf4bf31781bdaf08d70f27324ef9b436f73a3774d54925b93b73`.
+Root joined7099/7103/Cursor and accepted7104 C3 into main working source:
+100bound paths,54actual changes, all final hashes match and MASTER/control
+remain unchanged. Seven conflicts resolved; moved-method duplication and an
+incorrect test-superset claim were caught before application. Main typecheck
+and32file489/489 scoped tests passed (zero skipped, pins unchanged). Full main
+build:all passed after canonical bot stop; dist/source match50ceffdf and bot
+restarted/status confirmed PID9067. Fresh MAIN compiled /do diagnostic4/4
+passed again. Existing host MCP sessions are not claimed reconnected.
+Durable122payload archive, all SHA256SUMS verified:
+`/home/alperen/deckent-recovery-20260904/terminal-7099-main-join-20260908-BS13RT`,
+manifest SHA `b8770828b47fed7ae8e4b8db8ba2ceae15ae8676be17e5f6c15bf36773a8aaf1`.
+Commit staging is not yet closed:100paths alone omit five existing recovery
+production prerequisites. Their bounded dependency/provenance split and clean
+index/tree verification are next, not new MASTER scope. No commit/push,
+authenticated closure or whole7099 DONE follows from these proofs.
+
+### L1 fresh main ingress proof; selected landing HOLD — 2026-09-08T09:54Z
+
+Main working-tree source `40ca8b938c386a9c657615005fba536d3120e5e56ff28174b73ac976563d3991`
+on HEAD `3a390f0aa6ad98a664e0936e7a650de0dfec62b5` built successfully after
+canonical bot stop and fresh build admission; bot restarted as PID 3802464.
+This is dirty-main proof, **not** proof of the selected commit tree.
+
+Fresh compiled core 13/13, CLI 4/4, MCP stdio 4/4 passed. CLI/MCP exercise
+EN/TR legacy/tampered plan evidence refusal through actual entrypoints, correct
+typed next actions, unchanged retained stores and no new attempt. Children and
+their containing network-disabled proof containers terminated. Diagnostic planner
+setup is not a paid provider call; no worker/positive exact-start/settlement,
+existing host-MCP freshness, cross-platform or canonical XVerify claim follows.
+
+Durable snapshot (28 allowlisted payloads; no private project/DB/auth/custody copy):
+`/home/alperen/deckent-recovery-20260904/terminal-7099-planner-main-20260908`.
+Manifest SHA256 `3a669e60e7662465ae11b2fc2db72351def8c0cba1ffb83a27659e5645a7343c`;
+`SHA256SUMS` verifies all payloads and manifest. Main core result `da55259eb262…`,
+CLI `45869d91238e…`, MCP `e6aa0725ad6f…`; full digests are in the manifest.
+
+Selected-tree dependency assembly remains HOLD. Existing 3357 prerequisites
+are extracted by owned hunk, not whole backend/Store blobs: planning admission
+contract/topology/read scope → native preflight/recovery-health → retained
+started-failed/committed-unsettled structural and semantic readers, plus V1/V2
+private-output prompt reread compatibility. Native module now built in the
+selected worktree itself; main runtime was not rebuilt for that action.
+Joined v2 was 552/592 with 21 type errors; missing native capability and direct
+helper/fixture dependencies were identified. Corrected joined v3 is under
+verification, not declared green. Main's earlier extra explicit-adapter test
+failure remains UNREPRODUCED/ATTRIBUTION_HOLD; three legacy do failures remain open.
+No source commit, authenticated ledger mutation, 3357 DONE or 7099 DONE here.
+
 ### L1 Brain-provider parity landed / LOCAL_VERIFIED — 2026-09-08
 
 Exact four-path slice: `src/orchestra/{planner,run-proposal-compiler}.ts` and

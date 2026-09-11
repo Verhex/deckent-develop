@@ -1,0 +1,53 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/orchestra/spawn-backend-docker-dependency-inspection.test.ts (18 tests) 190ms
+ ✓ tests/cli/recover.test.ts (9 tests) 11ms
+ ✓ tests/agents/agentic-worker-entry.test.ts (12 tests) 279ms
+ ✓ tests/connectors/bot-agentic.test.ts (20 tests) 16ms
+ ✓ tests/orchestra/spawn-backend-docker-ipc-authority.test.ts (2 tests) 2362ms
+   ✓ Docker exact-attempt private IPC authority port > captures one private question, publishes the private answer, and rereads answered authority  1663ms
+   ✓ Docker exact-attempt private IPC authority port > cold-reconciles a durable answer whose answered cursor publication failed  697ms
+ ✓ tests/core/execution-effect-containment.test.ts (20 tests) 40ms
+ ✓ tests/orchestra/exact-docker-private-output-contract.test.ts (11 tests) 2594ms
+   ✓ exact Docker private output creation contract > rejects a permissive sealed landing postimage with a typed privacy cause  973ms
+   ✓ exact Docker private output creation contract > durably captures and decodes only the runner seal failure allowlist  1201ms
+ ✓ tests/agents/http-agentic-worker.test.ts (12 tests) 54ms
+  ✎ README.md (updated)
+  ✎ README.tr.md (updated)
+  ✎ .deckent/workspace/IDENTITY.md (updated)
+
+update-readme-stats: wrote 3 of 3 target(s).
+  ✎ README.md (updated)
+  ✎ README.tr.md (updated)
+  ✎ .deckent/workspace/IDENTITY.md (updated)
+
+update-readme-stats: wrote 3 of 3 target(s).
+  ✎ README.md (updated)
+  ✎ README.tr.md (updated)
+  ✎ .deckent/workspace/IDENTITY.md (updated)
+
+update-readme-stats: wrote 3 of 3 target(s).
+  ✎ README.md (updated)
+  ✎ README.tr.md (updated)
+  ✎ .deckent/workspace/IDENTITY.md (updated)
+
+update-readme-stats: wrote 3 of 3 target(s).
+ ✓ tests/core/identity-generator.test.ts (32 tests) 90ms
+ ✓ tests/cli/archive-terminal-seal.test.ts (10 tests) 795ms
+ ✓ tests/scripts/build-lifecycle.test.ts (22 tests) 3843ms
+   ✓ transactional build lifecycle > stages, verifies and commits core output under one maintenance boundary  753ms
+   ✓ transactional build lifecycle > bounds committed run retention while preserving the current recovery record  1083ms
+ ✓ tests/scripts/clean-active-execution-guard.test.ts (68 tests) 9045ms
+   ✓ clean active-execution admission > inspects more than two thousand canonical execution rows without an arbitrary authority limit  471ms
+   ✓ clean active-execution admission > rejects rehashed NOT_DISPATCHED cause, evidence, or timestamp mismatches  336ms
+   ✓ clean active-execution admission > binds legacy attestation to exact current task bytes and createdAt  326ms
+   ✓ clean active-execution admission > holds tampered, semantically non-terminal, and multiple matching receipts  340ms
+   ✓ clean active-execution admission > rejects rehashed receipt unknown keys, non-canonical strings, and fallback overflow  888ms
+   ✓ clean active-execution admission > rejects rehashed semantic forgeries for every InvocationEvent member  804ms
+
+ Test Files  12 passed (12)
+      Tests  236 passed (236)
+   Start at  05:08:53
+   Duration  19.94s (transform 4.47s, setup 120ms, collect 13.95s, tests 19.32s, environment 1ms, prepare 461ms)
+

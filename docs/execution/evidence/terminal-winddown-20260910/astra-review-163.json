@@ -1,0 +1,10 @@
+{
+  "utc": "2026-09-10T21:39:40.929130+00:00",
+  "entry": 163,
+  "reportDigest": "fb7aef6615d3def2b341b11c88b07b9eaa61d513164a011f061437f3462279d7",
+  "verdict": "OBSERVATION_RECEIVED_CLOSURE_HOLD",
+  "evidenceLevel": "Composer narrative; raw PTY/build manifest absent from artifact",
+  "p2CodeReview": "NOT_PERFORMED",
+  "budgetRemainingPercent": 5,
+  "newAssignments": false
+}

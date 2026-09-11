@@ -1,0 +1,16 @@
+{
+  "utc": "2026-09-10T21:52:15.582903+00:00",
+  "entry": 166,
+  "p2": "REVISE work/idle semantics; partial source review",
+  "files": {
+    "src/agent/session-lifecycle-snapshot.ts": "54f2533f240668b64b594a0062eb351a895277c064cc92f5c2046d4baad3feec",
+    "src/agent/work-budget-snapshot.ts": "82c0b21145bbc5eaecf9828e471319e9417ba8f85d443c7b27bd98021e5c02b3",
+    "src/agent/guards/recursion.ts": "f1bce9abdf9a58c58a1ed6629e396c7729a209205111469fc0757b74c74bcec6",
+    "src/agent/session.ts": "8b58400e9660d3aeea6c6120cb9275c0d785a2325228fce1ebc0f602376e16cc",
+    "src/agent/loop.ts": "3f7ceee33cb83e310ad0afefef15113b6dece8171e6da6e934de8504614a249d",
+    "src/cli/repl/at-ref.ts": "1ae9a5bac448fecc72e9332a6df4c8ea448f6812d4d5cd3b042a1fa5b1caa2c0",
+    "docs/execution/evidence/terminal-winddown-20260910/astra-terminal-flow-analysis-20260911.md": "4e2b3511300fe2b79c55d59b416e5b4d3cfea62233cf41a52a93644eaee0f65b"
+  },
+  "tests": "NOT_RUN",
+  "assignment": "P4 permission RCA evidence only"
+}

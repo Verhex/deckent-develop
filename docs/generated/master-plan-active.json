@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "f5c7d22cfc3f92926df04edbc4867a9f165efcd2cf4ba772659ad78dec673b1c"
+    "value": "b738ae2da941f470c6896391beeb0d5f74b83e4e929c9b163a8a63f2c05dc030"
   },
   "summary": {
     "total": 599,
@@ -5647,9 +5647,9 @@
       "program": "TERMINAL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-09-09",
+      "updated": "2026-09-11",
       "definitionDigest": "057aa8a82952fc03ceddfc83905b84b11180216e063f5d83ef3e1cca74392738",
-      "progressDigest": "1a459c4f049ae471d1ee73e04795f0cf99a2cfb1d1c2a88484d7cf1d895d2a90",
+      "progressDigest": "228725d37b40ac1b741719e892a06bd87399f26f655ff41c48f70b1328e3c6bb",
       "terminalClosureDigest": null
     },
     {
@@ -5669,9 +5669,9 @@
       "program": "TERMINAL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-09-09",
+      "updated": "2026-09-11",
       "definitionDigest": "89d419a60213350ef0a764e81a0742f63558710268ca8a8ce39a04b0be6de5cd",
-      "progressDigest": "fb75adaeb25f2e20b07b8e4043b05c3d0ba2d963be673664348d1414383ad4de",
+      "progressDigest": "6f5ff57c5a47c8072cb1aa6925cb0add101b5468bb93075be708ffef8db331e5",
       "terminalClosureDigest": null
     },
     {
@@ -5702,9 +5702,9 @@
       "program": "TERMINAL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-09-09",
+      "updated": "2026-09-11",
       "definitionDigest": "62fd9eb5604e77dda99bea89e67fe160e9ad7cfdaefaff2ec70deb0b823bb962",
-      "progressDigest": "58a3db0c9d8873e6a274eccbe393f8a01a664699f8c6229eee2c93d64da58d22",
+      "progressDigest": "d0bb15ce2412ae1dd18a1f2d9337553302832df770637f001a7422200459821b",
       "terminalClosureDigest": null
     },
     {
@@ -26967,8 +26967,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "131072 pencerede 18 KB tool çıktısı checkpoint tetiklemez; gerçek %75 token doluluğu tetikler; 32768de oranlı; bayt/token regresyon pini; gerçek binary MASTER-PLAN senaryosunda ilk 10 çağrıda sahte checkpoint 0.",
-      "evidence": "session checkpoints toolCalls 4/9/13/19; trace tool sonuçları 7.2 KB+7.2 KB+2 KB…; rawBudget=131072 (native-transport.ts:791). Landing 2026-09-09: d4046bdcb (7109-b, Cursor + main-session real-binary düzeltme; canlı kanıt probe exact-available, measured 364 == usage.prompt_tokens 364; scoped 237/237; fan-in 455/455). Gerçek Qwen kabul testi owner (build sonrası). 7109-c owner-admitted 2026-09-09 21:3xZ (\"7109-c kapsama al\"): exact ölçüm reasoning-off wire alanını taşımıyor → sabit +36 token üst sapma (Astra canlı kanıt); ölçüm gövdesine mapReasoningDirectiveToWire; Cursor, 7107-c sonrası.",
-      "updated": "2026-09-09"
+      "evidence": "session checkpoints toolCalls 4/9/13/19; trace tool sonuçları 7.2 KB+7.2 KB+2 KB…; rawBudget=131072 (native-transport.ts:791). Landing 2026-09-09: d4046bdcb (7109-b, Cursor + main-session real-binary düzeltme; canlı kanıt probe exact-available, measured 364 == usage.prompt_tokens 364; scoped 237/237; fan-in 455/455). Gerçek Qwen kabul testi owner (build sonrası). 7109-c owner-admitted 2026-09-09 21:3xZ (\"7109-c kapsama al\"): exact ölçüm reasoning-off wire alanını taşımıyor → sabit +36 token üst sapma (Astra canlı kanıt); ölçüm gövdesine mapReasoningDirectiveToWire; Cursor, 7107-c sonrası.  **Owner admission 2026-09-10 (Alperen canlı: master kapsamına alalım; bağlam ayarı kabul edildi):** 7109-d (P0): retained araç sonuçlarını bounded preview/content-ref ile daralt; tur tool-result tavanı tek başına token-pressure checkpoint üretmez; checkpoint gerçek ölçülmüş pencere baskısına dayanır, gerekçe kullanıcıya doğru gösterilir. Kabul: %10 gerçek pencere doluluğunda sahte checkpoint 0; gerçek basınç güvenliği korunur. Kayıt: docs/execution/owner-decisions/TERMINAL-OWNER-ADMISSION-2026-09-10.md. OPEN korunur; admission settlement değildir.",
+      "updated": "2026-09-11"
     },
     {
       "order": 7110,
@@ -27036,8 +27036,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Adversarial sınıflandırma matrisi (≥40) fail-closed; standart modda salt-okunur bash sessiz + audit izinde görünür; 20 KB satırlı fixture outline/range/search broker tavanına sığar; gerçek binary standart modda MASTER-PLAN senaryosu yalnız yazma/exec için onay ister.",
-      "evidence": "approval-command-classification.ts:64; native-tool-approval.ts:22; trace: 11/13 deckent_bash. Astra A7d post-landing CONFIRMED b4de8a1df (285/285, 2026-09-09).",
-      "updated": "2026-09-09"
+      "evidence": "approval-command-classification.ts:64; native-tool-approval.ts:22; trace: 11/13 deckent_bash. Astra A7d post-landing CONFIRMED b4de8a1df (285/285, 2026-09-09).  **Owner admission 2026-09-10 (Alperen canlı: master kapsamına alalım; bağlam ayarı kabul edildi):** 7111-c (P1): uzun satırlı grep ve native-read-file outline/search sessiz boş sonuç üretmez; eşleşen satır numarası, bounded/elided preview ve typed limit gerekçesi görünür. Kabul: 1.2 MB dosya/12–20 KB satır fixtures; gerçek eşleşme ile limit/unsupported ayrımı, cross-platform ve i18n. Kayıt: docs/execution/owner-decisions/TERMINAL-OWNER-ADMISSION-2026-09-10.md. OPEN korunur; admission settlement değildir.",
+      "updated": "2026-09-11"
     },
     {
       "order": 7112,
@@ -27155,8 +27155,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Gerçek Qwen 131k + 32k, standart + full-auto: MASTER-PLAN senaryosunda ilk görünür anlatım ≤10 s, ilk ara teslim ≤90 s veya ≤12 çağrı, kullanıcı kesince kısmi çıktı ekranda ve transcript'te, /context sayaçları; ölçüm \"exact\" (7109-b) ile sahte checkpoint 0; Claude/Codex provider ile aynı akış.",
-      "evidence": "Vaka transcript owner 15:5xZ; session chat-2026-09-09T15-40-24; curl /v1/tokenize 404. Landing 2026-09-09: f2dbb0db3 (anlatım sözleşmesi + host-zorunlu ara teslim + kesme-koruma + araç satırı hedef/süre; scoped 254/254; fan-in 455/455; preamble 64k 9698/9830 EN). Ekosistem araştırması follow-up-works/research-terminal-ecosystem-7114.md. Gerçek Qwen kabul bataryası owner (build sonrası).",
-      "updated": "2026-09-09"
+      "evidence": "Vaka transcript owner 15:5xZ; session chat-2026-09-09T15-40-24; curl /v1/tokenize 404. Landing 2026-09-09: f2dbb0db3 (anlatım sözleşmesi + host-zorunlu ara teslim + kesme-koruma + araç satırı hedef/süre; scoped 254/254; fan-in 455/455; preamble 64k 9698/9830 EN). Ekosistem araştırması follow-up-works/research-terminal-ecosystem-7114.md. Gerçek Qwen kabul bataryası owner (build sonrası).  **Owner admission 2026-09-10 (Alperen canlı: master kapsamına alalım; bağlam ayarı kabul edildi):** 7114-b (P0): anlatım delivered sayılmaz; host-requested yapılandırılmış ara/final yanıt teslim semantiği; son teslimden duvar-saati sınırı; maxToolCallsPerTurn zorunlu cevap; aynı hedefte ardışık başarısız denemeler için sınırlı sarmal kontrolü; oturum dili EN/TR. Kabul: gerçek terminalde ilk ara teslim ≤90 s ve ≤12 çağrı; araçlar arası anlatım sayaçları sıfırlamaz. Kayıt: docs/execution/owner-decisions/TERMINAL-OWNER-ADMISSION-2026-09-10.md. OPEN korunur; admission settlement değildir.",
+      "updated": "2026-09-11"
     },
     {
       "order": 7120,
@@ -30399,6 +30399,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "05fc84c5a2114384b9c20f15fa9006956cbed4a667582f1d4d29c58353cb97f3"
+    "value": "fd76fbfb7cdb3efb25b40a914d74f5c9363ae8614e94f8c1174e92d3e78a09e6"
   }
 }

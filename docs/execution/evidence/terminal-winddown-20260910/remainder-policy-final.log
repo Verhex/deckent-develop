@@ -1,0 +1,3 @@
+[operating-policy] canonical policy digest sha256=c4c96a971833ee892174b7d361e08c7f0eb53c629873381235deaa573594d863
+[operating-policy] active DECKENT-DEV-CONTROL digest sha256=ebc6d59aad2d22492cf040edd0110111c94260b2ec6e198354e2508705bab08e
+[operating-policy] OK — host projections in parity; capsule hygiene clean.

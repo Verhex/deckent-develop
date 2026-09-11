@@ -1,0 +1,7 @@
+[hermetic-lint] PROGRESS graph files=3040 edges=17157 depth=0 elapsedMs=3000
+[hermetic-lint] PROGRESS graph files=3041 edges=17163 depth=0 elapsedMs=3003
+[hermetic-lint] PROGRESS graph files=3042 edges=17170 depth=0 elapsedMs=3004
+[hermetic-lint] PROGRESS graph files=3043 edges=17172 depth=0 elapsedMs=3005
+[hermetic-lint] PROGRESS graph files=3044 edges=17174 depth=0 elapsedMs=3005
+[hermetic-lint] PROGRESS graph files=3045 edges=17177 depth=0 elapsedMs=3007
+[hermetic-lint] ERROR: Maximum call stack size exceeded

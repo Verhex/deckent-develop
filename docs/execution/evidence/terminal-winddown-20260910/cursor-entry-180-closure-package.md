@@ -9,7 +9,7 @@
 
 2. **Terminal transcript UX (Workline)**
    - Calm tool lines: `formatToolTranscriptVerb` + `describeToolTarget` (no `deckent_* — tool ran`).
-   - Assistant markdown: per-line `truncate-end`; **narrow TTY**: `maxTerminalWidth` on `renderMarkdown` degrades wide tables to compact bullet rows (`header: value · …`).
+   - Assistant markdown: per-line `wrap`; **narrow TTY**: `maxTerminalWidth` degrades wide tables to **one bullet line per cell** (optional display-width wrap for long values); `terminalColumns - indent` without a 20-col floor.
    - Live footer: `formatToolActivityDisplay` → `{tool}` placeholder shows verb+target, not raw tool id.
 
 3. **Context budget (operator clarity)**

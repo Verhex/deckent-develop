@@ -485,3 +485,7 @@ Yarın: önce bu custody/control-budget proof'u ve gerçek deny S4; ardından ow
 Temizlik: referanssız, untracked eski kanal kopyaları repo dışına SHA256 doğrulanarak arşivlendi. Kanıt/plan/receipt, aktif worktree, runtime/auth/memory ve henüz teslim edilmemiş kod silinmedi. Arşiv envanteri: docs/execution/evidence/terminal-winddown-20260910/astra-night-close-20260911.json.
 
 Main temizliği sınırı: kalan code/build/model-registry/test ve başka outcome değişiklikleri geçici dosya değildir; silinmedi veya toplu stage edilmedi. Main tamamen clean değildir.
+
+### Main remainder toplandı — 2026-09-11
+
+Kod/test commit a9006d5d0; 436 hedefli test PASS, tsc exit0, MASTER ve operating-policy exit0. Hermeticity scanner stack overflow exit2 açık. Runtime fiziksel dosyaları korunup Git takibinden ayrıldı; local host kurulumu yerel ignore ile korundu. Fiyat/katalog değişikliği geri uygulanabilir repo-dışı patch olarak ayrıldı. Güncel envanter: docs/execution/evidence/terminal-winddown-20260910/MAIN-REMAINDER-20260911.md. Build/push yapılmadı; ürün DONE değil.

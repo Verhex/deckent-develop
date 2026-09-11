@@ -1,14 +1,24 @@
-# Main devam envanteri — 2026-09-11
+# Main remainder — 2026-09-11 toplandı
 
-Main product HEAD 98983609a; terminal product cc70d0c05. Gece docs commit ayrıdır. Main tamamen clean değil. Aşağıdaki değişiklikler korunmuştur; otomatik çöp sınıflandırması yapılmadı.
+Kod/test/hygiene commit: a9006d5d0. Doküman/kanıt commit'i bunu takip eder.
 
-- src/core model registry/pricing + tests: teslim edilmemiş ürün işi.
-- scripts/build/clean/lint + testleri: başka recovery/build işi.
-- DIRECTIVES, MASTER mevcut satır değişiklikleri, generated ve recovery capsule: ayrı authority/settlement işi.
-- .brain exports / .deckent runtime: canlı veya generated; auth/memory/runtime mutasyonu yapılmadı.
-- Host hooks/coordinator: çalışan koordinasyon altyapısı; geçici kanal kopyası değil.
-- Terminal review/plan/proof: yarın devam için tutuldu.
+- 12 suite / 236 test PASS exit0; ek 3 suite / 200 test PASS (ayrı exit yakalanmadı, tsc dahil komut exit0).
+- TypeScript exit0; MASTER ve operating-policy exit0. Üç terminal kanıt satırının Updated tarihi 2026-09-11; disposition değişmedi.
+- Hermeticity scanner exit2: Maximum call stack size exceeded. Açık follow-up; scanner mantığı/toleransı değiştirilmedi.
+- Owner admission kaydı execution capsule olmadığı için docs/execution/owner-decisions/ altına taşındı; MASTER referansı düzeltildi.
+- Altı runtime/projection dosyası Git takibinden çıkarıldı, diskte digestleri değişmeden korundu. memory.db/auth değişmedi.
+- Session-bound .codex/.cursor coordinator, hook ve kopya skill kurulumu diskte; exact yerel ignore .git/info/exclude içinde.
+- Model katalog/fiyat eklemesi uzun bağlam fiyat doğruluğu tamamlanmadığı için ayrı patch'te korundu.
+- Build/push veya product process restart/kill yapılmadı. Mevcut dist, source konsolidasyonundan sonra güncel varsayılmamalı.
+- Yarın: context custody/control reserve, PTY S4, operator/prose ayrımı; ürün DONE değil.
 
-Exact git envanteri repo dışı: /home/alperen/deckent-worktree-archives-20260910/terminal-close-20260911/remaining-git-status.txt
+Arşiv: /home/alperen/deckent-worktree-archives-20260910/main-remainder-20260911
+- model-catalog-followup.patch: mevcut katalog değişikliğini geri uygulama.
+- gpt6-astra-catalog.test.ts: patch'e dahil olmayan yeni test, tests/core/ hedefine geri alınır.
+- model-catalog-preimages.json: SHA256 kontrolü.
+- all-tracked-before.patch: işlem öncesi tüm tracked dirty değişikliklerin yedeği.
+- runtime-kept-on-disk.json: fiziksel dosya korunumu.
 
-17 eski kanal kopyası hash doğrulanmış arşive taşınıp repo içinden silindi. Önceki outgoing kanal ENTRY kayıtları da arşivlenip kanaldan temizlendi; yeni ENTRY190 korunuyor.
+Makine-okunur kanıt: main-remainder-settlement-20260911.json; remainder-*.log.
+
+CLI help ham proof: 1589 dosya hash-doğrulamalı /home/alperen/deckent-worktree-archives-20260910/main-remainder-20260911/cli-help-proof.tar.gz arşivinde. Repoda yalnız manifest ve ARCHIVE.md kaldı.

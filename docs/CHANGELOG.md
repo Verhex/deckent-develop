@@ -14,6 +14,33 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint724] - 2026-09-05
+
+### Added
+
+- Recovery 3357 canary notuna kanıt satırını ekle
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
+## [sprint718] - 2026-09-04
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 1 total, 0 done, 0 tech debt, 1 no-go_
+
+## [sprint717] - 2026-09-04
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 1 total, 0 done, 0 tech debt, 1 no-go_
+
 ## [sprint707] - 2026-08-28
 
 ### Added

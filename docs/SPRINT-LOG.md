@@ -17684,3 +17684,91 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 713-010: 4033-VERIFY-FANIN — Full conformance and hermetic integration seal (PAUSED)
 
 ---
+## Sprint 715 — sprint-715
+
+**Status:** ABORTED
+**Date:** 2026-09-04
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 715-001: Analyze dogfood execution health and write the canary smoke note (PENDING)
+
+---
+## Sprint 717 — sprint-717
+
+**Status:** COMPLETE
+**Date:** 2026-09-04
+**Duration:** 42s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 42290ms |
+
+### Tasks
+
+- 717-001: Assess dogfood readiness and append canary smoke result (PENDING)
+
+---
+## Sprint 718 — sprint-718
+
+**Status:** COMPLETE
+**Date:** 2026-09-04
+**Duration:** 131s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 130608ms |
+
+### Tasks
+
+- 718-001: Assess dogfood readiness and append canary smoke result (PENDING)
+
+---
+## Sprint 724 — sprint-724
+
+**Status:** COMPLETE
+**Date:** 2026-09-05
+**Duration:** 16887s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 16887343ms |
+
+### Tasks
+
+- 724-001: Recovery 3357 canary notuna kanıt satırını ekle (DONE)
+
+---

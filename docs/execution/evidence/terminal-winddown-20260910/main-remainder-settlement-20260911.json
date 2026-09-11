@@ -1,0 +1,37 @@
+{
+  "utc": "2026-09-11T02:14:39.533733+00:00",
+  "codeCommit": "a9006d5d0",
+  "tests": {
+    "first": {
+      "passed": 236,
+      "exitCode": 0
+    },
+    "second": {
+      "passed": 200,
+      "exitCode": "not individually captured; PASS log, combined tsc command exit0"
+    }
+  },
+  "tscExitCode": 0,
+  "gates": {
+    "master": {
+      "exitCode": 0,
+      "output": "  ✓ docs/generated/master-plan-active.md — in-sync\n  ✓ docs/generated/master-plan-active.json — in-sync\n\n[master-plan] OK — 599 rows, 510 active, 232 receipts, 13 blocker classes; projections in sync.\n"
+    },
+    "policy": {
+      "exitCode": 0,
+      "output": "[operating-policy] canonical policy digest sha256=c4c96a971833ee892174b7d361e08c7f0eb53c629873381235deaa573594d863\n[operating-policy] active DECKENT-DEV-CONTROL digest sha256=ebc6d59aad2d22492cf040edd0110111c94260b2ec6e198354e2508705bab08e\n[operating-policy] OK — host projections in parity; capsule hygiene clean.\n"
+    }
+  },
+  "hermeticity": {
+    "exitCode": 2,
+    "reason": "Maximum call stack size exceeded",
+    "status": "HOLD"
+  },
+  "modelCatalogParked": "/home/alperen/deckent-worktree-archives-20260910/main-remainder-20260911/model-catalog-followup.patch",
+  "modelExtraTest": "/home/alperen/deckent-worktree-archives-20260910/main-remainder-20260911/gpt6-astra-catalog.test.ts",
+  "localHostInstall": "preserved on disk; exact .git/info/exclude entries",
+  "runtimeFiles": "6 removed from Git index only; unchanged physical bytes",
+  "build": "NOT_RUN",
+  "push": "NOT_RUN",
+  "productDone": false
+}

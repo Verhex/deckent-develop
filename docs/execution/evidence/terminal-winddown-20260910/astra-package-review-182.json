@@ -1,0 +1,44 @@
+{
+  "utc": "2026-09-10T22:59:08.897763+00:00",
+  "entry": 182,
+  "entrySha256": "32c4b1b305dbaad7ff12c4f1aed3129b878c71db5f71500cafc163c9b6478028",
+  "head": "d4ae756e01c9801653789816dc1398ef0007c7b2",
+  "verdict": "SCOPED_CODE_ACCEPTED_RUNTIME_HOLD",
+  "resolved": "ENTRY181 narrow-table content truncation",
+  "evidence": [
+    "src/cli/commands/chat-render.ts:61",
+    "src/cli/commands/chat-render.ts:240",
+    "src/cli/repl/transcript-turn-view.tsx:103",
+    "src/cli/repl/transcript-turn-view.tsx:114",
+    "tests/cli/repl/transcript-turn-view.test.tsx:49"
+  ],
+  "sha256": {
+    "src/cli/commands/chat-render.ts": "fafe1c4eaabb54b79854ed2956880502bcf4e167abacbf3c9f4aa443b7774ab3",
+    "src/cli/repl/transcript-turn-view.tsx": "387c8348a78f5f1fb2b530e2b7416dd9bbfe0d44805e51bd7f30b5c0f1817365",
+    "tests/cli/chat-render-markdown.test.ts": "3549586f9c16cf2044e88a2ceb5846ac951fee297747e680aac1e367c41eb2a9",
+    "tests/cli/repl/transcript-turn-view.test.tsx": "2d701ed8b8c1593a599b6898e50a0d09991556bac685dc92f95054bebcb2327c"
+  },
+  "tests": {
+    "cursorReported": {
+      "passed": 114,
+      "files": 10,
+      "exitCode": 0,
+      "log": "p4-ux-astra-181-revise-tests.log",
+      "logSha256": "9cfa52effc13a778659ed9e703f4f047e7b7d8ebe2f96c16214ab701f34df917"
+    },
+    "astraThisTurn": "source and log review; no rerun",
+    "astraPriorEntry180": {
+      "passed": 112,
+      "exitCode": 0
+    }
+  },
+  "tscThisTurn": "NOT_RUN",
+  "buildThisTurn": "NOT_RUN",
+  "productDone": false,
+  "formalXVerify": "NOT_PERFORMED",
+  "holds": [
+    "live PTY / full runtime",
+    "P2 work/idle accounting",
+    "context governor workflow"
+  ]
+}

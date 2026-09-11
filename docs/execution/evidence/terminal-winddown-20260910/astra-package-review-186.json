@@ -1,0 +1,13 @@
+{
+  "utc": "2026-09-11T01:41:42.999841+00:00",
+  "entrySha256": "4ab58dc599d6b8d20aac59c1153fce667d3167095858a776913a794709a49616",
+  "verdict": "REVISE",
+  "review": "re=186:4ab58dc599d6\nREVISE — rev2. İyileşmeler kabul: synthetic 128-token floor ve 2048 fallback kaldırılmış; structured recover dryRun default true ve false→unavailable doğru; i18n kesin devam/ref vaadini kaldırmış.\nBLOCKS_CURRENT_DONE 1 — recover alternatif giriş kapanmamış. chat-tool-bridge.ts:92 TOOL_COMMANDS.deckent_recover=['recover','--force']; :433 sprintId boşsa bu base + _rest dönüyor. Somut counterexample: { _rest:['sprint-731'], dryRun:false } → ['recover','--force','sprint-731']. Structured branch'in no-mutation kuralını atlıyor. Tüm girişleri normalize/validate edip aynı dryRun/authority gate'e bağla veya eksik sprintId'yi fail-closed reddet; bu karşı örneği no-spawn testiyle kapat.\nBLOCKS_CURRENT_DONE 2 — result custody. loop.ts handler sonrası :1216-1221 result'ın gerçek output/ok/meta bilgisi hata metniyle değiştiriliyor. Bu dalda durable capture/ref zorunlu değil. Model executed-but-undelivered ile tool failure ayrımını kaybediyor. Duplicate-effect/store-failure matrix bu değişikliğin doğrudan proof'u; paket dışı değil. Execution öncesi receipt rezervi, tam sonuç capture, typed delivery state ve aynı operation'ı yeniden çalıştırmayan resume gerekir.\nBLOCKS_CURRENT_DONE 3 — 'overshoot yok' kanıtlanmıyor: pay 0 iken nonempty hata metni transcript'e ekleniyor. Yeni test yalnız output<512 ve requests.length=2 kontrol ediyor; 0 allocation'a uyumu/retained toplamı ölçmüyor. Recovery/control receipt için ayrı rezerve edilmiş pay ve provider toplam admission hesabıyla test edilmeli. Metin boyutunu küçültmek tek başına çözüm değil.\nDar kill argv fix'i ile context continuity ayrı teslim edilebilir; context'i scoped ACCEPT adıyla bu iki temel eksikle kapatmayalım. Yeni audit kapsamı değil, 185'te belirtilen closure gereksinimleri.\nCursor reported 68/68 exit0 + lint:i18n exit0. Astra source/diff review; test/tsc/lint/build NOT_RUN. PTY/formal XVerify HOLD. Review kaynak digestleri astra-package-review-186.json içinde; canlı kill/cleanup/recover çalıştırılmadı. Yeni iş veya owner gate açılmadı.\n",
+  "sha256": {
+    "src/agent/loop.ts": "17c97a44b59fa0858b29946787cb394e608b92545c9dc44fb66749218f785ae3",
+    "src/cli/commands/chat-tool-bridge.ts": "cdbeccde564414e7e31f5d64c2279165b27286b4aba2bae6e3ec02d0e1668cee",
+    "tests/agent/loop.test.ts": "d0749a012b94aa501f60377c1a8ec95b736745ad0ec6eedc52e42abdcaae17a0",
+    "tests/cli/chat-tool-bridge.test.ts": "94b740eeb59cc8ed049c0635d86e61529bce5e0a56a6e412db7079cfe58cd422"
+  },
+  "checks": "Astra source/diff only; no test/tsc/lint/build or lifecycle mutation"
+}

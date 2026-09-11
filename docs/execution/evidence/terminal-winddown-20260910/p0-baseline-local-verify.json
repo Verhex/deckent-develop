@@ -1,0 +1,28 @@
+{
+  "utc": "2026-09-10T20:07:00.000Z",
+  "commands": [
+    {
+      "command": "npx tsx docs/execution/evidence/terminal-winddown-20260910/p0-cli-baseline-export.ts",
+      "exitCode": 0,
+      "note": "writes p0-cli-baseline-inventory.json"
+    },
+    {
+      "command": "npx vitest run tests/cli/cli-surface-truth-battery.test.ts",
+      "exitCode": 0,
+      "class": "SCOPED_GREEN"
+    },
+    {
+      "command": "npx vitest run tests/cli/command-registry.test.ts",
+      "exitCode": 1,
+      "class": "SCOPED_RED",
+      "failureSummary": "top-level CLI help missing registry cli surface; REPL /context /compact not in COMMAND_REGISTRY repl projection",
+      "missingTopLevel": ["help"],
+      "unmatchedReplSlash": ["/context", "/compact"],
+      "findingClass": "RELATED_BUT_NONBLOCKING",
+      "p0BaselineBlocker": false,
+      "p4RegistryParity": true
+    }
+  ],
+  "buildRun": "NOT_RUN",
+  "buildHold": "E_CLEAN_BOT_ACTIVE"
+}
