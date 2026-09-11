@@ -3473,6 +3473,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         />
       )}</Static>
 
+      {/* In-progress (incomplete) line — streamed reply prose sits above the live
+          operator strip so completed segments can flush into <Static> without the
+          strip jumping below freshly printed output (ENTRY 195 dynamic paint). */}
+      {partial.length > 0 && <Text>{partial}</Text>}
+
       {liveOperatorStrip && replSurfaceEnabled && (
         <LiveOperatorStripView
           tool={liveOperatorStrip}
@@ -3486,11 +3491,6 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           }}
         />
       )}
-
-      {/* In-progress (incomplete) line — the only streamed text in the dynamic
-          region (one line). Completed lines/blocks already flowed into <Static>
-          above (readable in real time, native scrollback, no tall re-render). */}
-      {partial.length > 0 && <Text>{partial}</Text>}
 
       {/* Confirm modal — one card per queued tool call, with an [i/N] position. */}
       {confirm && (
