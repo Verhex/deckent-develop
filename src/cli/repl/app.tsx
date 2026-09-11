@@ -15,7 +15,7 @@ import { InkPaletteContext, useInkPalette } from './ink-palette-context.js';
 import { useTerminalGlyphs } from './terminal-glyph-context.js';
 import type { SessionAuthority } from './session-authority.js';
 import type { InkPalette } from './ink-palette.js';
-import { useState, useRef, useEffect, useContext, Component, type ReactElement, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useCallback, useContext, Component, type ReactElement, type ReactNode } from 'react';
 import { homedir } from 'node:os';
 import { lstatSync } from 'node:fs';
 import { join } from 'node:path';
@@ -28,6 +28,7 @@ import {
   buildCommittedOperatorTurn,
   isOperatorStripTurnLive,
   LiveOperatorStripView,
+  scrollbackPriorOperatorStrip,
 } from './live-operator-strip.js';
 import { InputBar, type CaretStyle, type ShortcutsPanel } from './input-bar.js';
 import { StatusRow, formatSessionIdForTerminal } from './status-row.js';
@@ -2333,6 +2334,25 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     staticProseBatch.current?.flush();
   };
 
+  const advanceLiveOperatorStrip = useCallback((next: ToolInfo): void => {
+    const { scrollbackTurn, nextId } = scrollbackPriorOperatorStrip(
+      liveOperatorStripRef.current,
+      idRef.current,
+    );
+    if (scrollbackTurn) {
+      idRef.current = nextId;
+      setTurns((t) => [...t, scrollbackTurn]);
+    }
+    setLiveOperatorStrip(next);
+  }, []);
+
+  const flushLiveOperatorStripToScrollback = useCallback((): void => {
+    const live = liveOperatorStripRef.current;
+    if (!live) return;
+    setTurns((t) => [...t, buildCommittedOperatorTurn(idRef.current++, live)]);
+    setLiveOperatorStrip(null);
+  }, []);
+
   // F11-016-STAB (360-009): ONE clear routine for both clear surfaces (the
   // /clear command below + InputBar's Ctrl-L onClear — previously two drifting
   // inline copies). Also RECREATES the segmenter: the old instance still
@@ -2394,14 +2414,14 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       // on the just-cleared screen either — same epoch guard as `output`.
       if (!isOperatorStripTurnLive(turnEpoch.current, clearEpoch.current)) return;
       flushStreamedProse(); setPartial(''); // commit any in-flight reply first
-      setLiveOperatorStrip(info);
+      advanceLiveOperatorStrip(info);
       // TERM-FLOW-UNIFY Sprint-4 mount (426-002): a completed tool call may
       // have been `deckent_propose_run` (native-tool-registry.ts) — sync the
       // card's preview from the controller's OWN context (single source of
       // truth, no duplicate state) rather than special-casing the tool name.
       if (runFlowController) setRunFlowPreview(deriveRunFlowPreview(runFlowController.getContext()));
     });
-  }, [registerToolSink, runFlowController]);
+  }, [registerToolSink, runFlowController, advanceLiveOperatorStrip]);
 
   useEffect(() => {
     if (!healthAuthFeed) { setHealthAuthLine(null); return; }
@@ -2469,12 +2489,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     const finalizeReply = (): void => {
       flushStreamedProse();   // trailing partial line / open block + prose batch
       setPartial('');
-      const strip = liveOperatorStripRef.current;
-      if (strip) {
-        const opTurn = buildCommittedOperatorTurn(idRef.current++, strip);
-        setTurns((t) => [...t, opTurn]);
-        setLiveOperatorStrip(null);
-      }
+      flushLiveOperatorStripToScrollback();
       if (headPushed.current) {     // close the reply with a stats footer
         const stats = lastStats.current ?? undefined;
         lastStats.current = null;

@@ -6,6 +6,7 @@ import {
   buildCommittedOperatorTurn,
   isOperatorStripTurnLive,
   LiveOperatorStripView,
+  scrollbackPriorOperatorStrip,
 } from '../../../src/cli/repl/live-operator-strip.js';
 import { TerminalGlyphProvider } from '../../../src/cli/repl/terminal-glyph-context.js';
 import { resolveTerminalGlyphs } from '../../../src/cli/helpers/terminal-glyphs.js';
@@ -31,13 +32,16 @@ function driveLifecycle(
 ): {
   strip: ToolInfo | null;
   committed: ToolInfo | null;
+  scrollback: ToolInfo[];
   clearEpoch: number;
   turnEpoch: number;
 } {
   let strip: ToolInfo | null = null;
   let committed: ToolInfo | null = null;
+  const scrollback: ToolInfo[] = [];
   let clearEpoch = 0;
   let turnEpoch = 0;
+  let nextId = 1;
 
   for (const step of steps) {
     switch (step.kind) {
@@ -46,7 +50,14 @@ function driveLifecycle(
         strip = null;
         break;
       case 'tool':
-        if (isOperatorStripTurnLive(turnEpoch, clearEpoch)) strip = step.info;
+        if (isOperatorStripTurnLive(turnEpoch, clearEpoch)) {
+          const { scrollbackTurn, nextId: idAfter } = scrollbackPriorOperatorStrip(strip, nextId);
+          if (scrollbackTurn) {
+            scrollback.push(scrollbackTurn.tool);
+            nextId = idAfter;
+          }
+          strip = step.info;
+        }
         break;
       case 'prose':
         break;
@@ -57,6 +68,7 @@ function driveLifecycle(
       case 'finalize':
         if (strip) {
           committed = strip;
+          scrollback.push(strip);
           strip = null;
         }
         break;
@@ -64,7 +76,7 @@ function driveLifecycle(
         break;
     }
   }
-  return { strip, committed, clearEpoch, turnEpoch };
+  return { strip, committed, scrollback, clearEpoch, turnEpoch };
 }
 
 describe('operator strip lifecycle — clear/cancel/new turn (ENTRY 197 follow-up)', () => {
@@ -104,6 +116,33 @@ describe('operator strip lifecycle — clear/cancel/new turn (ENTRY 197 follow-u
     expect(frame).toContain('model prose line');
     expect(frame).toContain('second.ts');
     expect(frame).not.toContain('first.ts');
+  });
+
+  it('scrollbackPriorOperatorStrip appends each prior tool before the next lands', () => {
+    let id = 10;
+    const a = { verb: 'read', target: 'a.ts' };
+    const b = { verb: 'glob', target: 'src/**/*.ts' };
+    const first = scrollbackPriorOperatorStrip(null, id);
+    expect(first.scrollbackTurn).toBeNull();
+    expect(first.nextId).toBe(10);
+    const second = scrollbackPriorOperatorStrip(a, first.nextId);
+    expect(second.scrollbackTurn?.tool.target).toBe('a.ts');
+    expect(second.nextId).toBe(11);
+    const third = scrollbackPriorOperatorStrip(b, second.nextId);
+    expect(third.scrollbackTurn?.tool.target).toBe('src/**/*.ts');
+  });
+
+  it('three tools in one turn yield three scrollback rows after finalize', () => {
+    const end = driveLifecycle([
+      { kind: 'start' },
+      { kind: 'tool', info: { verb: 'read', target: 'one.ts' } },
+      { kind: 'tool', info: { verb: 'read', target: 'two.ts' } },
+      { kind: 'tool', info: { verb: 'write', target: 'three.ts' } },
+      { kind: 'finalize' },
+    ]);
+    expect(end.scrollback.map((t) => t.target)).toEqual(['one.ts', 'two.ts', 'three.ts']);
+    expect(end.committed?.target).toBe('three.ts');
+    expect(end.strip).toBeNull();
   });
 
   it('stale tool after /clear does not update strip; new turn accepts fresh tool', () => {
