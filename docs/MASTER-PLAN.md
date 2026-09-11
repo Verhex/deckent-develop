@@ -20,6 +20,8 @@ governance/developer projection'ıdır; product Terminal/Desktop/API yüzeyi de�
 vocabulary product'a açılmadan `FO-10-I18N` ve `DOCS-I18N-001` message/locale authority'sine
 taşınır.
 
+> **Terminal ilerleme kaydı — owner 2026-09-11:** 7099 / 7107 / 7109 kapsamındaki cc70d0c05 main teslimi sonrası owner local-llm MASTER analizi yaklaşık 262 s içinde tamamlandı; Cursor 73 test ve build:all exit0 bildiriyor. Recover argv bypass source-review ile kapalı; context custody/control-allocation, gerçek deny PTY ve formal closure HOLD. **Disposition/DONE değişmedi.** Ayrıntı: [terminal aktif capsule](execution/active/TERMINAL-OPERATOR-SURFACE-CLOSURE-001.md) ve [gece review/temizlik kanıtı](execution/evidence/terminal-winddown-20260910/astra-night-close-20260911.json). Yeni gecelik implementation başlatılmadı.
+
 ## 1. North Star ve bitiş sözleşmesi
 
 Deckent; solo kullanıcıdan dünyanın en büyük kurumlarına kadar aynı çekirdeği kullanan,

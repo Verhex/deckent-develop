@@ -473,3 +473,15 @@ REVISE: context min-share/emergency fallback toplam admission sınırını aşab
 ### ENTRY 186 rev2 — 2026-09-11T01:41:42.999841+00:00
 
 REVISE: recover eksik sprintId/_rest yolu eski --force mapping üzerinden mutation gate atlıyor. Context sıfır payda handler sonucunu capture garantisi olmadan hata metniyle değiştiriyor; executed/delivered ve no-duplicate-effect proof paket içi blocker. Overshoot testi gerçek retained allocation ölçmüyor. Kanıt: docs/execution/evidence/terminal-winddown-20260910/astra-package-review-186.json.
+
+### Gece teslimi — 2026-09-11: terminal ilerlemesi ve yarın devam
+
+Owner terminalin belirgin iyileştiğini bildirdi. Cursor ENTRY 189: cc70d0c0522ed871781e50e6374af9047f8e24c8 landed; owner build:all exit0 ve local-llm ile @docs/MASTER-PLAN.md analizi yaklaşık 262 saniyede tamamlandı, önceki turn-stop bu smoke'ta görülmedi. Bu olumlu tek-koşu kanıtıdır; 262 saniye hız hedefinin kapandığını veya bütün senaryoların tamamlandığını göstermez.
+
+Astra ENTRY188/189 source review: recover structured/_rest --force bypass kapalı; dryRun=false bridge mutation unavailable. Context executedOk ve spill eklenmiş; withhold helper receipt.sha256 doğrulamıyor ve resultRef metni için reserved/bounded control allocation kanıtı yok. delivery/executedOk meta'nın loop tool-result olayında tam consumer zinciri ve crash/retry sonrası no-duplicate-effect kanıtı tamamlanmadı. Context kapsamı PARTIAL/HOLD; ürün DONE değil. Cursor bildirimi 73/73 test exit0, lint:i18n exit0; Astra bu tur test/tsc/lint/build veya lifecycle mutation yapmadı.
+
+Yarın: önce bu custody/control-budget proof'u ve gerçek deny S4; ardından owner'ın operator/model ayrımı. Tool telemetry tek canlı activity satırında, geçmişi istenince açılan kayıt; model cevabı normal prose. Thinking ile kullanıcıya yönelik ara bilgi metni yalnız typed provider/event provenance varsa ayrılır; sırf üsluba bakarak model metni silinmez. Yeni gece implementation ASSIGN yok.
+
+Temizlik: referanssız, untracked eski kanal kopyaları repo dışına SHA256 doğrulanarak arşivlendi. Kanıt/plan/receipt, aktif worktree, runtime/auth/memory ve henüz teslim edilmemiş kod silinmedi. Arşiv envanteri: docs/execution/evidence/terminal-winddown-20260910/astra-night-close-20260911.json.
+
+Main temizliği sınırı: kalan code/build/model-registry/test ve başka outcome değişiklikleri geçici dosya değildir; silinmedi veya toplu stage edilmedi. Main tamamen clean değildir.

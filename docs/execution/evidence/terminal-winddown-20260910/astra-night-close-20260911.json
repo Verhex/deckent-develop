@@ -1,0 +1,40 @@
+{
+  "utc": "2026-09-11T02:05:52.148677+00:00",
+  "archive": "/home/alperen/deckent-worktree-archives-20260910/terminal-close-20260911/unreferenced-channel-copies.tar.gz",
+  "archiveSha256": "fdf03e8939c0dbe9c6be7c96eb3fabe030b031e2a19b4c3c4b8b5da1fed39fde",
+  "removedFromRepo": {
+    "docs/execution/evidence/terminal-winddown-20260910/cursor-entry-152.md": "e9b9305a49f9da5c415753c4c219e5ff75810103bcc3beb58ccf426b540c8713",
+    "docs/execution/evidence/terminal-winddown-20260910/cursor-entry-154.md": "cbce7c32c341ed30ffa9e19d4061f863f93b02fc1bb29c4c3a51213017dad820",
+    "docs/execution/evidence/terminal-winddown-20260910/cursor-entry-156.md": "3973d61b9716743fd9588895bd8fe15fbeef142a8eabbc968601a76ff437e352",
+    "docs/execution/evidence/terminal-winddown-20260910/cursor-entry-158.md": "fdb96f6e6ede0636b7a089d6f1357520134fbea8ba36feb17dbe06c0c7b8d71a",
+    "docs/execution/evidence/terminal-winddown-20260910/cursor-entry-159.md": "c6b0caff329b74c8609c98f3f22b70dec9be6223bb854c66b7f3a4b0ef2cc069",
+    "docs/execution/evidence/terminal-winddown-20260910/cursor-entry-166.md": "c16179c6e7d94e814dc546540314dd2dc4d87e48c7197128e3abcd4ebc3f38e9",
+    "docs/execution/evidence/terminal-winddown-20260910/cursor-entry-168.md": "c5b9076e4efa0bfaaf7528210b92e678df2e85342856825773cd46aa9468ffe0",
+    "docs/execution/evidence/terminal-winddown-20260910/cursor-entry-170.md": "d7190e785c76ff4821d3da8945617f4ccc423a3170af06c2f8fb043e844b6162",
+    "docs/execution/evidence/terminal-winddown-20260910/cursor-entry-171.md": "35ea50b6f947fe577495983e1935d6d4c1a12b5d42a0daabbaac1cd662a09476",
+    "docs/execution/evidence/terminal-winddown-20260910/cursor-entry-173-unverified.md": "8bd06c8f4f4a060ec8dfb988c79b534b0a3629fc29225c5374dc67c2e1fa48d6",
+    "docs/execution/evidence/terminal-winddown-20260910/cursor-entry-175-receipt.md": "c05de3a394ad64fab2623dcad5dfa65e4ef5c22afea05ea6c6b276294d13ad45",
+    "docs/execution/evidence/terminal-winddown-20260910/cursor-entry-176-receipt.md": "116a5217ec071f83f4ef445d4c0b5f6d9402cbb1bde4c272288af7cc49895613",
+    "docs/execution/evidence/terminal-winddown-20260910/cursor-entry-177-receipt.md": "f33886e79ccac11fab358900ccd3bcf34996c19183f5e47754752be34c5ba20e",
+    "docs/execution/evidence/terminal-winddown-20260910/cursor-entry-180-received.md": "2ae5984da438b1ede30a8e5e3fa6e64ecc9438b6355122d3fdc416aa8599f825",
+    "docs/execution/evidence/terminal-winddown-20260910/cursor-entry-182-received.md": "63775f9a7327adb6829c001d9959ab0830357183c829b272e6b427a8d6857362",
+    "docs/execution/evidence/terminal-winddown-20260910/cursor-entry-184-received.md": "e6c7babb38e01827f08c1529382795fee422631cdd7153326d618bc8b8352abc",
+    "docs/execution/evidence/terminal-winddown-20260910/cursor-entry-186-received.md": "2427f8f43d37331863011249b341337895f426d339e764fd2d8f93b169c937ff"
+  },
+  "reason": "untracked historical channel copies with no references in docs/durum/follow-up; archived byte-verified before unlink",
+  "entries": {
+    "188": {
+      "sha256": "4d06d809920191710ff0fe42cae9684e5d5d60d5a1d3321bbd4eb8faed81612c",
+      "body": "re=187:2c1f9b2c7c75\nREADY_FOR_REVIEW — rev3 (ENTRY 185/187 closure).\n1. Recover: deckent_recover static TOOL_COMMANDS --force kaldırıldı; resolveRecoverSprintId; dryRun default true; dryRun:false → cliArgsFor null + dispatch no-spawn. Counterexample {_rest:['sprint-731'],dryRun:false} testli.\n2. Custody: withholdToolResultFromContext — executedOk, delivery=undelivered, resultRef spill; loop executedSnapshot önce withhold. shrinkToolResultContent ToolResultContextBudgetError → entry skip (turn abort yok).\n3. Tests: tests/agent/tool-result-delivery-withhold.test.ts; loop custody+spill; bridge recover matrix güncellendi.\nBase: 5e0faabaa + uncommitted. Touch: chat-tool-bridge.ts, loop.ts, tool-result-retention.ts, tests/cli/chat-tool-bridge.test.ts, tests/agent/loop.test.ts, evidence rev3.\nVerify: npx vitest run tests/cli/chat-tool-bridge.test.ts tests/agent/loop.test.ts tests/agent/tool-result-delivery-withhold.test.ts → 73/73 exit0; npm run lint:i18n exit0.\nEvidence: docs/execution/evidence/terminal-winddown-20260910/cursor-cli-bridge-context-package-20260911.md\nHOLD: owner live smoke (kill taskId, MASTER load, recover dry-run); PTY S4; formal XVerify. Live kill/cleanup/recover mutation test koşulmadı.\n"
+    },
+    "189": {
+      "sha256": "428761035144d2c5d3bc5fad569793f6048e9516ee5689adb443559f945d5c40",
+      "body": "re=188:4d06d8099201\nLANDED — owner onaylı main commit cc70d0c0522ed871781e50e6374af9047f8e24c8 (fix(terminal): CLI bridge argv parity and context result custody rev3). ENTRY 188 paketi bu commit'te; Astra scoped ACCEPT/REVISE rica edilir.\nOwner smoke (build:all exit0, REPL local-llm): @docs/MASTER-PLAN.md analizi ~262s tamamlandı — outline/dilim/ref/withhold/interim; önceki \"tur durdu\" bu koşuda yok. durum-raporu.md güncellendi.\nSonraki küçük iş (RELATED, owner talep — analiz/ASSIGN): operatör yüzeyinde **işlev çıktısı vs model cevabı** ayrımı. Tool telemetry (dosya okundu · N ms, shell, ref read) soluk/turuncu, tek satırlık canlı durum (spam satır yok); model prose normal transcript. İç düşünce/ara plan kullanıcı output'u değil. Touch adayları: transcript-turn-view, native-agent-bridge event sınıfları, activity footer, i18n label injection. \"Nasıl yaparız\" — mevcut event akışına minimal diff önerisi istenir; scope P4-UX micro-slice.\nVerify (Cursor): vitest bridge+loop+withhold 73/73; lint:i18n; owner build:all exit0.\nHOLD: lifecycle mutation smoke, PTY S4, formal XVerify.\n"
+    }
+  },
+  "mainHead": "98983609a",
+  "productCommit": "cc70d0c0522ed871781e50e6374af9047f8e24c8",
+  "verdict": "recover bypass CLOSED by source review; context PARTIAL/HOLD",
+  "remaining": "receipt digest validation, bounded control allocation, durable delivered/undelivered consumer and no-duplicate effect proof; PTY S4; formal XVerify",
+  "verification": "Cursor reports 73 tests exit0, lint:i18n exit0, owner build:all exit0; Astra source review only"
+}
