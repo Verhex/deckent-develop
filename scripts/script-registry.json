@@ -1269,6 +1269,16 @@
    "notes": "Registered during the 2026-09-03 main landing closure; expanded by recovery 3333 without generic attestation. The immutable registry currently owns the Closure OS authority observer and the 7099 L1 Terminal native-provider observer. Each adapter fixes its assets, executable, argv, environment, target tuple, schema and success predicate in code; the harness validates no-follow asset custody and rechecks identity before returning an observation."
   },
   {
+   "file": "scripts/memory-compact-host-proof-observer.mjs",
+   "class": "recurring-proof",
+   "owner": "production-wiring-host-proof-registry",
+   "npmScript": null,
+   "input": "no operator input; code-owned temporary MemoryStore fixture and the exact memory export renderer observed by the production-wiring host-proof harness",
+   "output": "one canonical deckent-memory-compact-read-export-observation-v1 JSON observation on stdout, or a non-zero typed observation failure; removes only its temporary fixture directory",
+   "expiry": "none — permanent trusted-host observer for the exact memory read/export production-wiring profile",
+   "notes": "Registered with ADR-D-007 prerequisite 9002. The script is a harness-owned observer, not a product feature or durable-state writer: it creates an isolated tmpdir database, checks deterministic guarded exports and source preservation, then removes that tmpdir. The production-wiring harness fixes its identity, asset custody, execution and success predicate."
+  },
+  {
    "file": "scripts/terminal-health-config-host-proof-observer.mjs",
    "class": "recurring-proof",
    "owner": "terminal-host-proof-registry",

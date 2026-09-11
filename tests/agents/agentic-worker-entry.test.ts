@@ -32,6 +32,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   runWorkerEntry,
   computeNumstat,
@@ -42,6 +43,10 @@ import type {
   AgenticRunnerResult,
 } from '../../src/agents/agentic-worker-runner.js';
 import { LIVE_TRACE_ENV } from '../../src/core/config.js';
+import {
+  buildPromptDeliveryReceipt,
+  writePromptDeliveryReceipt,
+} from '../../src/core/prompt-delivery-receipt.js';
 
 // ─── Test helpers ───────────────────────────────────────────────────────────
 
@@ -124,6 +129,17 @@ function seedTaskJson(
     JSON.stringify(task),
     'utf-8',
   );
+  const prompt = `HOST_COMPILED_PROMPT:${String(task.description)}`;
+  const digest = createHash('sha256').update(prompt, 'utf8').digest('hex');
+  writeFileSync(join(projectDir, '.tasks', `.prompt-${taskId}-${digest}.txt`), prompt, 'utf8');
+  const receipt = buildPromptDeliveryReceipt({
+    taskId,
+    prompt,
+    promptCompilePlanId: `prompt-compile-plan:sha256:${'1'.repeat(64)}`,
+    rolePolicyIdentity: 'worker:generic',
+    segments: [],
+  });
+  expect(writePromptDeliveryReceipt(projectDir, receipt)).toBe(true);
 }
 
 /** Build a mock runner that emits a scripted AgenticRunnerResult. */
@@ -172,6 +188,46 @@ describe('runWorkerEntry / computeNumstat — T-234-002 .result completeness', (
       provider: 'ollama',
       model: 'qwen3.6:27b',
     });
+  });
+
+  it('passes the receipt-bound host-compiled prompt to the agentic runner instead of task description', async () => {
+    const taskId = 'memory-prompt-parity';
+    seedTaskJson(projectDir, taskId, { description: 'UNTRUSTED_DESCRIPTION_ONLY' });
+    let observedPrompt = '';
+    const runner = async (opts: AgenticRunnerOptions): Promise<AgenticRunnerResult> => {
+      observedPrompt = opts.prompt;
+      return {
+        taskId,
+        filesChanged: [],
+        selfAssessment: 'DONE',
+        notes: 'observed',
+        iterations: 1,
+        terminationReason: 'task_done',
+      };
+    };
+    await runWorkerEntry([taskId, 'qwen3.6:27b', 'http://localhost:11434'], projectDir, { runner });
+    expect(observedPrompt).toBe('HOST_COMPILED_PROMPT:UNTRUSTED_DESCRIPTION_ONLY');
+    expect(observedPrompt).not.toBe('UNTRUSTED_DESCRIPTION_ONLY');
+  });
+
+  it('fails closed before the runner when the compiled prompt bytes are tampered', async () => {
+    const taskId = 'memory-prompt-tampered';
+    seedTaskJson(projectDir, taskId);
+    const promptPath = readFileSync(
+      join(projectDir, '.tasks', `task-${taskId}.skill-delivery.json`),
+      'utf8',
+    );
+    const receipt = JSON.parse(promptPath) as { promptSha256: string };
+    writeFileSync(join(projectDir, '.tasks', `.prompt-${taskId}-${receipt.promptSha256}.txt`), 'tampered', 'utf8');
+    let called = false;
+    const { result } = await runWorkerEntry(
+      [taskId, 'qwen3.6:27b', 'http://localhost:11434'],
+      projectDir,
+      { runner: async () => { called = true; throw new Error('must-not-run'); } },
+    );
+    expect(called).toBe(false);
+    expect(result.selfAssessment).toBe('NO_GO');
+    expect(result.notes).toContain('COMPILED_PROMPT_AUTHORITY_HOLD:digest-mismatch');
   });
 
   // ── Test 2: git diff --numstat on a modified-tracked file ──

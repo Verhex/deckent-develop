@@ -12,7 +12,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync as realReadFileSync, existsSync as realExistsSync } from 'node:fs';
 import { join as realJoin, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -418,6 +417,72 @@ describe('runPostFinalizeHooks', () => {
 const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const IDENTITY_PATH = realJoin(PROJECT_ROOT, '.deckent/workspace/IDENTITY.md');
 
+/**
+ * Build a complete, isolated input for the real stats/lint producers. These
+ * tests must never rewrite the repository's managed identity artifact.
+ */
+async function createManagedIdentityProducerFixture(): Promise<{
+  readonly root: string;
+  readonly identityPath: string;
+  readonly cleanup: () => void;
+}> {
+  const fs = await vi.importActual<typeof import('node:fs')>('node:fs');
+  const os = await vi.importActual<typeof import('node:os')>('node:os');
+  const path = await vi.importActual<typeof import('node:path')>('node:path');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'deckent-identity-producer-'));
+  const identityPath = path.join(root, '.deckent', 'workspace', 'IDENTITY.md');
+  try {
+    fs.mkdirSync(path.join(root, 'src', 'mcp', 'tools'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'src', 'mcp', 'resources'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'src', 'cli', 'commands'), { recursive: true });
+    fs.mkdirSync(path.join(root, '.deckent', 'agents', 'operator'), { recursive: true });
+    fs.mkdirSync(path.join(root, '.deckent', 'skills', 'memory'), { recursive: true });
+    fs.mkdirSync(path.dirname(identityPath), { recursive: true });
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '1.0.0' }));
+    fs.writeFileSync(path.join(root, 'README.md'), '# Fixture\n');
+    fs.writeFileSync(path.join(root, 'README.tr.md'), '# Fixture\n');
+    fs.writeFileSync(identityPath, '# Fixture Identity\n\n## Project Status\n');
+    fs.writeFileSync(path.join(root, 'src', 'mcp', 'tools', 'fixture.ts'), "server.registerTool('fixture-tool', {});\n");
+    fs.writeFileSync(path.join(root, 'src', 'mcp', 'resources', 'fixture.ts'), "server.registerResource('fixture-resource', {});\n");
+    fs.writeFileSync(path.join(root, 'src', 'cli', 'commands', 'fixture.ts'), 'export function registerFixture(program: unknown): void {}\n');
+    fs.writeFileSync(path.join(root, '.deckent', 'agents', 'operator', 'agent.json'), '{}\n');
+    fs.writeFileSync(path.join(root, '.deckent', 'skills', 'memory', 'manifest.json'), '{}\n');
+
+    // The production scripts must see the native filesystem, not this test
+    // module's unit-test fs mock. Imported source modules above are already
+    // bound to their mocks; this only affects the isolated fixture producer.
+    vi.doUnmock('node:fs');
+    vi.resetModules();
+    const producer = await import('../../scripts/update-readme-stats.mjs') as {
+      main: (argv?: string[], opts?: { root?: string }) => number;
+    };
+    const generated = producer.main(['--write'], { root });
+    if (generated !== 0) {
+      throw new Error(`fixture producer failed with exit ${generated}`);
+    }
+    return { root, identityPath, cleanup: () => fs.rmSync(root, { recursive: true, force: true }) };
+  } catch (error) {
+    fs.rmSync(root, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+async function runFixtureIdentityLint(root: string): Promise<{ code: number; stderr: string }> {
+  const lint = await import('../../scripts/lint-identity-md.mjs') as {
+    main: (argv?: string[], opts?: { root?: string }) => Promise<number>;
+  };
+  const stderr: string[] = [];
+  const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: string | Uint8Array) => {
+    stderr.push(String(chunk));
+    return true;
+  }) as typeof process.stderr.write);
+  try {
+    return { code: await lint.main([], { root }), stderr: stderr.join('') };
+  } finally {
+    stderrSpy.mockRestore();
+  }
+}
+
 function extractAutogenBlockRaw(content: string, id: string): string | null {
   const start = `<!-- AUTOGEN:START id="${id}" -->`;
   const end = `<!-- AUTOGEN:END id="${id}" -->`;
@@ -478,24 +543,22 @@ describe('IDENTITY.md AUTOGEN block integrity', () => {
   // Implementation note: we invoke the generator in a child process because
   // this test file mocks `node:fs` at the top — calling `collectStats` via
   // dynamic import would feed it the empty mock and return mcpTools=0.
-  it('MCP Tools count in identity-status block matches registered count from update-readme-stats', () => {
-    const block = extractAutogenBlockRaw(identityContent, 'identity-status');
-    expect(block).not.toBeNull();
-    const match = block!.match(/\|\s*MCP Tools\s*\|\s*(\d+)\s*\|/);
-    expect(match).not.toBeNull();
-    const blockCount = parseInt(match![1]!, 10);
+  it('MCP Tools count in a producer-generated identity fixture matches registered count', async () => {
+    const fixture = await createManagedIdentityProducerFixture();
+    try {
+      const realFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+      const block = extractAutogenBlockRaw(realFs.readFileSync(fixture.identityPath, 'utf-8'), 'identity-status');
+      expect(block).not.toBeNull();
+      const match = block!.match(/\|\s*MCP Tools\s*\|\s*(\d+)\s*\|/);
+      expect(match).not.toBeNull();
+      const blockCount = parseInt(match![1]!, 10);
 
-    const scriptUrl = `file://${realJoin(PROJECT_ROOT, 'scripts/update-readme-stats.mjs').replace(/\\/g, '/')}`;
-    const proc = spawnSync('node', [
-      '-e',
-      `import('${scriptUrl}').then(m => { const s = m.collectStats({ root: ${JSON.stringify(PROJECT_ROOT)} }); process.stdout.write(String(s.mcpTools)); });`,
-    ], { encoding: 'utf-8' });
-    expect(proc.status).toBe(0);
-    const registeredCount = parseInt(proc.stdout.trim(), 10);
-    expect(Number.isFinite(registeredCount)).toBe(true);
-    expect(blockCount).toBe(registeredCount);
-    // Lower bound guard: must never regress below the Sprint 190 baseline.
-    expect(blockCount).toBeGreaterThanOrEqual(31);
+      // `--write` above is the real producer: it parsed this fixture's sole
+      // registerTool declaration and generated the block under assertion.
+      expect(blockCount).toBe(1);
+    } finally {
+      fixture.cleanup();
+    }
   });
 
   // (b) Project Status table is inside identity-status AUTOGEN block
@@ -616,12 +679,17 @@ describe('validateIdentityAutogenScope', () => {
 
 describe('AUTOGEN extends Project Status (Sprint 191 Task 191-009 contract)', () => {
   let identityContent: string;
+  let fixture: Awaited<ReturnType<typeof createManagedIdentityProducerFixture>>;
   const IDENTITY_REL = '.deckent/workspace/IDENTITY.md';
-  const LINT_SCRIPT = realJoin(PROJECT_ROOT, 'scripts/lint-identity-md.mjs');
 
   beforeEach(async () => {
     const realFs = await vi.importActual<typeof import('node:fs')>('node:fs');
-    identityContent = realFs.readFileSync(IDENTITY_PATH, 'utf-8');
+    fixture = await createManagedIdentityProducerFixture();
+    identityContent = realFs.readFileSync(fixture.identityPath, 'utf-8');
+  });
+
+  afterEach(() => {
+    fixture.cleanup();
   });
 
   // (a) AUTOGEN extends Project Status: the entire metric table is bracketed
@@ -660,26 +728,16 @@ describe('AUTOGEN extends Project Status (Sprint 191 Task 191-009 contract)', ()
   // `lint-identity-md.mjs` (the CI guard).
   it('lint script exits non-zero when a managed metric is hand-edited', async () => {
     const realFs = await vi.importActual<typeof import('node:fs')>('node:fs');
-    const original = realFs.readFileSync(IDENTITY_PATH, 'utf-8');
+    const original = realFs.readFileSync(fixture.identityPath, 'utf-8');
     const tampered = original.replace(/\|\s*MCP Tools\s*\|\s*\d+\s*\|/, '| MCP Tools | 99 |');
     expect(tampered).not.toBe(original);
 
-    try {
-      realFs.writeFileSync(IDENTITY_PATH, tampered);
-      const proc = spawnSync('node', [LINT_SCRIPT], {
-        cwd: PROJECT_ROOT,
-        encoding: 'utf-8',
-      });
-      expect(proc.status).not.toBe(0);
-      // The drift report should mention the IDENTITY.md path so operators
-      // know where to look.
-      const combined = `${proc.stdout}${proc.stderr}`;
-      expect(combined).toContain(IDENTITY_REL);
-    } finally {
-      // Always restore — leaving the file tampered would poison every
-      // subsequent test in the suite.
-      realFs.writeFileSync(IDENTITY_PATH, original);
-    }
+    realFs.writeFileSync(fixture.identityPath, tampered);
+    const result = await runFixtureIdentityLint(fixture.root);
+    expect(result.code).not.toBe(0);
+    // The drift report should mention the IDENTITY.md path so operators
+    // know where to look.
+    expect(result.stderr).toContain(IDENTITY_REL);
   });
 
   // (c) generator output stable across runs: invoking the lint script twice
@@ -688,15 +746,11 @@ describe('AUTOGEN extends Project Status (Sprint 191 Task 191-009 contract)', ()
   // When IDENTITY.md is in sync, both runs exit 0. When there is drift (e.g.,
   // during a sprint where docs:stats hasn't been run yet), both runs must still
   // agree — the tool must be deterministic regardless of drift state.
-  it('lint --check reports no drift across two consecutive runs', () => {
-    const runCheck = () => spawnSync('node', [LINT_SCRIPT], {
-      cwd: PROJECT_ROOT,
-      encoding: 'utf-8',
-    });
-    const first = runCheck();
-    const second = runCheck();
+  it('lint --check reports no drift across two consecutive runs', async () => {
+    const first = await runFixtureIdentityLint(fixture.root);
+    const second = await runFixtureIdentityLint(fixture.root);
     // Verify determinism: both runs must return the same exit code and output
-    expect(second.status).toBe(first.status);
-    expect(second.stdout).toBe(first.stdout);
+    expect(second.code).toBe(first.code);
+    expect(second.stderr).toBe(first.stderr);
   });
 });

@@ -123,6 +123,38 @@ function success(manifestValue: ExecutionEffectManifest): ExecutionEffectManifes
   return Object.freeze({ ok: true, manifest: manifestValue });
 }
 
+describe('exact Docker read-only .deck mask baseline', () => {
+  const note = 'docs/execution/canary/CANARY-NOTE.md';
+  const dirs = [directory('.'), directory('docs'), directory('docs/execution'),
+    directory('docs/execution/canary')];
+  const placeholder = file('.deck', '', 0o644);
+
+  it('allows a scoped canary edit when the protected inert mask target is unchanged', () => {
+    const baseline = manifest('baseline', [note], [...dirs, placeholder, file(note, 'before')]);
+    const final = manifest('final', [note], [...dirs, placeholder, file(note, 'after')]);
+    const decision = evaluateExecutionEffectContainment({ baseline: success(baseline), final: success(final) });
+    expect(decision.state).toBe('VERIFIED');
+    expect(decision.effects.map(effect => effect.path)).toEqual([note]);
+  });
+
+  it.each(['late-add', 'content-change', 'mode-change', 'delete'] as const)(
+    'still rejects a protected .deck %s rather than exempting mask paths', (mutation) => {
+      const baseline = manifest('baseline', [note], [
+        ...dirs, ...(mutation === 'late-add' ? [] : [placeholder]), file(note, 'before'),
+      ]);
+      const final = manifest('final', [note], [
+        ...dirs, ...(mutation === 'delete' ? [] : [
+          mutation === 'content-change' ? file('.deck', 'forged')
+            : mutation === 'mode-change' ? file('.deck', '', 0o600) : placeholder,
+        ]), file(note, 'after'),
+      ]);
+      const decision = evaluateExecutionEffectContainment({ baseline: success(baseline), final: success(final) });
+      expect(decision.state).toBe('HOLD');
+      expect(JSON.stringify(decision)).toContain('PROTECTED_PATH_CHANGED');
+    },
+  );
+});
+
 function withWorkspaceIdentity(
   source: ExecutionEffectManifest,
   workspaceIdentity: ExecutionEffectManifest['workspaceIdentity'],

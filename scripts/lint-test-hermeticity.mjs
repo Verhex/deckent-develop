@@ -750,7 +750,30 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // host completion, verifier/write-scope separation and compiler→DIRECTIVES
   // round-trip pins are source-derived and suite-owned; the sealed production
   // observer remains the only real child.
-  count: 18156,
+  // 2026-09-04 (3357 planner-admission supplement): count stays 18156. New
+  // contract/preflight suites use only suite-owned tmpdirs and injected
+  // provider seams; zero confirmed live-authority violations were measured.
+  // 2026-09-04 (3357 reservation recovery): count stays 18156. The real POSIX
+  // crash pin interrupts the adapter transition instead of deleting private
+  // state; only source-derived callsite identities moved.
+  // 2026-09-04 (3357 custody-epoch quarantine): count stays 18156. The
+  // old-root/no-effect recovery regression uses the existing in-memory Store
+  // harness; no additional host-state writer or child-process edge entered.
+  // 2026-09-04 (3357 planner failure/scope truth): count stays 18156. Typed
+  // failure projection and pre-wiring closed-scope tests use injected provider
+  // seams only; no new unresolved effect entered.
+  // 2026-09-04 (3357 exact recovery generation fold): 18156→18158 — two
+  // scheduler registry regressions exercise only suite-owned in-memory
+  // recovery reports under the existing tmpdir root; no child/provider,
+  // project runtime state or external filesystem effect is introduced.
+  // 2026-09-05 (sprint-718 population stdin recovery): 18158→18159 — one
+  // bounded async child-process regression feeds a large in-memory payload to
+  // the production Docker helper's shared stdin-reader source. It owns no
+  // filesystem path, provider, network, shell or ambient runtime mutation.
+  // 3357 exact semantic acceptance: measured 18159→18157, zero violations.
+  // Lexical tmp-root ownership improves cleanup/setup provenance; two dynamic
+  // canonical-artifact tamper targets remain honestly unresolved. No waiver.
+  count: 18157,
   // 2026-08-28 OPERATION-001 O3 ratchet: count unchanged, digest-only —
   // operation-ingress audit moved from report-only proof to a fail-closed
   // lint:gates member with hermetic regression coverage.
@@ -831,7 +854,32 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-09-04 (3333 planner host-completed wiring): final build-free source
   // fingerprint after the exact source/callsite-sealed observer and its
   // verifier/write-scope regression were admitted.
-  digest: 'dbcf292c83a0ee2988a844cb464d9300c72c9ef2d9ea4b5fbe701c061756c01b',
+  // 2026-09-04 (3357 sprint-714 exact dispatch recovery): already-tracked
+  // authority/Terminal tests moved callsite identities, but the measured
+  // unresolved count remains exactly 18156; no new unresolved effect entered.
+  // The image-authority supplement adds only injected-spawn/static Dockerfile
+  // assertions; the unresolved effect count and classifications stay fixed.
+  // The bounded dependency-authority regression adds only existing injected
+  // spawn/static-image assertions; count and classifications remain fixed.
+  // The terminal recovery-evidence supplement adds one hermetic preservation
+  // assertion; the unresolved effect count and classifications remain fixed.
+  // The pre-plan lock-retirement regression adds only a tmpdir-backed
+  // forensic-preservation assertion; count and classifications remain fixed.
+  // The planner applicability supplement adds one pure parser assertion;
+  // unresolved effect count and classifications remain fixed.
+  // The planner-admission supplement keeps the count fixed; its exact
+  // source-derived callsite fingerprint is sealed here.
+  // The recovery-generation fold adds only the two in-memory registry pins
+  // counted above; scanner logic, classifications and allowlists are unchanged.
+  // The sprint-718 stdin pin adds exactly the bounded async child edge counted
+  // above; the scanner remains source-derived and no path is allowlisted.
+  // 2026-09-05 MASTER 3357 continuation: same 18159 unresolved sites,
+  // zero confirmed violations; scoped catalog/prompt/landing source hashes only.
+  // 3357 started-failed recovery: unchanged unresolved count and zero violations;
+  // updated source fingerprints only, with no new tolerance or allowlist.
+  // 3357 clock/diagnostic/criterion continuation: same unresolved population;
+  // native test writes use their actual temporary allocation provenance.
+  digest: 'af68d4b6226fff404b6b83f5e77ddfe858c5f0716e77b7eeea71b85989375d90',
   // 2026-08-27 04:0x: ayni 16514, digest-only — full-suite hizalama batch'i
   // (pin/mock/census guncellemeleri + sync guard).
   // 2026-08-27 03:1x: ayni 16514, digest-only — CI-hizalama paketi
@@ -1391,7 +1439,13 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // content edges are scanner-derived; no module is manually listed here.
   // 2026-09-04 (3331 RECOVERY-BORN-NATIVE-DO-SLASH-PROVIDER-BOOTSTRAP-001): +1 production
   // module src/cli/repl/provider-bootstrap.ts (the ONE lazy provider-bootstrap seam). Prior: 1420.
-  count: 1421,
+  // 2026-09-04 (3357 planner-admission supplement): 1421→1422 solely for
+  // src/orchestra/planner-plan-contract.ts; scan logic and classifications are
+  // unchanged and the measured violation count remains zero.
+  // 3357: +1 wired spawn-backend-recovery-diagnostic production module.
+  // 3357 exact acceptance: pure core verification contract plus Store-backed
+  // orchestra evidence source; measured inventory only, no scanner relaxation.
+  count: 1425,
   // 2026-08-29 OPERATION-COVERAGE-MODEL-001 bounded ADR-D-007 recovery:
   // count unchanged; digest records the canonical catalog-backed semantic
   // inventory and comparative schema-3 baseline authority.
@@ -1504,7 +1558,34 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-09-04 (3333 planner host-completed wiring): final immutable-observer
   // separation moves the same profile/harness bytes; no new module enters the
   // source-derived inventory.
-  digest: 'db12218c84bbc86d54ede9a445745997c60760b25dd0ab1f3fda182b2b7e2e0e',
+  // 2026-09-04 (3357 sprint-714 exact dispatch recovery): existing Docker,
+  // Store, run-status and Terminal modules changed bytes; inventory remains
+  // exactly 1421 modules and no production classification is added or removed.
+  // The image-authority supplement changes only the existing image builder,
+  // readiness probe and Docker backend bytes; the inventory remains fixed.
+  // The dependency-authority closure changes those same admitted modules;
+  // the source-derived production inventory remains exactly 1421 modules.
+  // The terminal recovery-evidence supplement changes only the existing
+  // recovery operation; the inventory count and classifications remain fixed.
+  // The pre-plan startup-HOLD fix changes only the existing controller and
+  // failure-authority modules; the inventory remains exactly 1421 modules.
+  // The planner applicability supplement changes only the existing planner
+  // parser; the inventory count and classifications remain fixed.
+  // The planner path-filter supplement reuses the canonical real-path
+  // predicate from an existing production module; count remains fixed.
+  // The reservation-recovery supplement changes only already-inventoried
+  // Store, Docker backend, planner and recovery modules; count stays 1422.
+  // The custody-epoch quarantine supplement changes the same inventoried
+  // Store, Docker backend, recovery and CLI modules; count stays 1422.
+  // The planner failure/scope truth supplement changes only existing planner
+  // modules; the source-derived production inventory count stays 1422.
+  // The exact recovery generation fold changes only the existing scheduler
+  // registry; production inventory membership and classifications stay fixed.
+  // The sprint-718 stdin recovery changes only the already-inventoried exact
+  // Docker backend helper bytes; membership stays fixed at 1422.
+  // 2026-09-05 MASTER 3357 continuation: same 1422 production modules,
+  // scoped catalog/prompt/landing content and dependency-edge hashes only.
+  digest: '0e800533edc83b1faaf0ff2ecaf01e9558ca31c748c8d5c3a27d95b75b66c5a4',
   // 2026-08-27 04:0x: ayni 1339, digest-only — sync workspace-guard + drift-normalize.
   // 2026-08-27 03:1x: ayni 1339, digest-only — skill-pool readJsonSafe donusumu.
   // 2026-08-27 02:0x: ayni 1339, digest-only — Dalga-3 src kaymalari

@@ -171,38 +171,33 @@ describe('hasRealPendingCheckpoint', () => {
 });
 
 describe('buildBotSystemPrompt — conversational grounding (bot chat quality fix)', () => {
-  let root: string;
-  beforeEach(() => { root = mkdtempSync(join(tmpdir(), 'botprompt-')); });
-  afterEach(() => rmSync(root, { recursive: true, force: true }));
+  const labels = {
+    heading: 'Project memory context',
+    guidance: 'Use scoped records; do not invent missing context.',
+    absent: 'No matching scoped records.',
+    hold: (reasonCode: string) => `Memory context HOLD: ${reasonCode}`,
+  } as const;
 
-  it('no root → returns the bare tool prompt (back-compat)', () => {
+  it('no canonical grounding → returns the bare tool prompt (back-compat)', () => {
     expect(buildBotSystemPrompt()).toBe(DECKENT_BOT_SYSTEM_PROMPT);
   });
 
-  it('injects the live project context (summary.md) so answers are grounded, not hollow', () => {
-    mkdirSync(join(root, '.brain', 'exports'), { recursive: true });
-    writeFileSync(
-      join(root, '.brain', 'exports', 'summary.md'),
-      '# Brain Summary\nadr-088 Memory V2 DB-First — accepted\nSPRINT_MARKER_42',
-      'utf-8',
-    );
-    const prompt = buildBotSystemPrompt(root);
-    expect(prompt).toContain(DECKENT_BOT_SYSTEM_PROMPT); // keeps the tool directives
-    expect(prompt).toContain('SPRINT_MARKER_42');        // grounds in real project context
-    expect(prompt).toContain('Proje Bağlamı');           // the grounding section header
-  });
-
-  it('summary absent → still returns a non-empty grounded prompt (fail-safe, never throws)', () => {
-    const prompt = buildBotSystemPrompt(root);
+  it('injects only the caller-supplied canonical scoped memory view', () => {
+    const prompt = buildBotSystemPrompt({
+      state: 'AVAILABLE', rendered: '## [adr-g-035] Memory authority', revision: 'sha256:revision',
+    }, labels);
     expect(prompt).toContain(DECKENT_BOT_SYSTEM_PROMPT);
-    expect(prompt.length).toBeGreaterThan(DECKENT_BOT_SYSTEM_PROMPT.length);
+    expect(prompt).toContain('## [adr-g-035] Memory authority');
+    expect(prompt).toContain('## Project memory context');
   });
 
-  it('bounds a huge summary so the system prompt never blows up', () => {
-    mkdirSync(join(root, '.brain', 'exports'), { recursive: true });
-    writeFileSync(join(root, '.brain', 'exports', 'summary.md'), 'x'.repeat(20000), 'utf-8');
-    const prompt = buildBotSystemPrompt(root);
-    expect(prompt).toContain('kısaltıldı');
-    expect(prompt.length).toBeLessThan(8000);
+  it('surfaces ABSENT without inventing fallback project facts', () => {
+    const prompt = buildBotSystemPrompt({ state: 'ABSENT', revision: 'sha256:empty' }, labels);
+    expect(prompt).toContain(labels.absent);
+  });
+
+  it('surfaces HOLD as unavailable rather than empty context', () => {
+    const prompt = buildBotSystemPrompt({ state: 'HOLD', reasonCode: 'TENANT_SCOPE_UNAVAILABLE' }, labels);
+    expect(prompt).toContain('Memory context HOLD: TENANT_SCOPE_UNAVAILABLE');
   });
 });

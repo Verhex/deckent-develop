@@ -34,9 +34,11 @@ import {
 import {
   EXECUTION_LOCK_RECOVERY_ATTESTATION_SCHEMA_VERSION,
   acquireExecutionLock,
+  beginExecutionLockIrreversibleBoundary,
   checkExecutionLock,
   recoverQuarantinedExecutionLock,
   releaseExecutionLock,
+  resumeExecutionLockIrreversibleBoundary,
   type ExecutionLockInfo,
 } from '../../src/core/file-lock.js';
 import { processStartToken } from '../../src/core/pid-ownership.js';
@@ -132,8 +134,46 @@ function writeDedicatedTaskExecutionLock(
     authorityEpoch?: string;
     fileName?: string;
     value?: Record<string, unknown>;
+    legacyV3?: boolean;
   } = {},
 ): string {
+  if (options.value === undefined && !options.legacyV3) {
+    const acquiredAt = options.acquiredAt
+      ?? '2026-07-27T00:00:00.000Z';
+    const canonical = acquireExecutionLock(
+      root,
+      taskId,
+      options.actor ?? 'dispatch',
+      { now: () => Date.parse(acquiredAt) },
+    );
+    const value = {
+      ...canonical,
+      renewedAt: options.renewedAt ?? acquiredAt,
+      leaseDurationMs: options.leaseDurationMs ?? canonical.leaseDurationMs,
+    };
+    const directory = join(root, '.locks');
+    const canonicalPath = join(
+      directory,
+      `${sha256(taskId)}.executionlock`,
+    );
+    const path = join(
+      directory,
+      options.fileName ?? `${sha256(taskId)}.executionlock`,
+    );
+    const db = new Database(join(
+      directory,
+      'execution-lock-authority.sqlite3',
+    ));
+    db.prepare(`
+      UPDATE execution_lock_active
+         SET payload_json = ?
+       WHERE task_id = ?
+    `).run(JSON.stringify(value), taskId);
+    db.close();
+    if (path !== canonicalPath) rmSync(canonicalPath, { force: true });
+    writeFileSync(path, JSON.stringify(value), 'utf8');
+    return path;
+  }
   const directory = join(root, '.locks');
   const fileName = options.fileName ?? `${sha256(taskId)}.executionlock`;
   const path = join(directory, fileName);
@@ -345,6 +385,7 @@ function seedLegacyV2DedicatedExecutionLock(
     authorityEpoch: '40000000-0000-4000-8000-000000000004',
     fencingToken: 9,
     fencingNonce: '2'.repeat(32),
+    legacyV3: true,
   });
   const current = JSON.parse(
     readFileSync(projectionPath, 'utf8'),
@@ -1084,7 +1125,7 @@ describe('clean active-execution admission', () => {
     expect(report.reasons).toEqual([]);
   });
 
-  it('owns and releases the canonical v3 maintenance generation with epoch/counter/nonce fencing', () => {
+  it('owns and releases the canonical v4 maintenance generation with epoch/counter/nonce fencing', () => {
     const root = fixtureRoot();
     const lock = acquireCleanMaintenanceLock(root);
 
@@ -1121,7 +1162,7 @@ describe('clean active-execution admission', () => {
       join(root, '.locks', 'execution-lock-authority.sqlite3'),
       { readonly: true },
     );
-    expect(db.pragma('user_version', { simple: true })).toBe(3);
+    expect(db.pragma('user_version', { simple: true })).toBe(4);
     expect(db.prepare(`
       SELECT authority_epoch, fencing_counter
         FROM execution_lock_meta
@@ -1133,6 +1174,74 @@ describe('clean active-execution admission', () => {
     expect(db.prepare('SELECT COUNT(*) AS count FROM execution_lock_active').get())
       .toEqual({ count: 0 });
     db.close();
+  });
+
+  it('reads a core-produced v4 execution authority as a blocking active execution', () => {
+    const root = fixtureRoot();
+    writeTask(root, 'core-v4-to-clean', 'DRAFT');
+    const execution = acquireExecutionLock(root, 'core-v4-to-clean', 'dispatch');
+
+    const report = inspectActiveExecutions(root, {
+      processProbe: () => 'alive',
+    });
+    expect(report.decision).toBe('HOLD');
+    expect(reasonCodes(report)).toContain(
+      'E_CLEAN_TASK_EXECUTION_FENCE_ACTIVE',
+    );
+    expect(() => acquireCleanMaintenanceLock(root))
+      .toThrowError(/E_CLEAN_PROJECT_ACTIVE/u);
+
+    releaseExecutionLock(root, execution.taskId, execution.ownerId);
+  });
+
+  it('reads a core v4 resumed boundary whose original entry predates its new generation', () => {
+    const root = fixtureRoot();
+    const base = Date.parse('2026-07-27T12:00:00.000Z');
+    const firstIdentity = {
+      hostInstanceId: 'resume-host-a',
+      bootSessionId: 'resume-boot-a',
+      processSessionId: 'resume-process-a',
+    };
+    const resumedIdentity = {
+      hostInstanceId: 'resume-host-b',
+      bootSessionId: 'resume-boot-b',
+      processSessionId: 'resume-process-b',
+    };
+    const first = acquireExecutionLock(root, 'core-v4-resume-to-clean', 'dispatch', {
+      now: () => base,
+      leaseDurationMs: 100,
+      runtimeIdentity: firstIdentity,
+      livenessProbe: { inspect: () => 'alive' },
+    });
+    const boundary = beginExecutionLockIrreversibleBoundary(
+      root,
+      first,
+      { evidenceRefs: ['resume:boundary'] },
+      {
+        now: () => base + 1,
+        runtimeIdentity: firstIdentity,
+        livenessProbe: { inspect: () => 'alive' },
+      },
+    );
+    const resumed = resumeExecutionLockIrreversibleBoundary(
+      root,
+      boundary,
+      { evidenceRefs: ['resume:verified-context'] },
+      {
+        now: () => base + 101,
+        leaseDurationMs: 100,
+        runtimeIdentity: resumedIdentity,
+        livenessProbe: { inspect: () => 'dead' },
+      },
+    );
+
+    expect(Date.parse(resumed.resumed.lock.acquiredAt))
+      .toBeGreaterThan(Date.parse(boundary.enteredAt));
+    expect(() => acquireCleanMaintenanceLock(root))
+      .toThrowError(/E_CLEAN_MAINTENANCE_AUTHORITY_QUARANTINED/u);
+    expect(reasonCodes(inspectActiveExecutions(root))).toContain(
+      'E_CLEAN_EXECUTIONLOCK_QUARANTINED',
+    );
   });
 
   it('accepts a persistent authority anchor recorded in another mount namespace', () => {
@@ -1659,7 +1768,7 @@ describe('clean active-execution admission', () => {
     const db = new Database(
       join(root, '.locks', 'execution-lock-authority.sqlite3'),
     );
-    expect(db.pragma('user_version', { simple: true })).toBe(3);
+    expect(db.pragma('user_version', { simple: true })).toBe(4);
     const firstRows = db.prepare(`
       SELECT quarantine_id, payload_json
         FROM execution_lock_quarantine
@@ -1687,6 +1796,96 @@ describe('clean active-execution admission', () => {
        ORDER BY event_id
     `).all()).toEqual(firstAudits);
     replay.close();
+  });
+
+  it('migrates legacy v3 active and quarantine audit bytes to v4 before HOLDing', () => {
+    const root = fixtureRoot();
+    const taskId = 'legacy-v3-clean-migration';
+    const projectionPath = writeDedicatedTaskExecutionLock(root, taskId, {
+      legacyV3: true,
+    });
+    const lock = JSON.parse(readFileSync(
+      projectionPath,
+      'utf8',
+    )) as ExecutionLockInfo;
+    const quarantine = {
+      schemaVersion: 1,
+      quarantineId: '60000000-0000-4000-8000-000000000006',
+      lock,
+      state: 'quarantined',
+      reason: 'authority-uncertain',
+      evidenceRefs: ['legacy:v3-quarantine'],
+      enteredAt: lock.renewedAt,
+      quarantinedAt: lock.renewedAt,
+    };
+    const audit = {
+      schemaVersion: 1,
+      eventId: '70000000-0000-4000-8000-000000000007',
+      action: 'quarantined',
+      quarantineId: quarantine.quarantineId,
+      taskId,
+      ownerId: lock.ownerId,
+      fencingToken: lock.fencingToken,
+      occurredAt: lock.renewedAt,
+      payload: quarantine,
+    };
+    const dbPath = join(root, '.locks', 'execution-lock-authority.sqlite3');
+    const seeded = new Database(dbPath);
+    seeded.prepare(`
+      INSERT INTO execution_lock_quarantine(
+        task_id, quarantine_id, owner_id, fencing_epoch, fencing_counter,
+        fencing_nonce, state, reason, entered_at, quarantined_at, payload_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      taskId,
+      quarantine.quarantineId,
+      lock.ownerId,
+      lock.fencingToken.epoch,
+      lock.fencingToken.counter,
+      lock.fencingToken.nonce,
+      quarantine.state,
+      quarantine.reason,
+      quarantine.enteredAt,
+      quarantine.quarantinedAt,
+      JSON.stringify(quarantine),
+    );
+    seeded.prepare(`
+      INSERT INTO execution_lock_quarantine_audit(
+        event_id, action, quarantine_id, task_id, owner_id, fencing_epoch,
+        fencing_counter, fencing_nonce, occurred_at, payload_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      audit.eventId,
+      audit.action,
+      audit.quarantineId,
+      audit.taskId,
+      audit.ownerId,
+      lock.fencingToken.epoch,
+      lock.fencingToken.counter,
+      lock.fencingToken.nonce,
+      audit.occurredAt,
+      JSON.stringify(audit),
+    );
+    seeded.close();
+
+    expect(() => acquireCleanMaintenanceLock(root))
+      .toThrowError(/E_CLEAN_MAINTENANCE_AUTHORITY_QUARANTINED/u);
+
+    const migrated = new Database(dbPath, { readonly: true });
+    expect(migrated.pragma('user_version', { simple: true })).toBe(4);
+    expect(migrated.prepare(`
+      SELECT payload_json FROM execution_lock_active WHERE task_id = ?
+    `).get(taskId)).toEqual({ payload_json: JSON.stringify(lock) });
+    expect(migrated.prepare(`
+      SELECT payload_json FROM execution_lock_quarantine_audit
+       WHERE event_id = ?
+    `).get(audit.eventId)).toEqual({ payload_json: JSON.stringify(audit) });
+    migrated.close();
+    expect(checkExecutionLock(root, taskId)).toEqual({
+      state: 'quarantined',
+      lock,
+      quarantine,
+    });
   });
 
   it('rolls back clean v2 migration atomically when a later row is malformed', () => {
@@ -1739,14 +1938,21 @@ describe('clean active-execution admission', () => {
     after.close();
   });
 
-  it('fails closed when a named v3 quarantine guard is missing', () => {
+  it.each([
+    'execution_lock_quarantine_audit_no_delete',
+    'execution_lock_active_adoption_audit_no_delete',
+    'execution_lock_quarantine_monotonic_update',
+    'execution_lock_quarantine_one_resume_generation',
+  ])('fails closed when required v4 schema object %s is missing', (name) => {
     const root = fixtureRoot();
     const lock = acquireCleanMaintenanceLock(root);
     releaseCleanMaintenanceLock(root, lock);
     const db = new Database(
       join(root, '.locks', 'execution-lock-authority.sqlite3'),
     );
-    db.exec('DROP TRIGGER execution_lock_quarantine_audit_no_delete');
+    db.exec(name.startsWith('execution_lock_quarantine_one_')
+      ? `DROP INDEX ${name}`
+      : `DROP TRIGGER ${name}`);
     db.close();
 
     expect(checkExecutionLock(root, lock.taskId)).toEqual(
@@ -1761,7 +1967,7 @@ describe('clean active-execution admission', () => {
       .toThrowError(/E_CLEAN_MAINTENANCE_AUTHORITY_INVALID/u);
   });
 
-  it('fails closed for missing or mismatched v3 DB/sentinel authority state', () => {
+  it('fails closed for missing or mismatched v4 DB/sentinel authority state', () => {
     const sentinelOnly = fixtureRoot();
     mkdirSync(join(sentinelOnly, '.locks'), { recursive: true });
     writeFileSync(

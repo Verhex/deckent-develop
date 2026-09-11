@@ -298,3 +298,12 @@ native/exec-authority/.build-stage-*/
 .deckent/runtime/evaluations/
 .deckent/runtime/closure-staging/
 docs/archive/
+.mcp.local.json
+
+# Owner repository hygiene 2026-09-11: live projections stay on disk, not in Git.
+/.brain/exports/
+/.brain/ERRORS-critical.md
+/.deckent/runtime/bot-listen.log
+/.deckent/runtime/local-llm.pid
+/.deckent/runtime/recover-resume-outcome-*.json
+/.deckent/build/

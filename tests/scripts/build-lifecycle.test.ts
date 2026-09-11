@@ -6,6 +6,8 @@ import {
 } from 'vitest';
 import {
   existsSync,
+  linkSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -404,6 +406,157 @@ describe('transactional build lifecycle', () => {
       .toBe('export const value = "original";\n');
     expect(readFileSync(sourcePath, 'utf8'))
       .toBe('export const value = "original";\n');
+  });
+
+  it('copies a closed toolchain hardlink set into independent nlink-one snapshot files', async () => {
+    const root = fixtureRoot();
+    const events: string[] = [];
+    const source = join(root, 'node_modules', 'typescript', 'bin', 'tsc');
+    const alias = join(root, 'node_modules', 'typescript', 'bin', 'tsc-copy');
+    linkSync(source, alias);
+    expect(lstatSync(source).nlink).toBe(2);
+    expect(lstatSync(alias).ino).toBe(lstatSync(source).ino);
+
+    await runTransactionalBuild({
+      root,
+      allowFixtureRoot: true,
+      scope: 'core',
+      runId: 'run-closed-toolchain-hardlinks',
+      authority: fakeAuthority(events),
+      runTool: async (entrypoint, args, cwd) => {
+        const copied = join(cwd, 'node_modules', 'typescript', 'bin', 'tsc');
+        const copiedAlias = join(cwd, 'node_modules', 'typescript', 'bin', 'tsc-copy');
+        const copiedStat = lstatSync(copied);
+        const copiedAliasStat = lstatSync(copiedAlias);
+        expect(copiedStat.nlink).toBe(1);
+        expect(copiedAliasStat.nlink).toBe(1);
+        expect(copiedAliasStat.ino).not.toBe(copiedStat.ino);
+        expect(readFileSync(copiedAlias)).toEqual(readFileSync(copied));
+        await fakeTypeScript(entrypoint, args);
+      },
+      stdio: 'ignore',
+    });
+
+    expect(events).toEqual(['acquire', 'assert', 'begin', 'complete']);
+  });
+
+  it.each(['external', 'excluded'] as const)(
+    'rejects a toolchain hardlink set with an %s alias outside the copied tree',
+    async (aliasClass) => {
+      const root = fixtureRoot();
+      const events: string[] = [];
+      const source = join(root, 'node_modules', 'typescript', 'bin', 'tsc');
+      const alias = aliasClass === 'external'
+        ? join(root, 'toolchain-external-alias')
+        : join(root, 'node_modules', '.bin', 'excluded-tool-alias');
+      if (aliasClass === 'excluded') mkdirSync(join(root, 'node_modules', '.bin'));
+      linkSync(source, alias);
+
+      await expect(runTransactionalBuild({
+        root,
+        allowFixtureRoot: true,
+        scope: 'core',
+        runId: `run-open-toolchain-hardlinks-${aliasClass}`,
+        authority: fakeAuthority(events),
+        runTool: fakeTypeScript,
+        stdio: 'ignore',
+      })).rejects.toMatchObject({ code: 'E_BUILD_INPUT_UNSAFE' });
+
+      expect(events).toEqual(['acquire', 'release']);
+    },
+  );
+
+  it('keeps project source hardlinks outside the toolchain exception', async () => {
+    const root = fixtureRoot();
+    const events: string[] = [];
+    linkSync(
+      join(root, 'src', 'core', 'main.ts'),
+      join(root, 'src', 'core', 'main-copy.ts'),
+    );
+
+    await expect(runTransactionalBuild({
+      root,
+      allowFixtureRoot: true,
+      scope: 'core',
+      runId: 'run-source-hardlink-rejected',
+      authority: fakeAuthority(events),
+      runTool: fakeTypeScript,
+      stdio: 'ignore',
+    })).rejects.toMatchObject({ code: 'E_BUILD_INPUT_UNSAFE' });
+
+    expect(events).toEqual([]);
+  });
+
+  it('keeps generated build output hardlinks outside the toolchain exception', async () => {
+    const root = fixtureRoot();
+    const events: string[] = [];
+
+    await expect(runTransactionalBuild({
+      root,
+      allowFixtureRoot: true,
+      scope: 'core',
+      runId: 'run-output-hardlink-rejected',
+      authority: fakeAuthority(events),
+      runTool: async (entrypoint, args) => {
+        await fakeTypeScript(entrypoint, args);
+        const output = args[args.indexOf('--outDir') + 1]!;
+        linkSync(join(output, 'index.js'), join(output, 'index-copy.js'));
+      },
+      stdio: 'ignore',
+    })).rejects.toMatchObject({ code: 'E_BUILD_INPUT_UNSAFE' });
+
+    expect(events).toEqual(['acquire', 'release']);
+  });
+
+  it('rejects a closed toolchain inode that mutates during snapshot copy', async () => {
+    const root = fixtureRoot();
+    const events: string[] = [];
+    const runId = 'run-toolchain-hardlink-copy-drift';
+    const source = join(root, 'node_modules', 'typescript', 'bin', 'tsc');
+    const alias = join(root, 'node_modules', 'typescript', 'bin', 'zz-tsc-copy');
+    const copiedSource = join(
+      root,
+      '.deckent',
+      'build',
+      'runs',
+      runId,
+      'source-workspace',
+      'node_modules',
+      'typescript',
+      'bin',
+      'tsc',
+    );
+    linkSync(source, alias);
+    const authority = fakeAuthority(events);
+    const baseRenew = authority.renew;
+    let mutated = false;
+    authority.renew = (...args: Parameters<typeof baseRenew>) => {
+      if (!mutated && existsSync(copiedSource)) {
+        writeFileSync(alias, '#!/usr/bin/env node\n// mutated through closed alias\n');
+        mutated = true;
+      }
+      return baseRenew(...args);
+    };
+    let monotonic = 0;
+
+    await expect(runTransactionalBuild({
+      root,
+      allowFixtureRoot: true,
+      scope: 'core',
+      runId,
+      leaseDurationMs: 750,
+      heartbeatIntervalMs: 250,
+      monotonicNow: () => {
+        monotonic += 300;
+        return monotonic;
+      },
+      authority,
+      runTool: fakeTypeScript,
+      stdio: 'ignore',
+    })).rejects.toMatchObject({ code: 'E_BUILD_COPY_SOURCE_DRIFT' });
+
+    expect(mutated).toBe(true);
+    expect(events.at(-1)).toBe('release');
   });
 
   it('copies and digests the canonical root npm shrinkwrap as a build input', async () => {

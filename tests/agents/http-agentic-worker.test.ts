@@ -18,6 +18,7 @@ import { EventEmitter } from 'node:events';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
@@ -31,6 +32,10 @@ import {
 } from '../../src/agents/http-agentic-worker.js';
 import { OLLAMA_TOOLS } from '../../src/agents/agentic-worker-tools.js';
 import { OpenAICompatibleAdapter } from '../../src/providers/openai-compatible.js';
+import {
+  buildPromptDeliveryReceipt,
+  writePromptDeliveryReceipt,
+} from '../../src/core/prompt-delivery-receipt.js';
 
 // ─── send() scripting helpers ─────────────────────────────────────────────────
 
@@ -214,6 +219,17 @@ describe('runHttpWorkerEntry — F1-013 entry shim end-to-end', () => {
       JSON.stringify(body, null, 2),
       'utf-8',
     );
+    const prompt = `HOST_COMPILED_PROMPT:${String(body['description'] ?? '')}`;
+    const digest = createHash('sha256').update(prompt, 'utf8').digest('hex');
+    writeFileSync(join(projectRoot, '.tasks', `.prompt-${taskId}-${digest}.txt`), prompt, 'utf8');
+    const receipt = buildPromptDeliveryReceipt({
+      taskId,
+      prompt,
+      promptCompilePlanId: `prompt-compile-plan:sha256:${'2'.repeat(64)}`,
+      rolePolicyIdentity: 'worker:generic',
+      segments: [],
+    });
+    expect(writePromptDeliveryReceipt(projectRoot, receipt)).toBe(true);
   }
 
   it('reads task json, drives the REAL loop via injected send, writes a valid .result + .hb (DONE)', async () => {
@@ -226,11 +242,12 @@ describe('runHttpWorkerEntry — F1-013 entry shim end-to-end', () => {
       goNogo: { goCriteria: 'allowed.ts created', noGoCriteria: 'nothing written', techDebtAcceptable: 'none' },
     });
 
+    const captured: CapturedTurn[] = [];
     const send = scriptSend([
       toolTurn([{ name: 'read_file', args: { path: 'README.md' } }]),
       toolTurn([{ name: 'write_file', args: { path: 'allowed.ts', content: 'export const ok = true;\n' } }]),
       toolTurn([{ name: 'task_done', args: { selfAssessment: 'DONE', notes: 'created allowed.ts' } }]),
-    ]);
+    ], captured);
 
     const { exitCode, resultPath, result } = await runHttpWorkerEntry(
       [taskId, 'deepseek-chat', 'https://api.deepseek.com/v1', 'DEEPSEEK_API_KEY', 'deepseek'],
@@ -254,6 +271,8 @@ describe('runHttpWorkerEntry — F1-013 entry shim end-to-end', () => {
     const usage = onDisk['tokenUsage'] as Record<string, unknown>;
     expect(usage['provider']).toBe('deepseek');
     expect(usage['model']).toBe('deepseek-chat');
+    expect(captured[0]?.messages.find(message => message.role === 'user')?.content)
+      .toBe('HOST_COMPILED_PROMPT:Create allowed.ts');
 
     // Heartbeat reached the DONE terminal state.
     const hb = JSON.parse(

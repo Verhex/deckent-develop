@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import {
   BRAIN_PLAN_TIMEOUT_MS,
-  BRAIN_PLAN_MAX_CONTEXT_LINES,
   DECKENT_DIR,
   PROJECT_CONFIG_PATH,
   GLOBAL_DECKENT_DIR,
@@ -222,9 +221,6 @@ describe('Brain AI planner constants', () => {
     expect(BRAIN_PLAN_TIMEOUT_MS).toBe(900_000);
   });
 
-  it('BRAIN_PLAN_MAX_CONTEXT_LINES === 200', () => {
-    expect(BRAIN_PLAN_MAX_CONTEXT_LINES).toBe(200);
-  });
 });
 
 describe('Task file extensions', () => {

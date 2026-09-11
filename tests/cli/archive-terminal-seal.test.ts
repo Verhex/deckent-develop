@@ -222,6 +222,7 @@ describe('archive terminal operator surface', () => {
     expect(JSON.parse(verified.stdout)).toMatchObject({ ok: true, reasonCodes: [] });
     expect(verified.exitCode).toBe(0);
     expect(brainDiskSnapshot()).toEqual(brainBeforeVerify);
+    seal.mockRestore();
   });
 
   it('reports a staged partial core failure truthfully and replays the same original preimages', async () => {

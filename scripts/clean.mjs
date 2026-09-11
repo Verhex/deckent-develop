@@ -305,9 +305,10 @@ const TASK_EXECUTION_FENCE_STALE_MS = 5 * 60 * 1_000;
 const TASK_EXECUTION_FENCE_OWNER_RE =
   /^(dispatch|settlement):([1-9]\d*):([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/u;
 const EXECUTION_LOCK_SCHEMA_VERSION = 3;
-const EXECUTION_LOCK_DB_META_VERSION = 3;
+const EXECUTION_LOCK_DB_META_VERSION = 4;
 const EXECUTION_LOCK_QUARANTINE_SCHEMA_VERSION = 1;
 const EXECUTION_LOCK_BOUNDARY_COMPLETION_SCHEMA_VERSION = 1;
+const EXECUTION_LOCK_BOUNDARY_RESUME_SCHEMA_VERSION = 1;
 const EXECUTION_LOCK_RECOVERY_ATTESTATION_SCHEMA_VERSION = 1;
 const EXECUTION_LOCK_QUARANTINE_AUDIT_SCHEMA_VERSION = 1;
 const EXECUTION_LOCK_AUTHORITY_SENTINEL_SCHEMA_VERSION = 1;
@@ -346,6 +347,7 @@ const EXECUTION_LOCK_QUARANTINE_REASONS = new Set([
 const EXECUTION_LOCK_MAX_EVIDENCE_REFS = 16;
 const EXECUTION_LOCK_MAX_EVIDENCE_REF_BYTES = 1_024;
 const EXECUTION_LOCK_MAX_EVIDENCE_TOTAL_BYTES = 8_192;
+const EXECUTION_LOCK_MAX_BOUNDARY_RESUMES = 1_024;
 const EXECUTION_LOCK_MAX_RECOVERY_OPERATOR_BYTES = 128;
 const EXECUTION_LOCK_MAX_RECOVERY_JUSTIFICATION_BYTES = 2_048;
 const EXECUTION_LOCK_MAX_RECOVERY_ATTESTATION_AGE_MS = 15 * 60 * 1_000;
@@ -1797,9 +1799,10 @@ function parseCleanExecutionQuarantine(value, expectedTaskId) {
     || !canonicalExecutionLockTimestamp(value.quarantinedAt)) {
     return null;
   }
-  if (Date.parse(value.enteredAt) < Date.parse(lock.acquiredAt)
-    || (value.quarantinedAt !== null
-      && Date.parse(value.quarantinedAt) < Date.parse(value.enteredAt))) {
+  // A v4 fenced resume retains the original boundary time while the resumed
+  // generation has a later acquiredAt; its audit lineage proves that link.
+  if (value.quarantinedAt !== null
+    && Date.parse(value.quarantinedAt) < Date.parse(value.enteredAt)) {
     return null;
   }
   return {
@@ -1851,6 +1854,50 @@ function parseCleanExecutionCompletion(value) {
     fencingToken,
     evidenceRefs,
     completedAt: value.completedAt,
+  };
+}
+
+function parseCleanExecutionBoundaryResumeAttestation(value) {
+  if (!isRecord(value)
+    || !exactKeys(value, [
+      'schemaVersion',
+      'quarantineId',
+      'previousLock',
+      'resumedLock',
+      'evidenceRefs',
+      'resumedAt',
+    ])
+    || value.schemaVersion !== EXECUTION_LOCK_BOUNDARY_RESUME_SCHEMA_VERSION
+    || typeof value.quarantineId !== 'string'
+    || !EXECUTION_LOCK_OWNER_RE.test(value.quarantineId)
+    || !canonicalExecutionLockTimestamp(value.resumedAt)) {
+    return null;
+  }
+  const previousLock = parseExecutionLockProjection(value.previousLock);
+  const resumedLock = parseExecutionLockProjection(value.resumedLock);
+  const evidenceRefs = parseCleanExecutionEvidenceRefs(value.evidenceRefs);
+  if (previousLock === null
+    || resumedLock === null
+    || evidenceRefs === null
+    || evidenceRefs.length === 0
+    || previousLock.taskId !== resumedLock.taskId
+    || previousLock.actor !== resumedLock.actor
+    || previousLock.ownerId === resumedLock.ownerId
+    || previousLock.fencingToken.epoch !== resumedLock.fencingToken.epoch
+    || resumedLock.fencingToken.counter <= previousLock.fencingToken.counter
+    || previousLock.fencingToken.nonce === resumedLock.fencingToken.nonce
+    || resumedLock.acquiredAt !== value.resumedAt
+    || resumedLock.renewedAt !== value.resumedAt
+    || Date.parse(value.resumedAt) < Date.parse(previousLock.renewedAt)) {
+    return null;
+  }
+  return {
+    schemaVersion: EXECUTION_LOCK_BOUNDARY_RESUME_SCHEMA_VERSION,
+    quarantineId: value.quarantineId,
+    previousLock,
+    resumedLock,
+    evidenceRefs,
+    resumedAt: value.resumedAt,
   };
 }
 
@@ -1948,6 +1995,7 @@ function parseCleanExecutionQuarantineAudit(value) {
     || !EXECUTION_LOCK_OWNER_RE.test(value.eventId)
     || !new Set([
       'boundary-entered',
+      'resumed',
       'quarantined',
       'completed',
       'recovered',
@@ -1979,6 +2027,18 @@ function parseCleanExecutionQuarantineAudit(value) {
       || (value.action === 'boundary-entered'
         ? payload.state !== 'in-flight'
         : payload.state !== 'quarantined')) {
+      return null;
+    }
+  } else if (value.action === 'resumed') {
+    payload = parseCleanExecutionBoundaryResumeAttestation(value.payload);
+    if (payload === null
+      || payload.quarantineId !== value.quarantineId
+      || payload.resumedLock.taskId !== value.taskId
+      || payload.resumedLock.ownerId !== value.ownerId
+      || !executionLockFencingTokenEquals(
+        payload.resumedLock.fencingToken,
+        fencingToken,
+      )) {
       return null;
     }
   } else if (value.action === 'completed') {
@@ -2013,6 +2073,30 @@ function parseCleanExecutionQuarantineAudit(value) {
     occurredAt: value.occurredAt,
     payload,
   };
+}
+
+function parseCleanExecutionQuarantineAuditRow(row) {
+  let value;
+  try {
+    value = JSON.parse(row.payload_json);
+  } catch {
+    value = null;
+  }
+  const event = parseCleanExecutionQuarantineAudit(value);
+  if (event === null
+    || event.eventId !== row.event_id
+    || event.action !== row.action
+    || event.quarantineId !== row.quarantine_id
+    || event.taskId !== row.task_id
+    || event.ownerId !== row.owner_id
+    || event.fencingToken.epoch !== row.fencing_epoch
+    || event.fencingToken.counter !== row.fencing_counter
+    || event.fencingToken.nonce !== row.fencing_nonce
+    || event.occurredAt !== row.occurred_at
+    || JSON.stringify(event) !== row.payload_json) {
+    return null;
+  }
+  return event;
 }
 
 /**
@@ -5280,18 +5364,81 @@ function validatePreparedCleanExecutionAuthority(files) {
   }
 }
 
+function createCleanExecutionLockActiveAdoptionSchema(db) {
+  db.exec(`
+    CREATE TABLE execution_lock_active_adoption_audit (
+      event_id TEXT NOT NULL PRIMARY KEY CHECK(length(event_id) = 36),
+      task_id TEXT NOT NULL,
+      previous_owner_id TEXT NOT NULL CHECK(length(previous_owner_id) = 36),
+      previous_fencing_epoch TEXT NOT NULL CHECK(length(previous_fencing_epoch) = 36),
+      previous_fencing_counter INTEGER NOT NULL CHECK(previous_fencing_counter > 0),
+      previous_fencing_nonce TEXT NOT NULL CHECK(length(previous_fencing_nonce) = 32 AND previous_fencing_nonce NOT GLOB '*[^0-9a-f]*'),
+      adopted_owner_id TEXT NOT NULL CHECK(length(adopted_owner_id) = 36),
+      adopted_fencing_epoch TEXT NOT NULL CHECK(length(adopted_fencing_epoch) = 36),
+      adopted_fencing_counter INTEGER NOT NULL CHECK(adopted_fencing_counter > 0),
+      adopted_fencing_nonce TEXT NOT NULL CHECK(length(adopted_fencing_nonce) = 32 AND adopted_fencing_nonce NOT GLOB '*[^0-9a-f]*'),
+      occurred_at TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      CHECK(previous_owner_id <> adopted_owner_id),
+      CHECK(previous_fencing_epoch = adopted_fencing_epoch),
+      CHECK(previous_fencing_counter < adopted_fencing_counter),
+      CHECK(previous_fencing_nonce <> adopted_fencing_nonce),
+      UNIQUE(task_id, previous_owner_id, previous_fencing_epoch, previous_fencing_counter, previous_fencing_nonce),
+      UNIQUE(task_id, adopted_owner_id, adopted_fencing_epoch, adopted_fencing_counter, adopted_fencing_nonce)
+    ) STRICT, WITHOUT ROWID;
+    CREATE TRIGGER execution_lock_active_adoption_requires_previous
+    BEFORE INSERT ON execution_lock_active_adoption_audit
+    WHEN NOT EXISTS (SELECT 1 FROM execution_lock_active WHERE task_id = NEW.task_id AND owner_id = NEW.previous_owner_id AND fencing_epoch = NEW.previous_fencing_epoch AND fencing_counter = NEW.previous_fencing_counter AND fencing_nonce = NEW.previous_fencing_nonce)
+      OR EXISTS (SELECT 1 FROM execution_lock_quarantine WHERE task_id = NEW.task_id)
+    BEGIN SELECT RAISE(ABORT, 'execution lock active adoption requires exact unquarantined authority'); END;
+    CREATE TRIGGER execution_lock_active_monotonic_update
+    BEFORE UPDATE ON execution_lock_active
+    WHEN NOT (NEW.task_id = OLD.task_id AND ((NEW.owner_id = OLD.owner_id AND NEW.fencing_epoch = OLD.fencing_epoch AND NEW.fencing_counter = OLD.fencing_counter AND NEW.fencing_nonce = OLD.fencing_nonce) OR (NEW.owner_id <> OLD.owner_id AND NEW.fencing_epoch = OLD.fencing_epoch AND NEW.fencing_counter > OLD.fencing_counter AND NEW.fencing_nonce <> OLD.fencing_nonce AND (EXISTS (SELECT 1 FROM execution_lock_active_adoption_audit WHERE task_id = NEW.task_id AND previous_owner_id = OLD.owner_id AND previous_fencing_epoch = OLD.fencing_epoch AND previous_fencing_counter = OLD.fencing_counter AND previous_fencing_nonce = OLD.fencing_nonce AND adopted_owner_id = NEW.owner_id AND adopted_fencing_epoch = NEW.fencing_epoch AND adopted_fencing_counter = NEW.fencing_counter AND adopted_fencing_nonce = NEW.fencing_nonce) OR EXISTS (SELECT 1 FROM execution_lock_quarantine AS quarantine JOIN execution_lock_quarantine_audit AS audit ON audit.quarantine_id = quarantine.quarantine_id WHERE quarantine.task_id = OLD.task_id AND quarantine.owner_id = OLD.owner_id AND quarantine.fencing_epoch = OLD.fencing_epoch AND quarantine.fencing_counter = OLD.fencing_counter AND quarantine.fencing_nonce = OLD.fencing_nonce AND quarantine.state = 'in-flight' AND audit.action = 'resumed' AND audit.task_id = NEW.task_id AND audit.owner_id = NEW.owner_id AND audit.fencing_epoch = NEW.fencing_epoch AND audit.fencing_counter = NEW.fencing_counter AND audit.fencing_nonce = NEW.fencing_nonce)))))
+    BEGIN SELECT RAISE(ABORT, 'execution lock active transition is not monotonic'); END;
+    CREATE TRIGGER execution_lock_active_adoption_audit_no_update BEFORE UPDATE ON execution_lock_active_adoption_audit BEGIN SELECT RAISE(ABORT, 'execution lock active adoption audit is append-only'); END;
+    CREATE TRIGGER execution_lock_active_adoption_audit_no_delete BEFORE DELETE ON execution_lock_active_adoption_audit BEGIN SELECT RAISE(ABORT, 'execution lock active adoption audit is append-only'); END;
+  `);
+}
+
+function createCleanExecutionQuarantineAuditSchema(db) {
+  db.exec(`
+    CREATE TABLE execution_lock_quarantine_audit (
+      event_id TEXT NOT NULL PRIMARY KEY CHECK(length(event_id) = 36),
+      action TEXT NOT NULL CHECK(action IN (
+        'boundary-entered',
+        'resumed',
+        'quarantined',
+        'completed',
+        'recovered'
+      )),
+      quarantine_id TEXT NOT NULL CHECK(length(quarantine_id) = 36), task_id TEXT NOT NULL,
+      owner_id TEXT NOT NULL CHECK(length(owner_id) = 36), fencing_epoch TEXT NOT NULL CHECK(length(fencing_epoch) = 36),
+      fencing_counter INTEGER NOT NULL CHECK(fencing_counter > 0),
+      fencing_nonce TEXT NOT NULL CHECK(length(fencing_nonce) = 32 AND fencing_nonce NOT GLOB '*[^0-9a-f]*'),
+      occurred_at TEXT NOT NULL, payload_json TEXT NOT NULL
+    ) STRICT, WITHOUT ROWID;
+    CREATE UNIQUE INDEX execution_lock_quarantine_one_boundary ON execution_lock_quarantine_audit(quarantine_id) WHERE action = 'boundary-entered';
+    CREATE UNIQUE INDEX execution_lock_quarantine_one_quarantined ON execution_lock_quarantine_audit(quarantine_id) WHERE action = 'quarantined';
+    CREATE UNIQUE INDEX execution_lock_quarantine_one_resume_generation
+      ON execution_lock_quarantine_audit(
+        quarantine_id, fencing_epoch, fencing_counter, fencing_nonce
+      ) WHERE action = 'resumed';
+    CREATE UNIQUE INDEX execution_lock_quarantine_one_terminal ON execution_lock_quarantine_audit(quarantine_id) WHERE action IN ('completed', 'recovered');
+    CREATE TRIGGER execution_lock_quarantine_monotonic_update BEFORE UPDATE ON execution_lock_quarantine
+    WHEN NOT (NEW.task_id = OLD.task_id AND NEW.quarantine_id = OLD.quarantine_id AND NEW.entered_at = OLD.entered_at AND ((NEW.owner_id = OLD.owner_id AND NEW.fencing_epoch = OLD.fencing_epoch AND NEW.fencing_counter = OLD.fencing_counter AND NEW.fencing_nonce = OLD.fencing_nonce AND ((OLD.state = 'in-flight' AND NEW.state = 'in-flight' AND NEW.reason = OLD.reason AND OLD.quarantined_at IS NULL AND NEW.quarantined_at IS NULL) OR (OLD.state = 'in-flight' AND NEW.state = 'quarantined' AND OLD.quarantined_at IS NULL AND NEW.quarantined_at IS NOT NULL))) OR (OLD.state = 'in-flight' AND NEW.state = 'in-flight' AND NEW.reason = OLD.reason AND OLD.quarantined_at IS NULL AND NEW.quarantined_at IS NULL AND NEW.owner_id <> OLD.owner_id AND NEW.fencing_epoch = OLD.fencing_epoch AND NEW.fencing_counter > OLD.fencing_counter AND NEW.fencing_nonce <> OLD.fencing_nonce AND EXISTS (SELECT 1 FROM execution_lock_quarantine_audit WHERE quarantine_id = NEW.quarantine_id AND action = 'resumed' AND task_id = NEW.task_id AND owner_id = NEW.owner_id AND fencing_epoch = NEW.fencing_epoch AND fencing_counter = NEW.fencing_counter AND fencing_nonce = NEW.fencing_nonce))))
+    BEGIN SELECT RAISE(ABORT, 'execution lock quarantine transition is not monotonic'); END;
+    CREATE TRIGGER execution_lock_quarantine_terminal_delete BEFORE DELETE ON execution_lock_quarantine WHEN NOT EXISTS (SELECT 1 FROM execution_lock_quarantine_audit WHERE quarantine_id = OLD.quarantine_id AND task_id = OLD.task_id AND owner_id = OLD.owner_id AND fencing_epoch = OLD.fencing_epoch AND fencing_counter = OLD.fencing_counter AND fencing_nonce = OLD.fencing_nonce AND action IN ('completed', 'recovered')) BEGIN SELECT RAISE(ABORT, 'execution lock quarantine delete requires terminal audit'); END;
+    CREATE TRIGGER execution_lock_quarantine_audit_no_update BEFORE UPDATE ON execution_lock_quarantine_audit BEGIN SELECT RAISE(ABORT, 'execution lock quarantine audit is append-only'); END;
+    CREATE TRIGGER execution_lock_quarantine_audit_no_delete BEFORE DELETE ON execution_lock_quarantine_audit BEGIN SELECT RAISE(ABORT, 'execution lock quarantine audit is append-only'); END;
+  `);
+}
+
 function createCleanExecutionQuarantineSchema(db) {
   db.exec(`
     CREATE TABLE execution_lock_quarantine (
-      task_id TEXT NOT NULL PRIMARY KEY,
-      quarantine_id TEXT NOT NULL UNIQUE CHECK(length(quarantine_id) = 36),
-      owner_id TEXT NOT NULL UNIQUE CHECK(length(owner_id) = 36),
-      fencing_epoch TEXT NOT NULL CHECK(length(fencing_epoch) = 36),
-      fencing_counter INTEGER NOT NULL CHECK(fencing_counter > 0),
-      fencing_nonce TEXT NOT NULL CHECK(
-        length(fencing_nonce) = 32
-        AND fencing_nonce NOT GLOB '*[^0-9a-f]*'
-      ),
+      task_id TEXT NOT NULL PRIMARY KEY, quarantine_id TEXT NOT NULL UNIQUE CHECK(length(quarantine_id) = 36),
+      owner_id TEXT NOT NULL UNIQUE CHECK(length(owner_id) = 36), fencing_epoch TEXT NOT NULL CHECK(length(fencing_epoch) = 36),
+      fencing_counter INTEGER NOT NULL CHECK(fencing_counter > 0), fencing_nonce TEXT NOT NULL CHECK(length(fencing_nonce) = 32 AND fencing_nonce NOT GLOB '*[^0-9a-f]*'),
       state TEXT NOT NULL CHECK(state IN ('in-flight', 'quarantined')),
       reason TEXT NOT NULL CHECK(reason IN (
         'irreversible-boundary',
@@ -5301,101 +5448,12 @@ function createCleanExecutionQuarantineSchema(db) {
         'authority-uncertain',
         'legacy-v2-active'
       )),
-      entered_at TEXT NOT NULL,
-      quarantined_at TEXT,
-      payload_json TEXT NOT NULL,
-      CHECK(
-        (state = 'in-flight'
-          AND reason = 'irreversible-boundary'
-          AND quarantined_at IS NULL)
-        OR
-        (state = 'quarantined'
-          AND reason <> 'irreversible-boundary'
-          AND quarantined_at IS NOT NULL)
-      ),
+      entered_at TEXT NOT NULL, quarantined_at TEXT, payload_json TEXT NOT NULL,
+      CHECK((state = 'in-flight' AND reason = 'irreversible-boundary' AND quarantined_at IS NULL) OR (state = 'quarantined' AND reason <> 'irreversible-boundary' AND quarantined_at IS NOT NULL)),
       UNIQUE(fencing_epoch, fencing_counter, fencing_nonce)
     ) STRICT, WITHOUT ROWID;
-    CREATE TABLE execution_lock_quarantine_audit (
-      event_id TEXT NOT NULL PRIMARY KEY CHECK(length(event_id) = 36),
-      action TEXT NOT NULL CHECK(action IN (
-        'boundary-entered',
-        'quarantined',
-        'completed',
-        'recovered'
-      )),
-      quarantine_id TEXT NOT NULL CHECK(length(quarantine_id) = 36),
-      task_id TEXT NOT NULL,
-      owner_id TEXT NOT NULL CHECK(length(owner_id) = 36),
-      fencing_epoch TEXT NOT NULL CHECK(length(fencing_epoch) = 36),
-      fencing_counter INTEGER NOT NULL CHECK(fencing_counter > 0),
-      fencing_nonce TEXT NOT NULL CHECK(
-        length(fencing_nonce) = 32
-        AND fencing_nonce NOT GLOB '*[^0-9a-f]*'
-      ),
-      occurred_at TEXT NOT NULL,
-      payload_json TEXT NOT NULL,
-      UNIQUE(quarantine_id, action)
-    ) STRICT, WITHOUT ROWID;
-    CREATE UNIQUE INDEX execution_lock_quarantine_one_terminal
-      ON execution_lock_quarantine_audit(quarantine_id)
-      WHERE action IN ('completed', 'recovered');
-    CREATE TRIGGER execution_lock_quarantine_monotonic_update
-    BEFORE UPDATE ON execution_lock_quarantine
-    WHEN NOT (
-      NEW.task_id = OLD.task_id
-      AND NEW.quarantine_id = OLD.quarantine_id
-      AND NEW.owner_id = OLD.owner_id
-      AND NEW.fencing_epoch = OLD.fencing_epoch
-      AND NEW.fencing_counter = OLD.fencing_counter
-      AND NEW.fencing_nonce = OLD.fencing_nonce
-      AND NEW.entered_at = OLD.entered_at
-      AND (
-        (
-          OLD.state = 'in-flight'
-          AND NEW.state = 'in-flight'
-          AND NEW.reason = OLD.reason
-          AND OLD.quarantined_at IS NULL
-          AND NEW.quarantined_at IS NULL
-        )
-        OR
-        (
-          OLD.state = 'in-flight'
-          AND NEW.state = 'quarantined'
-          AND OLD.quarantined_at IS NULL
-          AND NEW.quarantined_at IS NOT NULL
-        )
-      )
-    )
-    BEGIN
-      SELECT RAISE(ABORT, 'execution lock quarantine transition is not monotonic');
-    END;
-    CREATE TRIGGER execution_lock_quarantine_terminal_delete
-    BEFORE DELETE ON execution_lock_quarantine
-    WHEN NOT EXISTS (
-      SELECT 1
-        FROM execution_lock_quarantine_audit
-       WHERE quarantine_id = OLD.quarantine_id
-         AND task_id = OLD.task_id
-         AND owner_id = OLD.owner_id
-         AND fencing_epoch = OLD.fencing_epoch
-         AND fencing_counter = OLD.fencing_counter
-         AND fencing_nonce = OLD.fencing_nonce
-         AND action IN ('completed', 'recovered')
-    )
-    BEGIN
-      SELECT RAISE(ABORT, 'execution lock quarantine delete requires terminal audit');
-    END;
-    CREATE TRIGGER execution_lock_quarantine_audit_no_update
-    BEFORE UPDATE ON execution_lock_quarantine_audit
-    BEGIN
-      SELECT RAISE(ABORT, 'execution lock quarantine audit is append-only');
-    END;
-    CREATE TRIGGER execution_lock_quarantine_audit_no_delete
-    BEFORE DELETE ON execution_lock_quarantine_audit
-    BEGIN
-      SELECT RAISE(ABORT, 'execution lock quarantine audit is append-only');
-    END;
   `);
+  createCleanExecutionQuarantineAuditSchema(db);
 }
 
 function validateCleanExecutionDatabaseSchema(db) {
@@ -5404,7 +5462,7 @@ function validateCleanExecutionDatabaseSchema(db) {
       type: 'table',
       fragments: [
         'check(singleton = 1)',
-        'check(meta_version = 3)',
+        'check(meta_version = 4)',
         'check(fencing_counter >= 0)',
         ') strict',
       ],
@@ -5417,6 +5475,39 @@ function validateCleanExecutionDatabaseSchema(db) {
         'unique(fencing_epoch, fencing_counter, fencing_nonce)',
         ') strict, without rowid',
       ],
+    }],
+    ['execution_lock_active_adoption_audit', {
+      type: 'table',
+      fragments: [
+        'check(previous_owner_id <> adopted_owner_id)',
+        'check(previous_fencing_epoch = adopted_fencing_epoch)',
+        'check(previous_fencing_counter < adopted_fencing_counter)',
+        ') strict, without rowid',
+      ],
+    }],
+    ['execution_lock_active_adoption_requires_previous', {
+      type: 'trigger',
+      fragments: [
+        'before insert on execution_lock_active_adoption_audit',
+        'from execution_lock_active', 'from execution_lock_quarantine',
+        "raise(abort, 'execution lock active adoption requires exact unquarantined authority')",
+      ],
+    }],
+    ['execution_lock_active_monotonic_update', {
+      type: 'trigger',
+      fragments: [
+        'before update on execution_lock_active', 'new.fencing_counter > old.fencing_counter',
+        'from execution_lock_active_adoption_audit',
+        "raise(abort, 'execution lock active transition is not monotonic')",
+      ],
+    }],
+    ['execution_lock_active_adoption_audit_no_update', {
+      type: 'trigger',
+      fragments: ['before update on execution_lock_active_adoption_audit', "raise(abort, 'execution lock active adoption audit is append-only')"],
+    }],
+    ['execution_lock_active_adoption_audit_no_delete', {
+      type: 'trigger',
+      fragments: ['before delete on execution_lock_active_adoption_audit', "raise(abort, 'execution lock active adoption audit is append-only')"],
     }],
     ['execution_lock_quarantine', {
       type: 'table',
@@ -5433,8 +5524,23 @@ function validateCleanExecutionDatabaseSchema(db) {
       type: 'table',
       fragments: [
         "action text not null check(action in ( 'boundary-entered'",
-        'unique(quarantine_id, action)',
+        "'resumed'",
         ') strict, without rowid',
+      ],
+    }],
+    ['execution_lock_quarantine_one_boundary', {
+      type: 'index',
+      fragments: ['on execution_lock_quarantine_audit(quarantine_id)', "where action = 'boundary-entered'"],
+    }],
+    ['execution_lock_quarantine_one_quarantined', {
+      type: 'index',
+      fragments: ['on execution_lock_quarantine_audit(quarantine_id)', "where action = 'quarantined'"],
+    }],
+    ['execution_lock_quarantine_one_resume_generation', {
+      type: 'index',
+      fragments: [
+        'on execution_lock_quarantine_audit( quarantine_id, fencing_epoch, fencing_counter, fencing_nonce )',
+        "where action = 'resumed'",
       ],
     }],
     ['execution_lock_quarantine_one_terminal', {
@@ -5450,6 +5556,8 @@ function validateCleanExecutionDatabaseSchema(db) {
         'before update on execution_lock_quarantine',
         "old.state = 'in-flight'",
         "new.state = 'quarantined'",
+        "action = 'resumed'",
+        'new.fencing_counter > old.fencing_counter',
         "raise(abort, 'execution lock quarantine transition is not monotonic')",
       ],
     }],
@@ -5562,6 +5670,67 @@ function deterministicCleanExecutionUuid(namespace, lock) {
   ].join('-');
 }
 
+function migrateCleanExecutionAuthorityDatabaseV3ToV4(db, sentinel) {
+  readCleanExecutionMeta(db, sentinel, 3);
+  const auditSchema = db.prepare(`
+    SELECT sql FROM sqlite_master
+     WHERE type = 'table' AND name = 'execution_lock_quarantine_audit'
+  `).get();
+  const normalizedAuditSchema = typeof auditSchema?.sql === 'string'
+    ? auditSchema.sql.replace(/\s+/gu, ' ').trim().toLowerCase()
+    : '';
+  if (!normalizedAuditSchema.includes(
+    "action text not null check(action in ( 'boundary-entered'",
+  ) || !normalizedAuditSchema.includes('unique(quarantine_id, action)')
+    || normalizedAuditSchema.includes("'resumed'")) {
+    throw codedError('E_CLEAN_MAINTENANCE_AUTHORITY_INVALID', 'v3-audit-schema');
+  }
+  const rows = db.prepare(`
+    SELECT event_id, action, quarantine_id, task_id, owner_id,
+           fencing_epoch, fencing_counter, fencing_nonce, occurred_at, payload_json
+      FROM execution_lock_quarantine_audit ORDER BY event_id
+  `).all();
+  if (rows.some(row => parseCleanExecutionQuarantineAuditRow(row) === null)) {
+    throw codedError('E_CLEAN_MAINTENANCE_AUTHORITY_INVALID', 'v3-audit-row');
+  }
+  db.exec(`
+    DROP TRIGGER execution_lock_quarantine_monotonic_update;
+    DROP TRIGGER execution_lock_quarantine_terminal_delete;
+    DROP TRIGGER execution_lock_quarantine_audit_no_update;
+    DROP TRIGGER execution_lock_quarantine_audit_no_delete;
+    DROP INDEX execution_lock_quarantine_one_terminal;
+    ALTER TABLE execution_lock_quarantine_audit RENAME TO execution_lock_quarantine_audit_v3;
+  `);
+  createCleanExecutionQuarantineAuditSchema(db);
+  db.exec(`
+    INSERT INTO execution_lock_quarantine_audit(
+      event_id, action, quarantine_id, task_id, owner_id, fencing_epoch,
+      fencing_counter, fencing_nonce, occurred_at, payload_json
+    ) SELECT event_id, action, quarantine_id, task_id, owner_id, fencing_epoch,
+             fencing_counter, fencing_nonce, occurred_at, payload_json
+        FROM execution_lock_quarantine_audit_v3;
+    DROP TABLE execution_lock_quarantine_audit_v3;
+    ALTER TABLE execution_lock_meta RENAME TO execution_lock_meta_v3;
+    CREATE TABLE execution_lock_meta (
+      singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton = 1),
+      meta_version INTEGER NOT NULL CHECK(meta_version = 4),
+      authority_epoch TEXT NOT NULL CHECK(length(authority_epoch) = 36),
+      fencing_counter INTEGER NOT NULL CHECK(fencing_counter >= 0)
+    ) STRICT;
+    INSERT INTO execution_lock_meta(singleton, meta_version, authority_epoch, fencing_counter)
+      SELECT singleton, 4, authority_epoch, fencing_counter FROM execution_lock_meta_v3;
+    DROP TABLE execution_lock_meta_v3;
+  `);
+  createCleanExecutionLockActiveAdoptionSchema(db);
+  const migratedCount = db.prepare(
+    'SELECT COUNT(*) AS count FROM execution_lock_quarantine_audit',
+  ).get();
+  if (migratedCount?.count !== rows.length) {
+    throw codedError('E_CLEAN_MAINTENANCE_AUTHORITY_OWNERSHIP_LOST', 'v3-audit-count');
+  }
+  db.pragma(`user_version = ${EXECUTION_LOCK_DB_META_VERSION}`);
+}
+
 function initializeCleanExecutionAuthorityDatabase(
   db,
   sentinel,
@@ -5576,6 +5745,7 @@ function initializeCleanExecutionAuthorityDatabase(
   }
   if (userVersion !== 0
     && userVersion !== 2
+    && userVersion !== 3
     && userVersion !== EXECUTION_LOCK_DB_META_VERSION) {
     throw codedError('E_CLEAN_MAINTENANCE_AUTHORITY_INVALID', 'user_version');
   }
@@ -5583,7 +5753,7 @@ function initializeCleanExecutionAuthorityDatabase(
     db.exec(`
       CREATE TABLE execution_lock_meta (
         singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton = 1),
-        meta_version INTEGER NOT NULL CHECK(meta_version = 3),
+        meta_version INTEGER NOT NULL CHECK(meta_version = 4),
         authority_epoch TEXT NOT NULL CHECK(length(authority_epoch) = 36),
         fencing_counter INTEGER NOT NULL CHECK(fencing_counter >= 0)
       ) STRICT;
@@ -5601,10 +5771,11 @@ function initializeCleanExecutionAuthorityDatabase(
       ) STRICT, WITHOUT ROWID;
     `);
     createCleanExecutionQuarantineSchema(db);
+    createCleanExecutionLockActiveAdoptionSchema(db);
     db.prepare(`
       INSERT INTO execution_lock_meta(
         singleton, meta_version, authority_epoch, fencing_counter
-      ) VALUES (1, 3, ?, 0)
+      ) VALUES (1, 4, ?, 0)
     `).run(sentinel.authorityEpoch);
     db.pragma(`user_version = ${EXECUTION_LOCK_DB_META_VERSION}`);
   }
@@ -5617,18 +5788,19 @@ function initializeCleanExecutionAuthorityDatabase(
         RENAME TO execution_lock_meta_v2;
       CREATE TABLE execution_lock_meta (
         singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton = 1),
-        meta_version INTEGER NOT NULL CHECK(meta_version = 3),
+        meta_version INTEGER NOT NULL CHECK(meta_version = 4),
         authority_epoch TEXT NOT NULL CHECK(length(authority_epoch) = 36),
         fencing_counter INTEGER NOT NULL CHECK(fencing_counter >= 0)
       ) STRICT;
       INSERT INTO execution_lock_meta(
         singleton, meta_version, authority_epoch, fencing_counter
       )
-      SELECT singleton, 3, authority_epoch, fencing_counter
+      SELECT singleton, 4, authority_epoch, fencing_counter
         FROM execution_lock_meta_v2;
       DROP TABLE execution_lock_meta_v2;
     `);
     createCleanExecutionQuarantineSchema(db);
+    createCleanExecutionLockActiveAdoptionSchema(db);
     for (const { lock, originalPayload } of legacyActive) {
       const normalized = db.prepare(`
         UPDATE execution_lock_active
@@ -5689,9 +5861,13 @@ function initializeCleanExecutionAuthorityDatabase(
     db.pragma(`user_version = ${EXECUTION_LOCK_DB_META_VERSION}`);
   }
 
+  if (userVersion === 3) {
+    migrateCleanExecutionAuthorityDatabaseV3ToV4(db, sentinel);
+  }
+
   readCleanExecutionMeta(db, sentinel, EXECUTION_LOCK_DB_META_VERSION);
   validateCleanExecutionDatabaseSchema(db);
-  return userVersion === 2;
+  return userVersion === 2 || userVersion === 3;
 }
 
 function withCleanExecutionAuthorityMutation(projectRoot, operation) {
@@ -5935,7 +6111,126 @@ function cleanExecutionGenerationEquals(left, right) {
     && executionLockFencingTokenEquals(
       left.fencingToken,
       right.fencingToken,
+  );
+}
+
+function cleanExecutionIsExactRenewalOf(previous, candidate) {
+  return previous.schemaVersion === candidate.schemaVersion
+    && previous.taskId === candidate.taskId
+    && previous.actor === candidate.actor
+    && previous.ownerId === candidate.ownerId
+    && previous.pid === candidate.pid
+    && previous.hostInstanceId === candidate.hostInstanceId
+    && previous.bootSessionId === candidate.bootSessionId
+    && previous.processSessionId === candidate.processSessionId
+    && executionLockFencingTokenEquals(
+      previous.fencingToken,
+      candidate.fencingToken,
+    )
+    && previous.acquiredAt === candidate.acquiredAt
+    && previous.leaseDurationMs === candidate.leaseDurationMs
+    && Date.parse(candidate.renewedAt) >= Date.parse(previous.renewedAt);
+}
+
+function assertCleanExecutionQuarantineAuditChain(db, quarantine) {
+  let rows;
+  try {
+    rows = db.prepare(`
+      SELECT event_id, action, quarantine_id, task_id, owner_id,
+             fencing_epoch, fencing_counter, fencing_nonce, occurred_at,
+             payload_json
+        FROM execution_lock_quarantine_audit
+       WHERE quarantine_id = ?
+       ORDER BY fencing_counter, occurred_at, event_id
+       LIMIT ?
+    `).all(
+      quarantine.quarantineId,
+      EXECUTION_LOCK_MAX_BOUNDARY_RESUMES + 4,
     );
+  } catch {
+    throw codedError(
+      'E_CLEAN_MAINTENANCE_AUTHORITY_INVALID',
+      quarantine.lock.taskId,
+    );
+  }
+  if (rows.length > EXECUTION_LOCK_MAX_BOUNDARY_RESUMES + 3) {
+    throw codedError(
+      'E_CLEAN_MAINTENANCE_AUTHORITY_INVALID',
+      quarantine.lock.taskId,
+    );
+  }
+  const events = rows.map(parseCleanExecutionQuarantineAuditRow);
+  if (events.some(event => event === null)) {
+    throw codedError(
+      'E_CLEAN_MAINTENANCE_AUTHORITY_INVALID',
+      quarantine.lock.taskId,
+    );
+  }
+  const boundaries = events.filter(event => event.action === 'boundary-entered');
+  const resumes = events.filter(event => event.action === 'resumed');
+  if (boundaries.length === 1
+    && resumes.length <= EXECUTION_LOCK_MAX_BOUNDARY_RESUMES) {
+    const boundary = boundaries[0];
+    if ('lock' in boundary.payload
+      && boundary.payload.quarantineId === quarantine.quarantineId
+      && boundary.payload.state === 'in-flight'
+      && boundary.payload.reason === 'irreversible-boundary') {
+      let currentLock = boundary.payload.lock;
+      let previousAt = boundary.occurredAt;
+      const orderedResumes = [...resumes].sort((left, right) => (
+        left.fencingToken.counter - right.fencingToken.counter
+          || left.eventId.localeCompare(right.eventId)
+      ));
+      let valid = true;
+      for (const event of orderedResumes) {
+        if (!('previousLock' in event.payload)
+          || event.quarantineId !== quarantine.quarantineId
+          || event.taskId !== boundary.taskId
+          || !cleanExecutionIsExactRenewalOf(
+            currentLock,
+            event.payload.previousLock,
+          )
+          || event.payload.resumedAt < previousAt
+          || event.occurredAt !== event.payload.resumedAt
+          || event.ownerId !== event.payload.resumedLock.ownerId
+          || !executionLockFencingTokenEquals(
+            event.fencingToken,
+            event.payload.resumedLock.fencingToken,
+          )) {
+          valid = false;
+          break;
+        }
+        currentLock = event.payload.resumedLock;
+        previousAt = event.occurredAt;
+      }
+      const nonLineage = events.filter(event => (
+        event.action !== 'boundary-entered' && event.action !== 'resumed'
+      ));
+      const terminal = nonLineage[0];
+      if (valid
+        && cleanExecutionIsExactRenewalOf(currentLock, quarantine.lock)
+        && (quarantine.state === 'in-flight'
+          ? nonLineage.length === 0
+          : nonLineage.length === 1
+            && terminal?.action === 'quarantined'
+            && 'lock' in terminal.payload
+            && JSON.stringify(terminal.payload) === JSON.stringify(quarantine)
+            && terminal.occurredAt >= boundary.occurredAt)) {
+        return;
+      }
+    }
+  }
+  if (quarantine.state === 'quarantined'
+    && events.length === 1
+    && events[0]?.action === 'quarantined'
+    && 'lock' in events[0].payload
+    && JSON.stringify(events[0].payload) === JSON.stringify(quarantine)) {
+    return;
+  }
+  throw codedError(
+    'E_CLEAN_MAINTENANCE_AUTHORITY_INVALID',
+    quarantine.lock.taskId,
+  );
 }
 
 function loadCleanExecutionQuarantineAudits(db) {
@@ -6045,27 +6340,8 @@ function loadCleanExecutionQuarantineRows(db, active) {
     }
     return quarantine;
   });
-  const audits = loadCleanExecutionQuarantineAudits(db);
-  const auditsByQuarantineId = new Map(
-    audits.map(audit => [audit.quarantineId, audit]),
-  );
   for (const quarantine of quarantines) {
-    const action =
-      quarantine.state === 'in-flight' ? 'boundary-entered' : 'quarantined';
-    const audit = auditsByQuarantineId.get(quarantine.quarantineId);
-    if (audit === undefined
-      || audit.action !== action
-      || audit.taskId !== quarantine.lock.taskId
-      || audit.ownerId !== quarantine.lock.ownerId
-      || !executionLockFencingTokenEquals(
-        audit.fencingToken,
-        quarantine.lock.fencingToken,
-      )) {
-      throw codedError(
-        'E_CLEAN_MAINTENANCE_AUTHORITY_INVALID',
-        quarantine.lock.taskId,
-      );
-    }
+    assertCleanExecutionQuarantineAuditChain(db, quarantine);
   }
   return quarantines;
 }
@@ -6115,53 +6391,7 @@ function loadCleanExecutionQuarantineForLock(db, lock) {
       lock.taskId,
     );
   }
-  const action =
-    quarantine.state === 'in-flight' ? 'boundary-entered' : 'quarantined';
-  let auditRow;
-  try {
-    auditRow = db.prepare(`
-      SELECT event_id, action, quarantine_id, task_id, owner_id,
-             fencing_epoch, fencing_counter, fencing_nonce, occurred_at,
-             payload_json
-        FROM execution_lock_quarantine_audit
-       WHERE quarantine_id = ?
-         AND action = ?
-    `).get(quarantine.quarantineId, action);
-  } catch {
-    throw codedError(
-      'E_CLEAN_MAINTENANCE_AUTHORITY_INVALID',
-      lock.taskId,
-    );
-  }
-  let auditValue;
-  try {
-    auditValue = auditRow === undefined
-      ? null
-      : JSON.parse(auditRow.payload_json);
-  } catch {
-    throw codedError(
-      'E_CLEAN_MAINTENANCE_AUTHORITY_INVALID',
-      lock.taskId,
-    );
-  }
-  const audit = parseCleanExecutionQuarantineAudit(auditValue);
-  if (auditRow === undefined
-    || audit === null
-    || audit.eventId !== auditRow.event_id
-    || audit.action !== auditRow.action
-    || audit.quarantineId !== auditRow.quarantine_id
-    || audit.taskId !== auditRow.task_id
-    || audit.ownerId !== auditRow.owner_id
-    || audit.fencingToken.epoch !== auditRow.fencing_epoch
-    || audit.fencingToken.counter !== auditRow.fencing_counter
-    || audit.fencingToken.nonce !== auditRow.fencing_nonce
-    || audit.occurredAt !== auditRow.occurred_at
-    || JSON.stringify(audit) !== auditRow.payload_json) {
-    throw codedError(
-      'E_CLEAN_MAINTENANCE_AUTHORITY_INVALID',
-      lock.taskId,
-    );
-  }
+  assertCleanExecutionQuarantineAuditChain(db, quarantine);
   return quarantine;
 }
 

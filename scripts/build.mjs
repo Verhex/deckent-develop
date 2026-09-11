@@ -102,11 +102,13 @@ function canonicalTimestamp(now = Date.now()) {
   return new Date(now).toISOString();
 }
 
-function openSecureRegularFile(path) {
+function openSecureRegularFile(path, options = {}) {
+  const allowSourceHardlinks = options.allowClosedSourceHardlinks === true;
   const pathStat = lstatSync(path, { bigint: true });
   if (!pathStat.isFile()
     || pathStat.isSymbolicLink()
-    || pathStat.nlink !== 1n) {
+    || pathStat.nlink < 1n
+    || (!allowSourceHardlinks && pathStat.nlink !== 1n)) {
     throw codedError('E_BUILD_INPUT_UNSAFE', path);
   }
   const fd = openSync(
@@ -115,17 +117,49 @@ function openSecureRegularFile(path) {
   );
   const stat = fstatSync(fd, { bigint: true });
   if (!stat.isFile()
-    || stat.nlink !== 1n
+    || stat.nlink !== pathStat.nlink
     || stat.dev !== pathStat.dev
-    || stat.ino !== pathStat.ino) {
+    || stat.ino !== pathStat.ino
+    || stat.size !== pathStat.size
+    || stat.mode !== pathStat.mode
+    || stat.mtimeNs !== pathStat.mtimeNs) {
     closeSync(fd);
     throw codedError('E_BUILD_INPUT_IDENTITY_CHANGED', path);
   }
   return { fd, stat };
 }
 
-function secureFileDigest(path) {
-  const opened = openSecureRegularFile(path);
+function assertSecureOpenedFileStable(path, opened, code) {
+  let after;
+  let namedAfter;
+  try {
+    after = fstatSync(opened.fd, { bigint: true });
+    namedAfter = lstatSync(path, { bigint: true });
+  } catch (error) {
+    throw codedError(code, path, error);
+  }
+  if (!after.isFile()
+    || !namedAfter.isFile()
+    || namedAfter.isSymbolicLink()
+    || after.dev !== opened.stat.dev
+    || after.ino !== opened.stat.ino
+    || after.nlink !== opened.stat.nlink
+    || after.size !== opened.stat.size
+    || after.mode !== opened.stat.mode
+    || after.mtimeNs !== opened.stat.mtimeNs
+    || namedAfter.dev !== opened.stat.dev
+    || namedAfter.ino !== opened.stat.ino
+    || namedAfter.nlink !== opened.stat.nlink
+    || namedAfter.size !== opened.stat.size
+    || namedAfter.mode !== opened.stat.mode
+    || namedAfter.mtimeNs !== opened.stat.mtimeNs) {
+    throw codedError(code, path);
+  }
+  return after;
+}
+
+function secureFileDigest(path, options = {}) {
+  const opened = openSecureRegularFile(path, options);
   try {
     const hash = createHash('sha256');
     const buffer = Buffer.allocUnsafe(64 * 1024);
@@ -142,18 +176,26 @@ function secureFileDigest(path) {
       hash.update(buffer.subarray(0, bytesRead));
       offset += bytesRead;
     }
-    const after = fstatSync(opened.fd, { bigint: true });
-    if (after.dev !== opened.stat.dev
-      || after.ino !== opened.stat.ino
-      || after.size !== opened.stat.size
-      || after.mtimeNs !== opened.stat.mtimeNs
-      || BigInt(offset) !== opened.stat.size) {
+    assertSecureOpenedFileStable(
+      path,
+      opened,
+      'E_BUILD_INPUT_IDENTITY_CHANGED',
+    );
+    if (BigInt(offset) !== opened.stat.size) {
       throw codedError('E_BUILD_INPUT_IDENTITY_CHANGED', path);
     }
     return {
       mode: Number(opened.stat.mode & 0o777n),
       size: Number(opened.stat.size),
       sha256: hash.digest('hex'),
+      identity: Object.freeze({
+        dev: opened.stat.dev.toString(),
+        ino: opened.stat.ino.toString(),
+        nlink: opened.stat.nlink.toString(),
+        size: opened.stat.size.toString(),
+        mode: opened.stat.mode.toString(),
+        mtimeNs: opened.stat.mtimeNs.toString(),
+      }),
     };
   } finally {
     closeSync(opened.fd);
@@ -179,12 +221,12 @@ function secureReadFile(path, maxBytes = 1024 * 1024) {
       if (bytesRead === 0) break;
       offset += bytesRead;
     }
-    const after = fstatSync(opened.fd, { bigint: true });
-    if (after.dev !== opened.stat.dev
-      || after.ino !== opened.stat.ino
-      || after.size !== opened.stat.size
-      || after.mtimeNs !== opened.stat.mtimeNs
-      || offset !== bytes.length) {
+    assertSecureOpenedFileStable(
+      path,
+      opened,
+      'E_BUILD_INPUT_IDENTITY_CHANGED',
+    );
+    if (offset !== bytes.length) {
       throw codedError('E_BUILD_INPUT_IDENTITY_CHANGED', path);
     }
     return bytes;
@@ -206,6 +248,8 @@ function treeManifest(directory, options = {}) {
       fileCount: 0,
       totalBytes: 0,
       records: Object.freeze([]),
+      identityDigest: manifestDigest([]),
+      identityRecords: Object.freeze([]),
     });
   }
   const namedDirectoryStat = lstatSync(directory);
@@ -219,6 +263,7 @@ function treeManifest(directory, options = {}) {
     throw codedError('E_BUILD_TREE_UNSAFE', directory);
   }
   const records = [];
+  const identityRecords = [];
   let totalBytes = 0;
   const walk = (current, relativeDirectory) => {
     for (const entry of readdirSync(current).sort()) {
@@ -239,14 +284,22 @@ function treeManifest(directory, options = {}) {
         throw codedError('E_BUILD_TREE_ENTRY_UNSUPPORTED', full);
       }
       options.checkpoint?.();
-      const file = secureFileDigest(full);
+      const file = secureFileDigest(full, {
+        allowClosedSourceHardlinks:
+          options.allowClosedSourceHardlinks === true,
+      });
       totalBytes += file.size;
+      const portablePath = relativePath.split(sep).join('/');
       records.push({
-        path: relativePath.split(sep).join('/'),
+        path: portablePath,
         size: file.size,
         mode: file.mode,
         sha256: file.sha256,
       });
+      identityRecords.push(Object.freeze({
+        path: portablePath,
+        ...file.identity,
+      }));
       if (records.length > MAX_MANIFEST_FILES
         || totalBytes > MAX_MANIFEST_BYTES) {
         throw codedError('E_BUILD_TREE_LIMIT_EXCEEDED', directory);
@@ -254,20 +307,52 @@ function treeManifest(directory, options = {}) {
     }
   };
   walk(canonicalDirectory, '');
+  if (options.allowClosedSourceHardlinks === true) {
+    const groups = new Map();
+    for (const record of identityRecords) {
+      const key = `${record.dev}:${record.ino}`;
+      const group = groups.get(key) ?? {
+        nlink: record.nlink,
+        paths: [],
+      };
+      if (group.nlink !== record.nlink) {
+        throw codedError('E_BUILD_INPUT_IDENTITY_CHANGED', join(directory, record.path));
+      }
+      group.paths.push(record.path);
+      groups.set(key, group);
+    }
+    for (const group of groups.values()) {
+      if (BigInt(group.paths.length) !== BigInt(group.nlink)) {
+        throw codedError(
+          'E_BUILD_INPUT_UNSAFE',
+          join(directory, ...group.paths[0].split('/')),
+        );
+      }
+    }
+  }
   return Object.freeze({
     digest: manifestDigest(records),
     fileCount: records.length,
     totalBytes,
     records: Object.freeze(records),
+    identityDigest: manifestDigest(identityRecords),
+    identityRecords: Object.freeze(identityRecords),
   });
 }
 
-function copyFileIdentityChecked(source, destination, expected) {
-  const opened = openSecureRegularFile(source);
+function copyFileIdentityChecked(source, destination, expected, options = {}) {
+  const opened = openSecureRegularFile(source, options);
   let destinationFd;
   try {
     if (Number(opened.stat.size) !== expected.size
-      || Number(opened.stat.mode & 0o777n) !== expected.mode) {
+      || Number(opened.stat.mode & 0o777n) !== expected.mode
+      || (options.expectedIdentity !== undefined
+        && (opened.stat.dev.toString() !== options.expectedIdentity.dev
+          || opened.stat.ino.toString() !== options.expectedIdentity.ino
+          || opened.stat.nlink.toString() !== options.expectedIdentity.nlink
+          || opened.stat.size.toString() !== options.expectedIdentity.size
+          || opened.stat.mode.toString() !== options.expectedIdentity.mode
+          || opened.stat.mtimeNs.toString() !== options.expectedIdentity.mtimeNs))) {
       throw codedError('E_BUILD_COPY_SOURCE_DRIFT', source);
     }
     destinationFd = openSync(
@@ -307,11 +392,15 @@ function copyFileIdentityChecked(source, destination, expected) {
       offset += bytesRead;
     }
     fsyncSync(destinationFd);
-    const after = fstatSync(opened.fd, { bigint: true });
-    if (after.dev !== opened.stat.dev
-      || after.ino !== opened.stat.ino
-      || after.size !== opened.stat.size
-      || after.mtimeNs !== opened.stat.mtimeNs
+    const destinationStat = fstatSync(destinationFd, { bigint: true });
+    assertSecureOpenedFileStable(
+      source,
+      opened,
+      'E_BUILD_COPY_SOURCE_DRIFT',
+    );
+    if (!destinationStat.isFile()
+      || destinationStat.nlink !== 1n
+      || destinationStat.size !== opened.stat.size
       || BigInt(offset) !== opened.stat.size
       || hash.digest('hex') !== expected.sha256) {
       throw codedError('E_BUILD_COPY_SOURCE_DRIFT', source);
@@ -324,6 +413,9 @@ function copyFileIdentityChecked(source, destination, expected) {
 
 function copyTreeIdentityChecked(source, destination, options = {}) {
   const before = treeManifest(source, options);
+  const identityByPath = new Map(
+    before.identityRecords.map(record => [record.path, record]),
+  );
   if (existsSync(destination)) {
     const destinationStat = lstatSync(destination);
     if (!destinationStat.isDirectory()
@@ -342,14 +434,20 @@ function copyTreeIdentityChecked(source, destination, options = {}) {
       recursive: true,
       mode: 0o700,
     });
-    copyFileIdentityChecked(sourcePath, destinationPath, record);
+    copyFileIdentityChecked(sourcePath, destinationPath, record, {
+      allowClosedSourceHardlinks:
+        options.allowClosedSourceHardlinks === true,
+      expectedIdentity: identityByPath.get(record.path),
+    });
     if (process.platform !== 'win32') {
       chmodSync(destinationPath, record.mode);
     }
   }
   const after = treeManifest(source, options);
   const copied = treeManifest(destination);
-  if (after.digest !== before.digest || copied.digest !== before.digest) {
+  if (after.digest !== before.digest
+    || after.identityDigest !== before.identityDigest
+    || copied.digest !== before.digest) {
     throw codedError('E_BUILD_COPY_IDENTITY_MISMATCH', source);
   }
   return before;
@@ -548,6 +646,7 @@ function prepareSourceWorkspace(
       join(workspace, 'node_modules'),
       {
         checkpoint,
+        allowClosedSourceHardlinks: true,
         exclude: (_relativePath, entry) => entry === '.bin',
       },
     );
@@ -567,6 +666,7 @@ function prepareSourceWorkspace(
       join(workspace, 'src', 'dashboard', 'node_modules'),
       {
         checkpoint,
+        allowClosedSourceHardlinks: true,
         exclude: (_relativePath, entry) => entry === '.bin',
       },
     );
