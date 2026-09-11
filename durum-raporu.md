@@ -5,7 +5,7 @@ Güncelleme: 2026-09-11T05:00:00+03:00 (owner: paket smoke + build geçti, commi
 ## Main ve yetki
 
 - Repo: `/home/alperen/deckent-dev`, branch `main`.
-- **Güncel ürün HEAD (2026-09-11):** `ea26935f69ef7e483b7c9cb9e109d46d62093270` — CLI bridge argv + context custody rev3 (+ önceki `5e0faabaa` kök-neden/@/UX). Push bu raporda doğrulanmadı.
+- **Güncel ürün HEAD (2026-09-11):** `cc70d0c0522ed871781e50e6374af9047f8e24c8` — CLI bridge argv + context custody rev3 (+ önceki `5e0faabaa` kök-neden/@/UX). Push bu raporda doğrulanmadı.
 - Push durumu bu rapor yazılırken doğrulanmadı; canlı smoke sonrası `dist/` yalnız owner'ın son başarılı `build:all` koşusuna güvenilir.
 - Epoch-6 koordinatör/yürütücü Astra. Canonical receipt: [0003-committed.json](docs/execution/handoffs/ah-2026-09-10-fable-astra-terminal-v2/0003-committed.json), receiptDigest `b0268be125a628e77fe836ac15314699200976029871418d1af4cfc010e705ee`.
 - Eski 9 Eylül raporundaki “epoch-5 Fable yürütücü” durumu artık tarihsel. Eski metin `/tmp/astra-main-landing-backup-20260910/durum-raporu-before-20260910.md` altında korundu.
