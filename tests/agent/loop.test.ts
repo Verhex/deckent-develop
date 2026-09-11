@@ -435,3 +435,68 @@ describe('retention shrink before publishing an incoming tool batch (7109-d)', (
       .toEqual(['prior-result', ...incoming]);
   });
 });
+
+describe('per-call tool-result admission (Astra rev2/187 — custody + cap)', () => {
+  it('withholds wire body under zero allocation while preserving executedOk and spill', async () => {
+    const payload = `echoed:${'z'.repeat(4_000)}`;
+    const reg = new ToolRegistry();
+    reg.register({
+      name: 'echo', description: 'echo', inputSchema: { type: 'object' }, category: 'coding',
+      tier: 'silent', source: 'builtin',
+      handler: async () => ({ ok: true, output: payload }),
+    });
+    const batch: ProviderEvent[] = [
+      { type: 'tool-call', id: 't1', name: 'echo', args: {} },
+    ];
+    const { adapter, requests } = scriptedAdapter([
+      [...batch, { type: 'done' }],
+      [{ type: 'text-delta', text: 'done' }, { type: 'done' }],
+    ]);
+    const measured = wireScaledMeasurement({ ...adapter, name: 'zero-remaining' });
+    const transcript = new Transcript();
+    transcript.appendUser('u');
+    transcript.appendAssistant('', [{ id: 'prior', name: 'echo', args: {} }]);
+    transcript.appendToolResult('prior', 'fill-'.repeat(4_000));
+    const rawBudget = 1_500;
+    const budget = resolveNativeAgentBudget({
+      policy: {
+        roles: {},
+        native_agent: {
+          outputReserveTokens: 1,
+          contextSafetyReserveTokens: 1,
+          maxToolResultShareOfContext: 0.01,
+          maxTurnToolResultShareOfContext: 0.01,
+        },
+      },
+    });
+    const stored = new Map<string, Buffer>();
+    const events = await drain(runAgentTurn({
+      ...baseDeps({ adapter: measured, nativeBudget: budget, getContextBudgetTokens: () => rawBudget }),
+      registry: reg,
+      contentStore: {
+        write(bytes) {
+          const sha256 = createHash('sha256').update(bytes).digest('hex');
+          const path = `content:${sha256}`;
+          stored.set(path, bytes);
+          return { path, sha256 };
+        },
+      },
+    }, transcript, 'go'));
+    const withheld = events.filter(
+      (e): e is Extract<AgentEvent, { type: 'tool-result' }> =>
+        e.type === 'tool-result' && e.code === 'TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED',
+    );
+    expect(withheld.length).toBe(1);
+    expect(withheld[0]!.ok).toBe(true);
+    expect(withheld[0]!.output).toContain('withheld');
+    expect(Buffer.byteLength(withheld[0]!.output, 'utf8')).toBeLessThan(256);
+    const spill = [...stored.values()].find((buf) => buf.toString() === payload);
+    expect(spill).toBeDefined();
+    const t1Wire = transcript.getToolResultContent('t1');
+    expect(t1Wire).toBeDefined();
+    expect(t1Wire).toContain('withheld');
+    expect(Buffer.byteLength(t1Wire!, 'utf8')).toBeLessThan(256);
+    expect(events.some(e => e.type === 'error' && e.code === 'native-context.admission-denied')).toBe(false);
+    expect(requests.length).toBe(2);
+  });
+});

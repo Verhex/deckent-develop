@@ -14,7 +14,7 @@ import { segmentGraphemes } from './cursor-model.js';
 import { appendHistory, HistoryNavigator, loadHistory } from './input-history.js';
 import { filterSlashCommands } from '../commands/chat-slash-menu.js';
 import type { SlashRegistry, SlashCommand } from '../commands/chat-slash-registry.js';
-import { activeAtQuery, filterAtPaths, completeAtToken, type ActiveAtToken } from './at-ref.js';
+import { activeAtQuery, filterAtPaths, completeAtToken, type ActiveAtToken, type AtRefPathProvider } from './at-ref.js';
 import { requireInjectedLabel } from '../helpers/injected-label.js';
 import { useInkPalette } from './ink-palette-context.js';
 import { useTerminalGlyphs } from './terminal-glyph-context.js';
@@ -72,10 +72,12 @@ export interface InputBarProps {
    * (run.tsx's cached walkProjectFiles lister) — string-free mechanism rule:
    * this component never imports a cli/commands internal. Absent → typing
    * `@` never opens a menu (render byte-identical). */
-  pathProvider?: (prefix: string) => string[];
+  pathProvider?: AtRefPathProvider;
   /** Localized hint under the `@` menu — same injected-labels route as
    * `menuHint` (tui.atref_menu_hint via run.tsx). */
   atMenuHint?: string;
+  /** Shown while the path index is still warming (bootstrap list is already usable). */
+  atMenuIndexingHint?: string;
 }
 
 /** Persistent (disk-backed), prefix-filtered history for one InputBar instance. */
@@ -122,7 +124,7 @@ export function slashMenuMatches(registry: SlashRegistry | undefined, buffer: st
  * dismissed token's `@` index), and the fuzzy filter finds ≥1 candidate.
  * Pure — regression-tested without mounting Ink (tests/cli/at-ref.test.ts). */
 export function atMenuMatches(
-  provider: ((prefix: string) => string[]) | undefined,
+  provider: AtRefPathProvider | undefined,
   state: InputState,
   dismissedStart: number | null,
 ): { token: ActiveAtToken; matches: string[] } | null {
@@ -260,7 +262,7 @@ export function formatMenuMore(template: string, n: number): string {
 }
 
 export function InputBar(props: InputBarProps): ReactElement {
-  const { active, onSubmit, onInterrupt, onClear, onEscape, slashRegistry, menuHint, pathProvider, atMenuHint, shortcutsPanel } = props;
+  const { active, onSubmit, onInterrupt, onClear, onEscape, slashRegistry, menuHint, pathProvider, atMenuHint, atMenuIndexingHint, shortcutsPanel } = props;
   // TERMINAL-TOOLS-010 — `?` shortcuts panel (open/closed).
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const palette = useInkPalette();
@@ -503,6 +505,9 @@ export function InputBar(props: InputBarProps): ReactElement {
               <Text {...(i === atSel ? palette.focus : {})} bold={i === atSel}>{p}</Text>
             </Text>
           ))}
+          {atMenuIndexingHint && pathProvider?.ready && !pathProvider.ready()
+            ? <Text {...palette.muted}>{`  ${atMenuIndexingHint}`}</Text>
+            : null}
           {atMenuHint ? <Text {...palette.muted}>{`  ${atMenuHint}`}</Text> : null}
         </Box>
       )}

@@ -5,7 +5,13 @@
 import type { ResolvedNativeAgentBudget } from '../core/execution-budget-policy.js';
 import { DEFAULT_NATIVE_AGENT_BUDGET } from '../core/execution-budget-policy.js';
 import type { ContentWriter } from './tool-result-broker.js';
-import { containToolResult, previewBytesFromTokenShare, renderToolResultEnvelope } from './tool-result-broker.js';
+import type { ToolResult } from './tools/types.js';
+import {
+  containToolResult,
+  previewBytesFromTokenShare,
+  renderToolResultEnvelope,
+  ToolResultContextBudgetError,
+} from './tool-result-broker.js';
 import { measureRetainedToolResultTokens, toolResultBytesToTokens } from './context-budget.js';
 import type { ProviderMessage, RequestMeasurement } from './provider-tooluse/types.js';
 import { Transcript, type TranscriptEntry } from './transcript.js';
@@ -45,7 +51,12 @@ export function shrinkToolResultContent(
   );
   if (!env.truncated) return { ok: false, reason: 'too-small' };
   if (env.contentRef === null) return { ok: false, reason: 'store-failed' };
-  return { ok: true, rendered: renderToolResultEnvelope(env, opts.maxRenderedBytes ?? opts.maxPreviewBytes) };
+  try {
+    return { ok: true, rendered: renderToolResultEnvelope(env, opts.maxRenderedBytes ?? opts.maxPreviewBytes) };
+  } catch (error) {
+    if (error instanceof ToolResultContextBudgetError) return { ok: false, reason: 'too-small' };
+    throw error;
+  }
 }
 
 export interface RetentionShrinkInput {
@@ -119,4 +130,40 @@ export function restoreToolResultSnapshots(transcript: Transcript, snapshots: re
 
 export function canEmitMeasuredWindowCheckpoint(measure: RequestMeasurement): boolean {
   return measure.quality === 'exact';
+}
+
+/** Delivery state when execution succeeded but context admission withheld the wire body. */
+export const TOOL_RESULT_DELIVERY_WITHHELD = 'undelivered' as const;
+
+export const TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED_CODE = 'TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED';
+
+/**
+ * Preserve executed tool truth while pairing a minimal transcript line. Full bytes
+ * spill to the session store when available so content-ref reads stay honest.
+ */
+export function withholdToolResultFromContext(
+  executed: ToolResult,
+  store: ContentWriter | undefined,
+): ToolResult {
+  const raw = typeof executed.output === 'string' ? executed.output : '';
+  let resultRef: string | undefined;
+  if (store && raw.length > 0) {
+    try {
+      const receipt = store.write(Buffer.from(raw, 'utf8'));
+      if (receipt.path.length > 0) resultRef = receipt.path;
+    } catch {
+      resultRef = undefined;
+    }
+  }
+  const meta: Record<string, unknown> = {
+    ...(executed.meta ?? {}),
+    code: TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED_CODE,
+    delivery: TOOL_RESULT_DELIVERY_WITHHELD,
+    executedOk: executed.ok,
+  };
+  if (resultRef !== undefined) meta['resultRef'] = resultRef;
+  const output = resultRef !== undefined
+    ? `[deckent] tool-result withheld; ref ${resultRef}`
+    : '[deckent] tool-result withheld; ref unavailable';
+  return { ok: executed.ok, output, meta };
 }

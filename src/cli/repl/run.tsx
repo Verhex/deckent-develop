@@ -224,7 +224,7 @@ import {
   type CliStructuredActionRequest,
 } from '../helpers/cli-tool-capture.js';
 import { createToolExecDispatcher, walkProjectFiles, readIgnoredDirs, resolveRealPathLenient } from '../commands/chat-tool-exec.js';
-import { createCachedPathLister, isScopedRelPath, resolveAtRefCandidate } from './at-ref.js';
+import { createCachedPathLister, expandAtRefs, isScopedRelPath, resolveAtRefCandidate } from './at-ref.js';
 import { formatToolActivityDisplay } from './tool-target.js';
 import { REFERENCE_FAILURE_CODES } from '../../agent/reference-digest-types.js';
 import { formatReferenceBytes } from './native-agent-bridge.js';
@@ -430,6 +430,7 @@ export function buildReplLabels(t: (key: string) => string): ReplLabels {
     approvalRejected: t('approval.terminal.rejected'),
     // TERM-AT-REF (583/N2b) — hint under the InputBar's `@` path menu.
     atMenuHint: t('tui.atref_menu_hint'),
+    atMenuIndexingHint: t('tui.atref_indexing'),
     // TERMINAL-TOOLS-002 — the three fields the mechanism used to default in
     // English: turn-exception line (387-003), `/model`·`/provider` busy gate
     // (388-001) and the composer's Ctrl-R prompt. All ReplLabels fields are
@@ -2620,6 +2621,7 @@ export async function runInkRepl(
     (root, visit) => walkProjectFiles(root, visit, readIgnoredDirs(root)),
     () => process.cwd(),
   );
+  atRefPathProvider.warm();
   const atRefReader = createScopedAtRefReader(
     () => process.cwd(),
     (token) => resolveAtRefCandidate(token, atRefPathProvider('')),

@@ -3521,6 +3521,10 @@ const BASE_MESSAGES: MessageMap = {
     en: '↑↓ move · Tab/Enter insert path · Esc close',
     tr: '↑↓ gez · Tab/Enter yolu ekle · Esc kapat',
   },
+  'tui.atref_indexing': {
+    en: 'Indexing project paths… (menu is partial until complete)',
+    tr: 'Proje yolları indeksleniyor… (tamamlanana kadar liste kısmi)',
+  },
   'tui.switched': {
     en: 'switched to',
     tr: 'geçildi',
@@ -3765,8 +3769,8 @@ const BASE_MESSAGES: MessageMap = {
     tr: 'Model özeti alınamadı. Checkpoint tam konuşmayı içerik referansıyla koruyor; üretilmiş bir özet içermiyor.',
   },
   'native.TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED': {
-    en: 'Tool results reached the context storage limit. The turn stopped because a complete content reference could not fit safely.',
-    tr: 'Araç sonuçları bağlam saklama sınırına ulaştı. Tam içerik referansı güvenli biçimde sığmadığı için tur durdu.',
+    en: 'This tool result did not fit the remaining context allocation for this turn. Other pending tool calls in the same batch may still run.',
+    tr: 'Bu araç sonucu bu tur için kalan bağlam payına sığmadı. Aynı batch’teki bekleyen diğer araç çağrıları hâlâ çalışabilir.',
   },
   'native.checkpoint.saved': {
     en: 'Scratch checkpoint saved.',

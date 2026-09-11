@@ -683,6 +683,8 @@ const NATIVE_AGENT_SIGNAL_KEYS = new Set([
   'native.transport-failure.not-authorized',
   INPUT_CONTEXT_OVERFLOW_KEY,
   CONTINUATION_EXHAUSTED_KEY,
+  'native.TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED',
+  'TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED',
 ]);
 
 /**
@@ -805,7 +807,7 @@ export function createParityExecImpl(ctx: ParityExecContext) {
       ? (args as Record<string, unknown>)
       : {};
     const resource = permissionResource(name, callArgs);
-    const elevated = checkSelfModifying(ctx.cwd, mutationTargetsForSelfMod(tool, callArgs)).elevated;
+    const elevated = checkSelfModifying(ctx.cwd, mutationTargetsForSelfMod(name, callArgs)).elevated;
     let tier = resolveTier(def, ctx.policy);
     if (elevated) tier = 'always';
     let decision = decide(name, resource, tier, {
@@ -842,7 +844,7 @@ export function createParityExecImpl(ctx: ParityExecContext) {
         }
       } else throw new Error(`${PARITY_POLICY_DENIAL_PREFIX} ${name}`);
     }
-    const currentElevated = checkSelfModifying(ctx.cwd, mutationTargetsForSelfMod(tool, callArgs)).elevated;
+    const currentElevated = checkSelfModifying(ctx.cwd, mutationTargetsForSelfMod(name, callArgs)).elevated;
     let currentTier = resolveTier(def, ctx.policy);
     if (currentElevated) currentTier = 'always';
     const currentDecision = decide(name, resource, currentTier, {
@@ -926,7 +928,7 @@ export function projectNativePermissionRoundItem(
   const def = deps.registry.get(call.tool);
   if (!def) return null;
   const resource = permissionResource(call.tool, call.args);
-  const elevated = checkSelfModifying(deps.cwd, mutationTargetsForSelfMod(call.name, call.args)).elevated;
+  const elevated = checkSelfModifying(deps.cwd, mutationTargetsForSelfMod(call.tool, call.args)).elevated;
   let tier = resolveTier(def, deps.policy);
   const isShellTool = call.tool === 'bash' || call.tool.endsWith('_bash');
   if (isShellTool) {

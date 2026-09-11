@@ -30,18 +30,18 @@ function mount(turn: Turn, ascii = false, columns = 100, terminalColumns?: numbe
 }
 
 describe('TranscriptTurnView — user vs deckent separation', () => {
-  it('labels the user block and indents body (unicode rail)', () => {
+  it('renders user label plus inverse-panel message lines (distinct from assistant)', () => {
     const frame = mount({ id: 1, role: 'user', text: 'hello\nworld' });
     expect(frame).toContain(labels.transcriptUser);
     expect(frame).not.toContain(labels.transcriptUserHint);
+    expect(frame).not.toContain(labels.transcriptAssistant);
     expect(frame).toContain('hello');
     expect(frame).toContain('world');
   });
 
-  it('shows a minimal assistant header and indented segment text (no vertical rail)', () => {
+  it('renders assistant segments flush without deckent header chrome', () => {
     const head = mount({ id: 2, role: 'head', text: '' });
-    expect(head).toContain(labels.transcriptAssistant);
-    expect(head).not.toContain(labels.transcriptAssistantHint);
+    expect(head).not.toContain(labels.transcriptAssistant);
     const seg = mount({ id: 3, role: 'seg', text: 'reply body' });
     expect(seg).toContain('reply body');
     expect(seg).not.toMatch(/^[│|]/m);

@@ -167,28 +167,72 @@ export function resolveAtRefCandidate(token: string, candidates: readonly string
   return token;
 }
 
-export function filterAtPaths(candidates: readonly string[], query: string, limit = 8): string[] {
-  const q = query.toLowerCase();
-  if (q.length === 0) return candidates.slice(0, limit);
-  // Alperen canlı-bulgusu (2026-07-17, `@cost`): the loose subsequence tier
-  // matched 'c…o…s…t' across long archive paths and drowned the list in
-  // noise — DROPPED. Substring tiers only, basename-weighted; hidden/meta
-  // roots (.analysis/.brain/…) lose ties to real source paths.
-  const scored: Array<{ path: string; score: number; dot: number }> = [];
+/** Score for one candidate against the live `@` query (lower = better). null = no match. */
+export function scoreAtPathMatch(candidate: string, rawQuery: string): number | null {
+  const q = rawQuery.trim().toLowerCase();
+  if (q.length === 0) return null;
+  const lc = candidate.toLowerCase();
+  const base = basenameOf(lc);
+  const deprioritize = deprioritizeAtWalkPath(candidate);
+
+  if (q.includes('/')) {
+    const pathQ = q.endsWith('/') ? q : q;
+    if (lc.startsWith(pathQ)) return 0 + deprioritize;
+    const qSegs = q.split('/').filter((s) => s.length > 0);
+    const cSegs = lc.replace(/\/$/, '').split('/');
+    let allPrefix = true;
+    for (let i = 0; i < qSegs.length; i++) {
+      const seg = cSegs[i];
+      if (seg === undefined || !seg.startsWith(qSegs[i] as string)) {
+        allPrefix = false;
+        break;
+      }
+    }
+    if (allPrefix) return 1 + qSegs.length + deprioritize;
+    if (lc.includes(q)) return 4 + deprioritize;
+    return null;
+  }
+
+  if (base.startsWith(q)) return 0 + deprioritize;
+  if (base.includes(q)) return 1 + deprioritize;
+  const segs = lc.split('/');
+  if (segs.some((seg) => seg.startsWith(q))) return 2 + deprioritize;
+  if (lc.startsWith(q)) return 3 + deprioritize;
+  if (lc.includes(q)) return 4 + deprioritize;
+  return null;
+}
+
+/** Top-level dirs + root files from the index (empty `@` query — not a hardcoded list). */
+export function rootAtPathCandidates(candidates: readonly string[], limit = 8): string[] {
+  const roots = new Set<string>();
   for (const candidate of candidates) {
-    const lc = candidate.toLowerCase();
-    const base = basenameOf(lc);
-    let score: number;
-    if (base.startsWith(q)) score = 0;
-    else if (base.includes(q)) score = 1;
-    else if (lc.startsWith(q)) score = 2;
-    else if (lc.includes(q)) score = 3;
-    else continue;
-    scored.push({ path: candidate, score, dot: lc.startsWith('.') ? 1 : 0 });
+    if (deprioritizeAtWalkPath(candidate) === 1) continue;
+    const clean = candidate.endsWith('/') ? candidate.slice(0, -1) : candidate;
+    const slash = clean.indexOf('/');
+    if (slash < 0) roots.add(candidate);
+    else roots.add(`${clean.slice(0, slash)}/`);
+  }
+  return [...roots]
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+    .slice(0, limit);
+}
+
+/**
+ * Live `@` menu filter — query-driven only (basename, path segments, path prefix).
+ * Empty query → project root entries derived from the index, not a fixed catalog.
+ */
+export function filterAtPaths(candidates: readonly string[], query: string, limit = 8): string[] {
+  const q = query.trim();
+  if (q.length === 0) return rootAtPathCandidates(candidates, limit);
+
+  const scored: Array<{ path: string; score: number }> = [];
+  for (const candidate of candidates) {
+    const score = scoreAtPathMatch(candidate, q);
+    if (score === null) continue;
+    scored.push({ path: candidate, score });
   }
   scored.sort((a, b) =>
     a.score - b.score
-    || a.dot - b.dot
     || a.path.length - b.path.length
     || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   return scored.slice(0, limit).map((s) => s.path);
@@ -255,63 +299,133 @@ export function isScopedRelPath(path: string): boolean {
 }
 
 export interface PathListerOptions {
-  /** Max candidate entries kept (files + derived dirs). Default 2000. */
+  /** Max candidate entries kept (files + derived dirs). Default 40_000. */
   cap?: number;
+  /** First `@` menu uses this smaller cap synchronously; full `cap` loads async. */
+  bootstrapCap?: number;
   /** Cache lifetime per project root. Default 15s (per-REPL-boot freshness). */
   ttlMs?: number;
   /** Clock seam (tests). Default Date.now. */
   now?: () => number;
+  /** Scheduler seam (tests). Default setImmediate. */
+  schedule?: (task: () => void) => void;
+}
+
+export type AtRefPathProvider = ((prefix: string) => readonly string[]) & {
+  /** Pre-warm the full index (non-blocking when bootstrap already cached). */
+  warm(): void;
+  /** True once the async full index (or a single-shot cap) is ready. */
+  ready(): boolean;
+};
+
+function buildProjectPathEntries(
+  walk: (rootAbs: string, visit: (fileAbs: string) => boolean) => unknown,
+  root: string,
+  fileCap: number,
+): string[] {
+  const primary: string[] = [];
+  const secondary: string[] = [];
+  const dirs = new Set<string>();
+  const noteDir = (rel: string): void => {
+    let dir = rel;
+    for (;;) {
+      const cut = dir.lastIndexOf('/');
+      if (cut < 0) break;
+      dir = dir.slice(0, cut);
+      dirs.add(`${dir}/`);
+    }
+  };
+  walk(root, (fileAbs) => {
+    const rel = relative(root, fileAbs).split(sep).join('/');
+    if (rel.length === 0) return true;
+    noteDir(rel);
+    if (deprioritizeAtWalkPath(rel) === 0) {
+      primary.push(rel);
+      if (primary.length >= fileCap) return false;
+    } else {
+      secondary.push(rel);
+    }
+    return true;
+  });
+  const cappedFiles = [...primary, ...secondary].slice(0, fileCap);
+  cappedFiles.sort((a, b) => deprioritizeAtWalkPath(a) - deprioritizeAtWalkPath(b) || (a < b ? -1 : a > b ? 1 : 0));
+  const dirList = [...dirs].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  return [...cappedFiles, ...dirList]
+    .sort((a, b) => deprioritizeAtWalkPath(a) - deprioritizeAtWalkPath(b) || (a < b ? -1 : a > b ? 1 : 0))
+    .slice(0, fileCap);
 }
 
 /**
  * Cached project-path candidate lister for the `@` menu. The WALKER is
  * injected (run.tsx passes chat-tool-exec.ts's walkProjectFiles — pure-Node,
  * node_modules/.git skipped, depth-capped) so this stays hermetically
- * testable. One walk fills the cache; repeat calls within `ttlMs` (and the
- * same root — /cd invalidates by root change) reuse it. Candidates are the
- * `/`-joined relative file paths plus every ancestor directory (with a
- * trailing `/`), sorted, capped at `cap` entries.
+ * testable. Bootstrap index returns quickly on first `@`; the full cap loads
+ * asynchronously so the REPL never freezes on a 30k+ tree walk.
  */
 export function createCachedPathLister(
   walk: (rootAbs: string, visit: (fileAbs: string) => boolean) => unknown,
   resolveRoot: () => string,
   opts: PathListerOptions = {},
-): (prefix: string) => string[] {
-  // Alperen canlı-bulgusu: deckent-dev 30k+ dosya — 2000-cap DFS-sırasıyla
-  // (.analysis/.brain önce) doluyordu ve gerçek kaynak dosyaları listeye
-  // hiç giremiyordu. 40k = mevcut repo + pay; bellek ~birkaç MB string.
-  const cap = opts.cap ?? 40_000;
+): AtRefPathProvider {
+  const fullCap = opts.cap ?? 40_000;
+  const bootstrapCap = Math.min(opts.bootstrapCap ?? 5_000, fullCap);
   const ttlMs = opts.ttlMs ?? 15_000;
   const now = opts.now ?? Date.now;
-  let cache: { at: number; root: string; entries: string[] } | null = null;
-  return () => {
+  const schedule = opts.schedule ?? ((task: () => void) => setImmediate(task));
+  let cache: { at: number; root: string; entries: string[]; complete: boolean } | null = null;
+  let warming = false;
+
+  const runFullIndex = (): void => {
+    if (warming || fullCap <= bootstrapCap) return;
+    const root = resolveRoot();
+    warming = true;
+    schedule(() => {
+      try {
+        const entries = buildProjectPathEntries(walk, root, fullCap);
+        cache = { at: now(), root, entries, complete: true };
+      } finally {
+        warming = false;
+      }
+    });
+  };
+
+  const loadEntries = (): readonly string[] => {
     const root = resolveRoot();
     const at = now();
     if (cache && cache.root === root && at - cache.at < ttlMs) return cache.entries;
-    const files: string[] = [];
-    const dirs = new Set<string>();
-    walk(root, (fileAbs) => {
-      const rel = relative(root, fileAbs).split(sep).join('/');
-      if (rel.length === 0) return true;
-      files.push(rel);
-      let dir = rel;
-      for (;;) {
-        const cut = dir.lastIndexOf('/');
-        if (cut < 0) break;
-        dir = dir.slice(0, cut);
-        dirs.add(`${dir}/`);
-      }
-      return files.length < cap; // visitor-false stops the whole walk (cap)
-    });
-    files.sort((a, b) => deprioritizeAtWalkPath(a) - deprioritizeAtWalkPath(b) || (a < b ? -1 : a > b ? 1 : 0));
-    const cappedFiles = files.slice(0, cap);
-    const dirList = [...dirs].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-    const entries = [...cappedFiles, ...dirList]
-      .sort((a, b) => deprioritizeAtWalkPath(a) - deprioritizeAtWalkPath(b) || (a < b ? -1 : a > b ? 1 : 0))
-      .slice(0, cap);
-    cache = { at, root, entries };
-    return entries;
+    const entries = buildProjectPathEntries(walk, root, bootstrapCap);
+    cache = { at, root, entries, complete: fullCap <= bootstrapCap };
+    if (!cache.complete) runFullIndex();
+    return cache.entries;
   };
+
+  const provider = ((queryPrefix: string) => {
+    const entries = loadEntries();
+    const q = queryPrefix.trim().toLowerCase();
+    if (q.length === 0) return entries;
+    const narrowed: string[] = [];
+    for (const candidate of entries) {
+      if (scoreAtPathMatch(candidate, q) !== null) narrowed.push(candidate);
+    }
+    return narrowed.length > 0 ? narrowed : entries;
+  }) as AtRefPathProvider;
+
+  provider.warm = () => {
+    const root = resolveRoot();
+    const at = now();
+    if (cache && cache.root === root && cache.complete && at - cache.at < ttlMs) return;
+    if (cache && cache.root === root && at - cache.at < ttlMs && !cache.complete) {
+      runFullIndex();
+      return;
+    }
+    const entries = buildProjectPathEntries(walk, root, bootstrapCap);
+    cache = { at, root, entries, complete: fullCap <= bootstrapCap };
+    if (!cache.complete) runFullIndex();
+  };
+
+  provider.ready = () => cache?.complete === true;
+
+  return provider;
 }
 
 /** 7113 typed seam. Legacy prompt bytes stay identical; no parsing of model-written markers. */

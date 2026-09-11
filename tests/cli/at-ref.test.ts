@@ -16,6 +16,7 @@ import {
   extractAtRefs,
   expandAtRefs,
   filterAtPaths,
+  scoreAtPathMatch,
   activeAtQuery,
   completeAtToken,
   isScopedRelPath,
@@ -129,6 +130,14 @@ describe('resolveAtRefCandidate — basename and aliases', () => {
   });
 });
 
+describe('scoreAtPathMatch — query-driven tiers', () => {
+  it('matches path-prefix and basename queries; rejects unrelated strings', () => {
+    expect(scoreAtPathMatch('src/cli/repl/app.tsx', 'src/cli/re')).toBe(0);
+    expect(scoreAtPathMatch('src/cli/repl/app.tsx', 'app')).toBe(0);
+    expect(scoreAtPathMatch('src/cli/repl/app.tsx', 'zzz-no-match')).toBeNull();
+  });
+});
+
 // ─── filterAtPaths ───────────────────────────────────────────────────────────
 
 describe('filterAtPaths — fuzzy ordering', () => {
@@ -140,8 +149,15 @@ describe('filterAtPaths — fuzzy ordering', () => {
     'README.md',
   ];
 
-  it('empty query → first `limit` candidates as provided', () => {
-    expect(filterAtPaths(candidates, '', 3)).toEqual(candidates.slice(0, 3));
+  it('empty query → root-level dirs and root files from the index (not a fixed slice)', () => {
+    expect(filterAtPaths(candidates, '', 4)).toEqual(['README.md', 'docs/', 'src/', 'tests/']);
+  });
+
+  it('narrows live as a path prefix is typed (`src/cli/re`)', () => {
+    const out = filterAtPaths(candidates, 'src/cli/re', 4);
+    expect(out).toHaveLength(2);
+    expect(out).toContain('src/cli/repl/input-bar.tsx');
+    expect(out).toContain('src/cli/repl/app.tsx');
   });
 
   it('ranks basename-prefix > basename-substring > path-prefix > path-substring (subsequence DROPPED)', () => {

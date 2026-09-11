@@ -149,11 +149,11 @@ describe('createCliToolDispatcher — chat-tool-bridge.ts', () => {
     expect(spawnFn).toHaveBeenCalledWith(expected);
   });
 
-  it('deckent_recover → bakes in --force (avoids headless readline hang)', async () => {
+  it('deckent_recover _rest sprint id uses dry-run gate (no --force bypass)', async () => {
     const spawnFn = vi.fn().mockResolvedValue('recovered') as unknown as CliToolSpawnFn;
     const d = createCliToolDispatcher({ spawnFn });
     await d.dispatch('deckent_recover', { _rest: ['sprint-224'] });
-    expect(spawnFn).toHaveBeenCalledWith(['recover', '--force', 'sprint-224']);
+    expect(spawnFn).toHaveBeenCalledWith(['recover', 'sprint-224', '--dry-run']);
   });
 
   it('deckent_kill passes through user flags via _rest', async () => {
@@ -161,6 +161,61 @@ describe('createCliToolDispatcher — chat-tool-bridge.ts', () => {
     const d = createCliToolDispatcher({ spawnFn });
     await d.dispatch('deckent_kill', { _rest: ['--all'] });
     expect(spawnFn).toHaveBeenCalledWith(['kill', '--all']);
+  });
+
+  it('deckent_kill maps MCP-shaped args to CLI argv', async () => {
+    const spawnFn = vi.fn().mockResolvedValue('ok') as unknown as CliToolSpawnFn;
+    const d = createCliToolDispatcher({ spawnFn });
+    await d.dispatch('deckent_kill', { taskId: 'approvaltest-A' });
+    expect(spawnFn).toHaveBeenCalledWith(['kill', 'approvaltest-A']);
+    await d.dispatch('deckent_kill', { all: true, force: true, userExplicit: true });
+    expect(spawnFn).toHaveBeenCalledWith(['kill', '--all', '--force', '--user-explicit']);
+  });
+
+  it('deckent_cleanup maps decay/dryRun booleans to CLI flags', async () => {
+    const spawnFn = vi.fn().mockResolvedValue('ok') as unknown as CliToolSpawnFn;
+    const d = createCliToolDispatcher({ spawnFn });
+    await d.dispatch('deckent_cleanup', { decay: true, dryRun: true });
+    expect(spawnFn).toHaveBeenCalledWith(['cleanup', '--decay', '--dry-run']);
+  });
+
+  it('deckent_recover defaults to MCP dryRun=true (--dry-run) on CLI bridge', async () => {
+    expect(cliArgsFor('deckent_recover', { sprintId: 'sprint-731' })).toEqual(['recover', 'sprint-731', '--dry-run']);
+    const spawnFn = vi.fn().mockResolvedValue('ok') as unknown as CliToolSpawnFn;
+    const d = createCliToolDispatcher({ spawnFn });
+    await d.dispatch('deckent_recover', { sprintId: 'sprint-731' });
+    expect(spawnFn).toHaveBeenCalledWith(['recover', 'sprint-731', '--dry-run']);
+  });
+
+  it('deckent_recover dryRun=false is unavailable on CLI bridge (no --force without approval binding)', async () => {
+    expect(cliArgsFor('deckent_recover', { sprintId: 'sprint-731', dryRun: false })).toBeNull();
+    const spawnFn = vi.fn().mockResolvedValue('ok') as unknown as CliToolSpawnFn;
+    const d = createCliToolDispatcher({ spawnFn });
+    const out = await d.dispatch('deckent_recover', { sprintId: 'sprint-731', dryRun: false });
+    expect(spawnFn).not.toHaveBeenCalled();
+    expect(out).toContain('[mcp-error]');
+  });
+
+  it('deckent_recover with sprintId ignores _rest (structured contract wins)', () => {
+    expect(cliArgsFor('deckent_recover', { sprintId: 'sprint-731', _rest: ['sprint-999'] }))
+      .toEqual(['recover', 'sprint-731', '--dry-run']);
+  });
+
+  it('deckent_recover rejects _rest + dryRun:false counterexample (Astra 187)', async () => {
+    expect(cliArgsFor('deckent_recover', { _rest: ['sprint-731'], dryRun: false })).toBeNull();
+    const spawnFn = vi.fn().mockResolvedValue('ok') as unknown as CliToolSpawnFn;
+    const d = createCliToolDispatcher({ spawnFn });
+    const out = await d.dispatch('deckent_recover', { _rest: ['sprint-731'], dryRun: false });
+    expect(spawnFn).not.toHaveBeenCalled();
+    expect(out).toContain('[mcp-error]');
+  });
+
+  it('deckent_recover without sprint id is unavailable', async () => {
+    expect(cliArgsFor('deckent_recover', {})).toBeNull();
+    const spawnFn = vi.fn().mockResolvedValue('ok') as unknown as CliToolSpawnFn;
+    const d = createCliToolDispatcher({ spawnFn });
+    await d.dispatch('deckent_recover', {});
+    expect(spawnFn).not.toHaveBeenCalled();
   });
 
   // Sprint 269 follow-up: deckent_audit is now bridged (the /audit slash needs

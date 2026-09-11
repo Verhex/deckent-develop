@@ -29,7 +29,7 @@ import { StatusRow, formatSessionIdForTerminal } from './status-row.js';
 import { resolveCtrlC, CTRL_C_EXIT_WINDOW_MS } from './interrupt-policy.js';
 import { useTerminalColumns } from './use-terminal-columns.js';
 import { TerminalViewportContext } from './terminal-resize-mediator.js';
-import { extractAtRefs, expandAtRefs } from './at-ref.js';
+import { extractAtRefs, expandAtRefs, type AtRefPathProvider } from './at-ref.js';
 import { resolveSlash, type SlashRegistry } from '../commands/chat-slash-registry.js';
 import type { ChatMode } from '../commands/chat-mode.js';
 import type { NativeReasoningActivityEvent, NativeReferenceActivityEvent, NativeToolActivityEvent, ReplEngine } from './native-agent-bridge.js';
@@ -45,6 +45,7 @@ import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { listLedgerSessions, readLedgerSessionForResume, type LedgerStoreOptions } from './session-ledger.js';
 import type { ActiveSelection } from './provider-switch.js';
 import { createStreamSegmenter, type StreamSegmenter } from './stream-segmenter.js';
+import { createStaticProseBatchEmitter, type StaticProseBatchEmitter } from './static-prose-batch.js';
 import { measuredOnTurnEnd } from './native-elapsed.js';
 import { buildLiveFooter, type LiveFooterLabels, type LiveFooterState } from '../helpers/live-footer.js';
 import { initialTermModeState, parseTermCommand, applyModeTarget, TERM_MODES, ALLOWED_RISKS_BY_MODE, type TermMode, type TermModeState } from './term-mode.js';
@@ -1104,6 +1105,7 @@ export interface ReplLabels {
   /** TERM-AT-REF (583/N2b) — localized hint under the InputBar's `@` path
    * menu (tui.atref_menu_hint; same injected-labels route as `menuHint`). */
   atMenuHint: string;
+  atMenuIndexingHint: string;
   /** TERMINAL-TOOLS-002 — the Ctrl-R reverse-history prompt of the composer
    * (tui.reverse_search). Was a readline-ism literal inside input-bar.tsx. */
   reverseSearch: string; // the Ctrl-R prompt text
@@ -1667,7 +1669,7 @@ export interface ReplAppProps {
    * fuzzy menu. Injected by run.tsx (cached walkProjectFiles lister, capped
    * ~2000 entries); absent → typing `@` never opens a menu (render
    * byte-identical to the pre-583/N2b App). */
-  atRefPathProvider?: (prefix: string) => string[];
+  atRefPathProvider?: AtRefPathProvider;
   /** TERM-AT-REF (583/N2b) — scope-guarded project-file reader (rel path →
    * content, `null` = missing/binary/out-of-scope) used to expand `@path`
    * tokens into the OUTBOUND prompt at the submit boundary (expandAtRefs,
@@ -1861,6 +1863,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const turnEpoch = useRef(0);
   const headPushed = useRef(false);       // ● deckent header emitted for this turn?
   const segmenter = useRef<StreamSegmenter | null>(null);
+  const staticProseBatch = useRef<StaticProseBatchEmitter | null>(null);
   // F11-016 (368-003 wire): the raw useRef<string[]> FIFO is replaced by the
   // pure input-queue core — same FIFO, plus the hardened contract (blank +
   // double-fire-Enter swallow, ESC clear resets the dup-guard). Lazy-init once,
@@ -2301,6 +2304,21 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     setTurns((t) => [...t, ...built.turns]);
   };
 
+  const wireStreamSegmenter = (): void => {
+    staticProseBatch.current = createStaticProseBatchEmitter((markdown) => pushSegment(markdown));
+    segmenter.current = createStreamSegmenter((seg) => {
+      const batch = staticProseBatch.current;
+      if (!batch) return;
+      if (seg.kind === 'block') batch.block(seg.markdown);
+      else batch.line(seg.markdown);
+    });
+  };
+
+  const flushStreamedProse = (): void => {
+    segmenter.current?.flush();
+    staticProseBatch.current?.flush();
+  };
+
   // F11-016-STAB (360-009): ONE clear routine for both clear surfaces (the
   // /clear command below + InputBar's Ctrl-L onClear — previously two drifting
   // inline copies). Also RECREATES the segmenter: the old instance still
@@ -2319,7 +2337,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     statusInspectGeneration.current += 1;
     invalidateSprintContext();
     setTurns([]); setPartial(''); setStatusInspectLines(null); headPushed.current = false;
-    segmenter.current = createStreamSegmenter((seg) => pushSegment(seg.markdown));
+    wireStreamSegmenter();
   };
 
   useEffect(() => {
@@ -2362,7 +2380,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       // 389-002: a stale (pre-clear) turn's tool-result block must not land
       // on the just-cleared screen either — same epoch guard as `output`.
       if (!isTurnLive(turnEpoch.current, clearEpoch.current)) return;
-      segmenter.current?.flush(); setPartial(''); // commit any in-flight reply first
+      flushStreamedProse(); setPartial(''); // commit any in-flight reply first
       const turn: Turn = { id: idRef.current++, role: 'tool', text: '', tool: info };
       setTurns((t) => [...t, turn]); // pure updater — id consumed above (360-009)
       // TERM-FLOW-UNIFY Sprint-4 mount (426-002): a completed tool call may
@@ -2434,10 +2452,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     // <Static> immediately (flow into scrollback, readable in real time, like
     // Claude Code); the dynamic region only ever holds the in-progress partial
     // line → no tall re-render, no drift.
-    segmenter.current = createStreamSegmenter((seg) => pushSegment(seg.markdown));
+    wireStreamSegmenter();
 
     const finalizeReply = (): void => {
-      segmenter.current?.flush();   // emit the trailing partial line / open block
+      flushStreamedProse();   // trailing partial line / open block + prose batch
       setPartial('');
       if (headPushed.current) {     // close the reply with a stats footer
         const stats = lastStats.current ?? undefined;
@@ -3632,6 +3650,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         // unless run.tsx injects a provider; hint via the same labels route.
         pathProvider={atRefPathProvider}
         atMenuHint={labels.atMenuHint}
+        atMenuIndexingHint={labels.atMenuIndexingHint}
       />
 
       {/* TERMINAL-TOOLS-004: ONE width-aware line (status-row.tsx) — the old

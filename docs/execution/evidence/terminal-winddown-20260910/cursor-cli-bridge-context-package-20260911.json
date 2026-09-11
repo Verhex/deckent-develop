@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "kind": "cursor-scoped-review-request",
+  "utc": "2026-09-11T01:36:00Z",
+  "baseSha": "5e0faabaaa6c19337d9f9998e5c13dd8a160729b",
+  "ownerSession": "chat-2026-09-11T01-06-11-219Z-cju9d4",
+  "findings": [
+    {
+      "id": "CLI-LIFECYCLE-ARG-BRIDGE-001",
+      "class": "BLOCKS_CURRENT_DONE",
+      "summary": "deckent_kill MCP args (taskId/all) dropped in cliArgsFor; approval allow then CLI fails taskId required"
+    },
+    {
+      "id": "CONTEXT-TOOL-RESULT-UX-001",
+      "class": "BLOCKS_CURRENT_DONE",
+      "summary": "Tight broker render budget + misleading tur durdu copy under parallel tool load"
+    }
+  ],
+  "changedPaths": [
+    "src/cli/commands/chat-tool-bridge.ts",
+    "src/agent/loop.ts",
+    "src/cli/helpers/messages.ts",
+    "src/cli/repl/native-agent-bridge.ts",
+    "tests/cli/chat-tool-bridge.test.ts"
+  ],
+  "localVerification": {
+    "commands": [
+      "npx vitest run tests/cli/chat-tool-bridge.test.ts tests/agent/loop.test.ts",
+      "npm run lint:i18n"
+    ],
+    "result": "65/65 PASS exit0; i18n exit0"
+  },
+  "hold": [
+    "S4 live deny PTY matrix",
+    "formal XVerify",
+    "MASTER ledger row"
+  ],
+  "astraAsk": [
+    "scoped code ACCEPT or REVISE on argv mapping",
+    "context slice sufficient vs shrink/checkpoint follow-up",
+    "approval journey partial closure assessment"
+  ]
+}

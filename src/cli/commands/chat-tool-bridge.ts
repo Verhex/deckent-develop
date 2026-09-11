@@ -87,9 +87,7 @@ const TOOL_COMMANDS: Readonly<Record<string, readonly string[]>> = {
   // ── Destructive tools (always-confirm; run.tsx never auto-approves these) ──
   deckent_kill: ['kill'],
   deckent_cleanup: ['cleanup'],
-  // recover prompts via readline unless --force; the REPL's always-confirm modal
-  // IS the confirmation, so bake in --force to avoid a headless stdin hang.
-  deckent_recover: ['recover', '--force'],
+  // deckent_recover: cliArgsFor builder only (MCP dryRun default + no headless --force bypass).
   // NOTE: deckent_watch is intentionally NOT here — a live event stream would
   // block the REPL turn forever, not just for a few minutes. deckent_start /
   // deckent_run / deckent_process are handled by the arg-aware builders below
@@ -301,6 +299,20 @@ export function defaultSpawnFn(args: string[]): Promise<string> {
  * that will run). deckent_memory_query is NOT covered here — it is special-cased
  * in dispatch because its `query` arg maps to a `recall <query>` positional.
  */
+/** Sprint id from structured field or first sprint-* positional in `_rest`. */
+export function resolveRecoverSprintId(args: Record<string, unknown>): string {
+  const fromField = typeof args['sprintId'] === 'string' ? (args['sprintId'] as string).trim() : '';
+  if (fromField.length > 0) return fromField;
+  const rest = args['_rest'];
+  if (!Array.isArray(rest)) return '';
+  for (const entry of rest) {
+    if (typeof entry !== 'string') continue;
+    const token = entry.trim();
+    if (/^sprint-\d+$/.test(token)) return token;
+  }
+  return '';
+}
+
 export function cliArgsFor(name: string, args: Record<string, unknown>): string[] | null {
   // ── Arg-aware builders (Sprint 269 follow-up — the /autonomous, /audit and
   // /directives slashes dispatch these tools with structured args; the static
@@ -403,6 +415,40 @@ export function cliArgsFor(name: string, args: Record<string, unknown>): string[
     }
     if (args['keep'] === true) argv.push('--keep');
     if (args['autoApprove'] === true) argv.push('--auto-approve');
+    return argv;
+  }
+  if (name === 'deckent_kill') {
+    const argv: string[] = ['kill'];
+    if (args['all'] === true) argv.push('--all');
+    if (args['force'] === true) argv.push('--force');
+    if (args['userExplicit'] === true) argv.push('--user-explicit');
+    const taskId = typeof args['taskId'] === 'string' ? (args['taskId'] as string).trim() : '';
+    if (taskId.length > 0) argv.push(taskId);
+    const rest = args['_rest'];
+    if (Array.isArray(rest)) {
+      for (const r of rest) if (typeof r === 'string') argv.push(r);
+    }
+    return argv;
+  }
+  if (name === 'deckent_cleanup') {
+    const argv: string[] = ['cleanup'];
+    if (args['decay'] === true) argv.push('--decay');
+    if (args['dryRun'] === true) argv.push('--dry-run');
+    const rest = args['_rest'];
+    if (Array.isArray(rest)) {
+      for (const r of rest) if (typeof r === 'string') argv.push(r);
+    }
+    return argv;
+  }
+  if (name === 'deckent_recover') {
+    const sprintId = resolveRecoverSprintId(args);
+    if (sprintId.length === 0) return null;
+    // MCP default dryRun=true (registerRecoverTool). CLI bridge cannot project
+    // verified MCP approval identity — mutation (dryRun=false) stays unavailable here.
+    const dryRun = args['dryRun'] !== false;
+    if (!dryRun) return null;
+    const argv: string[] = ['recover', sprintId, '--dry-run'];
+    if (args['skipAudit'] === true) argv.push('--skip-audit');
     return argv;
   }
   if (name === 'deckent_process') {

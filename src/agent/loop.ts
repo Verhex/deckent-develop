@@ -58,6 +58,7 @@ import { previewBytesFromTokenShare } from './tool-result-broker.js';
 import {
   canEmitMeasuredWindowCheckpoint,
   shrinkOldestRetainedResults,
+  withholdToolResultFromContext,
 } from './tool-result-retention.js';
 import { matchRule } from './permission-types.js';
 import type {
@@ -1177,6 +1178,11 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
       deps.preambleBudgeter?.observeToolResult(call.name, call.args, result);
       // 7110: a replayed envelope is already brokered/bounded — never re-capped.
       if (replayed === undefined && deps.nativeBudget && rawBudget !== undefined && rawBudget > 0) {
+        const executedSnapshot: ToolResult = {
+          ok: result.ok,
+          output: result.output,
+          ...(result.meta ? { meta: { ...result.meta } } : {}),
+        };
         const singleShare = deps.nativeBudget.maxToolResultShareOfContext ?? DEFAULT_NATIVE_AGENT_BUDGET.maxToolResultShareOfContext;
         const turnShare = deps.nativeBudget.maxTurnToolResultShareOfContext ?? DEFAULT_NATIVE_AGENT_BUDGET.maxTurnToolResultShareOfContext;
         const turnCapTokens = Math.floor(rawBudget * turnShare);
@@ -1184,26 +1190,79 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         // In-flight batch: size against brokered UTF-8 bodies with the same measured
         // wire ratio — not the conservative full−nonTool probe (that upper-bounds each
         // body byte as a token and starves large parallel batches mid-turn).
-        const retainedBytes = sumToolResultUtf8Bytes(transcript.toProviderMessages());
-        const retainedTokens = toolResultBytesToTokens(retainedBytes, lastTokensPerUtf8Byte);
-        const remainingTurnTokens = Math.max(0, turnCapTokens - retainedTokens);
-        const perCallTokenCap = Math.min(
+        let retainedBytes = sumToolResultUtf8Bytes(transcript.toProviderMessages());
+        let retainedTokens = toolResultBytesToTokens(retainedBytes, lastTokensPerUtf8Byte);
+        let remainingTurnTokens = Math.max(0, turnCapTokens - retainedTokens);
+        const callsRemaining = Math.max(1, calls.length - callIndex);
+        let perCallTokenCap = Math.min(
           singleCapTokens,
-          Math.floor(remainingTurnTokens / (calls.length - callIndex)),
+          Math.floor(remainingTurnTokens / callsRemaining),
         );
-        const previewBytes = previewBytesFromTokenShare(perCallTokenCap, lastTokensPerUtf8Byte);
-        try {
-          result = { ...result, output: brokerToolResult(result, {
-            store: deps.contentStore ?? { write: () => { throw new Error('Session content store unavailable'); } },
-            maxPreviewBytes: previewBytes, maxRenderedBytes: previewBytes,
-          }) };
-        } catch (error) {
-          if (!(error instanceof ToolResultContextBudgetError)) throw error;
-          result = {
-            ok: false,
-            output: '[deckent] tool-result context budget exhausted; use outline, search, or smaller ranges',
-            meta: { code: 'TOOL_RESULT_CONTEXT_BUDGET_EXHAUSTED' },
-          };
+        const store = deps.contentStore;
+        if (perCallTokenCap <= 0 && store) {
+          const shrink = await shrinkOldestRetainedResults({
+            transcript,
+            store,
+            nativeBudget: deps.nativeBudget,
+            rawBudget,
+            tokensPerUtf8Byte: lastTokensPerUtf8Byte,
+            measureRequest,
+            targetFreeTokens: Math.max(1, singleCapTokens),
+          });
+          if (shrink.shrunkCount > 0) {
+            retainedBytes = sumToolResultUtf8Bytes(transcript.toProviderMessages());
+            retainedTokens = toolResultBytesToTokens(retainedBytes, lastTokensPerUtf8Byte);
+            remainingTurnTokens = Math.max(0, turnCapTokens - retainedTokens);
+            perCallTokenCap = Math.min(
+              singleCapTokens,
+              Math.floor(remainingTurnTokens / callsRemaining),
+            );
+          }
+        }
+        if (perCallTokenCap <= 0) {
+          result = withholdToolResultFromContext(executedSnapshot, store);
+        } else {
+          const previewBytes = previewBytesFromTokenShare(perCallTokenCap, lastTokensPerUtf8Byte);
+          const writer = store ?? { write: () => { throw new Error('Session content store unavailable'); } };
+          try {
+            result = { ...executedSnapshot, output: brokerToolResult(executedSnapshot, {
+              store: writer, maxPreviewBytes: previewBytes, maxRenderedBytes: previewBytes,
+            }) };
+          } catch (error) {
+            if (!(error instanceof ToolResultContextBudgetError)) throw error;
+            if (store) {
+              const shrink = await shrinkOldestRetainedResults({
+                transcript,
+                store,
+                nativeBudget: deps.nativeBudget,
+                rawBudget,
+                tokensPerUtf8Byte: lastTokensPerUtf8Byte,
+                measureRequest,
+                targetFreeTokens: perCallTokenCap,
+              });
+              if (shrink.shrunkCount > 0) {
+                retainedBytes = sumToolResultUtf8Bytes(transcript.toProviderMessages());
+                retainedTokens = toolResultBytesToTokens(retainedBytes, lastTokensPerUtf8Byte);
+                remainingTurnTokens = Math.max(0, turnCapTokens - retainedTokens);
+                perCallTokenCap = Math.min(
+                  singleCapTokens,
+                  Math.floor(remainingTurnTokens / callsRemaining),
+                );
+              }
+            }
+            if (perCallTokenCap <= 0) {
+              result = withholdToolResultFromContext(executedSnapshot, store);
+            } else {
+              const retryPreviewBytes = previewBytesFromTokenShare(perCallTokenCap, lastTokensPerUtf8Byte);
+              try {
+                result = { ...executedSnapshot, output: brokerToolResult(executedSnapshot, {
+                  store: writer, maxPreviewBytes: retryPreviewBytes, maxRenderedBytes: retryPreviewBytes,
+                }) };
+              } catch {
+                result = withholdToolResultFromContext(executedSnapshot, store);
+              }
+            }
+          }
         }
       }
       // A handler may attach a typed `meta.code` (7110: replay-served, content-ref

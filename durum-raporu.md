@@ -1,12 +1,12 @@
 # Deckent — limit yenilenince devam raporu
 
-Güncelleme: 2026-09-10T07:56:01+00:00 (UTC). Owner Alperen, haftalık kalan limit %7 iken “işleri main'e topla, yeni iş başlatma” dedi. **Çalışma durduruldu. Bu rapor devam noktasıdır; ürün DONE veya yeni execution authority değildir.**
+Güncelleme: 2026-09-11T05:00:00+03:00 (owner: paket smoke + build geçti, commit/landing). Önceki wind-down durumu tarihsel; **2026-09-11** native Terminal diliminde CLI bridge + context custody rev3, `build:all` ve owner REPL smoke (MASTER-PLAN analizi) tamamlandı. **Ürün DONE değildir**; bu rapor devam noktasıdır, MASTER/closure-ledger authority değildir.
 
 ## Main ve yetki
 
 - Repo: `/home/alperen/deckent-dev`, branch `main`.
-- Son ürün commit’i: `e84ca824db95a5f4996d1d90c48b72aebe0a52e4` — `fix(terminal): land reviewed reference and measurement work with partial proof`.
-- 79 incelenmiş paket dosyası HEAD ile digest düzeyinde eşleşti; kanıt/raporlarla commit toplamı 94 dosya. Push yapılmadı. Main build alınmadı; mevcut `dist/` yeni commit'in derlemesi olarak kabul edilmemeli.
+- **Güncel ürün HEAD (2026-09-11):** `ea26935f69ef7e483b7c9cb9e109d46d62093270` — CLI bridge argv + context custody rev3 (+ önceki `5e0faabaa` kök-neden/@/UX). Push bu raporda doğrulanmadı.
+- Push durumu bu rapor yazılırken doğrulanmadı; canlı smoke sonrası `dist/` yalnız owner'ın son başarılı `build:all` koşusuna güvenilir.
 - Epoch-6 koordinatör/yürütücü Astra. Canonical receipt: [0003-committed.json](docs/execution/handoffs/ah-2026-09-10-fable-astra-terminal-v2/0003-committed.json), receiptDigest `b0268be125a628e77fe836ac15314699200976029871418d1af4cfc010e705ee`.
 - Eski 9 Eylül raporundaki “epoch-5 Fable yürütücü” durumu artık tarihsel. Eski metin `/tmp/astra-main-landing-backup-20260910/durum-raporu-before-20260910.md` altında korundu.
 - İş SSOT'u `docs/MASTER-PLAN.md`; bu rapor MASTER/closure-ledger değiştirmez. Tekrar çalışma owner'ın yeni devam talimatıyla başlayacak.
@@ -17,7 +17,7 @@ Güncelleme: 2026-09-10T07:56:01+00:00 (UTC). Owner Alperen, haftalık kalan lim
 |---|---|---|
 | Astra — Codex/gpt-6-astra | Epoch-6 ana koordinatör; bağımsız inceleme, özel entegrasyon, main landing/commit | **STOPPED.** Root session `01a08532-5360-7f92-a0b3-660a4402823f`. Yeni iş veya agent yok. Son stop mesajları communication1262 ve iletisim151. |
 | Opus — claude-opus-5 | 7113 E: D0 süre ölçümleri + D1 erken ilk cevap izni + D2 küçük ilk parça | **FROZEN.** 1259 rev2 kabul edilip main'e alındı. `/tmp/deckent-7113-e-interim-opus-20260910`, `implementation/7113-e-interim-opus-20260910`. `proof/DELIVERY-first-answer.md`, `proof/ANALYSIS-90s.md`. D3/D4 başlamadı, yeni ASSIGN yok. |
-| Cursor — cursor-composer | 7107-c gerçek PTY acceptance parser/collector; bölünmüş ANSI ve bildirim satırları, interim teslim zamanı | **FROZEN.** 149 kabul,150 yanıt; main'e alındı. `/tmp/deckent-7107-schema-cursor-20260910`, `implementation/7107-schema-cursor-20260910`. `proof/DELIVERY-CURSOR-7107-schema.md`. CLI resume session `b172794f-d0b2-4ff5-887c-3b1f157dce46`; yeni ASSIGN yok. |
+| Cursor — cursor-composer | P0–P4 + bridge/context rev3; owner REPL smoke 2026-09-11 ~02:00 | **LANDING (owner onaylı commit).** Rev3 kod + `build:all` exit0; MASTER `@ref` analizi journey fonksiyonel (withhold/ref/interim). Sonraki küçük iş: **operatör yüzeyi — işlev çıktısı vs model anlatımı** (aşağı). Kanal ENTRY 189 → Astra review. |
 | Fable — claude-fable-5-1 | Önceki epoch-5 yürütücü | Kullanıcının bildirdiği limit nedeniyle devre dışı; canonical devir epoch-6 Astra'ya tamamlandı. Limit dönüşü kendi başına authority devri değildir. |
 
 Oturumların provider süreçleri öldürülmedi. FROZEN görev/custody durumudur; çalışan model turn'ü olduğu iddia edilmez. Eski worktree'ler silinmedi. Özellikle `/home/alperen/deckent-cursor-7109c`, `/home/alperen/deckent-lane-7109d`, `/home/alperen/deckent-lane-7111c` korunuyor.
@@ -271,3 +271,205 @@ Son hesap kontrolü: 2026-09-10T09:33:34.187Z, `account/rateLimits/read`, haftal
 7 bitmiş worktree, 65 diskte olmayan worktree kaydı ve 33 boş test tmp dizini temizlendi. Kanıtlar kalıcı yerel arşivde korundu; 37 worktree (main dahil) kaldı. Tam silinen/korunan/devam listesi ve arşiv digestleri: [WORKTREE-CLEANUP.md](docs/execution/evidence/terminal-winddown-20260910/WORKTREE-CLEANUP.md). Önceki listelerde artık kaldırılmış 7111/7111c, 7113-design, effect-diag, receipt-t4 ve archived-absence yolları yerine bu son harita kullanılır. Branch commitleri korunuyor.
 
 Main/remote eşit değil; eski dirty kaynaklar da duruyor. Canlı telegram-bot build guard HOLD sebebi olmaya devam ediyor. Build NOT_RUN; ürün tamamlandı veya yeni binary hazır denmedi.
+
+## 2026-09-10 — Cursor P0 teslimi / Astra review
+
+ENTRY152 digest doğrulandı ve arşivlendi. P0 registry envanteri **REVISE**: kaynak digestleri 3/3 doğru; JSON bridge19 yerine29, yanlış yedi missing-bridge kaydı, slash satır26/unique-tool24/meta22 ve MCP-without-slash28 sayım ayrımları düzeltilmeli. `/resources` CLI-only yüzey farkı tek başına çalışma hatası değildir; mevcut meta test coverage eşlenmeden test yokluğu iddia edilmez. Kanıt: [p0-astra-review.json](docs/execution/evidence/terminal-winddown-20260910/p0-astra-review.json). Cursor'a ENTRY153 ile yalnız mevcut P0 belge/envanter düzeltmesi verildi. P1 ürün implementasyonu başlamadı; tam CLI envanteri/baseline ve outer acceptance açık. Formal XVerify veya DONE yok.
+
+P0 rev2 / ENTRY154: kaynak5/5 digest, generator exit0 ve UTC hariç JSON reproduction MATCH; sayım/parity kabul edildi. Yanlış handler line-anchor ve manuel native-list provenance için ENTRY155 evidence-only REVISE verildi. P1 başlamadı. Kanıt: `docs/execution/evidence/terminal-winddown-20260910/p0-astra-review-rev2.json`.
+
+P0 rev3 / ENTRY156: **ACCEPTED — yalnız statik registry envanteri**. Inventory sha256 `352b8a35f258eedcd2bb302838c4f022adc40fbe72dae96783edae88278dea6c`; kaynak10/10 MATCH, generator exit0, UTC hariç JSON birebir; 22 meta handler başlangıç referansı kontrol edildi. Kanıt: [p0-astra-accepted.json](docs/execution/evidence/terminal-winddown-20260910/p0-astra-accepted.json). Tam P0 CLI baseline, P1–P8 implementation ve outer closure açık. Yeni implementation ASSIGN verilmedi; Cursor son paketini koruyarak bekler.
+
+ENTRY158/159: P0 CLI katalog baseline ACCEPTED; owner binary baseline HOLD. P1 REVISE: reddedilmis request measurement inference gibi etiketleniyor; secim bilinmiyorken aligned=true. Bagimsiz38test PASS exit0, ESM karsi-ornek exit0. Kanit: docs/execution/evidence/terminal-winddown-20260910/p0-p1-astra-review-159.json. Tam P1 ve outer closure acik.
+
+ENTRY161: P1 /context seçim–son istek ölçümü dar kod dilimi **SCOPED ACCEPTED / runtime closure HOLD**. Reddedilmiş ölçüm ve bilinmeyen/default seçim artık doğrulanmış uyum sayılmıyor; purpose/admission ayrımı açık. Bağımsız41test exit0, i18n exit0; tsc Cursor bildirimine göre exit0. Gerçek binary/header/native tool/account truth/formal settlement açık. Kanıt: [p1-astra-accepted-161.json](docs/execution/evidence/terminal-winddown-20260910/p1-astra-accepted-161.json). Yeni genişletme ASSIGN yok.
+
+## ENTRY163 / limit5% durma siniri
+
+P1/P2 owner PTY gozlemi alindi; ham PTY/build-config digest zinciri raporda yok. P2 28005cc01 bagimsiz code review yapilmadi. /context gozlemi received; /status, otomatik epoch devam ve full P1/P2 closure HOLD. Kanit: docs/execution/evidence/terminal-winddown-20260910/astra-review-163.json. Weekly5%, DRAIN_AND_SETTLE; yeni ASSIGN yok. Devam onceligi permission classifier, @ref kesif, tool-result baskisi/continuation. Auth ve model kimligi farkli; MCP initialize mevcut session attachment kaniti degil.
+
+Owner düzeltmesi (ENTRY165): Cursor owner kontrolünde verilen görevlerle limit kontrollü devam eder. ENTRY164 genel STOP hükmü Cursor için geçersizdir; Astra %5 sınırı diğer provider oturumlarını durdurmaz. Astra yeni geniş iş başlatmadan sınırlı advisor review/teslim takibi yapar. Teknik HOLD ve mevcut yetki sınırları değişmedi.
+
+ENTRY166: kapsamli A-I akis analizi, diyagram ve DAG docs/execution/evidence/terminal-winddown-20260910/astra-terminal-flow-analysis-20260911.md dosyasinda. P2 work/idle iddiasi source ile celisiyor: REVISE. P1 dar acceptance korunur. Cursor ASSIGN: P4 permission RCA evidence-only; sonra P2 muhasebe, @ref ve tool-result recovery. Genel STOP yok, Cursor owner kontrolunde devam eder.
+
+ENTRY168: P4 statik RCA ACCEPTED,6/6 digest MATCH; owner exact PTY branch HOLD. Probe helper simulasyonu; production session proof degil. ENTRY169 read-tool approval compatibility dar scope: policy/deny/floor degismeden producer destegi ve gercek session regresyonu. P2/@ref sirada.
+
+ENTRY170 REVISE: list_dir({}) gecerli schema/default cwd iken classifier reddediyor; test custom read_file registry kullaniyor. Gercek native registry ile dort arac/default-path, deny ve grant sinirlari dogrulanmali. Kanit p4-permission-rca/astra-review-170.json. P2/@ref henuz baslamaz.
+
+ENTRY171 transcript UX 0ec9f9479 teslim bildirimi: RELATED readability kuyrugunda; Astra code/visual review yapmadi, PTY proof yok. Permission onceligi korunur.
+
+ENTRY173: DIGEST HOLD, tuketilmedi; yeniden dogru digest istendi. Disk code review REVISE: path trim/ignored file_path alias permission-dispatch farki ve grep/glob ask test eksigi. ESM probe exit0. Kanit p4-permission-rca/astra-review-173.json; yanit ENTRY174.
+
+ENTRY175: digest HOLD; owner onayiyla onceki iletisim mesajlari tam bayt arsivinden sonra silindi,175 ve yeni cevap korundu. P4 path:42 icin permission target cwd ama execution42 farki REVISE; mevcut dist probe exit0. Kanit p4-permission-rca/astra-review-175.json.
+
+ENTRY177 REVISE:47targeted test PASS exit0; explicit path "." pattern resource yapildiginda mevcut deny(.) => allow regresyonu ESM probe ile dogrulandi. Reply178 yazilip exact body geri-okuma digest MATCH kontrol edildi. Kanit p4-permission-rca/astra-review-177.json. Commit/build yapilmadi.
+
+ENTRY180 toplu review:112/112 tests exit0. P4 scoped code ACCEPTED/full runtime HOLD. Paket REVISE: compact tablo tek uzun satir uretiyor, TranscriptTurnView truncate-end hucreleri gizleyebilir; actual narrow rendered-frame coverage yok. Tek consolidated UX correction ENTRY181. Kanit astra-package-review-180.json. Weekly4%, Astra yeni agir suite/provider/implementation acmaz; Cursor owner kontrolunde devam eder.
+
+### ENTRY 182 — dar tablo revizyonu kabulü (2026-09-10T22:59:08.897763+00:00)
+
+Astra kaynak ve test log incelemesi: d4ae756e0 için SCOPED_CODE_ACCEPTED_RUNTIME_HOLD. Hücre başına satır ve display-width wrap; transcript truncate-end kaldırılması ENTRY 181 içerik kaybı bulgusunu kapatıyor. P4 kod kabulü korunuyor. Cursor 114/114 PASS, exit 0; Astra bu tur test/tsc/build tekrarlamadı (önceki bağımsız paket 112 PASS, exit 0). Canlı PTY, P2 work/idle muhasebesi ve context governor workflow HOLD; ürün DONE değil. Kanıt: docs/execution/evidence/terminal-winddown-20260910/astra-package-review-182.json.
+
+### Bağımsız operator kök neden analizi — 2026-09-10T23:47:13.126459+00:00
+
+Kapsamlı plan: docs/execution/evidence/terminal-winddown-20260910/astra-terminal-root-cause-plan-20260911.md. Yeni kesin kaynak bulgusu: read-only path alanları writeTargets üzerinden self-modifying always-floor tetikliyor; full-auto bağlantısı mevcut. @ aday taraması 40k sınırına .deckent/archive içinde ulaşıyor; MASTER adaylara girmiyor. Context receipt bütçesi, aynı görevin devamı, P2/P3, izin UI ve renderer birlikte kapanmalı. Bu kayıt analizdir; uygulama/test/build/commit yapılmadı. Önceki scoped kod ACCEPT korunur, ürün journey HOLD.
+
+## 2026-09-11 — owner canlı smoke (bugünlük durma)
+
+**Durum: SCOPED İLERLEME / JOURNEY HOLD / MASTER satırı elle güncellenmedi.**
+
+Owner (Alperen) aynı gün native Terminal REPL üzerinde kısmi elle test yaptı; tam checklist (full-auto read yolu, izin turu, ağır tool-batch continuation, PTY, 4–8 maddeler) koşulmadı. Bugünlük yeterli denildi; yeni provider görevi veya push bu turda istenmedi.
+
+### Main ve commit zinciri
+
+- Branch: `main`, HEAD **`5e0faabaa`** — `fix(terminal): Astra root-cause plan — self-mod reads, @refs, continuity, UX` (origin'a göre **ahead**, push bu kayıtta doğrulanmadı).
+- Önceki landing **`e84ca824d`** üstüne sıralı ürün commit'leri: P1 `/context` ölçümü (`1dfc9441e`), P2 lifecycle (`28005cc01`), user/deckent transcript (`0ec9f9479`), P4 permission/resources (`54b9fae0a`, `7ffb74e8b`), dar tablo wrap (`d4ae756e0`), kök-neden dilimi (`5e0faabaa`).
+- **`npm run build:all`**: owner bildirimi ve typing düzeltmeleri sonrası başarılı; canlı REPL için derlenmiş binary yeniden başlatılmadan önceki `dist/` eski sayılmalı.
+
+### Kodda kapanan / ilerleyen dilimler (scoped)
+
+| Alan | Ne yapıldı | Ana yollar |
+|---|---|---|
+| P4 self-mod | Read/grep/glob/list path'leri `mutationTargetsForSelfMod` dışında; full-auto'da gereksiz always-tier azaltıldı | `tool-mutation-targets.ts`, `loop.ts`, `native-agent-bridge.ts` |
+| Tur devamlılığı | `ToolResultContextBudgetError` sert abort yerine sınırlı hata çıktısı + tur devamı (ağır yükte hâlâ sık “tur durdu” hissi raporlandı) | `loop.ts` |
+| @ ref | Async index, sorguya göre filtre/skor, `resolveAtRefCandidate`, archive ağırlığı düşürme | `at-ref.ts`, `run.tsx` |
+| Transcript UX | User “Sen” / inverse panel; assistant head sadeleştirme; dar tablo hücre wrap (ENTRY 181–182 kabulü) | `transcript-turn-view.tsx`, `app.tsx` |
+| İzin UI | Dinamik iptal tuşları, insan okunur `toolLabel` | `approval-card.tsx`, `native-permission-approval.ts`, `messages.ts` |
+
+### Commit dışı (working tree — henüz land edilmedi)
+
+Aynı oturumda ek UX/@ düzeltmeleri **commitlenmedi** (yaklaşık +244/−90 satır REPL katmanında):
+
+- `src/cli/repl/at-ref.ts` — dinamik menü filtresi / bootstrap iyileştirmeleri
+- `src/cli/repl/static-prose-batch.ts` — **yeni**; Static render’da prose satır aralığı / dikey boşluk sıkıştırma
+- `src/cli/repl/transcript-turn-view.tsx`, `app.tsx`, `input-bar.tsx` — spacing + `AtRefPathProvider` typing
+- `src/cli/repl/native-agent-bridge.ts`, `run.tsx` — build (`tool`→`name`) ve `expandAtRefs` import
+
+Sonraki tur: owner onayıyla tek commit veya Astra paket review sonrası land.
+
+### Owner smoke sonuçları (kısmi)
+
+| # | Konu | Sonuç |
+|---|---|---|
+| 1 | User vs deckent ayrımı (transcript) | **OK** |
+| 2 | @ ref menüsü / dinamik filtre | **OK** |
+| 3 | `@docs/MASTER-PLAN.md` ile analiz | **Kısmen OK** — akış devam etti, “devam et” zorunluluğu yok; dosyanın tam okunup okunmadığı owner emin değil |
+| — | Dikey boşluk (Static prose) | Kodda batch/compact eklendi; **owner bu build ile yeniden smoke etmedi** |
+| — | “Araç sonuçları bağlam saklama sınırı… tur durdu” | **Hâlâ HOLD** — loop yumuşatması var, journey P2/work-budget/bridge parity tam değil |
+
+### Kanal / review
+
+- Astra: ENTRY 180–182 scoped kod kabulü (tablo/transcript); **183** kök-neden kod dilimi scoped accept / runtime HOLD (özet; kanıt paketi `terminal-winddown-20260910/` altında).
+- `iletisim.md` commit edilmez; yeni consolidated ENTRY bir sonraki paket land’inde.
+
+### Yerel doğrulama (agent — owner smoke değil)
+
+Hedefli vitest paketleri (at-ref, transcript, loop, permission, static-prose-batch) oturum içinde **PASS** raporlandı; tam repo testi ve formal XVerify bu gün koşulmadı.
+
+### Sonraki devam önceliği (öneri — owner ASSIGN bekler)
+
+1. Commit dışı UX/@/spacing dilimini land + `build:all` + REPL restart ile spacing smoke.
+2. Context-budget / tool-result retention under load (plan §C, P2 bridge) — tekrarlayan tur durması.
+3. Full-auto read + permission PTY journey; formal settlement zinciri olmadan **TERMINAL-001 / 5040 / 5050 DONE yazılmaz**.
+
+### `docs/MASTER-PLAN.md` güncellenmeli mi?
+
+**Hayır — bu oturum için elle MASTER satırı/değişikliği gerekli ve uygun değil.**
+
+- İş SSOT'u MASTER'dır; disposition **Closure-OS authenticated batch** veya owner-admitted admission ile güncellenir; smoke “1–3 OK” tek başına ledger kanıtı değildir.
+- Native terminal capability'leri (`TERMINAL-001` BLOCKED, `5040`/`5050` OPEN, `7078` OPEN vb.) **journey tamamlanmadan** DONE'a çekilmemeli; ilerleme bu rapor + `docs/execution/evidence/terminal-winddown-20260910/*` + sonraki land commit'lerinde kalır.
+- `@docs/MASTER-PLAN.md` okuma deneyimi **5050** yönünde sinyal verir ama MASTER'da ayrı satır güncellemesi zorunlu değil; owner MASTER'a yeni outcome admission isterse o zaman admission süreci açılır.
+
+### 2026-09-11 gece — uzun REPL oturumu (chat-2026-09-11T01-06-11-219Z-cju9d4)
+
+**Owner özeti:** local-llm (Qwen3.8-27B) ile akıcı; onay kartları takılmadan düştü. Agent transcript bulguları kod/disk ile çapraz doğrulandı.
+
+**Ortam (transcript):** `deckent v0.100.0`, `terminal.run_flow_v2=true`, `terminal.enabled=true`, sprint-731; oturum ~47k tok.
+
+#### Onay yüzeyi — doğrulanan davranış
+
+| Senaryo | Beklenen | Kanıt (owner + kod) |
+|---|---|---|
+| **safe** `read_file` | Kapı yok | İçerik döndü ✅ |
+| **moderate** `bash` (yazma) | Policy auto-allow (mevcut approval moduna bağlı) | Marker dosyası diskte ✅ — execution gerçek |
+| **always/destructive** `kill` | İnsan kartı, otomatik geçmez | 8–41 sn karar süreleri; `native-permission-*.request.json` disk izi ✅ |
+| Onay → spawn | CLI/process çalışır | Telemetri `confirmDecision: allow`, `status: executed` ✅ |
+
+**Sonuç:** Permission **sınıflandırma + kart + insan ölçekli bekleme** bu oturumda ürün hedefiyle uyumlu görünüyor. Moderate'ın 39 ms auto-allow'u policy seçimine bağlı (always-floor ile karıştırılmamalı).
+
+#### Reprodüksiyonlu bug — CLI bridge arg kaybı (BLOCKS operasyonel doğruluk)
+
+`deckent_call_tool` / native `deckent_kill` yolu **MCP in-process handler değil**, `createCliToolDispatcher` → `cliArgsFor` → `deckent kill` spawn.
+
+- `TOOL_COMMANDS['deckent_kill'] = ['kill']` — yalnız `_rest` positional ekleniyor; **`taskId`, `all`, `force`, `userExplicit` JSON alanları CLI argv'ye çevrilmiyor**.
+- Kaynak: `src/cli/commands/chat-tool-bridge.ts` (`cliArgsFor`, satır ~435–444). Testler bilinçli olarak yalnız `_rest: ['--all']` yolunu pinliyor (`tests/cli/chat-tool-bridge.test.ts`); model/MCP şekli `{ taskId, all }` kapsam dışı.
+- Belirti: Onay **allow** sonrası `deckent kill` argümansız → `taskId is required (or use --all)`; fixture `EXECUTING` kalır.
+- **Güvenlik modeli sağlam, veri köprüsü kırık:** yanlış/no-op execution riski (onay verildiği halde istenen iş yapılmıyor).
+- Aynı kalıp muhtemelen **`deckent_cleanup` / `deckent_recover`** için de geçerli (statik `['cleanup']` / recover özel `_rest`).
+
+**Önerilen fix (sonraki paket):** `cliArgsFor` içinde `deckent_kill` (ve lifecycle kritikleri) için MCP-parity builder: `taskId` positional, `all`→`--all`, `force`→`--force`, `userExplicit`→`--user-explicit`; vitest ile JSON args regression.
+
+#### `/cleanup` ve terminal modu (beklenen, bug değil)
+
+Mesaj: *«Otonom yetkisi gerekiyor — terminal modu Çalıştır; /term control ile geçin»* — `term-gate.ts` risk merdiveni: always-tier komutlar **Otonom** (= `/term control`) ister. `/cleanup` → `deckent_cleanup` always-floor. **Ask/run modunda reddedilmesi tasarım.**
+
+#### Bağlam bütçesi — owner smoke 2026-09-11 (güncel)
+
+- `@docs/MASTER-PLAN.md` (1,27 MB): bütçe uyarısı + **parçalı okuma/ref/withhold** ile journey **sonuna kadar** gitti; §1–§7 + ledger state özeti + P0 admission yorumu üretildi.
+- Eski BLOCKS maddesi (“tur durdu”) bu oturumda **regresyon olarak doğrulanmadı**; custody rev3 canlı yolda işlevsel görünüyor. Derin P01 blok haritası / P03 VERIFY kuyruğu ayrı istek.
+- Transcript yoğunluğu ayrı UX maddesi (yukarı); context governor **HOLD değil**, operatör sunumu iyileştirmesi.
+
+#### Diğer gözlemler
+
+- **`DECKENT_BINARY_IDENTITY_WARN` (build-source-mismatch):** dist kaynakla uyumsuz olabilir; canlı testlerde CLI spawn uyarısı. `build:all` sonrası REPL restart ile giderilmeli.
+- **`deckent_propose_run`:** `run_flow_v2=true` iken registry'ye eklenir; `deckent_search_tools("propose")` boş dönebilir (exposure/deferred index/`tool_surface` kombinasyonu — ayrı wire kanıtı gerekir, bu oturumda kapatılmadı).
+- **S4 reddetme testi** (kill B → deny → EXECUTING kalır) transcript'te bütçe yüzünden bitmedi.
+
+#### Sınıflandırma (owner bulguları)
+
+| Bulgu | Sınıf |
+|---|---|
+| Onay kartı + destructive insan kararı | **RELATED — olumlu sinyal**, runtime closure değil |
+| kill/cleanup JSON→CLI arg kaybı | **BLOCKS_CURRENT_DONE** (terminal tool parity / OPERATION-CLI wiring) |
+| MASTER okuma tur durması | **BLOCKS_CURRENT_DONE** (context governor — mevcut plan §C) |
+| /cleanup mod gate | **UNRELATED** (dokümantasyon/UX açıklaması yeterli) |
+
+**MASTER güncellemesi:** yine **gerekmez**; yukarıdaki BLOCKS maddeleri evidence + fix paketi + authenticated batch veya owner admission ile ledger'a girer.
+
+### Cursor paket — CLI bridge + context UX (2026-09-11)
+
+**Durum: REV3 LANDED (owner commit) / ASTRA ENTRY 188–189 review bekliyor.**
+
+ENTRY **187 REVISE** → rev3:
+
+1. **Lifecycle CLI argv:** `deckent_kill` / `deckent_cleanup` / `deckent_recover` MCP JSON → CLI; recover `--force` bypass kapatıldı.
+2. **Recover:** `resolveRecoverSprintId`; dryRun gate; `{ _rest:['sprint-731'], dryRun:false }` → spawn yok.
+3. **Context custody:** `withholdToolResultFromContext` — executedOk + spill + minimal wire; shrink cap hatası turn abort etmez.
+4. **Build hygiene:** onay smoke’undan kalan geçersiz `.tasks/task-approvaltest-*.json` stub’ları `DONE`+`createdAt` ile düzeltildi (aksi halde `E_CLEAN_ACTIVE_EXECUTION_HOLD`). Gerekirse `npx node-gyp install $(node -p process.versions.node)` (native headers).
+
+**LOCAL_VERIFIED:** vitest bridge+loop+withhold **73/73**; `npm run lint:i18n`; owner **`npm run build:all` exit0**; REPL `@docs/MASTER-PLAN.md` analizi ~262s — outline/dilim/ref/withhold/interim checkpoint; tur **tamamlandı** (önceki “tur durdu” regresyonu bu smoke’ta görülmedi).
+
+Kanıt: [cursor-cli-bridge-context-package-20260911.md](docs/execution/evidence/terminal-winddown-20260910/cursor-cli-bridge-context-package-20260911.md). Kanal: **ENTRY 188** READY_FOR_REVIEW, **ENTRY 189** landing + sonraki UX maddesi.
+
+#### Owner REPL gözlemi — sonraki küçük iş (P4-UX / operator surface)
+
+**Sınıf:** RELATED_BUT_NONBLOCKING (journey çalışıyor; okunabilirlik/yoğunluk).
+
+Transcript’te **model anlatımı** ile **işlev çıktısı** (ör. `dosya okundu … · 8 ms`, `komut çalıştırıldı …`, ref/content-read satırları) aynı görsel ağırlıkta ve her araç çağrısı **yeni satır** olarak birikiyor. Owner beklentisi:
+
+| Katman | İçerik | UI |
+|---|---|---|
+| **Operator / işlev** | Tool/file/shell telemetry — “ne yaptı deckent” | Soluk veya turuncu ton; **tek satırlık canlı durum** (okunuyor → alındı → sonraki); geçmişe spam yok |
+| **Model / cevap** | Kullanıcıya yönelik analiz, özet, karar | Normal transcript prose; ana okuma burada |
+
+Model iç düşünce/ara plan metni kullanıcı transcript’ine **output olarak basılmamalı** (host zaten biliyor); yalnızca teslim edilen cevap + isteğe bağlı compact operator strip. Astra’ya ENTRY 189 ile “nasıl yaparız” analiz ASSIGN’i istendi (`transcript-turn-view`, activity footer, event sınıflandırması, i18n label injection).
+
+**HOLD (bilinçli):** kapsamlı kill/cleanup/recover mutation smoke, PTY S4 deny replay, formal XVerify — owner ayrı tur.
+
+### ENTRY 184 review — 2026-09-11T01:37:50.422476+00:00
+
+REVISE: context min-share/emergency fallback toplam admission sınırını aşabiliyor; recover MCP dryRun default true ve approval binding CLI eşlemesinde korunmuyor. Yeni davranış regression/real deny proof eksik. Kanıt: docs/execution/evidence/terminal-winddown-20260910/astra-package-review-184.json. Astra test/build/lifecycle mutation yapmadı.
+
+### ENTRY 186 rev2 — 2026-09-11T01:41:42.999841+00:00
+
+REVISE: recover eksik sprintId/_rest yolu eski --force mapping üzerinden mutation gate atlıyor. Context sıfır payda handler sonucunu capture garantisi olmadan hata metniyle değiştiriyor; executed/delivered ve no-duplicate-effect proof paket içi blocker. Overshoot testi gerçek retained allocation ölçmüyor. Kanıt: docs/execution/evidence/terminal-winddown-20260910/astra-package-review-186.json.
