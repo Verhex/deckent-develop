@@ -74,13 +74,14 @@ describe('CodexAdapter', () => {
       expect(adapter.supportedModels).toContain('o4-mini');
     });
 
-    it('should support exactly 9 canonical models (6 builtin + 3 pinned parity)', () => {
-      // 2026-07-11 (MASTER-PLAN 538): providers/codex.ts registers
-      // CODEX_PARITY_MODELS (gpt-5.6-sol/-terra/-luna) into the
-      // singleton registry at module-load, so the adapter's registry-derived
-      // model list grows 6 → 9 with pinned IDs only.
-      expect(adapter.supportedModels).toHaveLength(9);
-      for (const id of ['gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']) {
+    it('supports the required canonical Codex identities without duplicates', () => {
+      // The catalog may grow; required identities and uniqueness are the
+      // contract, not the size of one historical bundled snapshot.
+      expect(new Set(adapter.supportedModels).size).toBe(adapter.supportedModels.length);
+      for (const id of [
+        'gpt-4.1', 'gpt-4.1-mini', 'gpt-5-mini', 'gpt-5.5', 'o3', 'o4-mini',
+        'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-6-astra',
+      ]) {
         expect(adapter.supportedModels).toContain(id);
       }
       expect(adapter.supportedModels).not.toContain('gpt-5.6');

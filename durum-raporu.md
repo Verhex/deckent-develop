@@ -1,5 +1,8 @@
 # Deckent — limit yenilenince devam raporu
 
+> **Güncel — 2026-09-11T09:46:19.842779+00:00:** gpt-6-astra katalog/config boot onarıldı. 431/431 test + son assertion 9/9 exit0; build:all exit0. Gerçek local-LLM PTY açıldı, N deny→yanıt→ready döndü. Owner Astra→Opus tier izni kaydedildi; dar katalog/test kaynak iddiası formal XVerify CONFIRMED/ALLOW (15386 token, durable receipt). Geniş runtime/terminal iddiası bu kabulün dışında; canlı EXECUTING S4 hedefi yok, eski B DONE. Önceki control reserve/durable retry HOLD'ları kapanmadı. Kod/test değişiklikleri commit edilmedi. **Push yalnız Alperen terminal testine OK dedikten sonra.** Detay: [güncel doğrulama kaydı](docs/execution/evidence/terminal-winddown-20260910/cursor-cli-bridge-context-package-20260911.md).
+
+
 Güncelleme: 2026-09-11T11:56:00+03:00 (ENTRY 190 ACK; docs/execution slim temizlik; context custody slice). Önceki wind-down durumu tarihsel; **2026-09-11** native Terminal diliminde CLI bridge + context custody rev3, `build:all` ve owner REPL smoke (MASTER-PLAN analizi) tamamlandı. **Ürün DONE değildir**; bu rapor devam noktasıdır, MASTER/closure-ledger authority değildir.
 
 ## Main ve yetki

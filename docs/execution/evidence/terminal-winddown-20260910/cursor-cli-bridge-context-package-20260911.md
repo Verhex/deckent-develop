@@ -100,3 +100,30 @@ Owner supplied vitest output: 2 files, 8/8 PASS, 5.09s, start 12:22:47; pasted o
 - `src/cli/repl/live-operator-strip.tsx` sha256 `338024e3db42f88e80efbf37bdff00571fd7c7be857a1b251f237c6bbbc35172`
 - `src/cli/repl/native-agent-bridge.ts` sha256 `beb455f1cef8d093273433d1c63ded575a33ab97646c604612928a5112a8a741`
 - `tests/cli/repl/operator-strip-dynamic.test.tsx` sha256 `e4dc989144fe8fda87e8b7b8d25fa409b9c1bbf068ccb88868dd8e3185055cbf`
+
+
+### Astra catalog bootstrap + real verification — 2026-09-11T09:46:19.842779+00:00
+
+Owner admitted exact gpt-6-astra catalog repair, withdrawal of ENTRY200, retry of formal XVerify/native PTY, and push only after owner terminal OK. Base f1d53375e; direct bounded bootstrap recovery because config validation prevented native/dogfood startup. No config/auth/task/memory mutation by the repair.
+
+- Official source fetched 2026-09-11: https://developers.openai.com/api/docs/models/gpt-6-astra and https://developers.openai.com/api/docs/pricing. Registry admits exact id/apiId, capabilities and published context/output sizes; default tier preference remains unchanged. Standard short-context pricing metadata restored from previously preserved patch after source verification. Above-272K full-request tariff is documented but NOT implemented by scalar cost calculator; do not claim complete long-context API billing. Subscription entitlement is not catalog membership.
+- Scope: src/core/model-registry.ts:409, src/core/pricing-data-baseline.json (gpt-6-astra), tests/core/model-registry.test.ts, tests/providers/codex.test.ts, tests/core/gpt6-astra-catalog.test.ts. Config uses existing registry-derived validation, no bypass.
+- LOCAL_VERIFIED: 431/431 across catalog/config/provider tests exit0; final native-config isolation assertion 9/9 exit0; npm run build:all exit0 after inspectActiveExecutions ALLOW. git diff --check exit0. Actual dist loadConfig returns OK with brain=gpt-6-astra.
+- Native boot PASS with TERM=xterm-256color DECKENT_INK=1; default host TERM produced surface-unsupported, not a config failure. Actual local-llm/Qwen3.8-27B-Q4_K_M session chat-2026-09-11T09-41-25-399Z-w0j36t used Kontrol mode. Kill proposal through nested tool reached real permission card; N denied; persisted tool result contains approval-denied/rejected by user deckent_kill; final answer returned and ready state restored; /exit exit0. No actual kill was authorized.
+- S4 PARTIAL: target approvaltest-B was already DONE before and remains DONE after. Therefore EXECUTING-preserved invariant not exercised. No fake task state or receipt created. Card displayed generic nested-tool label and empty target; persisted outer telemetry confirmDecision=allow coexists with inner denial—scope/UX ambiguity to inspect, not proof of kill execution.
+- Formal XVerify command completed exit0 with typed unavailable/HOLD: xv-1789119663575-054692c5-9417-4664-a9e9-821a8fd5bcb8; author codex/gpt-6-astra premium_plus, configured verifier claude/claude-opus-5 premium; xverify_verifier_tier_below_author. Existing exception is Sol→Opus, not Astra→Opus. No provider execution, usage, verdict or settlement; no authority override/self-verification. Original Cursor package also has no new formal receipt.
+- Remaining: exact tier admission or genuinely available eligible verifier; real running target and fresh deny/no-effect proof; prior control reserve/durable retry/full-App lifecycle and full tool-history HOLDs unchanged. No new broad implementation.
+- All current files remain uncommitted for owner/Cursor review. Push NOT_RUN, explicitly waits for owner terminal OK. ENTRY200 archived and removed by owner request.
+
+Raw logs, source digests, UTC receipt and selected PTY tool-result evidence (no full transcript committed): /home/alperen/deckent-worktree-archives-20260910/main-remainder-20260911/astra-catalog-boot/receipt.json.
+
+
+### Owner tier admission + scoped formal XVerify — 2026-09-11T10:15:08.983044+00:00
+
+Owner explicitly admitted Astra→Opus. Canonical CLI config set cross_verify.verifier_tier_authority exit0 preserved Sol→Opus and added exact gpt-6-astra→claude-opus-5 pair with decision_ref owner-live-2026-09-11-astra-opus5-xverify-tier-accepted. Production resolver admitted=true. No model tier reassignment or same-provider allowance. Config is local/ignored.
+
+First actual provider attempt xv-1789121458827-af766d57-a0af-4ba4-aee7-d275539f9453: Opus completed, 16512 tokens; UNCLEAR/HOLD because one evidence read truncated whole source files and the missing-evidence map was inaccurate. Receipt cross-verify-verdict:sha256:bdc0c2b754415c7cf63665c569067fd9964f0ea0964186b9da1424983f208adc. This broader assertion remains unconfirmed.
+
+Second attempt used bounded source excerpts (src/core/model-registry.ts:409-426; tests/core/gpt6-astra-catalog.test.ts:58-68) and explicitly narrower source-only criteria. Result **CONFIRMED / ALLOW**, exit0; provider claude/claude-opus-5 distinct from codex/gpt-6-astra. Invocation xv-1789121595886-98d36bb0-dffe-41a9-8c50-bc5a9c7edacc, terminal attempt c569aa76-1a21-858f-ab02-8202f33557f3, 15386 total provider tokens, typed-host-adjudicated, Docker settlement. Durable receipt `cross-verify-verdict:sha256:7756b1faadb9920f650e89bd89be3b34834d69dd46957308d73145f14f039d5c`. This confirms the exact catalog entry and the content of the config regression test; it does NOT independently prove complete production wiring, live test execution, default-tier behavior, pricing, whole Cursor terminal package or S4 EXECUTING retention. Those boundaries are unchanged.
+
+Raw result/report + hash manifest: /home/alperen/deckent-worktree-archives-20260910/main-remainder-20260911/astra-catalog-boot/tier-retry-receipt.json. Entry201 rewritten on owner instruction; no commit/push/build in this tier-only turn. Push waits owner terminal OK.

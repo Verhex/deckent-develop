@@ -302,6 +302,24 @@
           "_verified_at": "2026-07-02",
           "_notes": "Sprint 360 task 360-004 — live-fetched+disk-verified from the LiteLLM feed (raw.githubusercontent.com/BerriAI/litellm/main/litellm/model_prices_and_context_window_backup.json) key \"gpt-5.5\" (litellm_provider=openai, mode=chat) on 2026-07-02: input=$5.00/MTok, output=$30.00/MTok, cache_read=$0.50/MTok, max_input_tokens=1,050,000, max_output_tokens=128,000, supports_reasoning/vision/tool_choice/prompt_caching all true — not fabricated. Distinct from the registry's 'gpt-5' apiId-shim (Sprint 248); registry counterpart is CODEX_PARITY_MODELS in model-registry.ts (opt-in via registerCodexParityModels(), not yet auto-wired into a Codex provider bootstrap)."
         },
+        "gpt-6-astra": {
+          "input_cost_per_token": 1e-05,
+          "output_cost_per_token": 5e-05,
+          "cache_creation_input_token_cost": 1.25e-05,
+          "cache_creation_input_token_cost_above_1hr": null,
+          "cache_read_input_token_cost": 1e-06,
+          "max_input_tokens": 922000,
+          "max_output_tokens": 128000,
+          "supports_prompt_caching": true,
+          "supports_reasoning": true,
+          "supports_vision": true,
+          "supports_tool_choice": true,
+          "deckent_tier": "premium_plus",
+          "enabled": true,
+          "_source": "openai-official-pricing",
+          "_verified_at": "2026-09-11",
+          "_notes": "Exact gpt-6-astra identity; no aliases or activation decision. Official context window 1050000, max input 922000, max output 128000. OpenAI Standard API pricing for <=272K input: input $10.00/MTok, cached input $1.00/MTok, cache write $12.50/MTok, output $50.00/MTok. Above 272K input the full-request rates are $20.00/$2.00/$25.00/$75.00 respectively; the current ModelPricing schema/calculator does not represent this context-tiered tariff, so these scalar prices do not prove long-context API cost accuracy. Model metadata does not prove Codex CLI/account entitlement, subscription quota availability, or runtime execution. Sources: https://developers.openai.com/api/docs/models/gpt-6-astra and https://developers.openai.com/api/docs/pricing"
+        },
         "gpt-5.6-sol": {
           "input_cost_per_token": 5e-06,
           "output_cost_per_token": 3e-05,

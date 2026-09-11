@@ -407,6 +407,23 @@ export { OLLAMA_BUILTIN_MODELS } from './ollama-models.js';
 // entries. They are loaded by every ModelRegistry, so validation does not
 // depend on importing a provider module for its side effects.
 export const CODEX_PARITY_MODELS: readonly ModelDefinition[] = [
+  {
+    // Exact identity, verified against official OpenAI model/pricing pages
+    // 2026-09-11. Catalog membership is not account entitlement or activation.
+    // Keep Sol's tier preference unchanged; selecting Astra for Brain is an
+    // independent owner/config decision. Prices below are Standard <=272K
+    // input; the baseline notes retain the unsupported long-context tariff.
+    id: 'gpt-6-astra',
+    apiId: 'gpt-6-astra',
+    provider: 'codex',
+    tier: 'premium_plus',
+    contextWindow: 1_050_000,
+    costPerMillion: { input: 10, output: 50, cacheReadInput: 1 },
+    pricingEvidenceRef: 'https://developers.openai.com/api/docs/pricing',
+    capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: true },
+    status: 'ga',
+    maxOutputTokens: 128_000,
+  },
   // Pinned gpt-5.6 family. Official OpenAI guidance identifies bare `gpt-5.6`
   // as a moving alias to `gpt-5.6-sol`; it is migration-only above, never a
   // canonical runtime identity.

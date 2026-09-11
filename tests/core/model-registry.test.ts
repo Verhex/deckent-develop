@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   ModelRegistry,
   BUILTIN_MODELS,
+  CANONICAL_MODELS,
   CODEX_PARITY_MODELS,
   modelRegistry,
   registerCursorParityModels,
@@ -144,8 +145,13 @@ describe('ModelRegistry', () => {
       expect(registry.getByProvider('claude')).toHaveLength(6);
     });
 
-    it('returns all 9 canonical Codex models', () => {
-      expect(registry.getByProvider('codex')).toHaveLength(9);
+    it('returns every canonical Codex identity exactly once, including Astra', () => {
+      const ids = registry.getByProvider('codex').map(model => model.id);
+      const expectedIds = CANONICAL_MODELS.filter(model => model.provider === 'codex')
+        .map(model => model.id);
+      expect([...ids].sort()).toEqual([...expectedIds].sort());
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(ids).toContain('gpt-6-astra');
     });
 
     it('returns 4 models for gemini', () => {
@@ -568,9 +574,11 @@ describe('ModelRegistry', () => {
   // ── getAllModelIds / getAllModels / getAllProviders ──
 
   describe('getAllModelIds()', () => {
-    it('returns the 16 core, 3 Codex parity and 4 Cursor parity model ids', () => {
+    it('returns every canonical core and parity model identity exactly once', () => {
       const ids = registry.getAllModelIds();
-      expect(ids).toHaveLength(23);
+      expect([...ids].sort()).toEqual(CANONICAL_MODELS.map(model => model.id).sort());
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(ids).toContain('gpt-6-astra');
       expect(ids).toContain('claude-fable-5');
       expect(ids).toContain('claude-opus-4-8');
       expect(ids).toContain('claude-opus-5');
@@ -585,7 +593,10 @@ describe('ModelRegistry', () => {
   describe('getAllModels()', () => {
     it('returns all canonical model definitions', () => {
       const models = registry.getAllModels();
-      expect(models).toHaveLength(23);
+      const ids = models.map(model => model.id);
+      expect([...ids].sort()).toEqual(CANONICAL_MODELS.map(model => model.id).sort());
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(ids).toContain('gpt-6-astra');
       for (const m of models) {
         expect(m.id).toBeDefined();
         expect(m.apiId).toBeDefined();
@@ -785,6 +796,9 @@ describe('modelRegistry singleton', () => {
   });
 
   it('has the complete canonical offline catalog', () => {
-    expect(modelRegistry.getAllModelIds()).toHaveLength(23);
+    const ids = modelRegistry.getAllModelIds();
+    expect([...ids].sort()).toEqual(CANONICAL_MODELS.map(model => model.id).sort());
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toContain('gpt-6-astra');
   });
 });
