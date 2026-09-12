@@ -18139,3 +18139,25 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 746-002: Size-trigger ingress — shouldRotate zincirini metrics writer'a bağla (EXECUTING)
 
 ---
+## Sprint 751 — sprint-751
+
+**Status:** ABORTED
+**Date:** 2026-09-12
+**Duration:** 5081s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 5081394ms |
+
+### Tasks
+
+- 751-001: MASTER120 STATE-RETENTION-001 retention writer onarımını aynı oturumda tamamla (EXECUTING)
+
+---

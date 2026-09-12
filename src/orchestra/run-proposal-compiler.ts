@@ -418,6 +418,7 @@ function toDirectiveTask(task: PlannerTask, proposal: RunProposal): DirectiveBui
     model: task.forceModel,
     effort: task.effort,
     skills: task.forceSkills,
+    test: task.testTarget,
     goCriteria: [task.goNogo.goCriteria],
     nogo: [task.goNogo.noGoCriteria],
     criteriaItems,

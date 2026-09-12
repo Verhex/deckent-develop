@@ -1,6 +1,15 @@
 # 751 sonrası onarım ve dogfood dönüş planı
 
-Statü: **R1-A STARTED — PRODUCTION_CLOSURE_HOLD**. Owner sonraki “Evet başlayalım”
+Statü: **751 ABORTED + R1-B ARCHIVED; R1-A native effect HOLD, R1-C devam ediyor**.
+2026-09-12T20:21:02Z: canonical finalize exit0, sprint arşivi 12/12 hash doğrulandı;
+kalan 18 inaktif task artifact'ı canonical maintenance archive ile korundu, `.tasks`
+dosya sayısı 0. `npm run build:all` exit0. Bu outer ABORTED kapanışıdır;
+native effect kabulü veya XVerify PASS değildir. [Yeni kanıt](../evidence/astra-recovery-20260912/r1-close/verification.json).
+Önceki “negatif kapanış yolu yok” değerlendirmesi outer sprint için yanlıştı:
+mevcut `forceAbortSprint` unresolved kanıtı koruyarak kapatıyor. Native effect
+journal uyuşmazlığı ayrı açık kalıyor; eski kanıt dosyaları değiştirilmedi.
+
+Owner sonraki “Evet başlayalım”
 talimatıyla uygulamayı başlattı. Aşağıdaki özgün başlangıç kapısı böylece sağlandı;
 cleanup ve sonraki dilimler teknik bağımlılıklarını bekliyor. İlk sonuç:
 [R1-A clock repair ve negative-closure eksikliği](../evidence/astra-recovery-20260912/r1/RESULT.md).

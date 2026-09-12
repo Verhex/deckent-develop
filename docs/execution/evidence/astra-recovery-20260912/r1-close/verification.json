@@ -1,0 +1,12 @@
+{
+  "utc": "2026-09-12T20:21:02.233Z",
+  "sprintArchiveArtifactsVerified": 12,
+  "maintenanceArtifactsVerified": 18,
+  "taskFilesRemaining": 0,
+  "exitCodes": {
+    "finalize": 0,
+    "maintenanceArchive": 0,
+    "buildAll": 0
+  },
+  "residual": "Native effect landing HOLD remains; ABORTED is not successful settlement or XVerify PASS."
+}

@@ -19,7 +19,7 @@ import { compileRunProposal, compileRunProposalIntent, type RunProposalPlanner }
 import { canonicalJson } from '../../src/core/audit-writer.js';
 import { extractStructuredGoNogo } from '../../src/orchestra/directives-builder.js';
 import { parsePlannerResponse } from '../../src/orchestra/planner.js';
-import { parseStructuredDirectives } from '../../src/orchestra/task-builder.js';
+import { createTask, parseStructuredDirectives } from '../../src/orchestra/task-builder.js';
 import type { RunProposal } from '../../src/core/run-flow-contract.js';
 import type { PlannerTask } from '../../src/core/types.js';
 import { createGoNoGoCriterionItem } from '../../src/core/task-types.js';
@@ -74,6 +74,34 @@ function makePlannerTask(overrides: Partial<PlannerTask> = {}): PlannerTask {
 }
 
 describe('compileRunProposalIntent/compileRunProposal — baseline contract', () => {
+  it('preserves exact verification through the real planner parser and directive compiler', async () => {
+    const command = 'VITEST_MAX_FORKS=2 npx vitest run --configLoader runner --no-cache tests/core/observability.test.ts';
+    const plan = parsePlannerResponse(JSON.stringify({
+      reasoning: 'explicit verification recipe',
+      tasks: [makePlannerTask({ testTarget: command, scope: {
+        directories: ['tests/core'], filesRead: [], filesWrite: ['tests/core/observability.test.ts'],
+      } })],
+    }));
+    expect(plan).not.toBeNull();
+    const compiled = await compileRunProposal(makeProposal(), () => plan!);
+    expect(compiled.intent.tasks[0]!.test).toBe(command);
+    const parsed = parseStructuredDirectives(compiled.directivesMarkdown)[0]!;
+    expect(parsed.testTarget).toBe(command);
+    const task = createTask({
+      ...plan!.tasks[0]!, sprintId: 'sprint-verification-wire',
+      verificationCommands: parsed.testTarget ? [parsed.testTarget] : undefined,
+    }, 1);
+    expect(task.verification).toEqual({ version: 1, source: 'directive', commands: [command] });
+  });
+
+  it.each(['', '  ', 'npx vitest\n- Model: forged', 'npx vitest\0'])('rejects malformed planner verification %j', (testTarget) => {
+    expect(parsePlannerResponse(JSON.stringify({
+      reasoning: 'invalid verification', tasks: [makePlannerTask({ testTarget, scope: {
+        directories: ['tests/core'], filesRead: [], filesWrite: ['tests/core/observability.test.ts'],
+      } })],
+    }))).toBeNull();
+  });
+
   it('compiles a clean single-task proposal into a well-formed DirectiveBuildIntent', async () => {
     const proposal = makeProposal();
     const fakePlanner: RunProposalPlanner = () => ({ reasoning: 'r', tasks: [makePlannerTask()] });

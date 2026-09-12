@@ -1,0 +1,132 @@
+{
+  "kind": "deckent.sprint-archive-manifest",
+  "schemaVersion": 1,
+  "sprintId": "sprint-751",
+  "terminalOutcome": "ABORTED",
+  "artifactCount": 12,
+  "totalBytes": 95812,
+  "familyCounts": {
+    "run": 9,
+    "tasks": 2,
+    "evaluations": 0,
+    "metrics": 0,
+    "scheduler": 1,
+    "heartbeat": 0,
+    "docs": 0,
+    "audits": 0,
+    "unknown": 0
+  },
+  "artifacts": [
+    {
+      "path": "journal-history/sprint-751-events.jsonl.2dc1db2e6af632981d4ac225972e213a648f9674a47c0ef2fe4bb9583a7d8eb7",
+      "family": "run",
+      "bytes": 1851,
+      "sha256": "2dc1db2e6af632981d4ac225972e213a648f9674a47c0ef2fe4bb9583a7d8eb7",
+      "sources": [
+        "journal-history/sprint-751-events.jsonl.2dc1db2e6af632981d4ac225972e213a648f9674a47c0ef2fe4bb9583a7d8eb7"
+      ]
+    },
+    {
+      "path": "scheduler/sprint-751.jsonl",
+      "family": "scheduler",
+      "bytes": 23391,
+      "sha256": "3f9233b1e59615cec0f6888c027fdea9c893a352d750721dd3ef9709f85b2883",
+      "sources": [
+        ".deckent/runtime/scheduler-shadow/sprint-751.jsonl"
+      ]
+    },
+    {
+      "path": "sequence-history/sprint-751-seq.4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+      "family": "run",
+      "bytes": 1,
+      "sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+      "sources": [
+        "sequence-history/sprint-751-seq.4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a"
+      ]
+    },
+    {
+      "path": "sprint-751-events.jsonl",
+      "family": "run",
+      "bytes": 2175,
+      "sha256": "c31e04bf92b1e310db17bf70eeab6cbab9024fc891609aa8203ef14360f633b2",
+      "sources": [
+        ".deckent/recently-works/sprint-751-events.jsonl"
+      ]
+    },
+    {
+      "path": "sprint-751-metrics.jsonl",
+      "family": "run",
+      "bytes": 348,
+      "sha256": "e8f198d7b657de2c9c173223844a905bcd1d2343267ad051ec4a3a08cab4ee07",
+      "sources": [
+        ".deckent/recently-works/sprint-751-metrics.jsonl"
+      ]
+    },
+    {
+      "path": "sprint-751-pre-archive.sha256",
+      "family": "run",
+      "bytes": 96,
+      "sha256": "d812ddab49ccf55f5e49f37bb9ae8ba0b6ad9c157ba7ca3d9bf4eff6c63f2559",
+      "sources": [
+        ".deckent/recently-works/sprint-751-pre-archive.sha256"
+      ]
+    },
+    {
+      "path": "sprint-751-pre-archive.tar.gz",
+      "family": "run",
+      "bytes": 8658,
+      "sha256": "f6aef2fbf90fda3e0a219a8756beb112274e904accefd51c3080cf5ba65a4701",
+      "sources": [
+        ".deckent/recently-works/sprint-751-pre-archive.tar.gz"
+      ]
+    },
+    {
+      "path": "sprint-751-seq",
+      "family": "run",
+      "bytes": 1,
+      "sha256": "ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d",
+      "sources": [
+        ".deckent/recently-works/sprint-751-seq"
+      ]
+    },
+    {
+      "path": "sprint-751-terminal-receipt.json",
+      "family": "run",
+      "bytes": 4324,
+      "sha256": "a5b1c1102229143dbd709aae8ac61db433438abee764c7c1cba4fd19e8aaea96",
+      "sources": [
+        ".deckent/recently-works/sprint-751-terminal-receipt.json"
+      ]
+    },
+    {
+      "path": "tasks/task-751-001.json",
+      "family": "tasks",
+      "bytes": 52055,
+      "sha256": "e6a0199ed1632d1dc69e6f848fb6980d6ab2e807300a291d4550238f0179a33d",
+      "sources": [
+        "tasks/task-751-001.json"
+      ]
+    },
+    {
+      "path": "tasks/task-751-001.skill-delivery.json",
+      "family": "tasks",
+      "bytes": 681,
+      "sha256": "0ea83b3ffae86d6f90b9fc3d483e0cc034342fbb20d2be6054bc67bb61e330e4",
+      "sources": [
+        "tasks/task-751-001.skill-delivery.json"
+      ]
+    },
+    {
+      "path": "terminal-seal-receipt.json",
+      "family": "run",
+      "bytes": 2231,
+      "sha256": "e8c7914cfa1f5ebbd2f063bfa951ea8623481014236e0c78402206bf8959bb90",
+      "sources": [
+        "terminal-seal-receipt.json"
+      ]
+    }
+  ],
+  "conflicts": [],
+  "memoryReferences": [],
+  "contentDigest": "4f9dc926b8c34d24177450d751c7086155f41846c9172fd33a03ddb4d4f22ccd"
+}

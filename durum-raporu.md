@@ -1776,3 +1776,14 @@ Canary raporuna iki netleştirme: npm-shrinkwrap.json var ve Ink7.0.5 kilitli; h
 ## 2026-09-12 — R1-A başladı: saat gerilemesi onarıldı, kapanış HOLD
 
 Owner “Evet başlayalım” talimatı alındı. [R1-A kanıt/sonuç](docs/execution/evidence/astra-recovery-20260912/r1/RESULT.md): 751 APPLYING zamanı PREPARED predecessor’ından285ms önce; artifact hashleri korunmuş. Journal producer predecessor-floor ve ortak host clock ile düzeltildi. İlk61/61 + son coordinator38/38, tsc0; build:all clean gate exit1 (751 EXECUTING + XVerify pending/no-receipt). Eski751 kayıtları değiştirilmedi; yeni sprint, cleanup ve auth mutation yok. Negatif closure için etkisi main’de olup geçerli landing receipt’i olmayan attempt disposition’ı mevcut sözleşmede eksik. R1-A production closure / R1-B cleanup HOLD; yeni producer fix’i ürün DONE değildir.
+
+## 2026-09-12 — 751 gerçekten kapandı; task temizliği tamamlandı
+
+Canonical finalize exit0:751 ABORTED,0 completed/1 unresolved. Sprint arşivi12/12
+hash doğrulandı; kalan18 inaktif task artifact canonical bakım arşivinde korundu,
+.tasks dosya sayısı0. İlk build:all exit0. Önceki “kapanış yolu yok” yorumu outer
+sprint için yanlıştı; mevcut forceAbortSprint kullanıldı. Native effect HOLD ayrı.
+Planner→compiler doğrulama komutu aktarımı onarıldı; scoped115/115,tsc0.
+Geniş prompt paketi2FAIL; genel ürün kapanışı yok. Read-only planning kontrolü
+192.26s sonunda sonuçsuz sonlandırıldı; yeni worker açılmadı.
+[Kanıt ve kalan işler](docs/execution/evidence/astra-recovery-20260912/r1-close/RESULT.md).

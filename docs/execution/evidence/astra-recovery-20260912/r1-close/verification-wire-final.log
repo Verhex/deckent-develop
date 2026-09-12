@@ -1,0 +1,62 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/orchestra/run-proposal-compiler.test.ts (13 tests) 18ms
+ ❯ tests/orchestra/prompt-compile-authority.test.ts (2 tests | 2 failed) 111ms
+   × production prompt compile authority fan-in > carries a structured DIRECTIVES Test command into Task.verification without creating a criterion 14ms
+     → Production mutation task "Typed verification ingress" requires canonical V2 wiring authority.
+   × production prompt compile authority fan-in > compiles two real tasks with one stable leading prefix and digest-equal protected authority 97ms
+     → expected 'You are a Deckent worker agent.\nWORK…' to be 'You are a Deckent worker agent.\nWORK…' // Object.is equality
+ ✓ tests/orchestra/planner.test.ts (102 tests) 177ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/orchestra/prompt-compile-authority.test.ts > production prompt compile authority fan-in > carries a structured DIRECTIVES Test command into Task.verification without creating a criterion
+DeckentError: Production mutation task "Typed verification ingress" requires canonical V2 wiring authority.
+ ❯ validateProductionWiringAuthority src/orchestra/task-builder.ts:552:13
+    550|   if (!authority) {
+    551|     if (applicability.state === 'required') {
+    552|       throw new DeckentError(
+       |             ^
+    553|         'E_PRODUCTION_WIRING_REQUIRED',
+    554|         `Production mutation task "${title}" requires canonical V2 wir…
+ ❯ createTask src/orchestra/task-builder.ts:1440:28
+ ❯ tests/orchestra/prompt-compile-authority.test.ts:79:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/orchestra/prompt-compile-authority.test.ts > production prompt compile authority fan-in > compiles two real tasks with one stable leading prefix and digest-equal protected authority
+AssertionError: expected 'You are a Deckent worker agent.\nWORK…' to be 'You are a Deckent worker agent.\nWORK…' // Object.is equality
+
+- Expected
++ Received
+
+@@ -35,10 +35,10 @@
+  === Agent: implementer ===
+  # Implementer replacement
+  ROLE_REPLACEMENT_CANARY: production-selected role.
+
+  === Relevant project memory ===
+- Selection revision: sha256:827b150dc69778e03860573e92ccb30a9a4992e172750ff43c5376d5bd6e3d6a
++ Selection revision: sha256:61fdf20ff121dc990cff42586429d3568d92ac4444ed2ce9f437549f9731fb15
+  Memory scope: {"kind":"local-project","projectId":"d2727a08677572b5542e950b2a69973ec421cc0c460263fa07eab6134246b82e"}
+
+
+
+
+ ❯ tests/orchestra/prompt-compile-authority.test.ts:179:27
+    177|       expect(firstTaskSpecific.every(index => index > 0)).toBe(true);
+    178|       const prefixes = compiled.map(({ prompt }, index) => prompt.slic…
+    179|       expect(prefixes[0]).toBe(prefixes[1]);
+       |                           ^
+    180|       expect(prefixes[0]).toMatch(/^You are a Deckent worker agent\./);
+    181| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  2 failed | 115 passed (117)
+   Start at  23:23:45
+   Duration  6.13s (transform 3.92s, setup 46ms, collect 13.25s, tests 307ms, environment 0ms, prepare 126ms)
+

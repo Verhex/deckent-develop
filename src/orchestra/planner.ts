@@ -98,6 +98,7 @@ const PlannerCriterionItemSchema = z.object({
 const PlannerTaskSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
+  testTarget: z.string().trim().min(1).regex(/^[^\r\n\0]+$/u).optional(),
   model: z.string().min(1).refine((model) => getLegacyModelMigration(model) === undefined, 'E_LEGACY_MODEL_ALIAS'),
   effort: z.enum(['low', 'normal', 'high']),
   priority: z.enum(['CRITICAL', 'HIGH', 'NORMAL', 'LOW']),
@@ -505,6 +506,7 @@ RULES:
 - Semantic content, preservation, correctness and negative assertions MUST use assertion:<JSON string> describing the condition and relevant source paths. Keep GO and NO_GO conditions; never delete a failure criterion to obtain acceptance.
 - Do not mix file and assertion/command requirements in one item: deterministic file alternatives can short-circuit semantic confirmation. Assertion-only criteria remain undecidable until the configured confirmation adapter supplies genuine evidence; they are not automatic success.
 - Criterion IDs are host-derived after parsing; do not emit an id field.
+- Preserve an explicitly supplied task-local verification command in testTarget, including environment assignments and flags. Use a single line; do not replace it with a generic test command. Omit testTarget when no exact command is established; prose is not verification authority.
 - For every production mutation, emit the identity-only productionWiringProposal described below.
 
 ${FILE_PATH_RULES}
@@ -1866,6 +1868,7 @@ TASK SPLITTING RULES:
 - Semantic content, preservation, correctness and negative assertions MUST use assertion:<JSON string> describing the condition and relevant source paths. Keep GO and NO_GO conditions; never delete a failure criterion to obtain acceptance.
 - Do not mix file and assertion/command requirements in one item: deterministic file alternatives can short-circuit semantic confirmation. Assertion-only criteria remain undecidable until the configured confirmation adapter supplies genuine evidence; they are not automatic success.
 - Criterion IDs are host-derived after parsing; do not emit an id field.
+- Preserve an explicitly supplied task-local verification command in testTarget, including environment assignments and flags. Use a single line; do not replace it with a generic test command. Omit testTarget when no exact command is established; prose is not verification authority.
 
 ${contractRules}
 

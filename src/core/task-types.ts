@@ -1303,6 +1303,8 @@ export interface TaskPlan {
 export interface PlannerTask {
   title: string;
   description: string;
+  /** Exact task-local command; carried through Test to Task.verification. */
+  testTarget?: string;
   model: ModelType;
   effort: TaskEffort;
   priority: TaskPriority;
