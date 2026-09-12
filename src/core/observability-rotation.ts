@@ -209,19 +209,25 @@ export function rotateMetricsFile(
  * Check if the metrics file exceeds the size threshold.
  * Returns true if rotation should be triggered.
  */
+export function resolveRotationMaxBytes(
+  root: string,
+  config: Partial<ObservabilityRotationConfig> = {},
+): number {
+  // Precedence: built-in default ← operator config ← explicit caller override.
+  const opts = { ...DEFAULT_ROTATION_CONFIG, ...readConfiguredRotationConfig(root), ...config };
+  return opts.maxSizeMB * 1024 * 1024;
+}
+
 export function shouldRotate(
   root: string,
   config: Partial<ObservabilityRotationConfig> = {},
 ): boolean {
-  // Precedence: built-in default ← operator config ← explicit caller override.
-  const opts = { ...DEFAULT_ROTATION_CONFIG, ...readConfiguredRotationConfig(root), ...config };
   const metricsPath = join(root, DECKENT_DIR, METRICS_FILENAME);
 
   if (!existsSync(metricsPath)) return false;
 
   const stat = statSync(metricsPath);
-  const maxBytes = opts.maxSizeMB * 1024 * 1024;
-  return stat.size >= maxBytes;
+  return stat.size >= resolveRotationMaxBytes(root, config);
 }
 
 /**

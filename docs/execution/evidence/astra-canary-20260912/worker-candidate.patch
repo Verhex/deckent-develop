@@ -1,0 +1,106 @@
+diff --git a/src/core/observability-rotation.ts b/src/core/observability-rotation.ts
+index de487a53d..f20fc9661 100644
+--- a/src/core/observability-rotation.ts
++++ b/src/core/observability-rotation.ts
+@@ -209,19 +209,25 @@ export function rotateMetricsFile(
+  * Check if the metrics file exceeds the size threshold.
+  * Returns true if rotation should be triggered.
+  */
+-export function shouldRotate(
++export function resolveRotationMaxBytes(
+   root: string,
+   config: Partial<ObservabilityRotationConfig> = {},
+-): boolean {
++): number {
+   // Precedence: built-in default ← operator config ← explicit caller override.
+   const opts = { ...DEFAULT_ROTATION_CONFIG, ...readConfiguredRotationConfig(root), ...config };
++  return opts.maxSizeMB * 1024 * 1024;
++}
++
++export function shouldRotate(
++  root: string,
++  config: Partial<ObservabilityRotationConfig> = {},
++): boolean {
+   const metricsPath = join(root, DECKENT_DIR, METRICS_FILENAME);
+ 
+   if (!existsSync(metricsPath)) return false;
+ 
+   const stat = statSync(metricsPath);
+-  const maxBytes = opts.maxSizeMB * 1024 * 1024;
+-  return stat.size >= maxBytes;
++  return stat.size >= resolveRotationMaxBytes(root, config);
+ }
+ 
+ /**
+diff --git a/src/core/observability.ts b/src/core/observability.ts
+index 600006d1d..bf350f1ee 100644
+--- a/src/core/observability.ts
++++ b/src/core/observability.ts
+@@ -10,7 +10,7 @@ import { RECENT_WORKS_DIR, DECKENT_DIR } from './constants.js';
+ import { debugLog } from './utils.js';
+ // Rotation is a sibling module and does not import back into this one, so the
+ // direct edge is safe; a lazy require would only hide the dependency.
+-import { shouldRotate, rotateMetricsFile } from './observability-rotation.js';
++import { resolveRotationMaxBytes, shouldRotate, rotateMetricsFile } from './observability-rotation.js';
+ import { ErrorRegistry } from './errors.js';
+ 
+ // ─── Types ───────────────────────────────────────────────────────
+@@ -499,9 +499,10 @@ function rotateBeforeAppend(projectRoot: string, upcomingBytes: number): void {
+   }
+ 
+   try {
+-    const rotate = shouldRotate(projectRoot);
+     const metricsPath = getMetricsPath(projectRoot);
+     const sizeBeforeAppend = existsSync(metricsPath) ? statSync(metricsPath).size : 0;
++    const maxBytes = resolveRotationMaxBytes(projectRoot);
++    const rotate = shouldRotate(projectRoot);
+     // The archive is per-sprint; without a bound sprint there is no canonical
+     // destination, so rotation stays with finalize rather than inventing one.
+     const sprintId = _sprintId;
+@@ -515,10 +516,10 @@ function rotateBeforeAppend(projectRoot: string, upcomingBytes: number): void {
+       }
+     }
+ 
+-    // A negative decision (or an unavailable archive destination) is safe
+-    // until the hot file has grown by its observed size. This is a byte-based
+-    // geometric schedule, not an independently tuned rotation policy.
+-    _bytesUntilRotationCheck = Math.max(sizeBeforeAppend, upcomingBytes);
++    // Recheck at the policy-resolved distance to the effective ceiling. This
++    // keeps checks amortized while adapting each gate to operator changes,
++    // without inventing a writer-local rotation limit.
++    _bytesUntilRotationCheck = Math.max(maxBytes - sizeBeforeAppend, upcomingBytes);
+     _rotationRetryBytes = 0;
+   } catch (error) {
+     // Retry from the same session after an observed-byte backoff. Doubling the
+@@ -533,10 +534,10 @@ function rotateBeforeAppend(projectRoot: string, upcomingBytes: number): void {
+ function appendEntry(entry: ObservabilityEntry): void {
+   if (!_projectRoot) return;
+ 
+-  const taggedEntry = injectSprintId(entry);
+-  const line = JSON.stringify(taggedEntry) + '\n';
+-
+   try {
++    const taggedEntry = injectSprintId(entry);
++    const line = JSON.stringify(taggedEntry) + '\n';
++
+     // Always write to main metrics file
+     const metricsPath = getMetricsPath(_projectRoot);
+     const dir = dirname(metricsPath);
+diff --git a/tests/core/observability.test.ts b/tests/core/observability.test.ts
+index 8110b006a..e1b073e1d 100644
+--- a/tests/core/observability.test.ts
++++ b/tests/core/observability.test.ts
+@@ -488,9 +488,10 @@ describe('size-triggered rotation ingress (744-002 / 747-001)', () => {
+     );
+     setObservabilitySprintId('sprint-744003');
+ 
+-    // Force exactly one rotation attempt to fail. The policy remains due so
+-    // a later amortized retry must exercise the real rotation in this session.
+-    vi.mocked(shouldRotate).mockReturnValue(true);
++    // Seed a file over the actual configured ceiling. The failure uses the
++    // real policy resolver, so retries prove production behavior rather than a
++    // perpetual-due mock.
++    writeFileSync(METRICS_PATH, `{"type":"metric","name":"seed","value":0,"tags":{"payload":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"},"timestamp":"2026-09-12T18:53:02.199Z"}\n`, 'utf-8');
+     vi.mocked(rotateMetricsFile).mockImplementationOnce(() => {
+       throw new Error('simulated rotation failure');
+     });

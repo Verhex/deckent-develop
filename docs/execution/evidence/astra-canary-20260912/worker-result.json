@@ -1,0 +1,49 @@
+{
+  "taskId": "751-001",
+  "workerId": "w-751-001",
+  "promptCompilePlanId": "prompt-compile-plan:sha256:60c2894833852c7368cb7745f826ad7ce395270a5ddf6f57480b3f1e0bd2a33b",
+  "filesChanged": ["src/core/observability-rotation.ts", "src/core/observability.ts", "tests/core/observability.test.ts"],
+  "linesAdded": 14,
+  "linesRemoved": 10,
+  "testsPassed": false,
+  "testVerification": {
+    "applicability": "REQUIRED",
+    "outcome": "FAILED",
+    "commands": ["npx tsc --noEmit", "npm run test tests/core/observability-rotation.test.ts tests/core/observability.test.ts"]
+  },
+  "criteriaEvidence": [
+    {"criterionId":"criterion-go-26b48b60f5dd002aa4897f3ae3ac1c8a935f398cd57decdff2e92a9a8153d2ae","outcome":"UNVERIFIED","evidence":["Static change: resolveRotationMaxBytes derives the effective configured ceiling at scheduled gates; targeted tests could not start."]},
+    {"criterionId":"criterion-go-3d878c9578ba71cc9d6b2d163ed698de054506503ed6a50d724470f14116dbbc","outcome":"UNVERIFIED","evidence":["Static change preserves pre-append rotation and append ordering; required targeted test command did not start."]},
+    {"criterionId":"criterion-go-74ba8ac3621d717206d2d0df8567577ea009947dbc34ed0b03d5409e1fd83749","outcome":"UNVERIFIED","evidence":["JSON serialization now occurs inside appendEntry's existing telemetry isolation try/catch; no runnable test evidence."]},
+    {"criterionId":"criterion-go-8efc284866d5e2019b7eb3d4bb12d0832de89b83c41453d267a8760b901cad5b","outcome":"UNMET","evidence":["Production wiring settlement is explicitly host-owned and no host-bound execution receipt was available to this worker."]},
+    {"criterionId":"criterion-go-a053f1ffce6e04f62f06956b73e2c20d29637f99cef469a3167194250417e1fd","outcome":"UNVERIFIED","evidence":["Test now seeds a real policy-due file and mocks only one rotation failure, but Vitest startup failed before execution."]},
+    {"criterionId":"criterion-go-a3635d9502d923226c0c1a878832ab370d6218a057acd74d94e13868620b231c","outcome":"UNVERIFIED","evidence":["Static review retained shouldRotate and rotateMetricsFile signatures; type check is blocked by an unrelated error."]},
+    {"criterionId":"criterion-go-a7e5b385aed555f67f58a9bf057f6f3e8dc0bc475becb6daa945c2e4f2bef963","outcome":"UNMET","evidence":["npx tsc --noEmit exited 2 at src/cli/repl/app.tsx:1806: Props lacks suspendTerminal."]},
+    {"criterionId":"criterion-go-b0ba24da28fb82ab53c08e31e04eaca617bb6246573409203e5b74cdcee347bb","outcome":"UNVERIFIED","evidence":["No retention-path changes were made; tenant/legal-hold targeted tests could not execute."]},
+    {"criterionId":"criterion-go-cb64c5702083e5837d855b1b6467b4ec5fc04427c0ed81516d5f00a05c684efa","outcome":"UNVERIFIED","evidence":["Static test change removes shouldRotate.mockReturnValue(true) and uses the configured real resolver, but Vitest did not execute."]},
+    {"criterionId":"criterion-go-e94d17d4ee7f0517abac8361427ab73f19c0753b699219d40821a456b24b3c61","outcome":"UNMET","evidence":["Required targeted command exited 1 during Vite startup: ENOENT mkdir /workspace/node_modules/.vite-temp."]},
+    {"criterionId":"criterion-no-go-13d57a1cbabace6b6d79cd34e3589f102105f21c51bea95729a0032e71775fb2","outcome":"UNMET","evidence":["No routing override or provider selection operation was performed."]},
+    {"criterionId":"criterion-no-go-43951f1bb256b6d251bc39980bad560c0bd31892d2896733857b6b5c6d88578a","outcome":"UNMET","evidence":["Static implementation adds no telemetry emission from the rotation path; failures only call debugLog."]},
+    {"criterionId":"criterion-no-go-462aa4420050ecea49b7b6106771bbc4fcbbcf218e28ac08cab45c2862634cba","outcome":"UNMET","evidence":["Existing byte-backed retry state remains reset only after successful policy/rotation handling, not permanently disabled."]},
+    {"criterionId":"criterion-no-go-5a814f4a025463a2b729c2628aba38cfccd63cd557bfee61e72ce210b383fbd8","outcome":"UNMET","evidence":["Only the three listed allowlisted source/test files were modified; lifecycle artifacts are authorized exceptions."]},
+    {"criterionId":"criterion-no-go-62f2c786cb91b5fd2b27d29e2dc0ee029c1746ccde3033bfac5ddb0a63adc1ad","outcome":"UNMET","evidence":["Result reports presence-only worker observation and explicitly does not claim complete host settlement."]},
+    {"criterionId":"criterion-no-go-6931a688d639bc501409966c69d55cb891d46f7b1380fb2ce99aeeff00db6000","outcome":"UNMET","evidence":["No build, commit, push, auth mutation, dependency mutation, runtime cleanup, or retained-attempt mutation was performed."]},
+    {"criterionId":"criterion-no-go-c2da3467090b231e0345392ebc2251b06d200dbb7d4e6f651815bf4a4304061b","outcome":"UNMET","evidence":["Policy/config resolution occurs only when the byte gate is due; retry remains byte-backed."]},
+    {"criterionId":"criterion-no-go-d61cf7bd38c6c6f2e4982be0c8865f668105a770cc2cb2cd89b9e9f936a7db75","outcome":"UNMET","evidence":["resolveRotationMaxBytes reuses the canonical configured rotation policy and adds no local limit or second rotation engine."]},
+    {"criterionId":"criterion-no-go-fc594d10a78178485c24651ed7bb614e0a6d0eabb7fe3b8d2e9133e6c8314e00","outcome":"UNVERIFIED","evidence":["Scoped implementation is present, but required type check and targeted tests could not pass in this environment."]}
+  ],
+  "coverage": 0,
+  "selfAssessment": "NO_GO",
+  "techDebtCriterionIds": [],
+  "productionWiringEvidence": {
+    "version": 1,
+    "contractDigest": "70ab2aba53128268eea1b4eddc98aa3880127fc0a7c1e9b8fc2997e86580421c",
+    "observedBy": "worker",
+    "evidence": {
+      "state": "presence-only",
+      "basis": "static-reachability",
+      "evidenceRefs": ["src/core/observability.ts:appendEntry", "src/core/observability.ts:rotateBeforeAppend", "src/core/observability-rotation.ts:shouldRotate", "src/core/observability-rotation.ts:enforceRetentionPolicy"]
+    }
+  },
+  "notes": "Implemented scoped repair: resolveRotationMaxBytes derives the effective configured ceiling at byte gates; appendEntry serializes inside telemetry isolation; transient recovery test uses a real policy-due seed rather than a perpetual-due shouldRotate mock.\nVerification blocked: npx tsc --noEmit exits 2 on pre-existing/out-of-scope src/cli/repl/app.tsx:1806 (Props.suspendTerminal missing).\nVerification blocked: required Vitest command exits 1 before tests because Vite cannot mkdir /workspace/node_modules/.vite-temp; scope and dependency-mutation rules prevent repairing node_modules.\nUNWIRED: deckent.observability-rotation.size-triggered-rotation — host-owned consumer-execution proof is unavailable inside worker authority.\nUNWIRED: deckent.observability-rotation.retention-prune-receipt — host-owned consumer-execution proof is unavailable inside worker authority.\nUNWIRED: deckent.config.observability-rotation-policy-resolution — host-owned enablement-resolution proof is unavailable inside worker authority."
+}

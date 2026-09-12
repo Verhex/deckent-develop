@@ -1,0 +1,78 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ❯ tests/core/observability.test.ts (29 tests | 2 failed) 149ms
+   ✓ metric() > should write a metric entry and read it back correctly 5ms
+   ✓ metric() > should append multiple metrics (append-only) 2ms
+   ✓ metric() > should silently discard when not initialized 1ms
+   ✓ metric() > should omit tags when empty or undefined 2ms
+   ✓ trace() > should measure duration and record success 13ms
+   ✓ trace() > should capture error on exception and re-throw 2ms
+   ✓ structuredLog() > should write pino-compatible JSON log entry 2ms
+   ✓ structuredLog() > should support all log levels 2ms
+   ✓ JSONL format > should produce valid line-delimited JSON 2ms
+   ✓ data locality > should have TELEMETRY_ENABLED hard-coded to false 1ms
+   ✓ data locality > should not import or call net.connect 1ms
+   ✓ data locality > should only write to local filesystem 2ms
+   ✓ generateLoadReport() > should generate markdown report from metrics data 2ms
+   ✓ generateLoadReport() > should return placeholder when no metrics file exists 1ms
+   ✓ instrument integration > should record wave.start metric format correctly 1ms
+   ✓ wave.transition metric > should record wave transition events 2ms
+   ✓ percentile() > should calculate p50/p95/p99 correctly for 100 samples 1ms
+   ✓ percentile() > should handle single element 1ms
+   ✓ percentile() > should handle empty array 1ms
+   ✓ percentile() > should handle two elements 1ms
+   ✓ buildHistogramBuckets() > should distribute values into correct buckets 1ms
+   ✓ buildHistogramBuckets() > should handle empty values 1ms
+   ✓ eval.duration_ms metric > should record per-task evaluation duration 2ms
+   ✓ getMetricsPath() > should return correct path for project root 1ms
+   ✓ getMetricsPath() > should throw when no root is available 1ms
+   × size-triggered rotation ingress (744-002 / 747-001) > amortizes configured size-ceiling checks via shouldRotate 8ms
+     → expected "statSync" to be called at least once
+   × size-triggered rotation ingress (744-002 / 747-001) > evaluates the ceiling BEFORE the record is written 4ms
+     → expected [] to deeply equal [ 2 ]
+   ✓ size-triggered rotation ingress (744-002 / 747-001) > rotates once the configured size ceiling is crossed, without waiting for sprint finalize 41ms
+   ✓ size-triggered rotation ingress (744-002 / 747-001) > recovers from a transient rotation failure in the same session without losing or duplicating records 40ms
+ ✓ tests/core/observability-rotation.test.ts (42 tests) 149ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/core/observability.test.ts > size-triggered rotation ingress (744-002 / 747-001) > amortizes configured size-ceiling checks via shouldRotate
+AssertionError: expected "statSync" to be called at least once
+ ❯ tests/core/observability.test.ts:437:21
+    435|     // The real (call-through) ceiling check genuinely measures the fi…
+    436|     // fewer times than the append count.
+    437|     expect(statSpy).toHaveBeenCalled();
+       |                     ^
+    438|     // The writes themselves still happened.
+    439|     expect(readMetricsLines()).toHaveLength(20);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/core/observability.test.ts > size-triggered rotation ingress (744-002 / 747-001) > evaluates the ceiling BEFORE the record is written
+AssertionError: expected [] to deeply equal [ 2 ]
+
+- Expected
++ Received
+
+- [
+-   2,
+- ]
++ []
+
+ ❯ tests/core/observability.test.ts:457:30
+    455|     // The ceiling saw the PRE-append state — the third record was not…
+    456|     // disk when the ceiling was evaluated.
+    457|     expect(linesSeenAtCheck).toEqual([2]);
+       |                              ^
+    458|     expect(readMetricsLines()).toHaveLength(3);
+    459|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  2 failed | 69 passed (71)
+   Start at  22:02:57
+   Duration  2.10s (transform 473ms, setup 33ms, collect 1.05s, tests 298ms, environment 0ms, prepare 82ms)
+

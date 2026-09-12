@@ -1,0 +1,13 @@
+{
+  "startedAt": "2026-09-12T18:30:51.157109+00:00",
+  "argv": [
+    "node",
+    "dist/cli/entry.js",
+    "start"
+  ],
+  "pid": 660157,
+  "cwd": "/home/alperen/deckent-dev",
+  "endedAt": "2026-09-12T18:37:24.056052+00:00",
+  "elapsedMs": 416748,
+  "exitCode": 1
+}

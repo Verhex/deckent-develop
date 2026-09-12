@@ -1,0 +1,110 @@
+{
+  "receipt": {
+    "auth": {
+      "accountRefHash": null,
+      "mode": "subscription"
+    },
+    "backend": {
+      "executionBackend": "host-subprocess",
+      "transport": "cli"
+    },
+    "called": {
+      "model": "gpt-6-astra",
+      "provider": "codex",
+      "reasonCode": "none",
+      "source": "wire"
+    },
+    "callId": "inv-e98f0434da2b5569206ef9dc68274cb2:call-1",
+    "configured": {
+      "model": "gpt-6-astra",
+      "provider": "codex",
+      "reasonCode": "none",
+      "source": "config"
+    },
+    "createdAt": "2026-09-12T18:41:29.162Z",
+    "fallbackChain": [],
+    "idempotencyKey": "963bbc69-bfff-4b5f-b5ac-6ba130853feb:revision:1:brain:sprint-planning:1",
+    "invocationId": "inv-e98f0434da2b5569206ef9dc68274cb2",
+    "limits": {
+      "evidenceRefs": [],
+      "state": "unknown"
+    },
+    "projectId": "1553f97b-2503-4a15-90b8-88004e1320dc",
+    "purpose": "sprint-planning",
+    "reachability": {
+      "evidenceRef": null,
+      "state": "unknown"
+    },
+    "requested": {
+      "model": "gpt-6-astra",
+      "provider": "codex",
+      "reasonCode": "none",
+      "source": "config"
+    },
+    "resolved": {
+      "model": "gpt-6-astra",
+      "provider": "codex",
+      "reasonCode": "none",
+      "source": "router"
+    },
+    "role": "brain",
+    "runId": "963bbc69-bfff-4b5f-b5ac-6ba130853feb:revision:1",
+    "schemaVersion": 1,
+    "taskId": null,
+    "tenantId": "local"
+  },
+  "events": [
+    {
+      "eventId": "2cc49095-c509-43ac-86c1-3177041deba6",
+      "invocationId": "inv-e98f0434da2b5569206ef9dc68274cb2",
+      "sequence": 1,
+      "type": "dispatch_started",
+      "occurredAt": "2026-09-12T18:41:29.175Z",
+      "payload": {
+        "attempt": 1,
+        "calledModel": "gpt-6-astra",
+        "calledProvider": "codex"
+      },
+      "payloadHash": "6dd418a608ec966056c588be7b1b3e193ae1c90db2983ee537059be04af78a7f",
+      "previousHash": null,
+      "hash": "a2d260c1f296218f1221e21b3330743ef18b21b27f6bb3c90c9e0a6b3f184782"
+    },
+    {
+      "eventId": "75034881-e165-4398-b916-e533ff5c2feb",
+      "invocationId": "inv-e98f0434da2b5569206ef9dc68274cb2",
+      "sequence": 2,
+      "type": "transport_settled",
+      "occurredAt": "2026-09-12T18:43:14.812Z",
+      "payload": {
+        "durationMs": 105616,
+        "exitCode": 0,
+        "outcome": "succeeded",
+        "reasonCode": "none",
+        "signal": null
+      },
+      "payloadHash": "47cac2136fd7d98ffee4c1f374cb4027424b52db08999351a18b83f973dedcd2",
+      "previousHash": "a2d260c1f296218f1221e21b3330743ef18b21b27f6bb3c90c9e0a6b3f184782",
+      "hash": "eefeadfbfb481eed894a53e80e24f0c7e32d526f69f87300d5ce75099686948f"
+    },
+    {
+      "eventId": "326f3d0c-4160-44e1-93a5-70d9748d2ed8",
+      "invocationId": "inv-e98f0434da2b5569206ef9dc68274cb2",
+      "sequence": 3,
+      "type": "consumer_settled",
+      "occurredAt": "2026-09-12T18:43:14.818Z",
+      "payload": {
+        "evidenceRefs": [
+          "planner-result:sha256:0dc71020d5846c7c80ef3a9a46c94a62e6b280895c3b4887bde36fa22f9c9b78"
+        ],
+        "outcome": "accepted",
+        "reasonCode": "none"
+      },
+      "payloadHash": "12b5f60dc967025801ea54ecfe0daf1464e0a11e96128a504a466c5349196b6e",
+      "previousHash": "eefeadfbfb481eed894a53e80e24f0c7e32d526f69f87300d5ce75099686948f",
+      "hash": "b8bbba71c4b4df9f9d5930c70b06d09c59062ccd41b6c517cc04c611c4e5f299"
+    }
+  ],
+  "transportOutcome": "succeeded",
+  "consumerOutcome": "accepted",
+  "taskDisposition": null
+}

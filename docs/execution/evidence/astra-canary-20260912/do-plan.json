@@ -1,0 +1,1041 @@
+{
+  "flowId": "963bbc69-bfff-4b5f-b5ac-6ba130853feb",
+  "revision": 1,
+  "sprint": {
+    "id": "sprint-751",
+    "number": 751,
+    "status": "PLANNING",
+    "phase": "PLAN",
+    "tasks": [
+      {
+        "id": "751-001",
+        "title": "MASTER120 STATE-RETENTION-001 retention writer onarımını aynı oturumda tamamla",
+        "description": "Mevcut owner-admitted görevde tek implementation owner olarak devam et; yeni outcome veya ikinci görev oluşturma. DIRECTIVES.md kabul kontratını ve önceki attempt etkilerini yeniden doğrula. İncelenen kodda geometric byte scheduling mevcut effective ceiling mesafesini bilmiyor; serialization try bloğu dışında ve transient-failure testi shouldRotate sonucunu sürekli true yapıyor. Recursive telemetry etkisini ve mevcut call-count assertion hatasını gerçek effective policy üzerinden teşhis et. Önceki repair doğruysa yeniden yazmadan gerçek etkilerini doğrula. Aksi durumda mevcut rotation authority üzerinden policy-backed amortized threshold checks ve aynı session içinde bounded transient recovery uygula; metric byte bütünlüğünü, sıralamayı, public API ve tenant retention/legal holds davranışını koru. Assertion beklentilerini zayıflatmadan perpetual-due mock yerine gerçek policy davranışını çalıştır. Intent implementation ve tag test-coverage olsun. Provider/model/effort, skill/persona, concurrency ve finite execution budget effective project policy, registry ve canlı kapasiteden çözülür. Yalnız dört write-allowlist dosyası değişebilir. Build, commit, push, auth mutation, runtime kill/cleanup, başka task veya retained attempt mutation yasaktır. Host tarafından yetkilendirilen attempt-private result/heartbeat protokolünü kullan. Belirtilen Vitest komutunu çalıştır; subprocess gerekirse async spawn kullan. Host-injected productionWiringEvidence sözleşmesini NO_GO dahil aynen karşılayan exact task result üret; host bağımsız observation ve settlement yapar. Eksik authority veya kanıt HOLD olur. Bu plan yeni run başlatmaz; yürütme mevcut supervised dogfood bağlamında admission doğrulanarak yapılır.\n\nReason: Recovery, byte scheduling ve telemetry reentrancy birlikte incelenmelidir. Model ve effort alanları şema gereği adaydır; gerçek seçim effective policy tarafından doğrulanmalı veya değiştirilmelidir. Bu aday routing authority veya kabul koşulu değildir.\n### goNogo\n- goCriteria: Transient recovery aynı writer session içinde gerçekleşir. Threshold scheduling effective policy üzerinden amortize edilir. Metric byte bütünlüğü korunur. Public API korunur. Tenant retention ve legal holds korunur. Telemetry failure isolation sağlanır. Mevcut transient-failure assertion teşhis edilerek korunur. Belirtilen verification başarılıdır. Exact host-bound closure evidence doğrulanır.\n- nogo: Kalıcı failure latch bulunur. Her append rotation amaçlı filesystem/config kontrolü veya retry yapar. Recursive telemetry storm oluşur. Arbitrary limit veya ikinci rotation engine eklenir. Write allowlist aşılır. Yasak operasyon gerçekleştirilir. Routing policy bypass edilir. Eksik host/provider/settlement kanıtı COMPLETE olarak sunulur.\n- criteriaItems: [{\"id\":\"criterion-go-a053f1ffce6e04f62f06956b73e2c20d29637f99cef469a3167194250417e1fd\",\"polarity\":\"go\",\"statement\":\"Transient rotation failure aynı writer session içinde init/reset gerektirmeden iyileşir.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/observability.ts ve src/core/observability-rotation.ts için tests/core/observability.test.ts gerçek effective policy altında bir transient failure sonrasında aynı session içinde başarılı rotation gösterir.\\\"\"]},{\"id\":\"criterion-go-26b48b60f5dd002aa4897f3ae3ac1c8a935f398cd57decdff2e92a9a8153d2ae\",\"polarity\":\"go\",\"statement\":\"Threshold scheduling effective size ceiling ve operator policy değişikliklerine bağlı olarak amortize edilir.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/observability.ts ve src/core/observability-rotation.ts scheduling kararlarını src/core/config.ts ve src/core/config-types.ts mevcut policy authority üzerinden çözer; tests/core/observability.test.ts ve tests/core/observability-rotation.test.ts ceiling mesafesini ve policy değişikliklerini doğrular.\\\"\"]},{\"id\":\"criterion-go-3d878c9578ba71cc9d6b2d163ed698de054506503ed6a50d724470f14116dbbc\",\"polarity\":\"go\",\"statement\":\"Failure ve recovery boyunca metric byte bütünlüğü ve sıralaması korunur.\",\"evidenceRequirements\":[\"assertion:\\\"tests/core/observability.test.ts ve tests/core/observability-rotation.test.ts src/core/observability.ts ve src/core/observability-rotation.ts tarafından yazılan hot ve archived records toplamında her metric byte dizisinin kayıpsız ve tam bir kez doğru sırada korunduğunu doğrular; yalnız kayıt sayısı yeterli değildir.\\\"\"]},{\"id\":\"criterion-go-a3635d9502d923226c0c1a878832ab370d6218a057acd74d94e13868620b231c\",\"polarity\":\"go\",\"statement\":\"Mevcut public writer ve rotation API davranışı uyumludur.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/observability.ts ve src/core/observability-rotation.ts public call shapes ve mevcut size rotation semantics korunur; tests/core/observability.test.ts ve tests/core/observability-rotation.test.ts uyumluluk kanıtını sağlar.\\\"\"]},{\"id\":\"criterion-go-b0ba24da28fb82ab53c08e31e04eaca617bb6246573409203e5b74cdcee347bb\",\"polarity\":\"go\",\"statement\":\"Retention işlemleri tenant scope ve legal holds kurallarını korur.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/observability-rotation.ts için tests/core/observability-rotation.test.ts tenant isolation ve legal holds davranışını doğrular; scripts/metrics-retention-host-proof-observer.mjs üzerinden host tarafından gözlenen retention-prune receipt gerçek resolved policy ile eşleşir.\\\"\"]},{\"id\":\"criterion-go-74ba8ac3621d717206d2d0df8567577ea009947dbc34ed0b03d5409e1fd83749\",\"polarity\":\"go\",\"statement\":\"Serialization ve rotation hataları telemetry caller akışından izole edilir.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/observability.ts serialization ve rotation failure sınırları tests/core/observability.test.ts ile doğrulanır; bu hatalar caller akışına taşmaz.\\\"\"]},{\"id\":\"criterion-go-cb64c5702083e5837d855b1b6467b4ec5fc04427c0ed81516d5f00a05c684efa\",\"polarity\":\"go\",\"statement\":\"Mevcut transient-failure assertion zayıflatılmadan gerçek policy üzerinden doğrulanır.\",\"evidenceRequirements\":[\"assertion:\\\"tests/core/observability.test.ts perpetual-due shouldRotate mock davranışı ve recursive telemetry call zinciri teşhis edilir; mevcut recovery, preservation ve call-count beklentileri silinmez, gevşetilmez veya bypass edilmez; fixture gerçek policy kararını çalıştırır.\\\"\"]},{\"id\":\"criterion-go-e94d17d4ee7f0517abac8361427ab73f19c0753b699219d40821a456b24b3c61\",\"polarity\":\"go\",\"statement\":\"İstenen verification komutu exit zero ile tamamlanır.\",\"evidenceRequirements\":[\"assertion:\\\"VITEST_MAX_FORKS=2 npx vitest run --configLoader runner --no-cache tests/core/observability.test.ts tests/core/observability-rotation.test.ts gerçek çalıştırma çıktısı ve exit code 0 ile doğrulanır; dependency mount değişikliği yapılmaz.\\\"\"]},{\"id\":\"criterion-go-8efc284866d5e2019b7eb3d4bb12d0832de89b83c41453d267a8760b901cad5b\",\"polarity\":\"go\",\"statement\":\"Exact task result gerçek host-bound production wiring ve settlement kanıtıyla kapanır.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/production-wiring-contract.ts sözleşmesi ve değiştirilmeyen scripts/metrics-retention-host-proof-observer.mjs ile host registered topology bağımsız gözlemini sağlar; task result host-injected productionWiringEvidence taşır ve exact attempt/provider call, provider-reported usage, effect, evaluation ve durable terminal settlement bağı doğrulanır. Worker test çıktısı host settlement yerine geçmez.\\\"\"]},{\"id\":\"criterion-no-go-462aa4420050ecea49b7b6106771bbc4fcbbcf218e28ac08cab45c2862634cba\",\"polarity\":\"no-go\",\"statement\":\"Rotation kalıcı olarak devre dışı kalır.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/observability.ts veya src/core/observability-rotation.ts failure sonrasında aynı session recovery yolunu kalıcı latch ile kapatır.\\\"\"]},{\"id\":\"criterion-no-go-c2da3467090b231e0345392ebc2251b06d200dbb7d4e6f651815bf4a4304061b\",\"polarity\":\"no-go\",\"statement\":\"Rotation kontrolü veya retry her append üzerinde filesystem/config çalışması gerektirir.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/observability.ts ve src/core/observability-rotation.ts execution trace rotation kontrolleri veya failure retries için amortization yerine per-append filesystem/config okumalarını gösterir.\\\"\"]},{\"id\":\"criterion-no-go-43951f1bb256b6d251bc39980bad560c0bd31892d2896733857b6b5c6d88578a\",\"polarity\":\"no-go\",\"statement\":\"Rotation telemetry zinciri recursive storm üretir.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/observability.ts ve src/core/observability-rotation.ts üzerinden tests/core/observability.test.ts execution trace nested telemetry kaynaklı kontrolsüz rotation veya metric üretimi gösterir.\\\"\"]},{\"id\":\"criterion-no-go-d61cf7bd38c6c6f2e4982be0c8865f668105a770cc2cb2cd89b9e9f936a7db75\",\"polarity\":\"no-go\",\"statement\":\"Canonical authority dışında arbitrary limit veya ikinci rotation engine oluşturulur.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/observability.ts ve src/core/observability-rotation.ts diff incelemesi mevcut policy authority dışında yeni literal threshold, duplicated default veya bağımsız rotation engine gösterir.\\\"\"]},{\"id\":\"criterion-no-go-5a814f4a025463a2b729c2628aba38cfccd63cd557bfee61e72ce210b383fbd8\",\"polarity\":\"no-go\",\"statement\":\"Task kaynak değişiklikleri dört dosyalık write allowlist dışına çıkar.\",\"evidenceRequirements\":[\"assertion:\\\"Attempt başlangıç snapshotı ile task-attributed diff karşılaştırması src/core/observability.ts, src/core/observability-rotation.ts, tests/core/observability.test.ts ve tests/core/observability-rotation.test.ts dışında tracked mutation gösterir; read-only config ve host observer dahil diğer dosyalar değişmemelidir.\\\"\"]},{\"id\":\"criterion-no-go-6931a688d639bc501409966c69d55cb891d46f7b1380fb2ce99aeeff00db6000\",\"polarity\":\"no-go\",\"statement\":\"Task yasaklanmış operasyon gerçekleştirir.\",\"evidenceRequirements\":[\"assertion:\\\"Exact attempt action trace build, commit, push, auth mutation, runtime kill/cleanup, retained evidence değişikliği veya başka task mutation gösterir.\\\"\"]},{\"id\":\"criterion-no-go-13d57a1cbabace6b6d79cd34e3589f102105f21c51bea95729a0032e71775fb2\",\"polarity\":\"no-go\",\"statement\":\"Execution routing effective project policy dışında zorlanır.\",\"evidenceRequirements\":[\"assertion:\\\"Host admission kaydı provider/model/effort, skill/persona, concurrency veya finite budget seçiminin effective config, registry ve live capacity yerine plan tarafından zorlandığını gösterir.\\\"\"]},{\"id\":\"criterion-no-go-62f2c786cb91b5fd2b27d29e2dc0ee029c1746ccde3033bfac5ddb0a63adc1ad\",\"polarity\":\"no-go\",\"statement\":\"Eksik host/provider/settlement authority veya evidence COMPLETE olarak sunulur.\",\"evidenceRequirements\":[\"assertion:\\\"Exact task result gerekli host observation, genuine provider evidence veya durable terminal settlement eksikken DONE/COMPLETE iddia eder; bu durumda typed HOLD zorunludur ve assertion-only kriterler configured confirmation adapter kanıtı olmadan başarılı sayılamaz.\\\"\"]}]",
+        "model": "gpt-5.6-terra",
+        "effort": "high",
+        "priority": "NORMAL",
+        "reason": "Directive (model: gpt-5.6-terra -- resolved from scope/complexity/plan)",
+        "scope": {
+          "directories": [
+            "src/core",
+            "tests/core"
+          ],
+          "filesRead": [],
+          "filesWrite": [
+            "src/core/observability-rotation.ts",
+            "src/core/observability.ts",
+            "tests/core/observability-rotation.test.ts",
+            "tests/core/observability.test.ts"
+          ]
+        },
+        "dependencies": [],
+        "goNogo": {
+          "goCriteria": "Implementation satisfies the task requirements for the typescript stack; Transient recovery aynı writer session içinde gerçekleşir. Threshold scheduling effective policy üzerinden amortize edilir. Metric byte bütünlüğü korunur. Public API korunur. Tenant retention ve legal holds korunur. Telemetry failure isolation sağlanır. Mevcut transient-failure assertion teşhis edilerek korunur. Belirtilen verification başarılıdır. Exact host-bound closure evidence doğrulanır.",
+          "noGoCriteria": "Implementation does not satisfy the task requirements; Kalıcı failure latch bulunur. Her append rotation amaçlı filesystem/config kontrolü veya retry yapar. Recursive telemetry storm oluşur. Arbitrary limit veya ikinci rotation engine eklenir. Write allowlist aşılır. Yasak operasyon gerçekleştirilir. Routing policy bypass edilir. Eksik host/provider/settlement kanıtı COMPLETE olarak sunulur.",
+          "techDebtAcceptable": "Minor style issues that do not affect the task requirements",
+          "items": [
+            {
+              "id": "criterion-go-a7e5b385aed555f67f58a9bf057f6f3e8dc0bc475becb6daa945c2e4f2bef963",
+              "polarity": "go",
+              "statement": "Implementation satisfies the task requirements for the typescript stack",
+              "evidenceRequirements": [
+                "Implementation satisfies the task requirements for the typescript stack"
+              ]
+            },
+            {
+              "id": "criterion-no-go-fc594d10a78178485c24651ed7bb614e0a6d0eabb7fe3b8d2e9133e6c8314e00",
+              "polarity": "no-go",
+              "statement": "Implementation does not satisfy the task requirements",
+              "evidenceRequirements": [
+                "Implementation does not satisfy the task requirements"
+              ]
+            },
+            {
+              "id": "criterion-go-a053f1ffce6e04f62f06956b73e2c20d29637f99cef469a3167194250417e1fd",
+              "polarity": "go",
+              "statement": "Transient rotation failure aynı writer session içinde init/reset gerektirmeden iyileşir.",
+              "evidenceRequirements": [
+                "assertion:\"src/core/observability.ts ve src/core/observability-rotation.ts için tests/core/observability.test.ts gerçek effective policy altında bir transient failure sonrasında aynı session içinde başarılı rotation gösterir.\""
+              ]
+            },
+            {
+              "id": "criterion-go-26b48b60f5dd002aa4897f3ae3ac1c8a935f398cd57decdff2e92a9a8153d2ae",
+              "polarity": "go",
+              "statement": "Threshold scheduling effective size ceiling ve operator policy değişikliklerine bağlı olarak amortize edilir.",
+              "evidenceRequirements": [
+                "assertion:\"src/core/observability.ts ve src/core/observability-rotation.ts scheduling kararlarını src/core/config.ts ve src/core/config-types.ts mevcut policy authority üzerinden çözer; tests/core/observability.test.ts ve tests/core/observability-rotation.test.ts ceiling mesafesini ve policy değişikliklerini doğrular.\""
+              ]
+            },
+            {
+              "id": "criterion-go-3d878c9578ba71cc9d6b2d163ed698de054506503ed6a50d724470f14116dbbc",
+              "polarity": "go",
+              "statement": "Failure ve recovery boyunca metric byte bütünlüğü ve sıralaması korunur.",
+              "evidenceRequirements": [
+                "assertion:\"tests/core/observability.test.ts ve tests/core/observability-rotation.test.ts src/core/observability.ts ve src/core/observability-rotation.ts tarafından yazılan hot ve archived records toplamında her metric byte dizisinin kayıpsız ve tam bir kez doğru sırada korunduğunu doğrular; yalnız kayıt sayısı yeterli değildir.\""
+              ]
+            },
+            {
+              "id": "criterion-go-a3635d9502d923226c0c1a878832ab370d6218a057acd74d94e13868620b231c",
+              "polarity": "go",
+              "statement": "Mevcut public writer ve rotation API davranışı uyumludur.",
+              "evidenceRequirements": [
+                "assertion:\"src/core/observability.ts ve src/core/observability-rotation.ts public call shapes ve mevcut size rotation semantics korunur; tests/core/observability.test.ts ve tests/core/observability-rotation.test.ts uyumluluk kanıtını sağlar.\""
+              ]
+            },
+            {
+              "id": "criterion-go-b0ba24da28fb82ab53c08e31e04eaca617bb6246573409203e5b74cdcee347bb",
+              "polarity": "go",
+              "statement": "Retention işlemleri tenant scope ve legal holds kurallarını korur.",
+              "evidenceRequirements": [
+                "assertion:\"src/core/observability-rotation.ts için tests/core/observability-rotation.test.ts tenant isolation ve legal holds davranışını doğrular; scripts/metrics-retention-host-proof-observer.mjs üzerinden host tarafından gözlenen retention-prune receipt gerçek resolved policy ile eşleşir.\""
+              ]
+            },
+            {
+              "id": "criterion-go-74ba8ac3621d717206d2d0df8567577ea009947dbc34ed0b03d5409e1fd83749",
+              "polarity": "go",
+              "statement": "Serialization ve rotation hataları telemetry caller akışından izole edilir.",
+              "evidenceRequirements": [
+                "assertion:\"src/core/observability.ts serialization ve rotation failure sınırları tests/core/observability.test.ts ile doğrulanır; bu hatalar caller akışına taşmaz.\""
+              ]
+            },
+            {
+              "id": "criterion-go-cb64c5702083e5837d855b1b6467b4ec5fc04427c0ed81516d5f00a05c684efa",
+              "polarity": "go",
+              "statement": "Mevcut transient-failure assertion zayıflatılmadan gerçek policy üzerinden doğrulanır.",
+              "evidenceRequirements": [
+                "assertion:\"tests/core/observability.test.ts perpetual-due shouldRotate mock davranışı ve recursive telemetry call zinciri teşhis edilir; mevcut recovery, preservation ve call-count beklentileri silinmez, gevşetilmez veya bypass edilmez; fixture gerçek policy kararını çalıştırır.\""
+              ]
+            },
+            {
+              "id": "criterion-go-e94d17d4ee7f0517abac8361427ab73f19c0753b699219d40821a456b24b3c61",
+              "polarity": "go",
+              "statement": "İstenen verification komutu exit zero ile tamamlanır.",
+              "evidenceRequirements": [
+                "assertion:\"VITEST_MAX_FORKS=2 npx vitest run --configLoader runner --no-cache tests/core/observability.test.ts tests/core/observability-rotation.test.ts gerçek çalıştırma çıktısı ve exit code 0 ile doğrulanır; dependency mount değişikliği yapılmaz.\""
+              ]
+            },
+            {
+              "id": "criterion-go-8efc284866d5e2019b7eb3d4bb12d0832de89b83c41453d267a8760b901cad5b",
+              "polarity": "go",
+              "statement": "Exact task result gerçek host-bound production wiring ve settlement kanıtıyla kapanır.",
+              "evidenceRequirements": [
+                "assertion:\"src/core/production-wiring-contract.ts sözleşmesi ve değiştirilmeyen scripts/metrics-retention-host-proof-observer.mjs ile host registered topology bağımsız gözlemini sağlar; task result host-injected productionWiringEvidence taşır ve exact attempt/provider call, provider-reported usage, effect, evaluation ve durable terminal settlement bağı doğrulanır. Worker test çıktısı host settlement yerine geçmez.\""
+              ]
+            },
+            {
+              "id": "criterion-no-go-462aa4420050ecea49b7b6106771bbc4fcbbcf218e28ac08cab45c2862634cba",
+              "polarity": "no-go",
+              "statement": "Rotation kalıcı olarak devre dışı kalır.",
+              "evidenceRequirements": [
+                "assertion:\"src/core/observability.ts veya src/core/observability-rotation.ts failure sonrasında aynı session recovery yolunu kalıcı latch ile kapatır.\""
+              ]
+            },
+            {
+              "id": "criterion-no-go-c2da3467090b231e0345392ebc2251b06d200dbb7d4e6f651815bf4a4304061b",
+              "polarity": "no-go",
+              "statement": "Rotation kontrolü veya retry her append üzerinde filesystem/config çalışması gerektirir.",
+              "evidenceRequirements": [
+                "assertion:\"src/core/observability.ts ve src/core/observability-rotation.ts execution trace rotation kontrolleri veya failure retries için amortization yerine per-append filesystem/config okumalarını gösterir.\""
+              ]
+            },
+            {
+              "id": "criterion-no-go-43951f1bb256b6d251bc39980bad560c0bd31892d2896733857b6b5c6d88578a",
+              "polarity": "no-go",
+              "statement": "Rotation telemetry zinciri recursive storm üretir.",
+              "evidenceRequirements": [
+                "assertion:\"src/core/observability.ts ve src/core/observability-rotation.ts üzerinden tests/core/observability.test.ts execution trace nested telemetry kaynaklı kontrolsüz rotation veya metric üretimi gösterir.\""
+              ]
+            },
+            {
+              "id": "criterion-no-go-d61cf7bd38c6c6f2e4982be0c8865f668105a770cc2cb2cd89b9e9f936a7db75",
+              "polarity": "no-go",
+              "statement": "Canonical authority dışında arbitrary limit veya ikinci rotation engine oluşturulur.",
+              "evidenceRequirements": [
+                "assertion:\"src/core/observability.ts ve src/core/observability-rotation.ts diff incelemesi mevcut policy authority dışında yeni literal threshold, duplicated default veya bağımsız rotation engine gösterir.\""
+              ]
+            },
+            {
+              "id": "criterion-no-go-5a814f4a025463a2b729c2628aba38cfccd63cd557bfee61e72ce210b383fbd8",
+              "polarity": "no-go",
+              "statement": "Task kaynak değişiklikleri dört dosyalık write allowlist dışına çıkar.",
+              "evidenceRequirements": [
+                "assertion:\"Attempt başlangıç snapshotı ile task-attributed diff karşılaştırması src/core/observability.ts, src/core/observability-rotation.ts, tests/core/observability.test.ts ve tests/core/observability-rotation.test.ts dışında tracked mutation gösterir; read-only config ve host observer dahil diğer dosyalar değişmemelidir.\""
+              ]
+            },
+            {
+              "id": "criterion-no-go-6931a688d639bc501409966c69d55cb891d46f7b1380fb2ce99aeeff00db6000",
+              "polarity": "no-go",
+              "statement": "Task yasaklanmış operasyon gerçekleştirir.",
+              "evidenceRequirements": [
+                "assertion:\"Exact attempt action trace build, commit, push, auth mutation, runtime kill/cleanup, retained evidence değişikliği veya başka task mutation gösterir.\""
+              ]
+            },
+            {
+              "id": "criterion-no-go-13d57a1cbabace6b6d79cd34e3589f102105f21c51bea95729a0032e71775fb2",
+              "polarity": "no-go",
+              "statement": "Execution routing effective project policy dışında zorlanır.",
+              "evidenceRequirements": [
+                "assertion:\"Host admission kaydı provider/model/effort, skill/persona, concurrency veya finite budget seçiminin effective config, registry ve live capacity yerine plan tarafından zorlandığını gösterir.\""
+              ]
+            },
+            {
+              "id": "criterion-no-go-62f2c786cb91b5fd2b27d29e2dc0ee029c1746ccde3033bfac5ddb0a63adc1ad",
+              "polarity": "no-go",
+              "statement": "Eksik host/provider/settlement authority veya evidence COMPLETE olarak sunulur.",
+              "evidenceRequirements": [
+                "assertion:\"Exact task result gerekli host observation, genuine provider evidence veya durable terminal settlement eksikken DONE/COMPLETE iddia eder; bu durumda typed HOLD zorunludur ve assertion-only kriterler configured confirmation adapter kanıtı olmadan başarılı sayılamaz.\""
+              ]
+            }
+          ]
+        },
+        "status": "PENDING",
+        "type": "code-development",
+        "sprintId": "sprint-751",
+        "forceEffort": "high",
+        "assignedAgent": "implementer",
+        "assignedSkills": [
+          "rpc-protocol",
+          "react-specialist",
+          "ci-testing",
+          "typescript-expert"
+        ],
+        "createdAt": "2026-09-12T18:43:15.002Z",
+        "routingMeta": {
+          "routingVersion": "v3",
+          "workType": "build",
+          "confidence": 0.6259142543209877,
+          "provenance": "deterministic",
+          "personaSlices": [
+            "implementation",
+            "default"
+          ],
+          "storySummary": "implementer wins build work on the content axis (score 0.87, confidence 0.63).",
+          "skillEvidenceDigest": "sha256:d1ebbfa1dad4accae017b07cb5044072a9573353431ad688847c34f900f1161e",
+          "skillCatalogDigest": "sha256:cf2e55abd4b9d1b60ef7acaeb692eb7ac28c29a44dd3bbc91d5cf64dc337bf3c",
+          "skillDecisionDigest": "sha256:4918b2a57df797027556b5e3e0bc3f6ca8b01af0456ac23abe9da941eb6d8f2f",
+          "dominantDomain": "core/runtime"
+        },
+        "productionWiring": {
+          "version": 2,
+          "contractDigest": "70ab2aba53128268eea1b4eddc98aa3880127fc0a7c1e9b8fc2997e86580421c",
+          "hostProofProgramDigest": "1777b24238843474fd12fb4c3d3366acc4d58a23ef3c4583aa75fa55bdb2abab",
+          "contract": {
+            "version": 2,
+            "changeKind": "runtime-change",
+            "producer": {
+              "producerId": "deckent.observability.metrics-append"
+            },
+            "canonicalConsumer": {
+              "consumerId": "deckent.observability-rotation.size-triggered-rotation",
+              "relationship": "invokes-producer"
+            },
+            "affectedIngresses": [
+              {
+                "ingressId": "deckent.observability.record-metric",
+                "kind": "ingress"
+              }
+            ],
+            "enablementAuthority": {
+              "authorityId": "deckent.config.observability-rotation-policy",
+              "mechanism": "configuration"
+            },
+            "disposition": {
+              "kind": "production-wiring"
+            },
+            "proofTargets": [
+              {
+                "proofTargetId": "deckent.observability-rotation.size-triggered-rotation",
+                "kind": "consumer-execution"
+              },
+              {
+                "proofTargetId": "deckent.observability-rotation.retention-prune-receipt",
+                "kind": "consumer-execution"
+              },
+              {
+                "proofTargetId": "deckent.config.observability-rotation-policy-resolution",
+                "kind": "enablement-resolution"
+              }
+            ],
+            "hostProofProgram": {
+              "version": 1,
+              "kind": "production-wiring-host-proof-program-v1",
+              "executionClass": "read-only-idempotent",
+              "effect": "read-only",
+              "replayPolicy": "reuse-terminal-receipt",
+              "shell": "forbidden",
+              "ambientEnvironment": "forbidden",
+              "network": "forbidden",
+              "verifierAssets": [
+                {
+                  "path": "scripts/production-wiring-host-proof-harness.mjs",
+                  "sha256": "sha256:26d56698a276bd20d02d4511f235f63b587bd9f12bdeb8858f291b9fab2defd0",
+                  "role": "trusted-harness"
+                },
+                {
+                  "path": "scripts/metrics-retention-host-proof-observer.mjs",
+                  "sha256": "sha256:45a34b2ac13215e3d1aa84c9017c69289a1d4751411b45c94179355081b2ae52",
+                  "role": "trusted-harness"
+                }
+              ],
+              "platforms": [
+                {
+                  "platform": "linux",
+                  "state": "supported",
+                  "runnerAdapterId": "docker-readonly-host-proof-v1",
+                  "probes": [
+                    {
+                      "target": {
+                        "kind": "affected-ingress",
+                        "targetId": "deckent.observability.record-metric"
+                      },
+                      "observationGroupId": "deckent:metrics-retention",
+                      "harnessPath": "scripts/production-wiring-host-proof-harness.mjs",
+                      "verifierAssetPaths": [
+                        "scripts/production-wiring-host-proof-harness.mjs",
+                        "scripts/metrics-retention-host-proof-observer.mjs"
+                      ],
+                      "args": [
+                        "{\"adapterId\":\"deckent-metrics-retention-v1\",\"assets\":[{\"path\":\"scripts/production-wiring-host-proof-harness.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:26d56698a276bd20d02d4511f235f63b587bd9f12bdeb8858f291b9fab2defd0\"},{\"path\":\"scripts/metrics-retention-host-proof-observer.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:45a34b2ac13215e3d1aa84c9017c69289a1d4751411b45c94179355081b2ae52\"}],\"kind\":\"deckent-production-wiring-host-proof-request-v1\",\"outputLimitBytes\":65536,\"timeoutMs\":60000,\"version\":1}"
+                      ],
+                      "cwd": ".",
+                      "timeoutMs": 60000,
+                      "outputLimitBytes": 65536,
+                      "expectation": {
+                        "kind": "adapter-structured-outcome",
+                        "schemaId": "deckent.host-proof.metrics-retention.v1",
+                        "outcome": "observed"
+                      },
+                      "probeId": "production-wiring-probe:a26faefdee367405b7dfe4b828497d55b05092c32818ffabdb0f516f90e149db"
+                    },
+                    {
+                      "target": {
+                        "kind": "canonical-consumer",
+                        "targetId": "deckent.observability-rotation.size-triggered-rotation"
+                      },
+                      "observationGroupId": "deckent:metrics-retention",
+                      "harnessPath": "scripts/production-wiring-host-proof-harness.mjs",
+                      "verifierAssetPaths": [
+                        "scripts/production-wiring-host-proof-harness.mjs",
+                        "scripts/metrics-retention-host-proof-observer.mjs"
+                      ],
+                      "args": [
+                        "{\"adapterId\":\"deckent-metrics-retention-v1\",\"assets\":[{\"path\":\"scripts/production-wiring-host-proof-harness.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:26d56698a276bd20d02d4511f235f63b587bd9f12bdeb8858f291b9fab2defd0\"},{\"path\":\"scripts/metrics-retention-host-proof-observer.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:45a34b2ac13215e3d1aa84c9017c69289a1d4751411b45c94179355081b2ae52\"}],\"kind\":\"deckent-production-wiring-host-proof-request-v1\",\"outputLimitBytes\":65536,\"timeoutMs\":60000,\"version\":1}"
+                      ],
+                      "cwd": ".",
+                      "timeoutMs": 60000,
+                      "outputLimitBytes": 65536,
+                      "expectation": {
+                        "kind": "adapter-structured-outcome",
+                        "schemaId": "deckent.host-proof.metrics-retention.v1",
+                        "outcome": "observed"
+                      },
+                      "probeId": "production-wiring-probe:81b5007a949d3770b19a2ce56dcf808355577a41ed971376cf57e4d39d6fcb4a"
+                    },
+                    {
+                      "target": {
+                        "kind": "enablement-authority",
+                        "targetId": "deckent.config.observability-rotation-policy"
+                      },
+                      "observationGroupId": "deckent:metrics-retention",
+                      "harnessPath": "scripts/production-wiring-host-proof-harness.mjs",
+                      "verifierAssetPaths": [
+                        "scripts/production-wiring-host-proof-harness.mjs",
+                        "scripts/metrics-retention-host-proof-observer.mjs"
+                      ],
+                      "args": [
+                        "{\"adapterId\":\"deckent-metrics-retention-v1\",\"assets\":[{\"path\":\"scripts/production-wiring-host-proof-harness.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:26d56698a276bd20d02d4511f235f63b587bd9f12bdeb8858f291b9fab2defd0\"},{\"path\":\"scripts/metrics-retention-host-proof-observer.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:45a34b2ac13215e3d1aa84c9017c69289a1d4751411b45c94179355081b2ae52\"}],\"kind\":\"deckent-production-wiring-host-proof-request-v1\",\"outputLimitBytes\":65536,\"timeoutMs\":60000,\"version\":1}"
+                      ],
+                      "cwd": ".",
+                      "timeoutMs": 60000,
+                      "outputLimitBytes": 65536,
+                      "expectation": {
+                        "kind": "adapter-structured-outcome",
+                        "schemaId": "deckent.host-proof.metrics-retention.v1",
+                        "outcome": "observed"
+                      },
+                      "probeId": "production-wiring-probe:051c1fa63ecdb90f4b47ec2e7e9921ef9717babfa228485eed850634d19bf34a"
+                    },
+                    {
+                      "target": {
+                        "kind": "producer",
+                        "targetId": "deckent.observability.metrics-append"
+                      },
+                      "observationGroupId": "deckent:metrics-retention",
+                      "harnessPath": "scripts/production-wiring-host-proof-harness.mjs",
+                      "verifierAssetPaths": [
+                        "scripts/production-wiring-host-proof-harness.mjs",
+                        "scripts/metrics-retention-host-proof-observer.mjs"
+                      ],
+                      "args": [
+                        "{\"adapterId\":\"deckent-metrics-retention-v1\",\"assets\":[{\"path\":\"scripts/production-wiring-host-proof-harness.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:26d56698a276bd20d02d4511f235f63b587bd9f12bdeb8858f291b9fab2defd0\"},{\"path\":\"scripts/metrics-retention-host-proof-observer.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:45a34b2ac13215e3d1aa84c9017c69289a1d4751411b45c94179355081b2ae52\"}],\"kind\":\"deckent-production-wiring-host-proof-request-v1\",\"outputLimitBytes\":65536,\"timeoutMs\":60000,\"version\":1}"
+                      ],
+                      "cwd": ".",
+                      "timeoutMs": 60000,
+                      "outputLimitBytes": 65536,
+                      "expectation": {
+                        "kind": "adapter-structured-outcome",
+                        "schemaId": "deckent.host-proof.metrics-retention.v1",
+                        "outcome": "observed"
+                      },
+                      "probeId": "production-wiring-probe:a41716a68798770ad754387b62ea1a847171a9ba8c4792485c75b80ad4822c8d"
+                    },
+                    {
+                      "target": {
+                        "kind": "proof-target",
+                        "targetId": "deckent.config.observability-rotation-policy-resolution"
+                      },
+                      "observationGroupId": "deckent:metrics-retention",
+                      "harnessPath": "scripts/production-wiring-host-proof-harness.mjs",
+                      "verifierAssetPaths": [
+                        "scripts/production-wiring-host-proof-harness.mjs",
+                        "scripts/metrics-retention-host-proof-observer.mjs"
+                      ],
+                      "args": [
+                        "{\"adapterId\":\"deckent-metrics-retention-v1\",\"assets\":[{\"path\":\"scripts/production-wiring-host-proof-harness.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:26d56698a276bd20d02d4511f235f63b587bd9f12bdeb8858f291b9fab2defd0\"},{\"path\":\"scripts/metrics-retention-host-proof-observer.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:45a34b2ac13215e3d1aa84c9017c69289a1d4751411b45c94179355081b2ae52\"}],\"kind\":\"deckent-production-wiring-host-proof-request-v1\",\"outputLimitBytes\":65536,\"timeoutMs\":60000,\"version\":1}"
+                      ],
+                      "cwd": ".",
+                      "timeoutMs": 60000,
+                      "outputLimitBytes": 65536,
+                      "expectation": {
+                        "kind": "adapter-structured-outcome",
+                        "schemaId": "deckent.host-proof.metrics-retention.v1",
+                        "outcome": "observed"
+                      },
+                      "probeId": "production-wiring-probe:69ec57910542fc1ec9d82ac5af6b306a0977d26c9868d2c06ea28712a30d7b01"
+                    },
+                    {
+                      "target": {
+                        "kind": "proof-target",
+                        "targetId": "deckent.observability-rotation.retention-prune-receipt"
+                      },
+                      "observationGroupId": "deckent:metrics-retention",
+                      "harnessPath": "scripts/production-wiring-host-proof-harness.mjs",
+                      "verifierAssetPaths": [
+                        "scripts/production-wiring-host-proof-harness.mjs",
+                        "scripts/metrics-retention-host-proof-observer.mjs"
+                      ],
+                      "args": [
+                        "{\"adapterId\":\"deckent-metrics-retention-v1\",\"assets\":[{\"path\":\"scripts/production-wiring-host-proof-harness.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:26d56698a276bd20d02d4511f235f63b587bd9f12bdeb8858f291b9fab2defd0\"},{\"path\":\"scripts/metrics-retention-host-proof-observer.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:45a34b2ac13215e3d1aa84c9017c69289a1d4751411b45c94179355081b2ae52\"}],\"kind\":\"deckent-production-wiring-host-proof-request-v1\",\"outputLimitBytes\":65536,\"timeoutMs\":60000,\"version\":1}"
+                      ],
+                      "cwd": ".",
+                      "timeoutMs": 60000,
+                      "outputLimitBytes": 65536,
+                      "expectation": {
+                        "kind": "adapter-structured-outcome",
+                        "schemaId": "deckent.host-proof.metrics-retention.v1",
+                        "outcome": "observed"
+                      },
+                      "probeId": "production-wiring-probe:b933d61fe1245c57145659c92cd4c0bca57c6a0de2c2b5d26fec7ace4d432442"
+                    },
+                    {
+                      "target": {
+                        "kind": "proof-target",
+                        "targetId": "deckent.observability-rotation.size-triggered-rotation"
+                      },
+                      "observationGroupId": "deckent:metrics-retention",
+                      "harnessPath": "scripts/production-wiring-host-proof-harness.mjs",
+                      "verifierAssetPaths": [
+                        "scripts/production-wiring-host-proof-harness.mjs",
+                        "scripts/metrics-retention-host-proof-observer.mjs"
+                      ],
+                      "args": [
+                        "{\"adapterId\":\"deckent-metrics-retention-v1\",\"assets\":[{\"path\":\"scripts/production-wiring-host-proof-harness.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:26d56698a276bd20d02d4511f235f63b587bd9f12bdeb8858f291b9fab2defd0\"},{\"path\":\"scripts/metrics-retention-host-proof-observer.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:45a34b2ac13215e3d1aa84c9017c69289a1d4751411b45c94179355081b2ae52\"}],\"kind\":\"deckent-production-wiring-host-proof-request-v1\",\"outputLimitBytes\":65536,\"timeoutMs\":60000,\"version\":1}"
+                      ],
+                      "cwd": ".",
+                      "timeoutMs": 60000,
+                      "outputLimitBytes": 65536,
+                      "expectation": {
+                        "kind": "adapter-structured-outcome",
+                        "schemaId": "deckent.host-proof.metrics-retention.v1",
+                        "outcome": "observed"
+                      },
+                      "probeId": "production-wiring-probe:b874cc93d17c4844366bfb801a0ba9b7217ee22284754e558391cabab90b6f58"
+                    }
+                  ]
+                },
+                {
+                  "platform": "wsl2-linux",
+                  "state": "supported",
+                  "runnerAdapterId": "docker-readonly-host-proof-v1",
+                  "probes": [
+                    {
+                      "target": {
+                        "kind": "affected-ingress",
+                        "targetId": "deckent.observability.record-metric"
+                      },
+                      "observationGroupId": "deckent:metrics-retention",
+                      "harnessPath": "scripts/production-wiring-host-proof-harness.mjs",
+                      "verifierAssetPaths": [
+                        "scripts/production-wiring-host-proof-harness.mjs",
+                        "scripts/metrics-retention-host-proof-observer.mjs"
+                      ],
+                      "args": [
+                        "{\"adapterId\":\"deckent-metrics-retention-v1\",\"assets\":[{\"path\":\"scripts/production-wiring-host-proof-harness.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:26d56698a276bd20d02d4511f235f63b587bd9f12bdeb8858f291b9fab2defd0\"},{\"path\":\"scripts/metrics-retention-host-proof-observer.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:45a34b2ac13215e3d1aa84c9017c69289a1d4751411b45c94179355081b2ae52\"}],\"kind\":\"deckent-production-wiring-host-proof-request-v1\",\"outputLimitBytes\":65536,\"timeoutMs\":60000,\"version\":1}"
+                      ],
+                      "cwd": ".",
+                      "timeoutMs": 60000,
+                      "outputLimitBytes": 65536,
+                      "expectation": {
+                        "kind": "adapter-structured-outcome",
+                        "schemaId": "deckent.host-proof.metrics-retention.v1",
+                        "outcome": "observed"
+                      },
+                      "probeId": "production-wiring-probe:38dc19c8ec6c9bbf0af260b54f44f35befa43bd9c0c365d94fc633290bf276c1"
+                    },
+                    {
+                      "target": {
+                        "kind": "canonical-consumer",
+                        "targetId": "deckent.observability-rotation.size-triggered-rotation"
+                      },
+                      "observationGroupId": "deckent:metrics-retention",
+                      "harnessPath": "scripts/production-wiring-host-proof-harness.mjs",
+                      "verifierAssetPaths": [
+                        "scripts/production-wiring-host-proof-harness.mjs",
+                        "scripts/metrics-retention-host-proof-observer.mjs"
+                      ],
+                      "args": [
+                        "{\"adapterId\":\"deckent-metrics-retention-v1\",\"assets\":[{\"path\":\"scripts/production-wiring-host-proof-harness.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:26d56698a276bd20d02d4511f235f63b587bd9f12bdeb8858f291b9fab2defd0\"},{\"path\":\"scripts/metrics-retention-host-proof-observer.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:45a34b2ac13215e3d1aa84c9017c69289a1d4751411b45c94179355081b2ae52\"}],\"kind\":\"deckent-production-wiring-host-proof-request-v1\",\"outputLimitBytes\":65536,\"timeoutMs\":60000,\"version\":1}"
+                      ],
+                      "cwd": ".",
+                      "timeoutMs": 60000,
+                      "outputLimitBytes": 65536,
+                      "expectation": {
+                        "kind": "adapter-structured-outcome",
+                        "schemaId": "deckent.host-proof.metrics-retention.v1",
+                        "outcome": "observed"
+                      },
+                      "probeId": "production-wiring-probe:dfe7319512e6c5bc20c923ec2ed2aba827ebe5c8e0d5f2adafe49c07de0d1dee"
+                    },
+                    {
+                      "target": {
+                        "kind": "enablement-authority",
+                        "targetId": "deckent.config.observability-rotation-policy"
+                      },
+                      "observationGroupId": "deckent:metrics-retention",
+                      "harnessPath": "scripts/production-wiring-host-proof-harness.mjs",
+                      "verifierAssetPaths": [
+                        "scripts/production-wiring-host-proof-harness.mjs",
+                        "scripts/metrics-retention-host-proof-observer.mjs"
+                      ],
+                      "args": [
+                        "{\"adapterId\":\"deckent-metrics-retention-v1\",\"assets\":[{\"path\":\"scripts/production-wiring-host-proof-harness.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:26d56698a276bd20d02d4511f235f63b587bd9f12bdeb8858f291b9fab2defd0\"},{\"path\":\"scripts/metrics-retention-host-proof-observer.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:45a34b2ac13215e3d1aa84c9017c69289a1d4751411b45c94179355081b2ae52\"}],\"kind\":\"deckent-production-wiring-host-proof-request-v1\",\"outputLimitBytes\":65536,\"timeoutMs\":60000,\"version\":1}"
+                      ],
+                      "cwd": ".",
+                      "timeoutMs": 60000,
+                      "outputLimitBytes": 65536,
+                      "expectation": {
+                        "kind": "adapter-structured-outcome",
+                        "schemaId": "deckent.host-proof.metrics-retention.v1",
+                        "outcome": "observed"
+                      },
+                      "probeId": "production-wiring-probe:dcd93b35422a15f11b0f575b431a262e6c0ae522e9fb84b71e4551c5101492f8"
+                    },
+                    {
+                      "target": {
+                        "kind": "producer",
+                        "targetId": "deckent.observability.metrics-append"
+                      },
+                      "observationGroupId": "deckent:metrics-retention",
+                      "harnessPath": "scripts/production-wiring-host-proof-harness.mjs",
+                      "verifierAssetPaths": [
+                        "scripts/production-wiring-host-proof-harness.mjs",
+                        "scripts/metrics-retention-host-proof-observer.mjs"
+                      ],
+                      "args": [
+                        "{\"adapterId\":\"deckent-metrics-retention-v1\",\"assets\":[{\"path\":\"scripts/production-wiring-host-proof-harness.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:26d56698a276bd20d02d4511f235f63b587bd9f12bdeb8858f291b9fab2defd0\"},{\"path\":\"scripts/metrics-retention-host-proof-observer.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:45a34b2ac13215e3d1aa84c9017c69289a1d4751411b45c94179355081b2ae52\"}],\"kind\":\"deckent-production-wiring-host-proof-request-v1\",\"outputLimitBytes\":65536,\"timeoutMs\":60000,\"version\":1}"
+                      ],
+                      "cwd": ".",
+                      "timeoutMs": 60000,
+                      "outputLimitBytes": 65536,
+                      "expectation": {
+                        "kind": "adapter-structured-outcome",
+                        "schemaId": "deckent.host-proof.metrics-retention.v1",
+                        "outcome": "observed"
+                      },
+                      "probeId": "production-wiring-probe:9853c0c6b803e99f6db8d2aa2b7a68ce457e872b7552b12a905c6379708f2125"
+                    },
+                    {
+                      "target": {
+                        "kind": "proof-target",
+                        "targetId": "deckent.config.observability-rotation-policy-resolution"
+                      },
+                      "observationGroupId": "deckent:metrics-retention",
+                      "harnessPath": "scripts/production-wiring-host-proof-harness.mjs",
+                      "verifierAssetPaths": [
+                        "scripts/production-wiring-host-proof-harness.mjs",
+                        "scripts/metrics-retention-host-proof-observer.mjs"
+                      ],
+                      "args": [
+                        "{\"adapterId\":\"deckent-metrics-retention-v1\",\"assets\":[{\"path\":\"scripts/production-wiring-host-proof-harness.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:26d56698a276bd20d02d4511f235f63b587bd9f12bdeb8858f291b9fab2defd0\"},{\"path\":\"scripts/metrics-retention-host-proof-observer.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:45a34b2ac13215e3d1aa84c9017c69289a1d4751411b45c94179355081b2ae52\"}],\"kind\":\"deckent-production-wiring-host-proof-request-v1\",\"outputLimitBytes\":65536,\"timeoutMs\":60000,\"version\":1}"
+                      ],
+                      "cwd": ".",
+                      "timeoutMs": 60000,
+                      "outputLimitBytes": 65536,
+                      "expectation": {
+                        "kind": "adapter-structured-outcome",
+                        "schemaId": "deckent.host-proof.metrics-retention.v1",
+                        "outcome": "observed"
+                      },
+                      "probeId": "production-wiring-probe:7d0ae96e84f34af9268776103920aaceebd89689c9b9717885434077ae6064a3"
+                    },
+                    {
+                      "target": {
+                        "kind": "proof-target",
+                        "targetId": "deckent.observability-rotation.retention-prune-receipt"
+                      },
+                      "observationGroupId": "deckent:metrics-retention",
+                      "harnessPath": "scripts/production-wiring-host-proof-harness.mjs",
+                      "verifierAssetPaths": [
+                        "scripts/production-wiring-host-proof-harness.mjs",
+                        "scripts/metrics-retention-host-proof-observer.mjs"
+                      ],
+                      "args": [
+                        "{\"adapterId\":\"deckent-metrics-retention-v1\",\"assets\":[{\"path\":\"scripts/production-wiring-host-proof-harness.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:26d56698a276bd20d02d4511f235f63b587bd9f12bdeb8858f291b9fab2defd0\"},{\"path\":\"scripts/metrics-retention-host-proof-observer.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:45a34b2ac13215e3d1aa84c9017c69289a1d4751411b45c94179355081b2ae52\"}],\"kind\":\"deckent-production-wiring-host-proof-request-v1\",\"outputLimitBytes\":65536,\"timeoutMs\":60000,\"version\":1}"
+                      ],
+                      "cwd": ".",
+                      "timeoutMs": 60000,
+                      "outputLimitBytes": 65536,
+                      "expectation": {
+                        "kind": "adapter-structured-outcome",
+                        "schemaId": "deckent.host-proof.metrics-retention.v1",
+                        "outcome": "observed"
+                      },
+                      "probeId": "production-wiring-probe:0ff1c2d97365765526d66e853c00f976acc31a54ed8c23c01626613ea8662fd0"
+                    },
+                    {
+                      "target": {
+                        "kind": "proof-target",
+                        "targetId": "deckent.observability-rotation.size-triggered-rotation"
+                      },
+                      "observationGroupId": "deckent:metrics-retention",
+                      "harnessPath": "scripts/production-wiring-host-proof-harness.mjs",
+                      "verifierAssetPaths": [
+                        "scripts/production-wiring-host-proof-harness.mjs",
+                        "scripts/metrics-retention-host-proof-observer.mjs"
+                      ],
+                      "args": [
+                        "{\"adapterId\":\"deckent-metrics-retention-v1\",\"assets\":[{\"path\":\"scripts/production-wiring-host-proof-harness.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:26d56698a276bd20d02d4511f235f63b587bd9f12bdeb8858f291b9fab2defd0\"},{\"path\":\"scripts/metrics-retention-host-proof-observer.mjs\",\"role\":\"trusted-harness\",\"sha256\":\"sha256:45a34b2ac13215e3d1aa84c9017c69289a1d4751411b45c94179355081b2ae52\"}],\"kind\":\"deckent-production-wiring-host-proof-request-v1\",\"outputLimitBytes\":65536,\"timeoutMs\":60000,\"version\":1}"
+                      ],
+                      "cwd": ".",
+                      "timeoutMs": 60000,
+                      "outputLimitBytes": 65536,
+                      "expectation": {
+                        "kind": "adapter-structured-outcome",
+                        "schemaId": "deckent.host-proof.metrics-retention.v1",
+                        "outcome": "observed"
+                      },
+                      "probeId": "production-wiring-probe:53eccd1e6864c1e7652b8f01b1aaf36ae66cfc450ac1943d3f8f1dd102fe5b1b"
+                    }
+                  ]
+                },
+                {
+                  "platform": "darwin",
+                  "state": "unsupported",
+                  "reasonCode": "capability-unavailable"
+                },
+                {
+                  "platform": "win32",
+                  "state": "unsupported",
+                  "reasonCode": "capability-unavailable"
+                }
+              ],
+              "programDigest": "1777b24238843474fd12fb4c3d3366acc4d58a23ef3c4583aa75fa55bdb2abab"
+            }
+          }
+        },
+        "productionWiringApplicability": {
+          "state": "required",
+          "reasonCode": "production-write-scope"
+        },
+        "budget": {
+          "maxTokens": 4000000,
+          "maxTurns": 40,
+          "maxCacheReadTokens": 4000000,
+          "maxOutputTokens": 540000
+        },
+        "budgetPolicy": {
+          "state": "allow",
+          "role": "worker",
+          "taskKind": "code-development",
+          "resolvedProvider": "codex",
+          "executionCostClass": "remote",
+          "profileRef": "execution_budget.roles.worker.default",
+          "admissionMode": "unattended",
+          "policyDigest": "572601842a00eed23a5b4adf915bdd48cfd7260fd9581498b1ae2cb7ece73285",
+          "landingPolicy": {
+            "reserve_ratio": 0.35,
+            "attended_unsupported": "hold"
+          },
+          "finalOnlyUsage": {
+            "maxWallClockSeconds": 7200,
+            "profileRef": "execution_budget.final_only_usage",
+            "policyDigest": "572601842a00eed23a5b4adf915bdd48cfd7260fd9581498b1ae2cb7ece73285"
+          },
+          "requestedBudget": {
+            "maxOutputTokens": 540000
+          }
+        },
+        "promptCostCanary": {
+          "version": 1,
+          "logicalLineageId": "prompt-cost-lineage:sha256:c4e8167ff6fe03ce3b6ec529d3c52e2e965250e599b1c78f50aefdcaf304f27b",
+          "workloadDigest": "c4e8167ff6fe03ce3b6ec529d3c52e2e965250e599b1c78f50aefdcaf304f27b",
+          "featureDigest": "7a22d1c0632ac8ae2105010327a9ff819ba1adf129127f309e3a9b60c5b702af",
+          "featureSnapshot": {
+            "excludeDynamicSystemPromptSections": true,
+            "workerCoreSystemPrompt": true,
+            "codexCoreChannel": true,
+            "codexSuppressProjectDoc": true,
+            "catalogMountMask": false
+          },
+          "authorityDigest": "09b180501771467d162569f38e5aaa9e9ec18bc2dad96a85a19261a0cbfcd6ae"
+        }
+      }
+    ],
+    "workers": [
+      "w-751-001"
+    ],
+    "planningMode": "structured",
+    "plannerProof": {
+      "version": 1,
+      "requestedMode": "structured",
+      "actualMode": "structured",
+      "resolutionReason": "requested-structured",
+      "directiveOverrideKinds": [],
+      "call": {
+        "attempted": false,
+        "succeeded": false,
+        "requestedProvider": "codex",
+        "resolvedProvider": null,
+        "requestedModel": "gpt-6-astra",
+        "resolvedModel": null,
+        "failureReason": null,
+        "receiptRef": null
+      }
+    },
+    "promptGate": {
+      "ok": true,
+      "findings": [],
+      "blockers": []
+    },
+    "debtInjectionHolds": []
+  },
+  "planDigest": "39eb2a92cd218fe9ed57779219ea30ca0461c307e2839dfbbd2dc69118c346be",
+  "planDigestVersion": 5,
+  "planDigestContext": {
+    "configuredProvider": "codex",
+    "configuredModel": "gpt-5.6-sol",
+    "configuredBackend": "docker",
+    "configuredAuthMode": "subscription",
+    "fallbackProvider": null,
+    "fallbackPolicy": null,
+    "executionBudgetPolicy": {
+      "roles": {
+        "worker": {
+          "default": {
+            "maxTurns": 40,
+            "maxTokens": 4000000,
+            "maxCacheReadTokens": 4000000
+          },
+          "by_task_kind": {
+            "documentation": {
+              "maxTokens": 4000000,
+              "maxCacheReadTokens": 4000000,
+              "maxTurns": 40
+            }
+          }
+        },
+        "brain": {
+          "default": {
+            "maxCacheReadTokens": 1000000,
+            "maxTurns": 8
+          }
+        },
+        "auditor": {
+          "default": {
+            "maxCacheReadTokens": 10000000,
+            "maxTurns": 64
+          }
+        }
+      },
+      "landing": {
+        "reserve_ratio": 0.35
+      },
+      "native_agent": {
+        "maxInterimRequestsPerTurn": 3,
+        "maxToolCallsPerTurn": 40,
+        "maxConsecutiveFailuresPerTarget": 3,
+        "maxModelRounds": 120,
+        "maxToolCalls": 400,
+        "maxWallTimeMs": 2700000,
+        "maxCumulativeTokens": 2000000,
+        "maxNoProgressRounds": 8,
+        "checkpointEveryRounds": 20,
+        "checkpointEveryToolCalls": 60,
+        "outputReserveTokens": 4096,
+        "contextSafetyReserveTokens": 2048
+      },
+      "unmetered_backend": {
+        "action": "reroute-or-hold",
+        "ordered_backends": [
+          "docker",
+          "subprocess"
+        ]
+      },
+      "final_only_usage": {
+        "action": "allow-wall-clock-containment",
+        "roles": [
+          "worker"
+        ],
+        "max_wall_clock_seconds": 7200
+      },
+      "purposes": {
+        "reachability-probe": {
+          "maxInputTokens": 32768,
+          "maxOutputTokens": 512,
+          "maxTokens": 33280,
+          "timeoutMs": 60000,
+          "maxUsd": 0.2
+        },
+        "xverify-adjudication": {
+          "maxTokens": 2000000,
+          "maxWallClockSeconds": 3600,
+          "maxVerificationsPerSprint": 8
+        }
+      }
+    },
+    "configuredMaxWorkers": 2,
+    "writeScopePolicy": {
+      "mode": "closed-allowlist",
+      "filesWrite": [
+        "src/core/observability-rotation.ts",
+        "src/core/observability.ts",
+        "tests/core/observability-rotation.test.ts",
+        "tests/core/observability.test.ts"
+      ]
+    },
+    "planningEvidence": {
+      "kind": "accepted-planner-invocation",
+      "binding": {
+        "schemaVersion": 1,
+        "flowId": "963bbc69-bfff-4b5f-b5ac-6ba130853feb",
+        "revision": 1,
+        "receiptRef": {
+          "schemaVersion": 1,
+          "invocationId": "inv-e98f0434da2b5569206ef9dc68274cb2",
+          "tenantId": "local",
+          "projectId": "1553f97b-2503-4a15-90b8-88004e1320dc"
+        },
+        "receiptSha256": "18f02739197a404656fade1ca3ba08a7e4872747854f595deef3b013c343fe1b",
+        "terminalEventHash": "b8bbba71c4b4df9f9d5930c70b06d09c59062ccd41b6c517cc04c611c4e5f299",
+        "plannerResultSha256": "0dc71020d5846c7c80ef3a9a46c94a62e6b280895c3b4887bde36fa22f9c9b78",
+        "directivesSha256": "22e09164bbad0d6bffed20e5ca59bb6261e0747f1b3a8b9ec16e9d01d2f3cca7"
+      }
+    },
+    "sourceAuthoritySha256": "779de7762b88050752fecb205dfc252f96c9f4e88ae1a81606f293571aa01730"
+  },
+  "proposal": {
+    "flowId": "963bbc69-bfff-4b5f-b5ac-6ba130853feb",
+    "tenant": "local",
+    "project": "deckent-dev",
+    "actor": {
+      "id": "alperen@DESKTOP-7NLBLGA",
+      "identityClass": "local",
+      "assurance": "os-user",
+      "provenance": "cli"
+    },
+    "origin": "cli",
+    "revision": 1,
+    "intentSummary": "Continue the owner-admitted MASTER120 STATE-RETENTION-001 retention-writer repair as ONE bounded task in the existing project. Inspect current code first: earlier workers may have partially implemented this. Repair transient rotation failure recovery in the same session, amortize rotation threshold checks using effective policy, preserve every metric byte and public API, and respect tenant retention/legal holds. No permanent failure latch, per-append filesystem/config reads, recursive telemetry storm, arbitrary new limits, bypassed assertions or a second rotation engine. Only the four explicit write-allowlist files may change. Read DIRECTIVES.md for the accepted task contract; src/core/config.ts, src/core/config-types.ts and scripts/metrics-retention-host-proof-observer.mjs are read-only dependencies. Run VITEST_MAX_FORKS=2 npx vitest run --configLoader runner --no-cache tests/core/observability.test.ts tests/core/observability-rotation.test.ts. Diagnose the existing transient-failure assertion rather than weakening it. Provider, model, effort, skill/persona and concurrency resolve from effective project policy. Do not build, commit, push, mutate auth, kill or clean runtime or modify another task. Produce an exact task result with host-bound production wiring evidence; missing host/provider/settlement evidence means HOLD, never invented DONE. If the prior run already completed the repair, verify its actual effects and return evidence instead of rewriting correct code. This is a real supervised dogfood trial, not a dry-run. The permitted registered productionWiringProposal identity for this exact topology is: {\"version\":1,\"changeKind\":\"runtime-change\",\"producer\":{\"producerId\":\"deckent.observability.metrics-append\"},\"canonicalConsumer\":{\"consumerId\":\"deckent.observability-rotation.size-triggered-rotation\",\"relationship\":\"invokes-producer\"},\"affectedIngresses\":[{\"ingressId\":\"deckent.observability.record-metric\",\"kind\":\"ingress\"}],\"enablementAuthority\":{\"authorityId\":\"deckent.config.observability-rotation-policy\",\"mechanism\":\"configuration\"},\"disposition\":{\"kind\":\"production-wiring\"},\"proofTargets\":[{\"proofTargetId\":\"deckent.observability-rotation.size-triggered-rotation\",\"kind\":\"consumer-execution\"},{\"proofTargetId\":\"deckent.observability-rotation.retention-prune-receipt\",\"kind\":\"consumer-execution\"},{\"proofTargetId\":\"deckent.config.observability-rotation-policy-resolution\",\"kind\":\"enablement-resolution\"}]}"
+  },
+  "preview": {
+    "flowId": "963bbc69-bfff-4b5f-b5ac-6ba130853feb",
+    "revision": 1,
+    "planDigest": "39eb2a92cd218fe9ed57779219ea30ca0461c307e2839dfbbd2dc69118c346be",
+    "planDigestVersion": 5,
+    "planDigestContext": {
+      "configuredProvider": "codex",
+      "configuredModel": "gpt-5.6-sol",
+      "configuredBackend": "docker",
+      "configuredAuthMode": "subscription",
+      "fallbackProvider": null,
+      "fallbackPolicy": null,
+      "executionBudgetPolicy": {
+        "roles": {
+          "worker": {
+            "default": {
+              "maxTurns": 40,
+              "maxTokens": 4000000,
+              "maxCacheReadTokens": 4000000
+            },
+            "by_task_kind": {
+              "documentation": {
+                "maxTokens": 4000000,
+                "maxCacheReadTokens": 4000000,
+                "maxTurns": 40
+              }
+            }
+          },
+          "brain": {
+            "default": {
+              "maxCacheReadTokens": 1000000,
+              "maxTurns": 8
+            }
+          },
+          "auditor": {
+            "default": {
+              "maxCacheReadTokens": 10000000,
+              "maxTurns": 64
+            }
+          }
+        },
+        "landing": {
+          "reserve_ratio": 0.35
+        },
+        "native_agent": {
+          "maxInterimRequestsPerTurn": 3,
+          "maxToolCallsPerTurn": 40,
+          "maxConsecutiveFailuresPerTarget": 3,
+          "maxModelRounds": 120,
+          "maxToolCalls": 400,
+          "maxWallTimeMs": 2700000,
+          "maxCumulativeTokens": 2000000,
+          "maxNoProgressRounds": 8,
+          "checkpointEveryRounds": 20,
+          "checkpointEveryToolCalls": 60,
+          "outputReserveTokens": 4096,
+          "contextSafetyReserveTokens": 2048
+        },
+        "unmetered_backend": {
+          "action": "reroute-or-hold",
+          "ordered_backends": [
+            "docker",
+            "subprocess"
+          ]
+        },
+        "final_only_usage": {
+          "action": "allow-wall-clock-containment",
+          "roles": [
+            "worker"
+          ],
+          "max_wall_clock_seconds": 7200
+        },
+        "purposes": {
+          "reachability-probe": {
+            "maxInputTokens": 32768,
+            "maxOutputTokens": 512,
+            "maxTokens": 33280,
+            "timeoutMs": 60000,
+            "maxUsd": 0.2
+          },
+          "xverify-adjudication": {
+            "maxTokens": 2000000,
+            "maxWallClockSeconds": 3600,
+            "maxVerificationsPerSprint": 8
+          }
+        }
+      },
+      "configuredMaxWorkers": 2,
+      "writeScopePolicy": {
+        "mode": "closed-allowlist",
+        "filesWrite": [
+          "src/core/observability-rotation.ts",
+          "src/core/observability.ts",
+          "tests/core/observability-rotation.test.ts",
+          "tests/core/observability.test.ts"
+        ]
+      },
+      "planningEvidence": {
+        "kind": "accepted-planner-invocation",
+        "binding": {
+          "schemaVersion": 1,
+          "flowId": "963bbc69-bfff-4b5f-b5ac-6ba130853feb",
+          "revision": 1,
+          "receiptRef": {
+            "schemaVersion": 1,
+            "invocationId": "inv-e98f0434da2b5569206ef9dc68274cb2",
+            "tenantId": "local",
+            "projectId": "1553f97b-2503-4a15-90b8-88004e1320dc"
+          },
+          "receiptSha256": "18f02739197a404656fade1ca3ba08a7e4872747854f595deef3b013c343fe1b",
+          "terminalEventHash": "b8bbba71c4b4df9f9d5930c70b06d09c59062ccd41b6c517cc04c611c4e5f299",
+          "plannerResultSha256": "0dc71020d5846c7c80ef3a9a46c94a62e6b280895c3b4887bde36fa22f9c9b78",
+          "directivesSha256": "22e09164bbad0d6bffed20e5ca59bb6261e0747f1b3a8b9ec16e9d01d2f3cca7"
+        }
+      },
+      "sourceAuthoritySha256": "779de7762b88050752fecb205dfc252f96c9f4e88ae1a81606f293571aa01730"
+    },
+    "taskSummaries": [
+      {
+        "title": "MASTER120 STATE-RETENTION-001 retention writer onarımını aynı oturumda tamamla",
+        "summary": "Mevcut owner-admitted görevde tek implementation owner olarak devam et; yeni outcome veya ikinci görev oluşturma. DIRECTIVES.md kabul kontratını ve önceki attempt etkilerini yeniden doğrula. İncelenen kodda geometric byte scheduling mevcut effective ceiling mesafesini bilmiyor; serialization try bloğu dışında ve transient-failure testi shouldRotate sonucunu sürekli true yapıyor. Recursive telemetry etkisini ve mevcut call-count assertion hatasını gerçek effective policy üzerinden teşhis et. Önceki repair doğruysa yeniden yazmadan gerçek etkilerini doğrula. Aksi durumda mevcut rotation authority üzerinden policy-backed amortized threshold checks ve aynı session içinde bounded transient recovery uygula; metric byte bütünlüğünü, sıralamayı, public API ve tenant retention/legal holds davranışını koru. Assertion beklentilerini zayıflatmadan perpetual-due mock yerine gerçek policy davranışını çalıştır. Intent implementation ve tag test-coverage olsun. Provider/model/effort, skill/persona, concurrency ve finite execution budget effective project policy, registry ve canlı kapasiteden çözülür. Yalnız dört write-allowlist dosyası değişebilir. Build, commit, push, auth mutation, runtime kill/cleanup, başka task veya retained attempt mutation yasaktır. Host tarafından yetkilendirilen attempt-private result/heartbeat protokolünü kullan. Belirtilen Vitest komutunu çalıştır; subprocess gerekirse async spawn kullan. Host-injected productionWiringEvidence sözleşmesini NO_GO dahil aynen karşılayan exact task result üret; host bağımsız observation ve settlement yapar. Eksik authority veya kanıt HOLD olur. Bu plan yeni run başlatmaz; yürütme mevcut supervised dogfood bağlamında admission doğrulanarak yapılır.\n\nReason: Recovery, byte scheduling ve telemetry reentrancy birlikte incelenmelidir. Model ve effort alanları şema gereği adaydır; gerçek seçim effective policy tarafından doğrulanmalı veya değiştirilmelidir. Bu aday routing authority veya kabul koşulu değildir.\n### goNogo\n- goCriteria: Transient recovery aynı writer session içinde gerçekleşir. Threshold scheduling effective policy üzerinden amortize edilir. Metric byte bütünlüğü korunur. Public API korunur. Tenant retention ve legal holds korunur. Telemetry failure isolation sağlanır. Mevcut transient-failure assertion teşhis edilerek korunur. Belirtilen verification başarılıdır. Exact host-bound closure evidence doğrulanır.\n- nogo: Kalıcı failure latch bulunur. Her append rotation amaçlı filesystem/config kontrolü veya retry yapar. Recursive telemetry storm oluşur. Arbitrary limit veya ikinci rotation engine eklenir. Write allowlist aşılır. Yasak operasyon gerçekleştirilir. Routing policy bypass edilir. Eksik host/provider/settlement kanıtı COMPLETE olarak sunulur.\n- criteriaItems: [{\"id\":\"criterion-go-a053f1ffce6e04f62f06956b73e2c20d29637f99cef469a3167194250417e1fd\",\"polarity\":\"go\",\"statement\":\"Transient rotation failure aynı writer session içinde init/reset gerektirmeden iyileşir.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/observability.ts ve src/core/observability-rotation.ts için tests/core/observability.test.ts gerçek effective policy altında bir transient failure sonrasında aynı session içinde başarılı rotation gösterir.\\\"\"]},{\"id\":\"criterion-go-26b48b60f5dd002aa4897f3ae3ac1c8a935f398cd57decdff2e92a9a8153d2ae\",\"polarity\":\"go\",\"statement\":\"Threshold scheduling effective size ceiling ve operator policy değişikliklerine bağlı olarak amortize edilir.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/observability.ts ve src/core/observability-rotation.ts scheduling kararlarını src/core/config.ts ve src/core/config-types.ts mevcut policy authority üzerinden çözer; tests/core/observability.test.ts ve tests/core/observability-rotation.test.ts ceiling mesafesini ve policy değişikliklerini doğrular.\\\"\"]},{\"id\":\"criterion-go-3d878c9578ba71cc9d6b2d163ed698de054506503ed6a50d724470f14116dbbc\",\"polarity\":\"go\",\"statement\":\"Failure ve recovery boyunca metric byte bütünlüğü ve sıralaması korunur.\",\"evidenceRequirements\":[\"assertion:\\\"tests/core/observability.test.ts ve tests/core/observability-rotation.test.ts src/core/observability.ts ve src/core/observability-rotation.ts tarafından yazılan hot ve archived records toplamında her metric byte dizisinin kayıpsız ve tam bir kez doğru sırada korunduğunu doğrular; yalnız kayıt sayısı yeterli değildir.\\\"\"]},{\"id\":\"criterion-go-a3635d9502d923226c0c1a878832ab370d6218a057acd74d94e13868620b231c\",\"polarity\":\"go\",\"statement\":\"Mevcut public writer ve rotation API davranışı uyumludur.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/observability.ts ve src/core/observability-rotation.ts public call shapes ve mevcut size rotation semantics korunur; tests/core/observability.test.ts ve tests/core/observability-rotation.test.ts uyumluluk kanıtını sağlar.\\\"\"]},{\"id\":\"criterion-go-b0ba24da28fb82ab53c08e31e04eaca617bb6246573409203e5b74cdcee347bb\",\"polarity\":\"go\",\"statement\":\"Retention işlemleri tenant scope ve legal holds kurallarını korur.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/observability-rotation.ts için tests/core/observability-rotation.test.ts tenant isolation ve legal holds davranışını doğrular; scripts/metrics-retention-host-proof-observer.mjs üzerinden host tarafından gözlenen retention-prune receipt gerçek resolved policy ile eşleşir.\\\"\"]},{\"id\":\"criterion-go-74ba8ac3621d717206d2d0df8567577ea009947dbc34ed0b03d5409e1fd83749\",\"polarity\":\"go\",\"statement\":\"Serialization ve rotation hataları telemetry caller akışından izole edilir.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/observability.ts serialization ve rotation failure sınırları tests/core/observability.test.ts ile doğrulanır; bu hatalar caller akışına taşmaz.\\\"\"]},{\"id\":\"criterion-go-cb64c5702083e5837d855b1b6467b4ec5fc04427c0ed81516d5f00a05c684efa\",\"polarity\":\"go\",\"statement\":\"Mevcut transient-failure assertion zayıflatılmadan gerçek policy üzerinden doğrulanır.\",\"evidenceRequirements\":[\"assertion:\\\"tests/core/observability.test.ts perpetual-due shouldRotate mock davranışı ve recursive telemetry call zinciri teşhis edilir; mevcut recovery, preservation ve call-count beklentileri silinmez, gevşetilmez veya bypass edilmez; fixture gerçek policy kararını çalıştırır.\\\"\"]},{\"id\":\"criterion-go-e94d17d4ee7f0517abac8361427ab73f19c0753b699219d40821a456b24b3c61\",\"polarity\":\"go\",\"statement\":\"İstenen verification komutu exit zero ile tamamlanır.\",\"evidenceRequirements\":[\"assertion:\\\"VITEST_MAX_FORKS=2 npx vitest run --configLoader runner --no-cache tests/core/observability.test.ts tests/core/observability-rotation.test.ts gerçek çalıştırma çıktısı ve exit code 0 ile doğrulanır; dependency mount değişikliği yapılmaz.\\\"\"]},{\"id\":\"criterion-go-8efc284866d5e2019b7eb3d4bb12d0832de89b83c41453d267a8760b901cad5b\",\"polarity\":\"go\",\"statement\":\"Exact task result gerçek host-bound production wiring ve settlement kanıtıyla kapanır.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/production-wiring-contract.ts sözleşmesi ve değiştirilmeyen scripts/metrics-retention-host-proof-observer.mjs ile host registered topology bağımsız gözlemini sağlar; task result host-injected productionWiringEvidence taşır ve exact attempt/provider call, provider-reported usage, effect, evaluation ve durable terminal settlement bağı doğrulanır. Worker test çıktısı host settlement yerine geçmez.\\\"\"]},{\"id\":\"criterion-no-go-462aa4420050ecea49b7b6106771bbc4fcbbcf218e28ac08cab45c2862634cba\",\"polarity\":\"no-go\",\"statement\":\"Rotation kalıcı olarak devre dışı kalır.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/observability.ts veya src/core/observability-rotation.ts failure sonrasında aynı session recovery yolunu kalıcı latch ile kapatır.\\\"\"]},{\"id\":\"criterion-no-go-c2da3467090b231e0345392ebc2251b06d200dbb7d4e6f651815bf4a4304061b\",\"polarity\":\"no-go\",\"statement\":\"Rotation kontrolü veya retry her append üzerinde filesystem/config çalışması gerektirir.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/observability.ts ve src/core/observability-rotation.ts execution trace rotation kontrolleri veya failure retries için amortization yerine per-append filesystem/config okumalarını gösterir.\\\"\"]},{\"id\":\"criterion-no-go-43951f1bb256b6d251bc39980bad560c0bd31892d2896733857b6b5c6d88578a\",\"polarity\":\"no-go\",\"statement\":\"Rotation telemetry zinciri recursive storm üretir.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/observability.ts ve src/core/observability-rotation.ts üzerinden tests/core/observability.test.ts execution trace nested telemetry kaynaklı kontrolsüz rotation veya metric üretimi gösterir.\\\"\"]},{\"id\":\"criterion-no-go-d61cf7bd38c6c6f2e4982be0c8865f668105a770cc2cb2cd89b9e9f936a7db75\",\"polarity\":\"no-go\",\"statement\":\"Canonical authority dışında arbitrary limit veya ikinci rotation engine oluşturulur.\",\"evidenceRequirements\":[\"assertion:\\\"src/core/observability.ts ve src/core/observability-rotation.ts diff incelemesi mevcut policy authority dışında yeni literal threshold, duplicated default veya bağımsız rotation engine gösterir.\\\"\"]},{\"id\":\"criterion-no-go-5a814f4a025463a2b729c2628aba38cfccd63cd557bfee61e72ce210b383fbd8\",\"polarity\":\"no-go\",\"statement\":\"Task kaynak değişiklikleri dört dosyalık write allowlist dışına çıkar.\",\"evidenceRequirements\":[\"assertion:\\\"Attempt başlangıç snapshotı ile task-attributed diff karşılaştırması src/core/observability.ts, src/core/observability-rotation.ts, tests/core/observability.test.ts ve tests/core/observability-rotation.test.ts dışında tracked mutation gösterir; read-only config ve host observer dahil diğer dosyalar değişmemelidir.\\\"\"]},{\"id\":\"criterion-no-go-6931a688d639bc501409966c69d55cb891d46f7b1380fb2ce99aeeff00db6000\",\"polarity\":\"no-go\",\"statement\":\"Task yasaklanmış operasyon gerçekleştirir.\",\"evidenceRequirements\":[\"assertion:\\\"Exact attempt action trace build, commit, push, auth mutation, runtime kill/cleanup, retained evidence değişikliği veya başka task mutation gösterir.\\\"\"]},{\"id\":\"criterion-no-go-13d57a1cbabace6b6d79cd34e3589f102105f21c51bea95729a0032e71775fb2\",\"polarity\":\"no-go\",\"statement\":\"Execution routing effective project policy dışında zorlanır.\",\"evidenceRequirements\":[\"assertion:\\\"Host admission kaydı provider/model/effort, skill/persona, concurrency veya finite budget seçiminin effective config, registry ve live capacity yerine plan tarafından zorlandığını gösterir.\\\"\"]},{\"id\":\"criterion-no-go-62f2c786cb91b5fd2b27d29e2dc0ee029c1746ccde3033bfac5ddb0a63adc1ad\",\"polarity\":\"no-go\",\"statement\":\"Eksik host/provider/settlement authority veya evidence COMPLETE olarak sunulur.\",\"evidenceRequirements\":[\"assertion:\\\"Exact task result gerekli host observation, genuine provider evidence veya durable terminal settlement eksikken DONE/COMPLETE iddia eder; bu durumda typed HOLD zorunludur ve assertion-only kriterler configured confirmation adapter kanıtı olmadan başarılı sayılamaz.\\\"\"]}]"
+      }
+    ],
+    "policyDecision": "allow",
+    "gateResult": "pass",
+    "topology": {
+      "schemaVersion": 1,
+      "configuredMaxWorkers": 2,
+      "effectiveConcurrency": 1,
+      "taskSlots": [
+        1
+      ],
+      "collisions": [],
+      "authoredEdges": [],
+      "syntheticEdges": [],
+      "effectiveEdges": [],
+      "waves": [
+        {
+          "wave": 1,
+          "slots": [
+            1
+          ]
+        }
+      ],
+      "findings": [],
+      "verdict": "pass"
+    },
+    "topologyGateResult": "pass",
+    "scopeGateResult": "pass"
+  },
+  "sourceAuthority": {
+    "schemaVersion": 2,
+    "sourceKind": "intent",
+    "contentSha256": "f707345f85a32f616f8adaa8f6ee0bf5be49d87c41cfdcd5a434bc49b9b66af9",
+    "configSha256": "5dd01fdd312e7b71be027756399e0409b4eae94b9136f5809bf67674b6828b50",
+    "proposalSha256": "ec22bee4fa623bf3b97724f579b4ad405253b238fafd792bcf9bcfb8fdf127fd",
+    "planningInputSha256": "98be980521acf9aabc05099f7b07b94cbbfff323d3fec31c1ab0b0eea34721c5",
+    "scopeInputSha256": "d6e29b24740e223b84103b851b7d56c150438f8cfd2862b6fc764ee20206d187",
+    "lineageSha256": "cd37d030cc3ad5cfed11404f0be9fa2d07bbcec0fcda7de898de61d393432236",
+    "planningEvidence": {
+      "kind": "accepted-planner-invocation",
+      "binding": {
+        "schemaVersion": 1,
+        "flowId": "963bbc69-bfff-4b5f-b5ac-6ba130853feb",
+        "revision": 1,
+        "receiptRef": {
+          "schemaVersion": 1,
+          "invocationId": "inv-e98f0434da2b5569206ef9dc68274cb2",
+          "tenantId": "local",
+          "projectId": "1553f97b-2503-4a15-90b8-88004e1320dc"
+        },
+        "receiptSha256": "18f02739197a404656fade1ca3ba08a7e4872747854f595deef3b013c343fe1b",
+        "terminalEventHash": "b8bbba71c4b4df9f9d5930c70b06d09c59062ccd41b6c517cc04c611c4e5f299",
+        "plannerResultSha256": "0dc71020d5846c7c80ef3a9a46c94a62e6b280895c3b4887bde36fa22f9c9b78",
+        "directivesSha256": "22e09164bbad0d6bffed20e5ca59bb6261e0747f1b3a8b9ec16e9d01d2f3cca7"
+      }
+    }
+  },
+  "lineage": {
+    "tenantId": "local",
+    "actor": {
+      "id": "alperen@DESKTOP-7NLBLGA",
+      "identityClass": "local",
+      "assurance": "os-user",
+      "provenance": "cli"
+    },
+    "origin": "cli",
+    "correlationId": "963bbc69-bfff-4b5f-b5ac-6ba130853feb",
+    "idempotencyKey": "plan:963bbc69-bfff-4b5f-b5ac-6ba130853feb:r1",
+    "sourceRef": "terminal:run-flow"
+  }
+}

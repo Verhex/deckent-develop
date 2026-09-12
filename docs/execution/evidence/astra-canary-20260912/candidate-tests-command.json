@@ -1,0 +1,18 @@
+{
+  "startedAt": "2026-09-12T19:02:56.727029+00:00",
+  "argv": [
+    "npx",
+    "vitest",
+    "run",
+    "--configLoader",
+    "runner",
+    "--no-cache",
+    "tests/core/observability.test.ts",
+    "tests/core/observability-rotation.test.ts"
+  ],
+  "pid": 696603,
+  "cwd": "/home/alperen/deckent-dev",
+  "endedAt": "2026-09-12T19:03:00.489980+00:00",
+  "elapsedMs": 3763,
+  "exitCode": 1
+}

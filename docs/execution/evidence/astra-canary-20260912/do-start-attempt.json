@@ -1,0 +1,44 @@
+{
+  "observedAt": "2026-09-12T18:44:12.837Z",
+  "attempt": {
+    "flowId": "963bbc69-bfff-4b5f-b5ac-6ba130853feb",
+    "revision": 1,
+    "planDigest": "39eb2a92cd218fe9ed57779219ea30ca0461c307e2839dfbbd2dc69118c346be",
+    "generation": 1,
+    "attemptId": "7942af91-42db-48ad-b0ad-e6f49d00c9ca",
+    "state": "PROCESS_SPAWNED",
+    "createdAt": "2026-09-12T18:43:15.442Z",
+    "updatedAt": "2026-09-12T18:43:15.563Z",
+    "lineage": {
+      "tenantId": "local",
+      "projectId": "deckent-dev",
+      "actor": {
+        "id": "alperen@DESKTOP-7NLBLGA",
+        "identityClass": "local",
+        "assurance": "os-user",
+        "provenance": "cli"
+      },
+      "origin": "cli",
+      "correlationId": "963bbc69-bfff-4b5f-b5ac-6ba130853feb",
+      "idempotencyKey": "start:963bbc69-bfff-4b5f-b5ac-6ba130853feb:r1",
+      "parentPlanLineageHash": "cd37d030cc3ad5cfed11404f0be9fa2d07bbcec0fcda7de898de61d393432236",
+      "parentCorrelationId": "963bbc69-bfff-4b5f-b5ac-6ba130853feb",
+      "authorizationAuthority": "approved-actor:alperen@DESKTOP-7NLBLGA",
+      "sourceId": "terminal:run-flow"
+    },
+    "owner": {
+      "process": {
+        "pid": 669043,
+        "startToken": "s31820692",
+        "evidence": "verified"
+      },
+      "ownerNonce": "57b8b804-6af8-4fc6-9b90-6dcd6cd5e43b",
+      "leaseUntil": "2026-09-12T18:44:15.442Z"
+    },
+    "process": {
+      "pid": 677095,
+      "startToken": "s31855401",
+      "evidence": "verified"
+    }
+  }
+}

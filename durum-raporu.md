@@ -1749,3 +1749,16 @@ ve native bellek/süre kanıtı. Detay ve kaynak manifesti:
 `docs/execution/evidence/astra-recovery-20260912/r0b/RESULT.md`.
 
 R0B son üretim-default binary kontrolü:2026-09-12T18:17:19.940Z, READY / unresolved=[] / exit0; okuyucu205377ms. Eski doğruluk yolu korunmuş, hız hedefi kapanmamıştır.
+
+
+## 2026-09-12 — Owner start/do canary checkpoint (Astra epoch7)
+
+Owner isteğiyle terminal+main remainder önce `3eaa44da5` commit'ine alındı; ardından bir gerçek start ve bir gerçek do koşuldu. Sonuç: **dogfood hâlâ DEGRADED / ürün DONE değil**. Start416.7s/exit1, exact task admission hook eksikliği nedeniyle worker doğurmadı. Do CLI347.3s/exit0 ardından gerçek751 worker'ı (Codex/Terra, implementer, skill teslimi mevcut) çalıştı; worker NO_GO verdi. Üç dosyalık etki main'e uygulandı fakat release `ARTIFACT_REPLAY_MISMATCH`, sonra recovery `REHYDRATE_AUTHORITY_MISMATCH` ile reddedildi. Flow RUN_FAILED ve child FAILED settlement var; task/effect settlement HOLD, archive seal yok.
+
+Do→worker yaklaşık13dk; do→RUN_FAILED yaklaşık24dk (UTC farkları; monotonic end-to-end benchmark değil). Gerçek Astra planner çağrısı105.6s. Kaybın büyük bölümü provider dışı başlangıç/uzlaştırma/release hattında. Host Ink7.1.1 / worker Ink7.0.5 uyumsuzluğu tsc hatasını doğurdu; worker verilen runner/no-cache test komutunu kullanmadı.
+
+Host testi: candidate69/71 exit1, baseline70/71 exit1; eski transient-recovery kırmızısı kapandı, iki mevcut test yeni kırmızı. Host tsc exit0. Yeni test hatalarının ürün regresyonu veya eski scheduling'e bağlı assertion ayrımı henüz kapanmadı. Üç dosya **HOLD checkpoint** olarak korunur; ACCEPT/XVerify/DONE yok. Build deneme başında eşleşiyordu; worker etkisi sonrası dist eski, yeni build/push yapılmadı.
+
+Son gözlem:751 ABORTED/FAILED, coordinator dead, worker yok. `.tasks/task-751-001.json`, skill-delivery, checkpoint/PID snapshot/native custody korunur; elle cleanup/kill/settlement yapılmadı. **752 veya yeni canary başlatmadan önce751 release/rehydration kilidini çöz.** Sonra start'ın ortak exact-admission yolu, bounded custody-read latency ve erken canonical status, worker dependency/verification-recipe parity; ardından retention candidate kabulü. Yeni manuel onarım bu turda başlamadı.
+
+Kalıcı analiz, kimlikler, UTC, digest, komut ve test çıkışları: [canary REPORT](docs/execution/evidence/astra-canary-20260912/REPORT.md), [manifest](docs/execution/evidence/astra-canary-20260912/MANIFEST.json). Bu dosya geçici özet; MASTER120'nin disposition'ı değiştirilmedi.

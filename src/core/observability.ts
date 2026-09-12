@@ -10,7 +10,7 @@ import { RECENT_WORKS_DIR, DECKENT_DIR } from './constants.js';
 import { debugLog } from './utils.js';
 // Rotation is a sibling module and does not import back into this one, so the
 // direct edge is safe; a lazy require would only hide the dependency.
-import { shouldRotate, rotateMetricsFile } from './observability-rotation.js';
+import { resolveRotationMaxBytes, shouldRotate, rotateMetricsFile } from './observability-rotation.js';
 import { ErrorRegistry } from './errors.js';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -499,9 +499,10 @@ function rotateBeforeAppend(projectRoot: string, upcomingBytes: number): void {
   }
 
   try {
-    const rotate = shouldRotate(projectRoot);
     const metricsPath = getMetricsPath(projectRoot);
     const sizeBeforeAppend = existsSync(metricsPath) ? statSync(metricsPath).size : 0;
+    const maxBytes = resolveRotationMaxBytes(projectRoot);
+    const rotate = shouldRotate(projectRoot);
     // The archive is per-sprint; without a bound sprint there is no canonical
     // destination, so rotation stays with finalize rather than inventing one.
     const sprintId = _sprintId;
@@ -515,10 +516,10 @@ function rotateBeforeAppend(projectRoot: string, upcomingBytes: number): void {
       }
     }
 
-    // A negative decision (or an unavailable archive destination) is safe
-    // until the hot file has grown by its observed size. This is a byte-based
-    // geometric schedule, not an independently tuned rotation policy.
-    _bytesUntilRotationCheck = Math.max(sizeBeforeAppend, upcomingBytes);
+    // Recheck at the policy-resolved distance to the effective ceiling. This
+    // keeps checks amortized while adapting each gate to operator changes,
+    // without inventing a writer-local rotation limit.
+    _bytesUntilRotationCheck = Math.max(maxBytes - sizeBeforeAppend, upcomingBytes);
     _rotationRetryBytes = 0;
   } catch (error) {
     // Retry from the same session after an observed-byte backoff. Doubling the
@@ -533,10 +534,10 @@ function rotateBeforeAppend(projectRoot: string, upcomingBytes: number): void {
 function appendEntry(entry: ObservabilityEntry): void {
   if (!_projectRoot) return;
 
-  const taggedEntry = injectSprintId(entry);
-  const line = JSON.stringify(taggedEntry) + '\n';
-
   try {
+    const taggedEntry = injectSprintId(entry);
+    const line = JSON.stringify(taggedEntry) + '\n';
+
     // Always write to main metrics file
     const metricsPath = getMetricsPath(_projectRoot);
     const dir = dirname(metricsPath);

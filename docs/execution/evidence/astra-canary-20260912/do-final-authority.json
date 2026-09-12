@@ -1,0 +1,132 @@
+{
+  "observedAt": "2026-09-12T19:02:26.569Z",
+  "events": [
+    {
+      "type": "PROPOSAL_SUBMITTED",
+      "timestamp": "2026-09-12T18:43:15.292Z",
+      "sequence": 1
+    },
+    {
+      "type": "PREVIEW_STARTED",
+      "timestamp": "2026-09-12T18:43:15.292Z",
+      "sequence": 2
+    },
+    {
+      "type": "PREVIEW_READY",
+      "timestamp": "2026-09-12T18:43:15.329Z",
+      "sequence": 3
+    },
+    {
+      "type": "APPROVAL_GRANTED",
+      "timestamp": "2026-09-12T18:43:15.368Z",
+      "sequence": 4
+    },
+    {
+      "type": "START_REQUESTED",
+      "timestamp": "2026-09-12T18:43:15.459Z",
+      "sequence": 5
+    },
+    {
+      "type": "RUN_STARTED",
+      "timestamp": "2026-09-12T18:49:47.594Z",
+      "sequence": 6
+    },
+    {
+      "type": "RUN_FAILED",
+      "timestamp": "2026-09-12T19:01:47.509Z",
+      "sequence": 7,
+      "error": "run crashed before completion: {\"code\":\"DECKENT_E091:spawn-backend-recovery-hold\",\"holds\":[{\"kind\":\"spawn-backend-recovery-hold\",\"backend\":\"docker\",\"dispatchRequestId\":\"dreq-2c97eeee97075ce9b84b93893375b3dfaf91e219ab67bbfaa7b010c76757e83a\",\"taskId\":\"751-001\",\"admissionRefDigest\":\"sha256:3bb030b5d6b173803174421355671e34212502ad0768b2e5f84e5c1b69972192\",\"authorityState\":\"DISPATCH_TERMINAL\",\"reasonCode\":\"TERMINAL_RECONCILIATION_REQUIRED\",\"custodyHoldCode\":\"REHYDRATE_AUTHORITY_MISMATCH\"}],\"totalCount\":1,\"invalidCount\":0,\"omittedCount\":0}"
+    }
+  ],
+  "attempt": {
+    "flowId": "963bbc69-bfff-4b5f-b5ac-6ba130853feb",
+    "revision": 1,
+    "planDigest": "39eb2a92cd218fe9ed57779219ea30ca0461c307e2839dfbbd2dc69118c346be",
+    "generation": 1,
+    "attemptId": "7942af91-42db-48ad-b0ad-e6f49d00c9ca",
+    "state": "FAILED",
+    "createdAt": "2026-09-12T18:43:15.442Z",
+    "updatedAt": "2026-09-12T19:01:47.491Z",
+    "lineage": {
+      "tenantId": "local",
+      "projectId": "deckent-dev",
+      "actor": {
+        "id": "alperen@DESKTOP-7NLBLGA",
+        "identityClass": "local",
+        "assurance": "os-user",
+        "provenance": "cli"
+      },
+      "origin": "cli",
+      "correlationId": "963bbc69-bfff-4b5f-b5ac-6ba130853feb",
+      "idempotencyKey": "start:963bbc69-bfff-4b5f-b5ac-6ba130853feb:r1",
+      "parentPlanLineageHash": "cd37d030cc3ad5cfed11404f0be9fa2d07bbcec0fcda7de898de61d393432236",
+      "parentCorrelationId": "963bbc69-bfff-4b5f-b5ac-6ba130853feb",
+      "authorizationAuthority": "approved-actor:alperen@DESKTOP-7NLBLGA",
+      "sourceId": "terminal:run-flow"
+    },
+    "owner": {
+      "process": {
+        "pid": 669043,
+        "startToken": "s31820692",
+        "evidence": "verified"
+      },
+      "ownerNonce": "57b8b804-6af8-4fc6-9b90-6dcd6cd5e43b",
+      "leaseUntil": "2026-09-12T18:44:15.442Z"
+    },
+    "process": {
+      "pid": 677095,
+      "startToken": "s31855401",
+      "evidence": "verified"
+    },
+    "handle": {
+      "flowId": "963bbc69-bfff-4b5f-b5ac-6ba130853feb",
+      "jobId": "flow-963bbc69-bfff-4b5f-b5ac-6ba130853feb-r1",
+      "logRef": "/home/alperen/deckent-dev/.deckent/runtime/logs/detached/start-963bbc69-bfff-4b5f-b5ac-6ba130853feb-1789238595489.log"
+    },
+    "settlement": {
+      "state": "FAILED",
+      "code": "EXACT_CHILD_RUNTIME_FAILED",
+      "detail": "{\"code\":\"DECKENT_E091:spawn-backend-recovery-hold\",\"holds\":[{\"kind\":\"spawn-backend-recovery-hold\",\"backend\":\"docker\",\"dispatchRequestId\":\"dreq-2c97eeee97075ce9b84b93893375b3dfaf91e219ab67bbfaa7b010c76757e83a\",\"taskId\":\"751-001\",\"admissionRefDigest\":\"sha256:3bb030b5d6b173803174421355671e34212502ad0768b2e5f84e5c1b69972192\",\"authorityState\":\"DISPATCH_TERMINAL\",\"reasonCode\":\"TERMINAL_RECONCILIATION_REQUIRED\",\"custodyHoldCode\":\"REHYDRATE_AUTHORITY_MISMATCH\"}],\"totalCount\":1,\"invalidCount\":0,\"omittedCount\":0}",
+      "settledAt": "2026-09-12T19:01:47.491Z"
+    }
+  },
+  "handle": {
+    "flowId": "963bbc69-bfff-4b5f-b5ac-6ba130853feb",
+    "revision": 1,
+    "planDigest": "39eb2a92cd218fe9ed57779219ea30ca0461c307e2839dfbbd2dc69118c346be",
+    "handle": {
+      "flowId": "963bbc69-bfff-4b5f-b5ac-6ba130853feb",
+      "jobId": "flow-963bbc69-bfff-4b5f-b5ac-6ba130853feb-r1",
+      "logRef": "/home/alperen/deckent-dev/.deckent/runtime/logs/detached/start-963bbc69-bfff-4b5f-b5ac-6ba130853feb-1789238595489.log"
+    },
+    "startedAt": "2026-09-12T18:49:47.557Z",
+    "pid": 677095,
+    "startToken": "s31855401"
+  },
+  "authority": {
+    "schemaVersion": 1,
+    "lifecycle": "ACTIVE",
+    "active": true,
+    "resumable": false,
+    "sprintId": "sprint-751",
+    "phase": "EXECUTE",
+    "status": "ACTIVE",
+    "reason": null,
+    "recoveryCommand": null,
+    "finalizeCommand": null,
+    "coordinator": "alive",
+    "conflicts": [],
+    "recoveryReconciliation": {
+      "version": 1,
+      "sprintId": "sprint-751",
+      "evidence": {
+        "checkpointPresent": true,
+        "terminalReceipt": null,
+        "terminalReceiptConflict": null
+      },
+      "state": "consistent",
+      "mismatch": null,
+      "remediation": null
+    }
+  }
+}

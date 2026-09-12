@@ -1,0 +1,9 @@
+{
+  "observedAt": "2026-09-12T19:07:54.535825+00:00",
+  "status": "OWNER_REQUESTED_CHECKPOINT_NOT_ACCEPT",
+  "workerCandidate": "NO_GO; 69/71 host tests; tsc0; exact effect settlement HOLD",
+  "mainEffect": "preserved verbatim; no reset/stash/hand repair",
+  "runtime": "no live coordinator or worker after natural failure; retained task/pid/checkpoint/native custody untouched",
+  "nextImplementation": "not started",
+  "push": false
+}

@@ -1,0 +1,19 @@
+{
+  "observedAt": "2026-09-12T18:36:48.449673+00:00",
+  "ownerAuthority": "Current user authorized checkpoint plus one start and one do before next manual repair; then included terminal changes in checkpoint.",
+  "checkpoint": "3eaa44da5",
+  "scope": [
+    "src/core/observability.ts",
+    "src/core/observability-rotation.ts",
+    "tests/core/observability.test.ts",
+    "tests/core/observability-rotation.test.ts"
+  ],
+  "goalSha256": "f707345f85a32f616f8adaa8f6ee0bf5be49d87c41cfdcd5a434bc49b9b66af9",
+  "before": {
+    "src/core/observability.ts": "01f6d4d4699fa91f6675d876b03e721f4cc48504c468784d7317bdae4867b446",
+    "src/core/observability-rotation.ts": "d251243e427829b5b41a1d26fb8739ab6c2839d8b20c69bead1b9784a22e5c21",
+    "tests/core/observability.test.ts": "7c4b3e67de891333001407eea08a017e97d6a4a927b214fe49f79ed9e3fe3240",
+    "tests/core/observability-rotation.test.ts": "b24877a297484d0f3b258ea0b22bc5ea572d084cdbb438afe740f9353cda421a"
+  },
+  "notClosure": "No master disposition mutation, no forced gates, no manual task state or cleanup, no same-provider XVerify."
+}

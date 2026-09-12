@@ -1,0 +1,29 @@
+{
+  "observedAt": "2026-09-12T19:04:04.418Z",
+  "authority": {
+    "schemaVersion": 1,
+    "lifecycle": "ABORTED",
+    "active": false,
+    "resumable": false,
+    "sprintId": "sprint-751",
+    "phase": "EXECUTE",
+    "status": "FAILED",
+    "reason": "run crashed before completion: {\"code\":\"DECKENT_E091:spawn-backend-recovery-hold\",\"holds\":[{\"kind\":\"spawn-backend-recovery-hold\",\"backend\":\"docker\",\"dispatchRequestId\":\"dreq-2c97eeee97075ce9b84b93893375b3dfaf91e219ab67bbfaa7b010c76757e83a\",\"taskId\":\"751-001\",\"admissionRefDigest\":\"sha256:3bb030b5d6b173803174421355671e34212502ad0768b2e5f84e5c1b69972192\",\"authorityState\":\"DISPATCH_TERMINAL\",\"reasonCode\":\"TERMINAL_RECONCILIATION_REQUIRED\",\"custodyHoldCode\":\"REHYDRATE_AUTHORITY_MISMATCH\"}],\"totalCount\":1,\"invalidCount\":0,\"omittedCount\":0}",
+    "recoveryCommand": null,
+    "finalizeCommand": null,
+    "coordinator": "dead",
+    "conflicts": [],
+    "recoveryReconciliation": {
+      "version": 1,
+      "sprintId": "sprint-751",
+      "evidence": {
+        "checkpointPresent": true,
+        "terminalReceipt": null,
+        "terminalReceiptConflict": null
+      },
+      "state": "consistent",
+      "mismatch": null,
+      "remediation": null
+    }
+  }
+}
