@@ -158,7 +158,7 @@ export function editInput(state: InputState, key: Key): EditResult {
     case 'end':
       return { state: { buffer, cursor: lineEndOf(buffer, cursor) } };
     // TERMINAL-TOOLS-009 — inside a multi-line draft ↑/↓ move between lines;
-    // only past the first/last line do they navigate history (Claude Code's
+    // only past the first/last line do they navigate history (multi-line draft:
     // contract; a single-line draft is byte-identical to before).
     case 'up': {
       const moved = moveVertical(buffer, cursor, -1);

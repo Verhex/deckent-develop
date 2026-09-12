@@ -31,7 +31,9 @@ export function retireFailedSpawnAuthority(
 ): void {
   releaseSprintLock(projectRoot);
   clearActiveSprint();
-  clearPid(projectRoot, sprintId, { preserveSnapshot: true });
+  // Retain the generation snapshot: retirement here is not settlement, and the
+  // snapshot is what later binds this generation to its terminal RunFlow event.
+  clearPid(projectRoot, sprintId);
 }
 
 /**

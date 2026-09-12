@@ -1,0 +1,43 @@
+{
+  "observedAt": "2026-09-12T11:26Z",
+  "claim": "NO LIVE DECKENT EXECUTION OBSERVED — bounded evidence, not proof",
+  "signals": [
+    {
+      "surface": "sprint-state",
+      "evidence": ".deckent/sprint-state.json absent",
+      "reading": "no sprint claims ACTIVE"
+    },
+    {
+      "surface": "pid-liveness",
+      "evidence": ".deckent/pids/*.pid absent (only *.snapshot.json remain)",
+      "reading": "no process holds a liveness claim"
+    },
+    {
+      "surface": "heartbeat",
+      "evidence": ".tasks/*.hb absent",
+      "reading": "no worker heartbeat file"
+    },
+    {
+      "surface": "task-files",
+      "evidence": ".tasks/ holds only 5 .task-cas-*.previous artifacts",
+      "reading": "no active task projection"
+    },
+    {
+      "surface": "container",
+      "evidence": "docker ps -> only 'local-llm Up 3 days (healthy)'",
+      "reading": "no deckent worker/sprint container running"
+    },
+    {
+      "surface": "run-flow",
+      "evidence": "6de757f8-5156-4d81-9131-11f047876254 last event RUN_FAILED @2026-09-12T01:56:19.747Z; no RUN_STARTED was ever written",
+      "reading": "last run died before execution started"
+    }
+  ],
+  "residual": "These six signals are disk/daemon observations at one instant. They do not prove the absence of a live worker on another host, in another checkout, or a process that writes no artifact. Liveness elsewhere: UNKNOWN.",
+  "orphanSuspicion": {
+    "worker": "w-747-001",
+    "task": "747-001",
+    "evidence": "deckent resume sprint-747 reported staleness 'missing_file, age 92min'",
+    "label": "EXPLICIT — stale worker, process absent, snapshot retained"
+  }
+}

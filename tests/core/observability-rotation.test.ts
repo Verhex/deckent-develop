@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
 import {
   mkdirSync, existsSync, readFileSync, writeFileSync,
-  rmSync, readdirSync, symlinkSync,
+  rmSync, readdirSync, symlinkSync, utimesSync,
 } from 'node:fs';
 import { gzipSync, gunzipSync } from 'node:zlib';
 
@@ -10,9 +10,13 @@ import {
   rotateMetricsFile,
   shouldRotate,
   enforceKeepLastN,
+  enforceRetentionPolicy,
+  markArchiveLegalHold,
+  isArchiveUnderLegalHold,
   readArchivedMetrics,
   listArchives,
   DEFAULT_ROTATION_CONFIG,
+  DEFAULT_RETENTION_POLICY,
 } from '../../src/core/observability-rotation.js';
 import { SprintArchivePublicationError } from '../../src/core/sprint-archive.js';
 
@@ -45,6 +49,19 @@ function createSampleMetric(name: string, value: number, sprintId?: string): str
     entry.tags = { sprintId };
   }
   return JSON.stringify(entry);
+}
+
+/** Creates a fixture archive file with an explicit, staggered mtime and an
+ *  exact on-disk byte size (written raw, not gzipped, so size-ceiling tests
+ *  are not at the mercy of gzip's compression ratio) so age/count/size
+ *  ordering is deterministic across filesystems. */
+function createArchive(dir: string, name: string, ageMs: number, bytes = 16): string {
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, name);
+  writeFileSync(path, Buffer.alloc(bytes, 'x'));
+  const mtime = new Date(Date.now() - ageMs);
+  utimesSync(path, mtime, mtime);
+  return path;
 }
 
 function expectPublicationError(
@@ -169,33 +186,30 @@ describe('rotateMetricsFile()', () => {
 // ═══ keepLastN Enforcement ══════════════════════════════════════
 
 describe('enforceKeepLastN()', () => {
-  it('preserves immutable archives when the legacy hot-cache limit is exceeded', () => {
-    mkdirSync(ARCHIVE_DIR, { recursive: true });
-
-    // Create 5 archive files
+  it('737-001: actually prunes archives beyond the legacy count ceiling (no-op removed)', () => {
     for (let i = 1; i <= 5; i++) {
       const name = `metrics-sprint-${String(i).padStart(3, '0')}.jsonl.gz`;
-      writeFileSync(join(ARCHIVE_DIR, name), gzipSync('test'));
+      // Oldest first: file 1 is oldest (5000ms ago), file 5 is newest.
+      createArchive(ARCHIVE_DIR, name, (6 - i) * 1000);
     }
 
     const pruned = enforceKeepLastN(TEST_ROOT, 3);
 
-    expect(pruned).toEqual([]);
+    expect(pruned).toHaveLength(2);
     const remaining = readdirSync(ARCHIVE_DIR);
-    expect(remaining).toHaveLength(5);
-    expect(remaining).toContain('metrics-sprint-001.jsonl.gz');
-    expect(remaining).toContain('metrics-sprint-002.jsonl.gz');
+    expect(remaining).toHaveLength(3);
+    // The 3 newest survive; the 2 oldest are gone.
     expect(remaining).toContain('metrics-sprint-003.jsonl.gz');
     expect(remaining).toContain('metrics-sprint-004.jsonl.gz');
     expect(remaining).toContain('metrics-sprint-005.jsonl.gz');
+    expect(remaining).not.toContain('metrics-sprint-001.jsonl.gz');
+    expect(remaining).not.toContain('metrics-sprint-002.jsonl.gz');
   });
 
   it('should not prune when under limit', () => {
-    mkdirSync(ARCHIVE_DIR, { recursive: true });
-
     for (let i = 1; i <= 3; i++) {
       const name = `metrics-sprint-${String(i).padStart(3, '0')}.jsonl.gz`;
-      writeFileSync(join(ARCHIVE_DIR, name), gzipSync('test'));
+      createArchive(ARCHIVE_DIR, name, i * 1000);
     }
 
     const pruned = enforceKeepLastN(TEST_ROOT, 10);
@@ -208,6 +222,173 @@ describe('enforceKeepLastN()', () => {
   it('should return empty when archive dir does not exist', () => {
     const pruned = enforceKeepLastN(TEST_ROOT, 10);
     expect(pruned).toEqual([]);
+  });
+});
+
+// ═══ enforceRetentionPolicy — age + count + size + legal hold ═══
+
+describe('enforceRetentionPolicy()', () => {
+  it('has typed defaults (keepLastN/maxAgeDays/maxSizeMB)', () => {
+    expect(DEFAULT_RETENTION_POLICY.keepLastN).toBe(DEFAULT_ROTATION_CONFIG.keepLastN);
+    expect(DEFAULT_RETENTION_POLICY.maxAgeDays).toBeGreaterThan(0);
+    expect(DEFAULT_RETENTION_POLICY.maxSizeMB).toBeGreaterThan(0);
+  });
+
+  it('returns a typed prune receipt with pruned/policy/legalHold', () => {
+    createArchive(ARCHIVE_DIR, 'metrics-a.jsonl.gz', 1000);
+    const receipt = enforceRetentionPolicy(TEST_ROOT, { keepLastN: 10, maxAgeDays: 90, maxSizeMB: 500 });
+
+    expect(Array.isArray(receipt.pruned)).toBe(true);
+    expect(receipt.policy).toEqual({ keepLastN: 10, maxAgeDays: 90, maxSizeMB: 500 });
+    expect(typeof receipt.legalHold).toBe('boolean');
+  });
+
+  it('never deletes without producing a receipt entry for exactly what was removed', () => {
+    const oldPath = createArchive(ARCHIVE_DIR, 'metrics-old.jsonl.gz', 10_000);
+    createArchive(ARCHIVE_DIR, 'metrics-new.jsonl.gz', 1);
+
+    const receipt = enforceRetentionPolicy(TEST_ROOT, { keepLastN: 1, maxAgeDays: 90, maxSizeMB: 500 });
+
+    expect(receipt.pruned).toEqual([oldPath]);
+    expect(existsSync(oldPath)).toBe(false);
+    expect(readdirSync(ARCHIVE_DIR)).toHaveLength(1);
+  });
+
+  // ── Count ceiling ──────────────────────────────────────────────
+  it('prunes oldest-first beyond the count ceiling', () => {
+    const paths = Array.from({ length: 5 }, (_, i) =>
+      createArchive(ARCHIVE_DIR, `metrics-${i}.jsonl.gz`, (5 - i) * 1000));
+
+    const receipt = enforceRetentionPolicy(TEST_ROOT, { keepLastN: 2, maxAgeDays: 90, maxSizeMB: 500 });
+
+    expect(receipt.pruned.sort()).toEqual([paths[0], paths[1], paths[2]].sort());
+    expect(readdirSync(ARCHIVE_DIR)).toHaveLength(2);
+  });
+
+  // ── Age ceiling ─────────────────────────────────────────────────
+  it('prunes archives older than the age ceiling, keeps fresh ones', () => {
+    const oldOne = createArchive(ARCHIVE_DIR, 'metrics-ancient-1.jsonl.gz', 200 * 24 * 60 * 60 * 1000);
+    const oldTwo = createArchive(ARCHIVE_DIR, 'metrics-ancient-2.jsonl.gz', 150 * 24 * 60 * 60 * 1000);
+    const fresh = createArchive(ARCHIVE_DIR, 'metrics-fresh.jsonl.gz', 1000);
+
+    const receipt = enforceRetentionPolicy(TEST_ROOT, { keepLastN: 10, maxAgeDays: 90, maxSizeMB: 500 });
+
+    expect(receipt.pruned.sort()).toEqual([oldOne, oldTwo].sort());
+    expect(existsSync(fresh)).toBe(true);
+  });
+
+  // ── Size ceiling ────────────────────────────────────────────────
+  it('prunes oldest survivors until the aggregate size fits the ceiling', () => {
+    const oldest = createArchive(ARCHIVE_DIR, 'metrics-1.jsonl.gz', 3000, 2000);
+    const middle = createArchive(ARCHIVE_DIR, 'metrics-2.jsonl.gz', 2000, 2000);
+    const newest = createArchive(ARCHIVE_DIR, 'metrics-3.jsonl.gz', 1000, 2000);
+
+    // Ceiling ~1KB while 3 archives of 2000 bytes each exist — must shed the two oldest.
+    const receipt = enforceRetentionPolicy(TEST_ROOT, {
+      keepLastN: 10, maxAgeDays: 90, maxSizeMB: 1 / 1024,
+    });
+
+    expect(receipt.pruned.sort()).toEqual([oldest, middle].sort());
+    expect(existsSync(newest)).toBe(true);
+  });
+
+  it('never prunes the last surviving archive purely for exceeding the size ceiling', () => {
+    const onlyOne = createArchive(ARCHIVE_DIR, 'metrics-solo.jsonl.gz', 1000, 5000);
+
+    const receipt = enforceRetentionPolicy(TEST_ROOT, { keepLastN: 10, maxAgeDays: 90, maxSizeMB: 1 / 1024 });
+
+    expect(receipt.pruned).toEqual([]);
+    expect(existsSync(onlyOne)).toBe(true);
+  });
+
+  // ── Legal hold ──────────────────────────────────────────────────
+  it('never prunes a legal-hold-marked archive under any ceiling', () => {
+    const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
+    const held = createArchive(ARCHIVE_DIR, 'metrics-held.jsonl.gz', FIVE_DAYS_MS);
+    // Unheld control at the SAME age: proves the age ceiling really would
+    // have pruned `held` too, if it were not under legal hold.
+    const unheldControl = createArchive(ARCHIVE_DIR, 'metrics-unheld-control.jsonl.gz', FIVE_DAYS_MS);
+    const newer = createArchive(ARCHIVE_DIR, 'metrics-fresh.jsonl.gz', 1);
+    markArchiveLegalHold(held, 'litigation-hold-2026');
+
+    expect(isArchiveUnderLegalHold(held)).toBe(true);
+
+    // maxAgeDays=1 makes the 5-day-old archives prunable by age.
+    const receipt = enforceRetentionPolicy(TEST_ROOT, { keepLastN: 10, maxAgeDays: 1, maxSizeMB: 500 });
+
+    expect(receipt.pruned).not.toContain(held);
+    expect(receipt.pruned).toContain(unheldControl);
+    expect(existsSync(held)).toBe(true);
+    expect(existsSync(unheldControl)).toBe(false);
+    expect(receipt.legalHold).toBe(true);
+    // The non-held, fresh archive is unaffected by the held one's exclusion.
+    expect(existsSync(newer)).toBe(true);
+  });
+
+  it('legalHold is false when no archive is under hold', () => {
+    createArchive(ARCHIVE_DIR, 'metrics-plain.jsonl.gz', 1);
+    const receipt = enforceRetentionPolicy(TEST_ROOT, { keepLastN: 10, maxAgeDays: 90, maxSizeMB: 500 });
+    expect(receipt.legalHold).toBe(false);
+  });
+
+  // ── Active metrics.jsonl is never a candidate ────────────────────
+  it('never deletes the active metrics.jsonl file', () => {
+    writeMetricsLines([createSampleMetric('active.metric', 1)]);
+    for (let i = 0; i < 5; i++) createArchive(ARCHIVE_DIR, `metrics-${i}.jsonl.gz`, (5 - i) * 1000);
+
+    enforceRetentionPolicy(TEST_ROOT, { keepLastN: 1, maxAgeDays: 0, maxSizeMB: 0.0001 });
+
+    expect(existsSync(METRICS_PATH)).toBe(true);
+    expect(readFileSync(METRICS_PATH, 'utf-8')).toContain('active.metric');
+  });
+
+  // ── Immutable / content-addressed bytes preserved ────────────────
+  it('never rewrites bytes of a surviving archive (only whole-file unlink)', () => {
+    const survivor = createArchive(ARCHIVE_DIR, 'metrics-survivor.jsonl.gz', 1);
+    const before = readFileSync(survivor);
+    createArchive(ARCHIVE_DIR, 'metrics-doomed.jsonl.gz', 10_000);
+
+    enforceRetentionPolicy(TEST_ROOT, { keepLastN: 1, maxAgeDays: 90, maxSizeMB: 500 });
+
+    expect(existsSync(survivor)).toBe(true);
+    expect(readFileSync(survivor).equals(before)).toBe(true);
+  });
+
+  // ── Config resolution (737-001 enablement authority) ─────────────
+  it('resolves ceilings from .deckent/config.json observability.retention when no override is given', () => {
+    writeFileSync(
+      join(TEST_ROOT, '.deckent', 'config.json'),
+      JSON.stringify({ observability: { retention: { max_count: 2 } } }),
+      'utf-8',
+    );
+    for (let i = 0; i < 5; i++) createArchive(ARCHIVE_DIR, `metrics-${i}.jsonl.gz`, (5 - i) * 1000);
+
+    const receipt = enforceRetentionPolicy(TEST_ROOT);
+
+    expect(receipt.policy.keepLastN).toBe(2);
+    expect(readdirSync(ARCHIVE_DIR)).toHaveLength(2);
+  });
+
+  it('falls back to defaults when config.json has no observability.retention block', () => {
+    writeFileSync(join(TEST_ROOT, '.deckent', 'config.json'), JSON.stringify({}), 'utf-8');
+    const receipt = enforceRetentionPolicy(TEST_ROOT);
+    expect(receipt.policy).toEqual(DEFAULT_RETENTION_POLICY);
+  });
+
+  it('an explicit override always wins over the configured value', () => {
+    writeFileSync(
+      join(TEST_ROOT, '.deckent', 'config.json'),
+      JSON.stringify({ observability: { retention: { max_count: 2 } } }),
+      'utf-8',
+    );
+    const receipt = enforceRetentionPolicy(TEST_ROOT, { keepLastN: 7 });
+    expect(receipt.policy.keepLastN).toBe(7);
+  });
+
+  it('returns empty pruned array and no throw when the archive dir does not exist', () => {
+    const receipt = enforceRetentionPolicy(TEST_ROOT);
+    expect(receipt.pruned).toEqual([]);
+    expect(receipt.legalHold).toBe(false);
   });
 });
 

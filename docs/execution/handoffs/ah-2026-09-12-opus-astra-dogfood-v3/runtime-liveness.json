@@ -1,0 +1,44 @@
+{
+  "observedAt": "2026-09-12T09:47:40Z",
+  "utcSource": "host `date -u`; local offset measured as +0300 via `date +%z` (earlier v1/v2 evidence wrote local time with a Z suffix — corrected here)",
+  "claim": "NO LIVE DECKENT EXECUTION OBSERVED — bounded evidence, not proof",
+  "signals": [
+    {
+      "surface": "sprint-state",
+      "evidence": ".deckent/sprint-state.json ABSENT",
+      "reading": "no sprint claims ACTIVE"
+    },
+    {
+      "surface": "pid-liveness",
+      "evidence": ".deckent/pids/*.pid ABSENT (only *.snapshot.json remain)",
+      "reading": "no process holds a liveness claim"
+    },
+    {
+      "surface": "heartbeat",
+      "evidence": ".tasks/*.hb ABSENT",
+      "reading": "no worker heartbeat file"
+    },
+    {
+      "surface": "task-files",
+      "evidence": "ls -A .tasks/ -> exactly 5 .task-cas-*.previous artifacts",
+      "reading": "no active task projection"
+    },
+    {
+      "surface": "container",
+      "evidence": "docker ps -> local-llm|Up 3 days (healthy) only",
+      "reading": "no deckent worker/sprint container"
+    },
+    {
+      "surface": "run-flow",
+      "evidence": "6de757f8-5156-4d81-9131-11f047876254 last event RUN_FAILED @2026-09-12T01:56:19.747Z; RUN_STARTED never written",
+      "reading": "last run died before execution began"
+    }
+  ],
+  "residual": "Six disk/daemon observations at one instant. They do NOT prove the absence of a live worker on another host, in another checkout, or in a process that writes no artifact. Liveness elsewhere: UNKNOWN.",
+  "orphanSuspicion": {
+    "worker": "w-747-001",
+    "task": "747-001",
+    "evidence": "deckent resume sprint-747 reported 'missing_file, age 92min'",
+    "label": "EXPLICIT"
+  }
+}

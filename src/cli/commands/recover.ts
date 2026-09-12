@@ -132,7 +132,7 @@ export type RecoveryReport = SprintRecoveryReport;
 export async function runRecovery(
   root: string,
   sprintId: string,
-  opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; retainStartedFailed?: string; retainCommittedUnsettled?: string },
+  opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; retainStartedFailed?: string; retainCommittedUnsettled?: string; closeRejectedResult?: string },
   lang: string,
 ): Promise<RecoveryReport> {
   try {
@@ -142,6 +142,7 @@ export async function runRecovery(
       skipAudit: opts.skipAudit,
       startedFailedDispatchRequestId: opts.retainStartedFailed,
       committedUnsettledDispatchRequestId: opts.retainCommittedUnsettled,
+      rejectedResultDispatchRequestId: opts.closeRejectedResult,
       ...(!opts.dryRun
         ? {
             approval: {
@@ -183,11 +184,12 @@ export function registerRecover(program: Command): void {
     .option('--restore-tasks', getMessage('recover.restore_tasks_option', registerLang))
     .option('--retain-started-failed <dispatch-request-id>', getMessage('recover.retain_started_failed_option', registerLang))
     .option('--retain-committed-unsettled <dispatch-request-id>', getMessage('recover.retain_committed_unsettled_option', registerLang))
+    .option('--close-rejected-result <dispatch-request-id>', getMessage('recover.close_rejected_result_option', registerLang))
     .option('--resume', getMessage('recover.resume_option', registerLang))
     .option('--auto-approve', getMessage('recover.auto_approve_option', registerLang), false)
     .option('--force-scope', getMessage('recover.force_scope_option', registerLang), false)
     .option('--json', getMessage('recover.json_option', registerLang))
-    .action(async (sprintId: string, opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; restoreTasks?: boolean; resume?: boolean; autoApprove?: boolean; forceScope?: boolean; json?: boolean; retainStartedFailed?: string; retainCommittedUnsettled?: string }) => {
+    .action(async (sprintId: string, opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; restoreTasks?: boolean; resume?: boolean; autoApprove?: boolean; forceScope?: boolean; json?: boolean; retainStartedFailed?: string; retainCommittedUnsettled?: string; closeRejectedResult?: string }) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);
 
@@ -209,7 +211,15 @@ export function registerRecover(program: Command): void {
             throw new DeckentError('E_RECOVER_RETENTION_CONFLICT', getMessage('recover.retain_committed_unsettled_conflict', lang));
           }
         }
-        if (opts.retainStartedFailed !== undefined && opts.retainCommittedUnsettled !== undefined) {
+        if (opts.closeRejectedResult !== undefined) {
+          if (!/^dreq-[a-f0-9]{64}$/u.test(opts.closeRejectedResult)) {
+            throw new DeckentError('E_RECOVER_INVALID_DISPATCH_REQUEST_ID', getMessage('recover.invalid_dispatch_request_id', lang));
+          }
+          if (opts.resume || opts.restoreTasks) {
+            throw new DeckentError('E_RECOVER_RETENTION_CONFLICT', getMessage('recover.retain_started_failed_conflict', lang));
+          }
+        }
+        if ([opts.retainStartedFailed, opts.retainCommittedUnsettled, opts.closeRejectedResult].filter(value => value !== undefined).length > 1) {
           throw new DeckentError('E_RECOVER_RETENTION_MODE_CONFLICT', getMessage('recover.retention_modes_conflict', lang));
         }
         if (opts.dryRun && opts.restoreTasks) {
@@ -294,6 +304,7 @@ export function registerRecover(program: Command): void {
             remediation: report.remediation,
             ...(report.startedFailedAttempt ? { startedFailedAttempt: report.startedFailedAttempt } : {}),
             ...(report.committedUnsettledAttempt ? { committedUnsettledAttempt: report.committedUnsettledAttempt } : {}),
+            ...(report.rejectedResultAttempt ? { rejectedResultAttempt: report.rejectedResultAttempt } : {}),
           }));
           return;
         }
@@ -307,6 +318,12 @@ export function registerRecover(program: Command): void {
             print(getMessage('recover.started_failed_result', lang, { state: report.startedFailedAttempt.state,
               dispatchRequestId: report.startedFailedAttempt.dispatchRequestId,
               evidenceDigest: report.startedFailedAttempt.evidenceDigest }));
+            return;
+          }
+          if (report.rejectedResultAttempt) {
+            print(getMessage('recover.rejected_result_result', lang, { state: report.rejectedResultAttempt.state,
+              dispatchRequestId: report.rejectedResultAttempt.dispatchRequestId,
+              evidenceDigest: report.rejectedResultAttempt.evidenceDigest }));
             return;
           }
           if (report.committedUnsettledAttempt) {
@@ -342,6 +359,8 @@ export function registerRecover(program: Command): void {
         if (!opts.force) {
           if (opts.retainStartedFailed) {
             print(getMessage('recover.retain_started_failed_confirm', lang, { dispatchRequestId: opts.retainStartedFailed }));
+          } else if (opts.closeRejectedResult) {
+            print(getMessage('recover.close_rejected_result_confirm', lang, { dispatchRequestId: opts.closeRejectedResult }));
           } else if (opts.retainCommittedUnsettled) {
             print(getMessage('recover.retain_committed_unsettled_confirm', lang, { dispatchRequestId: opts.retainCommittedUnsettled }));
           } else {
@@ -370,6 +389,12 @@ export function registerRecover(program: Command): void {
           print(getMessage('recover.started_failed_result', lang, { state: report.startedFailedAttempt.state,
             dispatchRequestId: report.startedFailedAttempt.dispatchRequestId,
             evidenceDigest: report.startedFailedAttempt.evidenceDigest }));
+          return;
+        }
+        if (report.rejectedResultAttempt) {
+          print(getMessage('recover.rejected_result_result', lang, { state: report.rejectedResultAttempt.state,
+            dispatchRequestId: report.rejectedResultAttempt.dispatchRequestId,
+            evidenceDigest: report.rejectedResultAttempt.evidenceDigest }));
           return;
         }
         if (report.committedUnsettledAttempt) {

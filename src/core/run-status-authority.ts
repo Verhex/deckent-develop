@@ -49,6 +49,13 @@ export interface CanonicalRunStatus {
   readonly finalizeCommand: string | null;
   readonly coordinator: 'alive' | 'dead' | 'absent' | 'unknown';
   readonly conflicts: readonly RunStatusConflict[];
+  /** A foreign display/lock projection can outlive its identity-proven Flow.
+   * It is retained history, not evidence of a currently running worker. */
+  readonly historicalProjections?: readonly Readonly<{
+    projection: RunStatusConflict;
+    terminalFlowState: 'COMPLETED' | 'FAILED';
+    completedAt?: string;
+  }>[];
   /** Side-effect-free reconciliation of PAUSED projection and durable successors. */
   readonly recoveryReconciliation?: SprintStatusRecoveryReconciliation;
 }
@@ -440,8 +447,26 @@ export function readCanonicalRunStatus(
   options: { sprintIdHint?: string | null; nowMs?: number } = {},
 ): CanonicalRunStatus {
   const authority = readCanonicalRunStatusBase(projectRoot, options);
+  const historicalProjections: NonNullable<CanonicalRunStatus['historicalProjections']>[number][] = [];
+  const terminalBySprint = new Map<string, ReturnType<typeof readRunFlowTerminalClosureForSprint>>();
+  const conflicts = authority.conflicts.filter(conflict => {
+    if ((conflict.surface !== 'dashboard' && conflict.surface !== 'sprint-lock')
+      || !conflict.sprintId || conflict.sprintId === authority.sprintId) return true;
+    if (!terminalBySprint.has(conflict.sprintId)) {
+      const coordinator = readCoordinatorState(projectRoot, conflict.sprintId, options.nowMs ?? Date.now());
+      terminalBySprint.set(conflict.sprintId, coordinator === 'alive' || coordinator === 'unknown'
+        ? null : readRunFlowTerminalClosureForSprint(projectRoot, conflict.sprintId));
+    }
+    const terminal = terminalBySprint.get(conflict.sprintId);
+    if (!terminal) return true;
+    historicalProjections.push(Object.freeze({ projection: conflict, terminalFlowState: terminal.state,
+      ...(terminal.completedAt ? { completedAt: terminal.completedAt } : {}) }));
+    return false;
+  });
   return {
     ...authority,
+    conflicts,
+    ...(historicalProjections.length > 0 ? { historicalProjections: Object.freeze(historicalProjections) } : {}),
     recoveryReconciliation: readSprintStatusRecoveryReconciliation(projectRoot, authority),
   };
 }

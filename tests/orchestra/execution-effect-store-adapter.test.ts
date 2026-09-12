@@ -576,7 +576,37 @@ describe('execution effect Store adapter', () => {
       directories: [...fixture.adapter.directories.keys()].sort(),
     });
     const before = storeSnapshot();
-    const evidence = fixture.bridge.readCommittedReleasePendingEvidence();
+    const retainedFiles = new Map(fixture.adapter.files);
+    const readBounds = { maxEntries: 10_000, maxBytes: 32 * 1024 * 1024, maxDurationMs: 10_000 };
+    const siblingReader = createExecutionEffectLifecycleStoreAdmissionAdapterV1({
+      store: fixture.store, identity: fixture.identity, policy: fixture.policy,
+      admissionReceiptDigest: fixture.store.readAdmission(fixture.identity, fixture.policy)!.receiptDigest, platform: 'linux',
+      now: () => '2026-09-01T00:00:00.000Z',
+    });
+    const operation = fixture.store.withVerifiedReadSnapshot(readBounds, () => {
+      const first = fixture.bridge.readCommittedReleasePendingEvidence();
+      expect(siblingReader.readLifecycleAuthority('READY_FOR_LANDING'))
+        .toBe(fixture.bridge.readLifecycleAuthority('READY_FOR_LANDING'));
+      expect(fixture.bridge.readCommittedReleasePendingEvidence()).toEqual(first);
+      return first;
+    });
+    const evidence = operation.value;
+    expect(operation.statistics.semanticHits).toBeGreaterThan(0);
+    expect(() => fixture.store.withVerifiedReadSnapshot(readBounds, () => {
+      fixture.bridge.readCommittedReleasePendingEvidence();
+      mutateStoredArtifact(fixture, 'execution-effect-lifecycle-authority',
+        evidence!.readyLifecycle.artifactKey, 'missing');
+      return 'ready';
+    })).toThrow(TaskAttemptCustodyHold);
+    // Restore through the fixture's retained bytes for the remaining read-only
+    // assertions; this is an isolated in-memory adapter, never live custody.
+    for (const [path] of before.files) {
+      const previous = fixture.adapter.files.get(path);
+      if (!previous) {
+        const originalFile = retainedFiles.get(path)!;
+        fixture.adapter.files.set(path, originalFile);
+      }
+    }
     expect(evidence).toMatchObject({
       phase: 'COMMITTED_JOURNAL_RELEASE_PENDING',
       semanticVerifier: 'orchestra-required-v1',

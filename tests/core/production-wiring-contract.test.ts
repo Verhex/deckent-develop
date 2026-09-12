@@ -13,6 +13,7 @@ import {
 } from '../../src/core/production-wiring-contract.js';
 import {
   MEMORY_COMPACT_READ_EXPORT_PROOF_IDENTITY,
+  METRICS_RETENTION_PROOF_IDENTITY,
   TERMINAL_NATIVE_BOOT_HEALTH_PROOF_IDENTITY,
   TERMINAL_NATIVE_AUTH_HEALTH_PROOF_IDENTITY,
   TERMINAL_NATIVE_PROVIDER_PROOF_IDENTITY,
@@ -144,6 +145,7 @@ describe('production wiring contract', () => {
       TERMINAL_NATIVE_BOOT_HEALTH_PROOF_IDENTITY,
       TERMINAL_REPL_SURFACE_PROOF_IDENTITY,
       MEMORY_COMPACT_READ_EXPORT_PROOF_IDENTITY,
+      METRICS_RETENTION_PROOF_IDENTITY,
     ]);
     expect(Object.isFrozen(identities)).toBe(true);
     expect(JSON.stringify(identities)).not.toMatch(/adapterId|harnessPath|sha256|schemaId/u);
@@ -157,6 +159,35 @@ describe('production wiring contract', () => {
     expect(terminalContract.hostProofProgram.verifierAssets.map(asset => asset.path)).toEqual([
       'scripts/production-wiring-host-proof-harness.mjs',
     ]);
+  });
+
+  it('registers the metrics rotation/retention identity and host-completes its proof program', () => {
+    expect(isProductionWiringHostProofIdentityRegistered(
+      METRICS_RETENTION_PROOF_IDENTITY,
+    )).toBe(true);
+
+    // A tuple that is not registered byte-for-byte stays unregistered: the planner
+    // may propose a registered identity, never invent one.
+    expect(isProductionWiringHostProofIdentityRegistered({
+      ...METRICS_RETENTION_PROOF_IDENTITY,
+      producer: { producerId: 'deckent.observability.not-registered' },
+    })).toBe(false);
+
+    const contract = completeProductionWiringFromProposal({
+      version: 1,
+      changeKind: 'runtime-change',
+      ...METRICS_RETENTION_PROOF_IDENTITY,
+      disposition: { kind: 'production-wiring' },
+    }, { projectRoot: process.cwd() });
+
+    // Host owns the verifier assets; the observer is host-registered, never plan-authored.
+    expect(contract.hostProofProgram.verifierAssets.map(asset => asset.path)).toEqual([
+      'scripts/production-wiring-host-proof-harness.mjs',
+      'scripts/metrics-retention-host-proof-observer.mjs',
+    ]);
+    expect(contract.producer.producerId).toBe('deckent.observability.metrics-append');
+    expect(contract.canonicalConsumer.consumerId)
+      .toBe('deckent.observability-rotation.size-triggered-rotation');
   });
 
   it('completes only the exact memory identity into its two-asset bounded platform profile', () => {

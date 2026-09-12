@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { productionWiringResultEvidenceSchema } from '../../src/core/task-result-schema.js';
 import {
   buildProductionWiringAuthorityBlock,
   buildTaskPrompt,
@@ -20,6 +21,29 @@ const complete = (ref: string): ProductionWiringEvidence => ({
   state: 'complete',
   basis: 'authority-record',
   evidenceRefs: [ref],
+});
+
+describe('worker result instructions round-trip through the real ingress schema', () => {
+  it.each(['v1', 'v2'] as const)('provides valid negative evidence for every advertised state (%s)', version => {
+    const authority = version === 'v1' ? makeEvidence() : makeV2Evidence();
+    const block = buildProductionWiringAuthorityBlock(authority);
+    const examples = [...block.matchAll(/\{\n  "version":[\s\S]*?\n\}/g)]
+      .map(match => JSON.parse(match[0]) as unknown);
+    expect(examples).toHaveLength(4);
+    const parsed = examples.map(example => productionWiringResultEvidenceSchema.parse(example));
+    expect(parsed.map(example => example.evidence.state)).toEqual([
+      'presence-only', 'incomplete', 'unsupported', 'contradictory',
+    ]);
+    for (const example of parsed) {
+      expect(example.contractDigest).toBe(authority.contractDigest);
+      expect(example.observedBy).toBe('worker');
+      expect(example.evidence.evidenceRefs.length).toBeGreaterThan(0);
+      const missingDiscriminator = { ...example, evidence: { ...example.evidence } };
+      Reflect.deleteProperty(missingDiscriminator.evidence, 'basis');
+      Reflect.deleteProperty(missingDiscriminator.evidence, 'reasonCode');
+      expect(productionWiringResultEvidenceSchema.safeParse(missingDiscriminator).success).toBe(false);
+    }
+  });
 });
 
 const executed = (ref: string): ProductionWiringEvidence => ({
@@ -180,8 +204,15 @@ describe('production-wiring prompt block — rendering', () => {
     expect(block).toContain(`Host proof program: sha256:${evidence.contract.hostProofProgram.programDigest}`);
     expect(block).toContain('wsl2-linux:supported/native-v1');
     expect(block).toContain('darwin:unsupported/owner-deferred');
-    expect(block).not.toContain('evidenceRefs');
+    // The rendered forms are what must never appear for a V2 contract: a
+    // `refs:` list, or a V1 `[state/basis]` qualifier presenting plan/worker
+    // observation as host evidence. Asserting those directly is stricter than
+    // banning the substring `evidenceRefs`, which the worker result-contract
+    // directive now legitimately names as the key the worker must fill in.
     expect(block).not.toContain('refs:');
+    for (const state of ['complete', 'presence-only', 'incomplete', 'unsupported', 'contradictory']) {
+      expect(block).not.toContain(`[${state}/`);
+    }
   });
 
   it('renders identities verbatim and never invents one from task prose', () => {

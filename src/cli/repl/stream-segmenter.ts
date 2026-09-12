@@ -29,6 +29,8 @@ export interface StreamSegmenter {
   feed(chunk: string | Uint8Array): void;
   /** End of turn: emit the trailing partial line / any open block. */
   flush(): void;
+  /** Drop buffered prose without emitting (tool-active: keep scrollback calm). */
+  discard(): void;
   /** The current in-progress (incomplete) line, for a small live preview. */
   partial(): string;
 }
@@ -118,6 +120,12 @@ export function createStreamSegmenter(emit: (seg: Segment) => void): StreamSegme
       if (buf.length > 0) { handleLine(buf); buf = ''; }
       if (mode === 'code' && block.length > 0) { emit({ kind: 'block', markdown: block.join('\n') }); block = []; }
       else if (mode === 'table') flushTable();
+      mode = 'prose';
+    },
+    discard(): void {
+      decoder = null;
+      buf = '';
+      block = [];
       mode = 'prose';
     },
     partial: () => buf,

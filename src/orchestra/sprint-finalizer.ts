@@ -6155,7 +6155,12 @@ export function persistFinalSprintState(projectRoot: string, sprint: Sprint): vo
     }
   } catch (e) { debugLog('persistFinalSprintState:writeSprintState', e); }
   try {
-    clearPid(projectRoot, sprint.id);
+    // Finalization IS the settlement authority for this sprint: the terminal
+    // state has just been persisted, so the generation snapshot has served its
+    // purpose and is retired with the PID file. Ordinary teardown paths must
+    // NOT do this — they leave the snapshot as the only evidence binding a
+    // finished run to its terminal RunFlow event.
+    clearPid(projectRoot, sprint.id, { dropSnapshot: true });
   } catch (e) { debugLog('persistFinalSprintState:clearPid', e); }
   // GHOST-FINALIZE fix (Sprint 272 272-001): purge this sprint's checkpoint
   // artifacts so the next `deckent start` cannot read a stale checkpoint and

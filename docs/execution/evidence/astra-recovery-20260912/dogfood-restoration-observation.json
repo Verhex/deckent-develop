@@ -1,0 +1,61 @@
+{
+  "observedAt": "2026-09-12T16:00:40.541803+00:00",
+  "kind": "read-only observation, not settlement or effective runtime attestation",
+  "dockerPs": {
+    "exitCode": 0,
+    "output": "local-llm\tUp 3 days (healthy)\n"
+  },
+  "tasks": [
+    {
+      "sprint": 748,
+      "taskId": "748-001",
+      "rawProjectionStatus": "EXECUTING",
+      "sha256": "80623c62c52977aa9a5af7bae0af220f73c72e8d6c8c3fc6dcad1655c4fde55d",
+      "skillDeliveryPresent": true,
+      "legacyHeartbeatPresent": false
+    },
+    {
+      "sprint": 749,
+      "taskId": "749-001",
+      "rawProjectionStatus": "PENDING",
+      "sha256": "1b83d030db00c5aa865b23c0c259f25984ba23c63fee6774e1553815e06458f2",
+      "skillDeliveryPresent": false,
+      "legacyHeartbeatPresent": false
+    },
+    {
+      "sprint": 750,
+      "taskId": "750-001",
+      "rawProjectionStatus": "PENDING",
+      "sha256": "e13e135bb7f9ce0a7a3e48e6b81e857e80d06fc333586fe9a11672a00d5a6846",
+      "skillDeliveryPresent": false,
+      "legacyHeartbeatPresent": false
+    }
+  ],
+  "projectConfigProjectionOnly": {
+    "mode": "performance",
+    "maxWorkersTopLevel": 2,
+    "performanceBrainModel": "gpt-6-astra",
+    "performanceMaxWorkers": 8,
+    "nervousEnabled": true,
+    "nervousMode": "balanced",
+    "nervousDesktopNotificationEnabled": false
+  },
+  "limits": [
+    "Not merged effective config. No new provider/auth/capacity admission.",
+    "Docker observation does not prove absence on all backends.",
+    "Task statuses are raw projections, not live worker counts."
+  ],
+  "verification": {
+    "tests": "NOT_RUN audit only",
+    "tsc": "NOT_RUN audit only",
+    "lint": "NOT_RUN audit only",
+    "build": "NOT_RUN audit only",
+    "memoryDetailCliExitCodes": {
+      "adr-d-007": 0,
+      "adr-g-020": 0,
+      "adr-g-022": 0,
+      "adr-g-031": 0
+    }
+  },
+  "gitDirtyPathCount": 100
+}

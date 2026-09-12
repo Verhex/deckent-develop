@@ -249,7 +249,23 @@ from source parity or simulated green tests.
 No prototype interaction may be reported as production-wired until these exact paths have real
 binary evidence.
 
-## 11. Acceptance evidence for implementation
+## 11. Workline configuration (provider-neutral)
+
+Runtime tuning for the Causal Workline lives under `terminal.workline` in project
+config (see `CONFIG_METADATA` and `src/core/terminal-workline-contract.ts`). Terminal
+REPL and future Desktop operator chat must resolve the **same** keys:
+
+| Key | Role |
+| --- | --- |
+| `terminal.workline.composer.paste_max_lines_inline` | Paste chip threshold (lines) |
+| `terminal.workline.composer.paste_max_chars_inline` | Paste chip threshold (chars) |
+| `terminal.workline.operator.suppress_prose_during_tool_execution` | Scrollback calm during tool-active phases |
+
+User-visible chip text remains in the message catalog (`tui.composer.paste_chip`), not
+in config prose. Agent-OS management (approvals, run flow, evidence) shares authority
+with Desktop via existing run-flow and approval surfaces — not duplicate Terminal rules.
+
+## 12. Acceptance evidence for implementation
 
 - accepted Causal Workline + Work Ledger region-to-Ink primitive map;
 - en/tr rendered parity and no hardcoded user-facing strings;

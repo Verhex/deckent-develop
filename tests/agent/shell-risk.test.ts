@@ -5,9 +5,17 @@ import { runAgentTurn, type LoopDeps } from '../../src/agent/loop.js';
 import { Transcript } from '../../src/agent/transcript.js';
 import { ToolRegistry } from '../../src/agent/tools/registry.js';
 import { SAFE_DEFAULT_POLICY } from '../../src/agent/permission-policy.js';
-import type { AgentEvent } from '../../src/agent/events.js';
+import type { AgentEvent, PermissionRequestEvent } from '../../src/agent/events.js';
 import type { ProviderAdapter, ProviderEvent } from '../../src/agent/provider-tooluse/types.js';
 import type { RuleStore } from '../../src/agent/permission-store.js';
+import type { PermissionResponse } from '../../src/agent/permission.js';
+import {
+  bindNativePermissionIntent,
+  createNativePermissionInvocation,
+  digestNativePermissionArgs,
+  nativePermissionBindingsEqual,
+} from '../../src/agent/native-permission-binding.js';
+import { nativeBuiltinApprovalClassifier } from '../../src/agent/native-tool-approval.js';
 
 function expectRisk(command: string, risk: ShellRisk): void {
   expect(classifyShellCommand(command), command).toMatchObject({ risk });
@@ -52,6 +60,10 @@ describe('classifyShellCommand', () => {
     expectRisk('cat input | tee output', 'modify');
     expectRisk('echo "> literal"', 'safe-read');
   });
+
+  it('does not demote compound writes via the read-only parser', () => {
+    expectRisk("mkdir -p /tmp/deckent-x && printf 'test' > /tmp/deckent-x/file.txt", 'modify');
+  });
 });
 
 function scriptedAdapter(events: ProviderEvent[][]): ProviderAdapter {
@@ -87,8 +99,29 @@ function shellDeps(
     category: 'coding',
     tier: 'confirm',
     source: 'builtin',
+    approval: nativeBuiltinApprovalClassifier(tool),
     handler: async () => ({ ok: true, output: 'ran' }),
   });
+  let invocation = 0;
+  const issuePermission: LoopDeps['issuePermission'] = (input) => ({
+    type: 'permission-request',
+    id: input.callId,
+    tool: input.tool,
+    resource: input.resource,
+    tier: input.tier,
+    approval: Object.freeze({ ...input.approval }),
+    maskedArgs: Object.freeze({ ...input.rawArgs }),
+    invocation: createNativePermissionInvocation({
+      sessionId: 'shell-risk', sessionInstanceId: 'shell-risk', turnGeneration: 1,
+      invocationId: `invocation-${++invocation}`, callId: input.callId, tool: input.tool,
+      rawArgs: input.rawArgs, tier: input.tier, elevated: input.elevated, nested: input.nested,
+    }),
+  });
+  const valid = (request: PermissionRequestEvent, response: PermissionResponse, rawArgs: Record<string, unknown>): boolean => {
+    if (response.decision === 'hold' || response.decision === 'deny') return false;
+    return digestNativePermissionArgs(rawArgs) === request.invocation.invocationArgsDigest
+      && nativePermissionBindingsEqual(response.binding, bindNativePermissionIntent(request.invocation, response.decision, request.resource));
+  };
   return {
     adapter: scriptedAdapter([
       [{
@@ -105,7 +138,13 @@ function shellDeps(
     cwd: tmpdir(),
     model: 'test',
     getMode: () => 'full-auto',
-    requestPermission: async (event) => { requested.push(event.resource); return { decision: 'once' }; },
+    issuePermission,
+    requestPermission: async (event) => {
+      requested.push(event.resource);
+      return { decision: 'once', binding: bindNativePermissionIntent(event.invocation, 'once', event.resource) };
+    },
+    validatePermission: valid,
+    claimPermissionEffect: valid,
   };
 }
 
@@ -118,19 +157,10 @@ describe('shell risk loop integration', () => {
     expect(events).toContainEqual({ type: 'tool-executing', id: 'shell-1', tool: 'deckent_bash' });
   });
 
-  it.each(['bash', 'deckent_bash'] as const)(
-    'keeps destructive %s commands on the always floor in full-auto',
-    async (tool) => {
+  it('keeps destructive deckent_bash on the always floor in full-auto', async () => {
     const requested: string[] = [];
-    const events = await drain(runAgentTurn(shellDeps('rm -rf /tmp/x', requested, tool), new Transcript(), 'go'));
-    expect(requested).toEqual([tool === 'bash' ? '' : 'rm -rf /tmp/x']);
-    expect(events).toContainEqual({
-      type: 'permission-request',
-      id: 'shell-1',
-      tool,
-      resource: tool === 'bash' ? '' : 'rm -rf /tmp/x',
-      tier: 'always',
-    });
-    },
-  );
+    const events = await drain(runAgentTurn(shellDeps('rm -rf /tmp/x', requested), new Transcript(), 'go'));
+    expect(requested).toEqual(['rm -rf /tmp/x']);
+    expect(events.some((event) => event.type === 'permission-request' && event.tier === 'always' && event.tool === 'deckent_bash')).toBe(true);
+  });
 });

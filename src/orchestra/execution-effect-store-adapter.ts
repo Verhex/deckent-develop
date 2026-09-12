@@ -76,6 +76,9 @@ import {
   type ReleaseExecutionEffectDockerWorkspaceV1Result,
 } from './execution-effect-docker-lifecycle.js';
 
+// Private to this reader module. Facts remain keyed by complete authority and
+// stored only in the current Store operation, including across reader instances.
+const READ_SNAPSHOT_OWNER = Object.freeze({});
 const DIGEST = /^sha256:[a-f0-9]{64}$/u;
 const SAFE_KEY = /^[a-z0-9][a-z0-9._-]{0,127}$/u;
 const JOURNAL_KEY = /^effect-landing\/([a-f0-9]{64})\/(prepared|applying|committed|step-[0-9]{7})\.json$/u;
@@ -1204,6 +1207,15 @@ export class ExecutionEffectStoreAdapterV1 {
     mode: ExecutionEffectStoreCleanupModeV1,
     state: ExecutionEffectStoreCleanupStateV1,
     cache: Map<string, ExecutionEffectStoreCleanupProgressV1 | null> = new Map(),
+  ): ExecutionEffectStoreCleanupProgressV1 | null {
+    return this.#readSnapshotFact('cleanup', `${mode}:${state}`,
+      () => this.#readCleanupProgressUncached(mode, state, cache));
+  }
+
+  #readCleanupProgressUncached(
+    mode: ExecutionEffectStoreCleanupModeV1,
+    state: ExecutionEffectStoreCleanupStateV1,
+    cache: Map<string, ExecutionEffectStoreCleanupProgressV1 | null>,
   ): ExecutionEffectStoreCleanupProgressV1 | null {
     const cacheKey = `${mode}:${state}`;
     if (cache.has(cacheKey)) return cache.get(cacheKey) ?? null;
@@ -2487,7 +2499,22 @@ export class ExecutionEffectStoreAdapterV1 {
     });
   }
 
+  #readSnapshotFact<T>(kind: string, key: string, read: () => T): T {
+    return this.#store.readVerifiedSnapshotFact(READ_SNAPSHOT_OWNER, {
+      kind, key, identity: this.#identity, policy: this.#policy,
+      admissionReceiptDigest: this.#admissionReceiptDigest, platform: this.#platform,
+    }, read);
+  }
+
   #readLifecyclePublication<S extends ExecutionEffectDockerLifecycleAuthorityV1['state']>(
+    state: S,
+  ): (ExecutionEffectStoreLifecyclePublicationV1 & Readonly<{
+    authority: Extract<ExecutionEffectDockerLifecycleAuthorityV1, { state: S }>;
+  }>) | null {
+    return this.#readSnapshotFact('lifecycle', state, () => this.#readLifecyclePublicationUncached(state));
+  }
+
+  #readLifecyclePublicationUncached<S extends ExecutionEffectDockerLifecycleAuthorityV1['state']>(
     state: S,
   ): (ExecutionEffectStoreLifecyclePublicationV1 & Readonly<{
     authority: Extract<ExecutionEffectDockerLifecycleAuthorityV1, { state: S }>;

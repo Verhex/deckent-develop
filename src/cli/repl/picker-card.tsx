@@ -29,7 +29,7 @@ import {
 // lines = muted). No literal survives a theme the user customized.
 /** Border (2) + paddingX (2) cells the Box consumes around the content. */
 const FRAME_CELLS = 4;
-/** Cursor gutter cells before each row. */
+/** Selection gutter cells before each row. */
 const GUTTER_CELLS = 2;
 const MAX_WINDOW_ROWS = 10;
 /** Rows the frame needs besides the list (title, filter, scope, hints, border). */

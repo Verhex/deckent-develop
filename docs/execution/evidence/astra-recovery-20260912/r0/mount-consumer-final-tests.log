@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/orchestra/spawn-backend-docker-mounts.test.ts (92 tests) 456ms
+
+ Test Files  1 passed (1)
+      Tests  92 passed (92)
+   Start at  19:47:27
+   Duration  5.90s (transform 3.00s, setup 17ms, collect 4.09s, tests 456ms, environment 0ms, prepare 38ms)
+

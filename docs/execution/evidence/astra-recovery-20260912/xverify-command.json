@@ -1,0 +1,26 @@
+{
+  "startedAt": "2026-09-12T14:47:50.992481+00:00",
+  "argv": [
+    "node",
+    "dist/cli/entry.js",
+    "xverify",
+    "Review the exact Codex recovery safety claim in xverify-claim.md; source correctness only, production closure explicitly unproven. Find blocking authority/cold-restart/race defects and advise exact CLI orphan preflight boundary.",
+    "--author",
+    "codex",
+    "--author-model",
+    "gpt-6-astra",
+    "--verifier",
+    "claude",
+    "--verifier-model",
+    "claude-opus-5",
+    "--files",
+    "docs/execution/evidence/astra-recovery-20260912/xverify-claim.md,docs/execution/evidence/astra-recovery-20260912/recovery-candidate.patch,tests/orchestra/rejected-result-history.test.ts",
+    "--target",
+    "src/orchestra/result-ingress.ts:210-250,src/orchestra/spawn-backend-docker.ts:14707-14732,src/orchestra/spawn-backend-docker.ts:15020-15090,src/orchestra/spawn-backend-docker.ts:21230-21300,src/orchestra/scheduler-effects.ts:970-1005,src/orchestra/scheduler-effects.ts:1120-1145,src/orchestra/sprint-controller.ts:1780-1895,src/cli/commands/start.ts:352-405",
+    "--timeout",
+    "180000",
+    "--json"
+  ],
+  "exitCode": 0,
+  "finishedAt": "2026-09-12T14:51:20.739189+00:00"
+}

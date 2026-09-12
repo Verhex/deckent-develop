@@ -82,6 +82,8 @@ export interface SpawnBackendRecoveryReport {
   closedBeforeAdmission?: string[];
   /** Started attempts explicitly retained as failed; never zero-work or success. */
   closedStartedFailed?: string[];
+  /** Released effects with a durably rejected worker result; never successful task completion. */
+  closedRejectedResults?: string[];
   /** Main effect is durably committed, while release/acceptance/settlement remain
    * absent. These attempts stay failed and unresolved; retention only prevents
    * the old provider attempt from being replayed during startup. */
@@ -239,7 +241,20 @@ export interface ExactDockerAcceptedResultV2 {
   readonly reader: ExactDockerAcceptedResultReaderV2;
 }
 
-export type ExactDockerAcceptResultOutcomeV2 = ExactDockerAcceptedResultV2 | Readonly<{
+/** Process-local capability; only its issuing backend can revalidate the durable rejection. */
+export interface ExactDockerRejectedResultReaderV2 { readonly token: symbol }
+
+export interface ExactDockerRejectedResultV2 {
+  readonly kind: 'rejected-result';
+  readonly reasonCode: 'WORKER_RESULT_SCHEMA_INVALID';
+  readonly custodyRef: ExactDockerCustodyRefV2;
+  readonly releaseReceipt: ExactDockerCustodyReceiptRefV2;
+  readonly projectionFence: Sha256Digest;
+  readonly sourceResultDigest: Sha256Digest;
+  readonly reader: ExactDockerRejectedResultReaderV2;
+}
+
+export type ExactDockerAcceptResultOutcomeV2 = ExactDockerAcceptedResultV2 | ExactDockerRejectedResultV2 | Readonly<{
   readonly kind: 'capture-hold';
   readonly reasonCode:
     | Extract<ExactDockerCustodyCompletionV2, { kind: 'capture-hold' }>['reasonCode']
@@ -674,6 +689,11 @@ export interface SpawnBackend {
   awaitExactDockerAcceptedResult?(
     query: ExactDockerCustodyTerminalQueryV2,
   ): Promise<ExactDockerAcceptResultOutcomeV2>;
+
+  /** Read-only: true only for the same rejected bytes/custody, no acceptance, and an absent daemon execution. */
+  verifyExactDockerRejectedResult?(
+    rejected: ExactDockerRejectedResultV2,
+  ): Promise<boolean>;
 
   acceptExactDockerCustodyResult?(
     input: AcceptExactDockerCustodyResultInputV2,

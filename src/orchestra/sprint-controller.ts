@@ -54,6 +54,7 @@ import type { ExactAcceptedResultTerminalAuthorityV2 } from './exact-accepted-re
 import { debugLog, parseSprintOrdinal, readJsonSafe, updateLastSprintId } from '../core/utils.js';
 import { listRunInspectorRuns } from '../core/run-inspector-read-model.js';
 import { readRunFlowTerminalClosureForSprint } from '../core/run-jobs-read.js';
+import { readArchivedSprintTerminalOutcome } from '../core/sprint-archive.js';
 
 // ─── Core — adaptive timeout defaults (Sprint 192 Task 192-011) ────
 import {
@@ -1537,7 +1538,8 @@ const DECIDED_EXACT_SETTLEMENT_HOLD_SUFFIXES = Object.freeze([
  * Conservative by construction: an unknown code is NEVER decided. Only a code
  * that survives the transient deny list and then matches the decided allowlist —
  * or the `production-wiring-*` verifier-asset family, whose asset no longer
- * snapshots and never will — may retire an attempt as foreign history.
+ * snapshots and never will, or missing evidence in immutable accepted worker
+ * bytes — may retire an attempt as foreign history.
  *
  * @internal Exported for cold-restart fan-in behavior tests.
  */
@@ -1545,6 +1547,11 @@ export function isDecidedExactSettlementHold(reasonCode: string): boolean {
   if (!/^[a-z0-9][a-z0-9-]*$/u.test(reasonCode)) return false;
   if (TRANSIENT_EXACT_SETTLEMENT_HOLD_SUFFIXES.some(s => reasonCode.endsWith(s))) return false;
   if (reasonCode === 'custody-hold') return false;
+  // This branch is consumed only after exact accepted-result custody. Worker
+  // evidence is part of those immutable bytes; a later host observation cannot
+  // supply it. The caller still requires a durably terminal historical owner,
+  // and retirement never publishes a successful task settlement.
+  if (reasonCode === 'production-wiring-missing-worker-evidence') return true;
   if (reasonCode.startsWith('production-wiring-')) {
     return reasonCode.endsWith('-invalid') || reasonCode.endsWith('-changed');
   }
@@ -1621,6 +1628,15 @@ export function readOwningRunTerminalDisposition(
     if (recordState !== null && NON_TERMINAL_ARCHIVE_RECORD_STATES.includes(recordState)) {
       return 'unknown';
     }
+    // A sealed archive is the run's own durable settlement record and outlives
+    // the coordinator, its `.pid` and its generation snapshot. Consulting it
+    // first is not a weakening: the seal is digest-bound and self-consistent,
+    // and the deny-only guard above still wins. The closure path below infers
+    // terminality from process-liveness artifacts that teardown removes, so a
+    // genuinely finished run whose snapshot is gone read back `unknown` forever
+    // and its accepted-result attempt could never retire.
+    const sealed = readArchivedSprintTerminalOutcome(projectRoot, sprintId);
+    if (sealed === 'COMPLETE' || sealed === 'ABORTED') return 'terminal';
     const closure = readRunFlowTerminalClosureForSprint(projectRoot, sprintId);
     return closure !== null
       && (closure.state === 'COMPLETED' || closure.state === 'FAILED')
@@ -1834,6 +1850,33 @@ export async function settleRecoveredExactTerminalAuthorities(
         );
       }
       continue;
+    }
+    const rejected = resultAuthority.state === 'authority-hold'
+      ? registry.readRejectedResultAuthority?.(taskId) : null;
+    if (rejected?.reasonCode === 'WORKER_RESULT_SCHEMA_INVALID'
+      && resultAuthority.state === 'authority-hold'
+      && resultAuthority.holdReason === rejected.reasonCode) {
+      const owningSprintId = restoreCandidateSprintIdForTaskId(taskId);
+      const owningOrdinal = owningSprintId === null ? null : parseSprintOrdinal(owningSprintId);
+      if (candidateOrdinal !== null && owningOrdinal !== null && owningOrdinal < candidateOrdinal
+        && owningSprintId !== null
+        && isBoundRecoveredAttemptIdentity(taskId, rejected.custodyRef.identity)
+        && readOwningRun(owningSprintId) === 'terminal'
+        && await registry.verifyRejectedResultAuthority?.(taskId, rejected) === true) {
+        // This is negative history, never an accepted result or successful settlement.
+        // The async daemon/custody check may race a lifecycle change: bypass the cache.
+        let freshOwningRun: OwningRunTerminalDisposition = 'unknown';
+        try {
+          freshOwningRun = options.readOwningRunLifecycle
+            ? options.readOwningRunLifecycle(owningSprintId) ?? 'unknown'
+            : readOwningRunTerminalDisposition(options.projectRoot, owningSprintId);
+        } catch { /* unreadable authority remains HOLD */ }
+        if (freshOwningRun === 'terminal'
+          && registry.readRejectedResultAuthority?.(taskId) === rejected) {
+          retireAsHistory(taskId, owningSprintId, rejected.reasonCode);
+          continue;
+        }
+      }
     }
     const diagnostic = resultAuthority.state === 'authority-hold'
       ? `:${exactRecoveryDiagnosticToken(resultAuthority.holdReason)}`

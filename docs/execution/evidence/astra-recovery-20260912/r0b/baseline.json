@@ -1,0 +1,31 @@
+{
+  "observedAt": "2026-09-12T17:19:36.958503+00:00",
+  "files": [
+    {
+      "path": "src/core/task-attempt-custody-store.ts",
+      "sha256": "9f4a829e5ccb7b81df3aa8189a53bf7ca44599720387630969bdc2bc3c14c261"
+    },
+    {
+      "path": "src/orchestra/spawn-backend-docker.ts",
+      "sha256": "8bbccd4453703aa28a4816b5ca2122e27ddc70d0933fd8bb4f5ea9e69071a24a"
+    },
+    {
+      "path": "src/core/run-status-authority.ts",
+      "sha256": "65e98e58bfde26b643fedec660451bd8b4d4a196d037cd35c210e1a20208a537"
+    },
+    {
+      "path": "src/core/run-status-read-model.ts",
+      "sha256": "108fa5054de652f9cd3bb2e2cb4a52d01278f95a1824cc9563d061a7cc49ab02"
+    },
+    {
+      "path": "src/orchestra/sprint-recovery-operation.ts",
+      "sha256": "396dfb18a468defbebca5ee0220d86451e91bc319a7b58f240d3478df4d6b79b"
+    },
+    {
+      "path": "src/orchestra/execution-effect-store-adapter.ts",
+      "sha256": "a8199eb23fe1f67ba00fc8cc4f42559e1b6c6e74761b63d477879c7033e0082f",
+      "addedAt": "2026-09-12T17:53:40.751924+00:00",
+      "reason": "profile proves repeated lifecycle/cleanup semantic validation blocks current read-only gate"
+    }
+  ]
+}

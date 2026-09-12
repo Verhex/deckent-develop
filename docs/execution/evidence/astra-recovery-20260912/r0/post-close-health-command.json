@@ -1,0 +1,7 @@
+{
+  "startedAt": "2026-09-12T16:48:51.863048+00:00",
+  "finishedAt": "2026-09-12T16:52:07.724388+00:00",
+  "durationMs": 207415,
+  "exitCode": 0,
+  "surface": "inspectExactDockerPlanningRecoveryHealth, real native Store, CPU profile"
+}

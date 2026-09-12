@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "node",
+    "/tmp/deckent-r0-astra-20260912/cold-negative-read.mjs"
+  ],
+  "startedAt": "2026-09-12T17:00:53.158940+00:00",
+  "finishedAt": "2026-09-12T17:00:58.722986+00:00",
+  "durationMs": 5564,
+  "exitCode": 0
+}

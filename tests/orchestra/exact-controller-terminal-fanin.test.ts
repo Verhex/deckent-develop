@@ -1243,6 +1243,59 @@ describe('exact controller terminal fan-in behavior', () => {
     expect(isBoundRecoveredAttemptIdentity('728-001', null)).toBe(false);
   });
 
+  it('re-derives terminal history for immutable missing worker evidence after each cold start', async () => {
+    const reasonCode = 'production-wiring-missing-worker-evidence';
+    for (let restart = 0; restart < 2; restart++) {
+      const { registry, terminal, retired } = unsettleableForeignRegistry('913-001', reasonCode);
+      await settleRecoveredExactTerminalAuthorities(registry, {
+        projectRoot: '/test/project', restoreCandidateSprintId: null,
+        readOwningRunLifecycle: () => 'terminal',
+      });
+      expect(terminal.has('913-001')).toBe(false);
+      expect(retired.get('913-001')?.reasonCode).toBe(reasonCode);
+      expect(registry.readTaskResultAuthority('913-001').state).not.toBe('exact-accepted');
+    }
+  });
+
+  it.each([
+    { current: 'sprint-913', lifecycle: 'terminal' as const },
+    { current: 'sprint-912', lifecycle: 'terminal' as const },
+    { current: null, lifecycle: 'not-terminal' as const },
+    { current: null, lifecycle: 'unknown' as const },
+  ])('keeps immutable missing evidence held at an unsafe owner boundary: %j', async ({ current, lifecycle }) => {
+    const { registry, terminal } = unsettleableForeignRegistry('913-001', 'production-wiring-missing-worker-evidence');
+    await expect(settleRecoveredExactTerminalAuthorities(registry, {
+      projectRoot: '/test/project', restoreCandidateSprintId: current,
+      readOwningRunLifecycle: () => lifecycle,
+    })).rejects.toThrow('EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD');
+    expect(registry.retireHistoricalUnsettleableAttempt).not.toHaveBeenCalled();
+    expect(terminal.has('913-001')).toBe(true);
+  });
+
+  it.each([true, false])('requires a generation-bound disk closure for missing worker evidence (bound=%s)', async bound => {
+    const root = owningRunFixture();
+    identityProvenFlow(root, 'sprint-728', bound ? {} : { snapshotStartToken: 'foreign-generation' });
+    const { registry, terminal } = unsettleableForeignRegistry('728-001', 'production-wiring-missing-worker-evidence');
+    const result = settleRecoveredExactTerminalAuthorities(registry, {
+      projectRoot: root, restoreCandidateSprintId: null,
+    });
+    if (bound) await expect(result).resolves.toBeUndefined();
+    else await expect(result).rejects.toThrow('EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD');
+    expect(terminal.has('728-001')).toBe(!bound);
+  });
+
+  it.each(['unbound-identity', 'terminal-reread'] as const)('keeps missing worker evidence held for %s', async mode => {
+    const reasonCode = 'production-wiring-missing-worker-evidence';
+    const { registry } = unsettleableForeignRegistry('913-001', reasonCode,
+      mode === 'terminal-reread' ? { state: 'hold', reasonCode, origin: 'terminal-reread' } : undefined,
+      mode === 'unbound-identity' ? { taskId: '913-002', attemptId: 'foreign', projectId: 'p', generation: 1 } : undefined,
+    );
+    await expect(settleRecoveredExactTerminalAuthorities(registry, {
+      projectRoot: '/test/project', restoreCandidateSprintId: null, readOwningRunLifecycle: () => 'terminal',
+    })).rejects.toThrow('EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD');
+    expect(registry.retireHistoricalUnsettleableAttempt).not.toHaveBeenCalled();
+  });
+
   it('retires a foreign attempt whose evaluation replay can never match again', async () => {
     const { registry, terminal, retired } = unsettleableForeignRegistry(
       '724-001',
@@ -1320,6 +1373,7 @@ describe('exact controller terminal fan-in behavior', () => {
       'invalid-terminal-input',
       'production-wiring-verifier-asset-invalid',
       'production-wiring-verifier-asset-changed',
+      'production-wiring-missing-worker-evidence',
     ]) expect(isDecidedExactSettlementHold(decided)).toBe(true);
 
     for (const undecided of [
@@ -1333,6 +1387,8 @@ describe('exact controller terminal fan-in behavior', () => {
       'host-proof-timeout',
       'host-proof-cancelled',
       'production-wiring-verifier-asset-unbound',
+      'production-wiring-missing-host-consumer-execution',
+      'production-wiring-host-observation-unavailable',
       'acceptance-confirmation-required',
       'terminal-chain-mismatch',
       'reason-unavailable',

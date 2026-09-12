@@ -53,6 +53,14 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
     en: 'assistant reply',
     tr: 'asistan yanıtı',
   },
+  'tui.transcript.tools_turn_summary': {
+    en: '{n} tools',
+    tr: '{n} araç',
+  },
+  'tui.composer.paste_chip': {
+    en: '[Pasted text · {lines} lines · {bytes} B]',
+    tr: '[Yapıştırılan metin · {lines} satır · {bytes} B]',
+  },
   // TERMINAL-TOOLS-006 — Ctrl-C states its target (interrupt-policy.ts); the
   // hint names the next key. Shown for the second-press window only.
   'tui.ctrl_c_draft_cleared': { en: 'draft discarded · Ctrl-C again to exit', tr: 'taslak silindi · çıkmak için tekrar Ctrl-C' },

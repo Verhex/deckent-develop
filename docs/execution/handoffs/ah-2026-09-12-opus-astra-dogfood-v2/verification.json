@@ -1,0 +1,57 @@
+[
+  {
+    "class": "LOCAL_VERIFIED",
+    "scope": "transferor session test files (7)",
+    "command": "VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/production-wiring-host-proof-failure-reason.test.ts tests/orchestra/archived-sprint-terminal-disposition.test.ts tests/core/memory-read-planner-profile.test.ts tests/orchestra/production-wiring-worker-result-contract.test.ts tests/orchestra/model-selector-max-tier.test.ts tests/orchestra/sprint-pid-manager.test.ts tests/orchestra/production-wiring-prompt.test.ts",
+    "exitCode": 0,
+    "result": "96 passed (96)",
+    "logRef": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v2/verify-session-tests.log",
+    "logSha256": "sha256:0d34d1c494f1a3af638050046eea0e6d0edd12414c1f72417abeef0fb7a54a72",
+    "observedAt": "2026-09-12T11:27:00Z"
+  },
+  {
+    "class": "LOCAL_VERIFIED",
+    "scope": "typecheck",
+    "command": "npx tsc --noEmit -p tsconfig.json",
+    "exitCode": 0,
+    "result": "clean (empty output)",
+    "logRef": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v2/verify-tsc.log",
+    "logSha256": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "observedAt": "2026-09-12T11:27:20Z"
+  },
+  {
+    "class": "PRE_EXISTING_RED",
+    "scope": "planner-override-precedence + brain-planning-precedence",
+    "command": "VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/planner-override-precedence.test.ts tests/orchestra/brain-planning-precedence.test.ts",
+    "exitCode": 1,
+    "result": "9 failed | 10 passed (19); every failure is E_PRODUCTION_WIRING_REQUIRED",
+    "logRef": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v2/verify-preexisting-red.log",
+    "logSha256": "sha256:74c52c74cf4b801c768497f0b7d6e36461ed07daec7c81bf103b353f9abc5d8d",
+    "baselineMethod": "transferor copied its two changed sources aside, `git checkout --` them, re-ran: identical 9 failed | 10 passed. Not caused by this session.",
+    "observedAt": "2026-09-12T11:27:26Z"
+  },
+  {
+    "class": "BUILD_IDENTITY_VERIFIED",
+    "scope": "source<->dist identity",
+    "command": "npm run build:all (exit 0 @2026-09-12T04:37Z) then buildSourceTreeIdentity(root) vs dist/build-identity.json",
+    "exitCode": 0,
+    "result": "MATCH sourceTreeSha256=5f5fb64f043fa6fa1eb74fa8a76ff7b44f8096c6e4990f61afbc1dc14b10045a fileCount=1465; sourceRootSha256=b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27; nativeSourceTreeSha256=sha256:ef06f44f070e07061cacb7672e0812a88f44a8235e7002f338c2786f32d69a8d",
+    "authority": "src/cli/worktree-binary-authority.ts (BUILD_IDENTITY_SCHEMA_VERSION=3) — the product's own identity authority, NOT mtime ordering",
+    "note": "scripts/*.mjs (incl. the authority-handoff tooling change) is outside the compiled source-tree set and is executed directly; no rebuild is implied by it.",
+    "observedAt": "2026-09-12T11:25Z"
+  },
+  {
+    "class": "NOT_RUN",
+    "scope": "remote CI",
+    "command": "n/a",
+    "exitCode": null,
+    "result": "REMOTE_ADVISORY not executed this session"
+  },
+  {
+    "class": "NOT_CLOSED",
+    "scope": "provider call + usage + settlement chain",
+    "command": "deckent do -> approve -> start (run 6de757f8)",
+    "exitCode": null,
+    "result": "RUN_FAILED before RUN_STARTED; no worker .result exists; productionWiringEvidence never observed"
+  }
+]

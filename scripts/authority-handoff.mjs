@@ -96,14 +96,73 @@ function requireArg(name) {
   return v;
 }
 
+const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
+
+/**
+ * Resolve one identity digest field.
+ *
+ * `--<prefix>-<field>` carries a RAW value that this tool hashes.
+ * `--<prefix>-<field>-digest` carries an ALREADY-COMPUTED `sha256:<64hex>` and is
+ * recorded verbatim — never hashed a second time.
+ *
+ * The second form exists because §1.2 identity fields are runtime-resolved by the
+ * party they describe: only the transferee can resolve its own live session, and
+ * the transferor must be able to record the digest the transferee reports without
+ * demanding that party's raw session identifier. Without it the transferor either
+ * fabricates a value (the default `Date.now()` shape, which can never match a live
+ * session) or the transferee must hand over a raw identifier it has no reason to
+ * disclose. Observed 2026-09-12: `ah-2026-09-12-opus-astra-dogfood` was rejected
+ * `IDENTITY_MISMATCH/HOLD` for exactly this reason.
+ *
+ * Both forms together are a contradiction, not a preference — fail rather than pick.
+ */
+function identityDigest(prefix, field, rawFallback) {
+  const precomputed = arg(`${prefix}-${field}-digest`);
+  const raw = arg(`${prefix}-${field}`);
+  if (precomputed !== undefined && raw !== undefined) {
+    fail('E_ARGS', `--${prefix}-${field} and --${prefix}-${field}-digest are mutually exclusive`);
+  }
+  if (precomputed !== undefined) {
+    if (!DIGEST_PATTERN.test(precomputed)) {
+      fail('E_ARGS', `--${prefix}-${field}-digest must be sha256:<64 lowercase hex>`);
+    }
+    return precomputed;
+  }
+  return `sha256:${createHash('sha256').update(raw ?? rawFallback, 'utf-8').digest('hex')}`;
+}
+
+/**
+ * Load one canonical §8 evidence array from a JSON file.
+ *
+ * `filesChanged`, `verification` and `findings` are declared by the operating
+ * policy §8 receipt schema, but this tool wrote them as fixed empty arrays, so a
+ * receiver could not drift-check a dirty source handover against anything. They
+ * are file-backed rather than inline because the manifests are large and belong
+ * on disk next to the receipt, where the receipt digest binds their content.
+ *
+ * Omitted stays `[]` — every existing invocation produces byte-identical output.
+ */
+function jsonArrayArg(name) {
+  const path = arg(name);
+  if (path === undefined) return [];
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(path, 'utf-8'));
+  } catch (e) {
+    fail('E_ARGS', `--${name} is not readable JSON: ${e.message}`);
+  }
+  if (!Array.isArray(parsed)) fail('E_ARGS', `--${name} must contain a JSON array`);
+  return parsed;
+}
+
 function identityFrom(prefix) {
   return {
     hostId: arg(`${prefix}-host`, 'claude-code-cli'),
     providerId: requireArg(`${prefix}-provider`),
     modelApiId: requireArg(`${prefix}-model`),
     role: arg(`${prefix}-role`, 'supervisor'),
-    principalDigest: `sha256:${createHash('sha256').update(arg(`${prefix}-principal`, 'owner-account'), 'utf-8').digest('hex')}`,
-    sessionDigest: `sha256:${createHash('sha256').update(arg(`${prefix}-session`, `${Date.now()}`), 'utf-8').digest('hex')}`,
+    principalDigest: identityDigest(prefix, 'principal', 'owner-account'),
+    sessionDigest: identityDigest(prefix, 'session', `${Date.now()}`),
   };
 }
 
@@ -140,7 +199,9 @@ if (command === 'prepare') {
     baseSha: snap.baseSha, headSha: snap.headSha, branch: snap.branch,
     policyDigest: policy,
     scopeDigest: `sha256:${createHash('sha256').update(canonicalize(scope), 'utf-8').digest('hex')}`,
-    filesChanged: [], verification: [], findings: [],
+    filesChanged: jsonArrayArg('files-changed-file'),
+    verification: jsonArrayArg('verification-file'),
+    findings: jsonArrayArg('findings-file'),
     openActions: requireArg('open-actions').split('|'),
     recommendedNextAction: requireArg('next-action'),
     authorityHandoff: {

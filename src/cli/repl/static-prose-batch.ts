@@ -5,6 +5,7 @@ export interface StaticProseBatchEmitter {
   line(markdown: string): void;
   block(markdown: string): void;
   flush(): void;
+  discard(): void;
 }
 
 export function createStaticProseBatchEmitter(
@@ -24,6 +25,14 @@ export function createStaticProseBatchEmitter(
     buf = [];
   };
 
+  const discard = (): void => {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+    buf = [];
+  };
+
   return {
     line(markdown: string) {
       buf.push(markdown);
@@ -35,5 +44,6 @@ export function createStaticProseBatchEmitter(
       pushSegment(markdown);
     },
     flush,
+    discard,
   };
 }

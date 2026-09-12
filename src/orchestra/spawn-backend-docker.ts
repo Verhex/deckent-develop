@@ -1,3 +1,4 @@
+import type { ExactDockerRejectedResultV2, ExactDockerRejectedResultReaderV2 } from './spawn-backend.js';
 // ─── Docker Spawn Backend ─────────────────────────────────────────────────
 // Spawns workers in isolated Docker containers.
 // Each worker gets its own filesystem namespace — no cross-worker interference.
@@ -64,6 +65,7 @@ import {
 import {
   LOCKS_DIR, TASKS_DIR,
   DOCKER_POPULATION_RETRY_MAX_DEFAULT, DOCKER_POPULATION_RETRY_MAX_LIMIT,
+  DECKENT_DIR,
 } from '../core/constants.js';
 import { archiveTaskArtifacts } from '../core/sprint-archive.js';
 import {
@@ -300,6 +302,7 @@ import { getDefaultProviderName } from './sprint-utils.js';
 import {
   assembleCanonicalIngressResult,
   assembleCanonicalIngressResultV2,
+  WorkerResultSchemaError,
   type CanonicalIngressAuthority,
   type CanonicalIngressCustodyAuthority,
 } from './result-ingress.js';
@@ -5427,6 +5430,7 @@ export interface ExactDockerPlanningRecoveryHealth {
   readonly state: 'ready' | 'hold';
   readonly unresolved: readonly ExactDockerPlanningRecoveryIssue[];
   readonly recoveryListReceiptDigest: Sha256Digest;
+  readonly readSnapshot?: import('../core/custody-read-snapshot.js').CustodyReadSnapshotStatistics;
 }
 
 export interface ExactDockerStartedFailedRecoveryInput {
@@ -5447,6 +5451,23 @@ export interface ExactDockerStartedFailedRecoveryResult {
   readonly generation: number;
   readonly receiptDigest: string | null;
   readonly evidenceDigest: string;
+}
+
+export interface ExactDockerRejectedResultRecoveryResult {
+  readonly state: 'eligible' | 'closed';
+  readonly outcome: 'REJECTED_RESULT_CLOSED';
+  readonly dispatchRequestId: string;
+  readonly taskId: string;
+  readonly attemptId: string;
+  readonly generation: number;
+  readonly receiptDigest: string | null;
+  readonly evidenceDigest: string;
+}
+
+export async function closeExactDockerRejectedResultAttempt(
+  input: ExactDockerStartedFailedRecoveryInput,
+): Promise<ExactDockerRejectedResultRecoveryResult> {
+  return new DockerSpawnBackend(input.projectRoot).closeRejectedResultAttempt(input);
 }
 
 export interface ExactDockerCommittedUnsettledRecoveryInput {
@@ -5508,6 +5529,9 @@ export function inspectExactDockerPlanningRecoveryHealth(
     platform?: NodeJS.Platform;
     env?: NodeJS.ProcessEnv;
     stateDir?: string;
+    /** Explicit verification candidate. Default stays on the proven reader until
+     * native memory/latency gates close; this is not persisted policy authority. */
+    verifiedReadSnapshot?: boolean;
   }> = {},
 ): ExactDockerPlanningRecoveryHealth {
   const canonicalProjectRoot = canonicalExactDockerProjectRoot(projectRoot);
@@ -5531,6 +5555,7 @@ export function inspectExactDockerPlanningRecoveryHealth(
     create: false,
   });
   const policy = createExactDockerCustodyPolicy();
+  const readHealth = () => {
   const discovered = store.listDispatchAdmissionsForRecovery({
     policy,
     maxEntries: 100_000,
@@ -5582,6 +5607,12 @@ export function inspectExactDockerPlanningRecoveryHealth(
     unresolved: Object.freeze(unresolved),
     recoveryListReceiptDigest: discovered.receiptDigest,
   });
+  };
+  if (options.verifiedReadSnapshot !== true) return readHealth();
+  const snapshot = store.withVerifiedReadSnapshot({
+    maxEntries: 100_000, maxBytes: 64 * 1024 * 1024, maxDurationMs: 10_000,
+  }, readHealth);
+  return Object.freeze({ ...snapshot.value, readSnapshot: snapshot.statistics });
 }
 
 /** Canonical Sprint-recovery mutation seam for reservation-only records. The
@@ -11278,6 +11309,17 @@ export class DockerSpawnBackend implements SpawnBackend {
     Promise<ExactDockerAcceptResultOutcomeV2>
   >();
   /** Keeps the opaque reader capability alive after a cold durable acceptance reread. */
+  /** Rejected attempts must remain in recovery inventory after live completion handles close. */
+  private readonly exactRejectedRecoveryResults = new Map<Sha256Digest, Readonly<{
+    query: ExactDockerCustodyTerminalQueryV2;
+    rejected: ExactDockerRejectedResultV2;
+  }>>();
+  private readonly exactRejectedResults = new WeakMap<ExactDockerRejectedResultReaderV2, Readonly<{
+    rejected: ExactDockerRejectedResultV2;
+    scope: PreparedExactDockerCustodyScope;
+    query: ExactDockerCustodyTerminalQueryV2;
+    exit: ExactDockerProviderExitObservationRefV2;
+  }>>();
   private readonly exactRecoveredAcceptedResults = new Map<
     Sha256Digest,
     Readonly<{
@@ -11339,6 +11381,86 @@ export class DockerSpawnBackend implements SpawnBackend {
     settlementRef?: TaskResultSettlementRefV1;
     gitAdapterHostPath?: string;
   }>(); // taskId → effective execution context
+
+  /**
+   * Durable twin of `containers`, written next to the run's other runtime state.
+   *
+   * The in-memory map dies with the process that spawned the container. Every
+   * other process — `deckent kill`, `finalize --force`'s worker sweep, an
+   * operator asking "which container is task X?" — then finds nothing and
+   * reports the worker as already dead while it is still running and writing.
+   * Container names are attempt-derived (`deckent-x-<attemptId>`), so a human
+   * cannot recover the link by reading `docker ps` either.
+   *
+   * This registry restores that link WITHOUT reintroducing name-derived
+   * lifecycle mutation: the container id is read from a record this backend
+   * itself wrote, never guessed from a name pattern.
+   */
+  private containerRegistryPath(taskId: string): string {
+    return join(this.projectDir, DECKENT_DIR, 'runtime', 'containers', `${taskId}.json`);
+  }
+
+  private recordContainerRegistry(taskId: string, record: Readonly<{
+    containerId: string;
+    containerName: string;
+    model: string;
+    projectDir: string;
+    tasksDir: string;
+    gitAdapterHostPath?: string;
+  }>): void {
+    try {
+      const path = this.containerRegistryPath(taskId);
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, `${JSON.stringify({
+        schemaVersion: 1,
+        kind: 'deckent-docker-container-registry-v1',
+        taskId,
+        ...record,
+        backend: this.name,
+        recordedAt: new Date().toISOString(),
+      }, null, 2)}\n`, { encoding: 'utf-8', mode: 0o600 });
+    } catch (error) {
+      // Never fail a spawn over bookkeeping; the in-memory map still serves
+      // this process, and the operator surface degrades rather than breaks.
+      debugLog('docker-backend:registry-write', error);
+    }
+  }
+
+  private readContainerRegistry(taskId: string): {
+    containerId: string;
+    containerName: string;
+    model: string;
+    projectDir: string;
+    tasksDir: string;
+    gitAdapterHostPath?: string;
+  } | null {
+    try {
+      const path = this.containerRegistryPath(taskId);
+      if (!existsSync(path)) return null;
+      const parsed = JSON.parse(readFileSync(path, 'utf-8')) as Record<string, unknown>;
+      if (parsed.kind !== 'deckent-docker-container-registry-v1' || parsed.taskId !== taskId) return null;
+      const containerId = parsed.containerId;
+      const containerName = parsed.containerName;
+      if (typeof containerId !== 'string' || !/^[a-f0-9]{12,64}$/u.test(containerId)) return null;
+      if (typeof containerName !== 'string' || containerName.length === 0) return null;
+      return {
+        containerId,
+        containerName,
+        model: typeof parsed.model === 'string' ? parsed.model : '',
+        projectDir: typeof parsed.projectDir === 'string' ? parsed.projectDir : this.projectDir,
+        tasksDir: typeof parsed.tasksDir === 'string' ? parsed.tasksDir : '',
+        ...(typeof parsed.gitAdapterHostPath === 'string' ? { gitAdapterHostPath: parsed.gitAdapterHostPath } : {}),
+      };
+    } catch (error) {
+      debugLog('docker-backend:registry-read', error);
+      return null;
+    }
+  }
+
+  private clearContainerRegistry(taskId: string): void {
+    try { unlinkSync(this.containerRegistryPath(taskId)); }
+    catch { /* absent is the normal terminal case */ }
+  }
 
   constructor(projectDir: string, opts?: DockerSpawnBackendConstructionOptions) {
     // WORKER-ENV-TMPFS-001: config-resolved HOME tmpfs size; default preserves 100m.
@@ -14036,6 +14158,14 @@ export class DockerSpawnBackend implements SpawnBackend {
     };
     const cached = readCached();
     if (cached) return cached;
+    const rejected = this.exactRejectedRecoveryResults.get(admissionRefDigest);
+    if (rejected) {
+      if (canonicalJson(rejected.query) !== canonicalJson(query)) {
+        throw new ExactDockerCustodyFailure('EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH', true);
+      }
+      return rejected.rejected;
+    }
+
 
     const inFlight = this.exactCustodyAutomaticAcceptances.get(admissionRefDigest)
       ?? this.exactCustodyAcceptanceSetups.get(admissionRefDigest);
@@ -14602,6 +14732,30 @@ export class DockerSpawnBackend implements SpawnBackend {
     return observed;
   }
 
+  async verifyExactDockerRejectedResult(rejected: ExactDockerRejectedResultV2): Promise<boolean> {
+    const retained = this.exactRejectedResults.get(rejected.reader);
+    if (!retained || retained.rejected !== rejected) return false;
+    try {
+      const { scope, query, exit } = retained;
+      this.rereadExactProviderExitObservation(scope, exit);
+      if (this.readColdExactDockerAcceptedResult(scope, query, exit)) return false;
+      const completion = this.readColdExactDockerCompletion(scope, query, exit);
+      if (!completion || completion.kind === 'capture-hold'
+        || completion.result.sourceResult.artifactSha256 !== rejected.sourceResultDigest
+        || canonicalJson(completion.custodyRef) !== canonicalJson(rejected.custodyRef)
+        || completion.projectionFence !== rejected.projectionFence) return false;
+      if (await this.observeExactDockerDaemonContainerState(exit.containerId) !== 'absent') return false;
+      // Re-read after the asynchronous daemon observation: a concurrent change may not retire.
+      this.rereadExactProviderExitObservation(scope, exit);
+      const after = this.readColdExactDockerCompletion(scope, query, exit);
+      return after !== null && after.kind !== 'capture-hold'
+        && after.result.sourceResult.artifactSha256 === rejected.sourceResultDigest
+        && canonicalJson(after.custodyRef) === canonicalJson(rejected.custodyRef)
+        && after.projectionFence === rejected.projectionFence
+        && this.readColdExactDockerAcceptedResult(scope, query, exit) === null;
+    } catch { return false; }
+  }
+
   async acceptExactDockerCustodyResult(
     input: AcceptExactDockerCustodyResultInputV2,
   ): Promise<ExactDockerAcceptResultOutcomeV2> {
@@ -14658,6 +14812,7 @@ export class DockerSpawnBackend implements SpawnBackend {
 
   private async acceptExactDockerCustodyResultInternal(
     input: AcceptExactDockerCustodyResultInputV2,
+    rejectionOnly = false,
   ): Promise<ExactDockerAcceptResultOutcomeV2> {
     const snapshot = snapshotExactPlainData(input);
     const inputRecord = snapshot.ok
@@ -14906,24 +15061,46 @@ export class DockerSpawnBackend implements SpawnBackend {
           reasonCode: 'PROVIDER_PRICE_ENVELOPE_NOT_EMITTED' as const,
           providerStreamReceiptDigest: completion.providerBilling.providerStreamReceiptDigest,
         });
-    const result = assembleCanonicalIngressResultV2(
-      ingressSnapshot.value as Record<string, unknown>,
-      durableAuthority,
-      Object.freeze({
-        attemptCustody: durableAttemptCustody,
-        hostWorkArtifact: hostWorkArtifactBinding,
-        jsonBounds: entry.scope.policy.jsonBounds,
-        hostTerminalUsage: Object.freeze({
-          evidence: Object.freeze(durableUsage),
-          evidenceDigest: completion.providerUsage.evidenceDigest,
-          providerStreamReceiptDigest: completion.providerUsage.providerStreamReceiptDigest,
+    let result: TaskResultV2;
+    try {
+      result = assembleCanonicalIngressResultV2(
+        ingressSnapshot.value as Record<string, unknown>,
+        durableAuthority,
+        Object.freeze({
+          attemptCustody: durableAttemptCustody,
+          hostWorkArtifact: hostWorkArtifactBinding,
+          jsonBounds: entry.scope.policy.jsonBounds,
+          hostTerminalUsage: Object.freeze({
+            evidence: Object.freeze(durableUsage),
+            evidenceDigest: completion.providerUsage.evidenceDigest,
+            providerStreamReceiptDigest: completion.providerUsage.providerStreamReceiptDigest,
+          }),
+          hostTerminalBilling,
+          hostWorkAuthority,
+          hostPromptDeliveryAuthority,
+          hostEffectAuthority: completion.hostEffectAuthority,
         }),
-        hostTerminalBilling,
-        hostWorkAuthority,
-        hostPromptDeliveryAuthority,
-        hostEffectAuthority: completion.hostEffectAuthority,
-      }),
-    );
+      );
+    } catch (error) {
+      if (!(error instanceof WorkerResultSchemaError)) throw error;
+      const reader = Object.freeze({ token: Symbol('exact-rejected-worker-result') });
+      const rejected: ExactDockerRejectedResultV2 = Object.freeze({
+        kind: 'rejected-result', reasonCode: 'WORKER_RESULT_SCHEMA_INVALID',
+        custodyRef: completion.custodyRef, releaseReceipt: completion.releaseReceipt,
+        projectionFence: completion.projectionFence,
+        sourceResultDigest: source.receipt.artifact.sha256,
+        reader,
+      });
+      debugLog('docker-backend:worker-result-schema-rejected', error);
+      this.exactRejectedRecoveryResults.set(entry.scope.admissionRef.refDigest, Object.freeze({ query, rejected }));
+      this.exactRejectedResults.set(reader, Object.freeze({
+        rejected, scope: entry.scope, query, exit: completion.providerExit,
+      }));
+      return rejected;
+    }
+    if (rejectionOnly) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED', true, 'RECOVERY_RESULT_NOT_REJECTED');
+    }
     const acceptedBytes = canonicalTaskAttemptCustodyJson(result, entry.scope.policy.jsonBounds);
     const effectLanding = entry.scope.store.readVerifiedEffectLanding({
       identity: entry.scope.identity,
@@ -17592,6 +17769,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     policy: TaskAttemptCustodyPolicyV2,
     entry: ExactDockerDurableAdmissionV2,
   ): boolean {
+    if (store.readRejectedResultDispatch({ admissionRef: entry.ref, policy })) return true;
     if (store.readStartedFailedDispatch({ admissionRef: entry.ref, policy })) return true;
     const dispatch = store.readDispatchAuthority({ admissionRef: entry.ref, policy });
     // A reservation recovered into admission without a mount/provider effect
@@ -17631,6 +17809,65 @@ export class DockerSpawnBackend implements SpawnBackend {
     this.readExactDockerRecoveryProviderExecution(scope, start);
     const exit = this.readExactDockerRecoveryProviderExit(scope);
     return exit !== null && this.readColdExactDockerAcceptedResult(scope, query, exit, true) !== null;
+  }
+
+  /** Close a schema-rejected result after verified effect release. Validation
+   * mode never publishes an accepted result, including when the input is valid. */
+  async closeRejectedResultAttempt(input: ExactDockerStartedFailedRecoveryInput): Promise<ExactDockerRejectedResultRecoveryResult> {
+    const refuse = (stage: string): never => {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED', true, stage);
+    };
+    if (!/^sprint-[0-9]+$/u.test(input.sprintId) || !/^dreq-[a-f0-9]{64}$/u.test(input.dispatchRequestId)
+      || input.recoveryAuthority.executionId !== input.sprintId || input.recoveryAuthority.taskId !== input.sprintId
+      || canonicalExactDockerProjectRoot(input.projectRoot) !== canonicalExactDockerProjectRoot(this.projectDir)) refuse('RECOVERY_SCOPE');
+    const opened = this.openExactDockerRecoveryStore();
+    if (!opened) return refuse('RECOVERY_STORE');
+    const admitted = opened.store.readDispatchAdmission({ dispatchRequestId: input.dispatchRequestId, policy: opened.policy });
+    if (admitted.state !== 'admitted' || !admitted.ref.identity.taskId.startsWith(`${input.sprintId.slice(7)}-`)) return refuse('RECOVERY_ADMISSION');
+    const result = (state: 'eligible' | 'closed', receiptDigest: string | null, evidenceDigest: string): ExactDockerRejectedResultRecoveryResult => Object.freeze({
+      state, outcome: 'REJECTED_RESULT_CLOSED', dispatchRequestId: input.dispatchRequestId,
+      taskId: admitted.ref.identity.taskId, attemptId: admitted.ref.identity.attemptId,
+      generation: admitted.ref.identity.generation, receiptDigest, evidenceDigest,
+    });
+    const existing = opened.store.readRejectedResultDispatch({ admissionRef: admitted.ref, policy: opened.policy });
+    if (existing) return result('closed', existing.receiptDigest, existing.evidenceDigest);
+    const scope = this.reconstructExactDockerRecoveryScope(opened.store, opened.policy, admitted);
+    const dispatch = opened.store.readDispatchAuthority({ admissionRef: admitted.ref, policy: opened.policy });
+    if (dispatch.state !== 'terminal' || dispatch.authority.state !== 'RELEASED') return refuse('RECOVERY_NOT_STARTED');
+    const startObservation = opened.store.readDispatchObservationByClass({ admissionRef: admitted.ref, policy: opened.policy, observationClass: 'PROVIDER_START' });
+    if (!startObservation) return refuse('RECOVERY_START_MISSING');
+    const providerStartReceipt = Object.freeze({ ref: startObservation.receipt.receiptDigest, digest: startObservation.receipt.evidenceDigest });
+    const query: ExactDockerCustodyTerminalQueryV2 = Object.freeze({
+      custodyRef: this.exactReleasedCustodyProjection(scope, providerStartReceipt),
+      releaseReceipt: Object.freeze({ ref: dispatch.authority.releaseReceiptDigest, digest: dispatch.authority.releaseEvidenceDigest }),
+      providerStartReceipt, projectionFence: dispatch.authority.projectionFence,
+    });
+    const start = this.rereadExactProviderStartObservation(scope, query);
+    const execution = this.readExactDockerRecoveryProviderExecution(scope, start);
+    const exit = this.readExactDockerRecoveryProviderExit(scope);
+    if (!exit || this.readColdExactDockerAcceptedResult(scope, query, exit)) return refuse('RECOVERY_EXIT_OR_ACCEPTANCE');
+    const completion = this.readColdExactDockerCompletion(scope, query, exit);
+    if (!completion || completion.kind === 'capture-hold') return refuse('RECOVERY_COMPLETION_HOLD');
+    this.exactCustodyCompletions.set(scope.admissionRef.refDigest, Object.freeze({
+      scope, query, providerStartReceipt, providerExecutionReceipt: execution, promise: Promise.resolve(completion),
+    }));
+    const rejected = await this.acceptExactDockerCustodyResultInternal({ query, authority: this.exactCanonicalIngressAuthority(scope) }, true);
+    if (rejected.kind !== 'rejected-result' || !await this.verifyExactDockerRejectedResult(rejected)) return refuse('RECOVERY_REJECTION_UNPROVEN');
+    const candidate = opened.store.inspectRejectedResultDispatchCandidate({ admissionRef: admitted.ref, policy: opened.policy });
+    if (candidate.sourceResultDigest !== rejected.sourceResultDigest) return refuse('RECOVERY_SOURCE_CHANGED');
+    if (input.dryRun) return result('eligible', null, candidate.evidenceDigest);
+    input.beforePublish();
+    const recordedAt = this.nextExactDockerTimestamp();
+    const closed = opened.store.closeRejectedResultDispatch({
+      admissionRef: admitted.ref, policy: opened.policy, recoveryAuthority: input.recoveryAuthority,
+      sourceResultDigest: rejected.sourceResultDigest, recordedAt,
+      stoppedExecutionEvidenceDigest: exactCustodyJsonDigest({
+        kind: 'rejected-result-recovery-stopped-observation', containerId: exit.containerId,
+        providerExit: exit, state: 'absent', sourceResultDigest: rejected.sourceResultDigest,
+        admissionRefDigest: admitted.ref.refDigest, observedAt: recordedAt,
+      }),
+    });
+    return result('closed', closed.receiptDigest, closed.evidenceDigest);
   }
 
   /** Preserve a stopped, unlanded attempt under explicit canonical recovery authority. */
@@ -19408,6 +19645,12 @@ export class DockerSpawnBackend implements SpawnBackend {
           }
           continue;
         }
+        const rejectedResult = opened.store.readRejectedResultDispatch({ admissionRef: entry.ref, policy: opened.policy });
+        if (rejectedResult) {
+          const closed = report.closedRejectedResults ?? (report.closedRejectedResults = []);
+          if (!closed.includes(entry.ref.identity.taskId)) closed.push(entry.ref.identity.taskId);
+          continue;
+        }
         const retainedFailure = opened.store.readStartedFailedDispatch({
           admissionRef: entry.ref, policy: opened.policy,
         });
@@ -21114,6 +21357,14 @@ export class DockerSpawnBackend implements SpawnBackend {
         accepted: recovered.accepted,
       }));
     }
+    for (const [admissionRefDigest, rejected] of this.exactRejectedRecoveryResults) {
+      if (recoveredEntries.has(admissionRefDigest)) continue;
+      recoveredEntries.set(admissionRefDigest, Object.freeze({
+        kind: 'released' as const,
+        taskId: rejected.query.custodyRef.identity.taskId,
+        query: rejected.query,
+      }));
+    }
     for (const [admissionRefDigest, completion] of this.exactCustodyCompletions) {
       if (recoveredEntries.has(admissionRefDigest)) continue;
       recoveredEntries.set(admissionRefDigest, Object.freeze({
@@ -22553,6 +22804,16 @@ export class DockerSpawnBackend implements SpawnBackend {
       settlementRef: attemptRef,
       ...(gitIsolation.adapter ? { gitAdapterHostPath: gitIsolation.adapter.hostPath } : {}),
     });
+    // Publish the task→container link before anything else can need it: a
+    // sweep from another process must be able to find this container.
+    this.recordContainerRegistry(taskId, {
+      containerId,
+      containerName,
+      model,
+      projectDir: dir,
+      tasksDir,
+      ...(gitIsolation.adapter ? { gitAdapterHostPath: gitIsolation.adapter.hostPath } : {}),
+    });
     debugLog(
       'docker-backend:spawn-ok',
       `taskId=${taskId} containerId=${containerId.slice(0, 12)} instantExit=${instantExitSuccess}`,
@@ -22826,7 +23087,9 @@ export class DockerSpawnBackend implements SpawnBackend {
     containerId: string;
     gitAdapterHostPath?: string;
   } {
-    const execution = this.containers.get(taskId);
+    // In-process authority first; then the durable record this backend wrote at
+    // spawn. Both are self-authored — a name pattern is still never trusted.
+    const execution = this.containers.get(taskId) ?? this.readContainerRegistry(taskId);
     if (!execution) {
       throw new SpawnBackendError(
         `No exact Docker container authority is registered for task ${taskId}; refusing name-derived lifecycle mutation.`,
@@ -22886,8 +23149,20 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Post-stop verification: ensure .result was persisted to disk
     this.verifyResultAfterStop(taskId, tasksDir);
 
+    // The durable link is retired only once the container provably no longer
+    // exists. Clearing it earlier — before stop, or on a failed removal — would
+    // hand a still-running worker back to the untracked state this registry
+    // exists to prevent, and no later sweep could find it again.
     try {
-      spawnSync('docker', ['rm', containerId], { encoding: 'utf-8', timeout: 10_000 });
+      const rmResult = spawnSync('docker', ['rm', containerId], { encoding: 'utf-8', timeout: 10_000 });
+      if (rmResult.status === 0) {
+        this.clearContainerRegistry(taskId);
+      } else {
+        debugLog(
+          'docker-backend:rm-failed',
+          `taskId=${taskId} kept container registry: ${rmResult.stderr?.trim()}`,
+        );
+      }
     } catch (e) { debugLog('docker-backend:rm-error', e); }
 
     // Sprint 156 Task 10: forced shutdown — release any spawn locks left over

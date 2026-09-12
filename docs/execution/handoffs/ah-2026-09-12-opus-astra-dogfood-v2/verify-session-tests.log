@@ -1,0 +1,16 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/orchestra/archived-sprint-terminal-disposition.test.ts (11 tests) 35ms
+ ✓ tests/orchestra/sprint-pid-manager.test.ts (29 tests) 115ms
+ ✓ tests/orchestra/production-wiring-host-proof-failure-reason.test.ts (13 tests) 8ms
+ ✓ tests/orchestra/production-wiring-worker-result-contract.test.ts (10 tests) 3ms
+ ✓ tests/orchestra/production-wiring-prompt.test.ts (15 tests) 26ms
+ ✓ tests/orchestra/model-selector-max-tier.test.ts (8 tests) 3ms
+ ✓ tests/core/memory-read-planner-profile.test.ts (10 tests) 3ms
+
+ Test Files  7 passed (7)
+      Tests  96 passed (96)
+   Start at  11:27:00
+   Duration  6.14s (transform 3.23s, setup 62ms, collect 8.24s, tests 194ms, environment 1ms, prepare 233ms)
+

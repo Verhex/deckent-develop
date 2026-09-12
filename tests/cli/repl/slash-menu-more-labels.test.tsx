@@ -79,6 +79,7 @@ describe('InputBar — `/` menu scroll hint (ink-testing-library)', () => {
         menuMoreAbove={tr.menuMoreAbove}
         menuMoreBelow={tr.menuMoreBelow}
         reverseSearchLabel={tr.reverseSearch}
+        composerPasteChip={en.composerPasteChip}
         historyProjectRoot={root}
       />,
     );
@@ -108,6 +109,7 @@ describe('InputBar — `/` menu scroll hint (ink-testing-library)', () => {
             slashRegistry={TWELVE}
             historyProjectRoot={root}
             reverseSearchLabel={getMessage('tui.reverse_search', lang)}
+        composerPasteChip={en.composerPasteChip}
             {...missing}
           />
         </ReplErrorBoundary>,
@@ -136,7 +138,8 @@ describe('InputBar — `/` menu scroll hint (ink-testing-library)', () => {
     const missing = {} as Pick<InputBarProps, 'menuMoreAbove' | 'menuMoreBelow'>;
     const { lastFrame, unmount } = render(
       <ReplErrorBoundary label={getMessage('tui.render_error', 'en')}>
-        <InputBar active onSubmit={() => {}} onInterrupt={() => {}} slashRegistry={TWELVE} historyProjectRoot={root} reverseSearchLabel={getMessage('tui.reverse_search', 'en')} {...missing} />
+        <InputBar active onSubmit={() => {}} onInterrupt={() => {}} slashRegistry={TWELVE} historyProjectRoot={root} reverseSearchLabel={getMessage('tui.reverse_search', 'en')}
+        composerPasteChip={en.composerPasteChip} {...missing} />
       </ReplErrorBoundary>,
     );
     await tick();

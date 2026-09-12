@@ -7,6 +7,17 @@ function collect(): { seg: Segment[]; emit: (s: Segment) => void } {
 }
 
 describe('createStreamSegmenter', () => {
+  it('discard clears partial without emitting', () => {
+    const segs: Segment[] = [];
+    const s = createStreamSegmenter((seg) => segs.push(seg));
+    s.feed('partial line');
+    expect(s.partial()).toBe('partial line');
+    s.discard();
+    expect(s.partial()).toBe('');
+    s.flush();
+    expect(segs).toHaveLength(0);
+  });
+
   it('emits prose lines as they complete (real-time flow)', () => {
     const { seg, emit } = collect();
     const s = createStreamSegmenter(emit);

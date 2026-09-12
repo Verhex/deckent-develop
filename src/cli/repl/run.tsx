@@ -17,6 +17,9 @@ import {
   probeRequestMeasurementAuthority,
   inferNativeProviderForModel,
   listNativeModelCandidates,
+  discoverNativeEndpointModels,
+  configuredLocalLlmRegistryModels,
+  mergeLocalLlmPublishedModelIds,
   registryProviderFor,
   NATIVE_PROVIDER_NAMES,
   type NativeTransportConfig,
@@ -32,6 +35,7 @@ import { createProviderEvidence, type ProviderEvidenceStore } from './provider-e
 import { probeProviderAuth } from '../../core/provider-auth-probe.js';
 import { buildLegacyPickerSpecs } from './picker-legacy.js';
 import { resolveConfiguredPosture } from './term-mode.js';
+import { pastePolicyFromTerminalWorkline } from './paste-composer.js';
 import { buildModelPickerSpec, buildProviderPickerSpec, type PickerSpecContext, type ProviderAvailability } from './picker-specs.js';
 import type { PickerKind, PickerSpec } from './picker.js';
 import { resolveActiveModelPolicy } from '../../core/model-activation-store.js';
@@ -367,7 +371,10 @@ export function localizeNativeError(
  * entirely, so app.tsx's pure helpers silently fell back to their hardcoded
  * English `??` defaults regardless of `lang`.
  */
-export function buildReplLabels(t: (key: string) => string): ReplLabels {
+export function buildReplLabels(
+  t: (key: string) => string,
+  workline?: import('../../core/terminal-workline-contract.js').TerminalWorklineConfig,
+): ReplLabels {
   return {
     thinking: t('tui.thinking'),
     generating: t('tui.generating'),
@@ -451,6 +458,9 @@ export function buildReplLabels(t: (key: string) => string): ReplLabels {
     transcriptAssistant: t('tui.transcript.assistant'),
     transcriptUserHint: t('tui.transcript.user_hint'),
     transcriptAssistantHint: t('tui.transcript.assistant_hint'),
+    transcriptToolsTurnSummary: t('tui.transcript.tools_turn_summary'),
+    composerPasteChip: t('tui.composer.paste_chip'),
+    pasteComposerPolicy: pastePolicyFromTerminalWorkline(workline),
   };
 }
 
@@ -865,8 +875,7 @@ export function withRenewSlash(engine: ReplEngine, labels: RenewSlashLabels): Re
 
 // ─── TERMINAL-TOOLS-010 — `/context` · `/compact` (local slashes) ────────────
 //
-// Parity with Claude Code (/context, /compact), Codex CLI (/status token
-// usage, /compact) and Hermes (/compress). Both are answered locally through
+// Context slash commands (/context, /compact, /status, /compress) are answered locally through
 // the native engine's seams (contextSnapshot / compactContext); `/context`
 // makes zero provider calls, `/compact` makes exactly the one checkpoint call
 // the session's epoch path already owns. Labels come from the catalog
@@ -1889,6 +1898,7 @@ export async function runInkRepl(
       run_flow_v2?: boolean;
       startup?: { recent_sessions?: boolean };
       resume?: { sprint_context?: { enabled?: boolean; max_bytes?: number; verification_timeout_ms?: number } };
+      workline?: import('../../core/terminal-workline-contract.js').TerminalWorklineConfig;
     };
     strict_tenant_isolation?: boolean;
     native_provider?: string;
@@ -2277,6 +2287,9 @@ export async function runInkRepl(
   // TERMINAL-PROVIDER-EVIDENCE-001 — one evidence store per session (native
   // or host surface); every picker row's ok / blocked / unknown comes from it.
   let pickerEvidence: ProviderEvidenceStore | undefined;
+  let compositePickerEvidence:
+    | { refresh: () => Promise<void>; subscribe: (listener: () => void) => () => void }
+    | undefined;
   const ollamaEvidenceHost = (process.env['DECKENT_OLLAMA_HOST'] ?? (projectCfg as { ollama_host?: string }).ollama_host)?.replace(/\/$/, '');
   let nativeSelection: ActiveSelection | undefined;
   // TERM-FLOW-UNIFY Sprint-4 mount (426-002) — `terminal.run_flow_v2` gate;
@@ -2392,6 +2405,39 @@ export async function runInkRepl(
       });
       pickerEvidence = nativeEvidence;
       void nativeEvidence.refresh();
+      const localLlmModelListeners = new Set<() => void>();
+      let localLlmPublishedModels = mergeLocalLlmPublishedModelIds(
+        configuredLocalLlmRegistryModels(resolvedNativeCfg),
+        [],
+      );
+      const refreshLocalLlmPublishedModels = async (): Promise<void> => {
+        const endpoint = resolveNativeMeasurementEndpoint('local-llm', resolvedNativeCfg);
+        if (!endpoint) return;
+        const discovery = await discoverNativeEndpointModels(endpoint);
+        const next = mergeLocalLlmPublishedModelIds(
+          configuredLocalLlmRegistryModels(resolvedNativeCfg),
+          discovery.ok ? discovery.ids : [],
+        );
+        const changed = next.length !== localLlmPublishedModels.length
+          || next.some((id, i) => id !== localLlmPublishedModels[i]);
+        localLlmPublishedModels = next;
+        if (changed) for (const listener of localLlmModelListeners) listener();
+      };
+      void refreshLocalLlmPublishedModels();
+      compositePickerEvidence = {
+        refresh: async () => {
+          await nativeEvidence.refresh();
+          await refreshLocalLlmPublishedModels();
+        },
+        subscribe: (listener) => {
+          const off = nativeEvidence.subscribe(listener);
+          localLlmModelListeners.add(listener);
+          return () => {
+            off();
+            localLlmModelListeners.delete(listener);
+          };
+        },
+      };
       const pickerContext = (): PickerSpecContext => {
         const policy = resolveActiveModelPolicy(process.cwd());
         const availability = (provider: string): ProviderAvailability => {
@@ -2414,7 +2460,11 @@ export async function runInkRepl(
         };
         return {
           providers: NATIVE_PROVIDER_NAMES,
-          candidatesFor: (provider) => listNativeModelCandidates(provider, resolvedNativeCfg, provider === 'local-llm' && live.provider === 'local-llm' ? [live.model] : []),
+          candidatesFor: (provider) => listNativeModelCandidates(
+            provider,
+            resolvedNativeCfg,
+            provider === 'local-llm' ? localLlmPublishedModels : [],
+          ),
           policy,
           current: { provider: live.provider, model: live.model },
           availability,
@@ -2687,7 +2737,7 @@ export async function runInkRepl(
       sprintHistoricalContext={sprintHistoricalContext}
       renderSprintContextReason={(reasonCode) => localizeSprintContextReason(reasonCode, terminalLabel)}
       lang={lang}
-      labels={buildReplLabels(terminalLabel)}
+      labels={buildReplLabels(terminalLabel, projectCfg.terminal?.workline)}
       approvalLabels={buildApprovalLabels(terminalLabel)}
       doSlashLabels={buildDoSlashLabels(terminalLabel)}
       runInboxProvider={(input) => renderRunsCommand(process.cwd(), input, buildInboxLabels(terminalLabel), { separator: terminalGlyphs.separator })}
@@ -2701,7 +2751,10 @@ export async function runInkRepl(
         (via) => terminalLabel(PICKER_VIA_KEYS[via]),
         (provider) => hostEvidence.get(provider),
       )}
-      pickerEvidence={{ refresh: () => hostEvidence.refresh(), subscribe: (listener) => hostEvidence.subscribe(listener) }}
+      pickerEvidence={compositePickerEvidence ?? {
+        refresh: () => hostEvidence.refresh(),
+        subscribe: (listener) => hostEvidence.subscribe(listener),
+      }}
       saveDefault={(kind, id) => {
         // Native and legacy-host selectors have distinct persisted authority.
         // A legacy subscription identity must never become an API transport pin.

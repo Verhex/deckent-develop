@@ -34,9 +34,25 @@ export const TERMINAL_REPL_SURFACE_SCHEMA_ID = 'deckent.host-proof.terminal-repl
 export const TERMINAL_NATIVE_AUTH_HEALTH_ADAPTER_ID = 'deckent-terminal-native-auth-health-source-runtime-v1';
 export const TERMINAL_NATIVE_AUTH_HEALTH_OBSERVATION_GROUP_ID = 'deckent:terminal-native-auth-health-source-runtime';
 export const TERMINAL_NATIVE_AUTH_HEALTH_SCHEMA_ID = 'deckent.host-proof.terminal-native-auth-health-source-runtime.v1';
+export const METRICS_RETENTION_ADAPTER_ID = 'deckent-metrics-retention-v1';
+export const METRICS_RETENTION_OBSERVATION_GROUP_ID = 'deckent:metrics-retention';
+export const METRICS_RETENTION_SCHEMA_ID = 'deckent.host-proof.metrics-retention.v1';
 
 const REQUEST_KIND = 'deckent-production-wiring-host-proof-request-v1';
 const OUTCOME_KIND = 'deckent-production-wiring-host-proof-outcome';
+/**
+ * Diagnostic channel for a non-observed harness outcome.
+ *
+ * stdout stays the exact success protocol — a hold writes NOTHING there. The
+ * typed reason goes to stderr instead, so the caller can tell a decided defect
+ * (a digest that will never match again) from a transient process failure.
+ * Without it every hold collapses into the runner's generic
+ * `host-proof-process-failed`, which is undecidable and therefore blocks
+ * recovery settlement forever.
+ */
+const FAILURE_KIND = 'deckent-production-wiring-host-proof-failure-v1';
+/** Bounded machine-code vocabulary; never free prose, a path, or a stack. */
+const REASON_CODE_PATTERN = /^[a-z0-9][a-z0-9-]{0,95}$/u;
 const MAX_REQUEST_BYTES = 64 * 1024;
 const MAX_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_BYTES = 64 * 1024;
@@ -166,6 +182,42 @@ const MEMORY_COMPACT_READ_EXPORT_OBSERVATION = canonicalJson({
   version: 1,
 });
 
+const METRICS_RETENTION_OBSERVER_PATH =
+  'scripts/metrics-retention-host-proof-observer.mjs';
+const METRICS_RETENTION_REQUIRED_ASSETS = Object.freeze([
+  Object.freeze({
+    path: 'scripts/production-wiring-host-proof-harness.mjs',
+    role: 'trusted-harness',
+  }),
+  Object.freeze({
+    path: METRICS_RETENTION_OBSERVER_PATH,
+    role: 'trusted-harness',
+  }),
+]);
+// Must stay byte-identical to identityTargetKeys(METRICS_RETENTION_PROOF_IDENTITY)
+// in src/core/production-wiring-host-proof.ts — the runner compares the sorted
+// key set against the one it derives from the registered identity tuple.
+const METRICS_RETENTION_TARGET_KEYS = Object.freeze([
+  'affected-ingress:deckent.observability.record-metric',
+  'canonical-consumer:deckent.observability-rotation.size-triggered-rotation',
+  'enablement-authority:deckent.config.observability-rotation-policy',
+  'producer:deckent.observability.metrics-append',
+  'proof-target:deckent.config.observability-rotation-policy-resolution',
+  'proof-target:deckent.observability-rotation.retention-prune-receipt',
+  'proof-target:deckent.observability-rotation.size-triggered-rotation',
+].sort());
+const METRICS_RETENTION_OBSERVATION = canonicalJson({
+  checks: [
+    'size-triggered-rotation',
+    'retention-prune-bounded',
+    'prune-receipt-typed',
+    'active-file-preserved',
+  ],
+  kind: 'deckent-metrics-retention-observation-v1',
+  outcome: 'observed',
+  version: 1,
+});
+
 const PROFILES = Object.freeze([
   Object.freeze({
     adapterId: CLOSURE_OS_AUTHORITY_ADAPTER_ID,
@@ -193,6 +245,14 @@ const PROFILES = Object.freeze([
     assets: MEMORY_COMPACT_READ_EXPORT_REQUIRED_ASSETS,
     targetKeys: MEMORY_COMPACT_READ_EXPORT_TARGET_KEYS,
     observer: 'memory-compact-read-export',
+  }),
+  Object.freeze({
+    adapterId: METRICS_RETENTION_ADAPTER_ID,
+    schemaId: METRICS_RETENTION_SCHEMA_ID,
+    observationGroupId: METRICS_RETENTION_OBSERVATION_GROUP_ID,
+    assets: METRICS_RETENTION_REQUIRED_ASSETS,
+    targetKeys: METRICS_RETENTION_TARGET_KEYS,
+    observer: 'metrics-retention',
   }),
 ]);
 
@@ -487,6 +547,18 @@ function observerInvocation(root, request) {
         && Buffer.from(result.stdout).toString('utf8') === MEMORY_COMPACT_READ_EXPORT_OBSERVATION,
     });
   }
+  if (request.profile.observer === 'metrics-retention') {
+    return Object.freeze({
+      executable: process.execPath,
+      args: [
+        '--import',
+        'tsx',
+        resolve(root, METRICS_RETENTION_OBSERVER_PATH),
+      ],
+      accepts: result => result.stderr.byteLength === 0
+        && Buffer.from(result.stdout).toString('utf8') === METRICS_RETENTION_OBSERVATION,
+    });
+  }
   if (request.profile.observer === 'terminal-health-config') {
     return Object.freeze({ executable: process.execPath, args: [resolve(root, TERMINAL_HEALTH_OBSERVER_PATH), request.profile.adapterId], accepts: result => result.stderr.byteLength === 0 && Buffer.from(result.stdout).toString('utf8') === 'observed' });
   }
@@ -578,7 +650,17 @@ async function main() {
     const result = await runProductionWiringHostProofHarness(process.argv[2], {
       signal: controller.signal,
     });
-    if (result.state !== 'observed') return 1;
+    if (result.state !== 'observed') {
+      // Emit the typed reason the harness already decided. Re-validated against
+      // the bounded vocabulary before it leaves the process so a future reason
+      // producer cannot widen this channel into arbitrary text.
+      const reasonCode = typeof result.reasonCode === 'string'
+        && REASON_CODE_PATTERN.test(result.reasonCode)
+        ? result.reasonCode
+        : 'host-proof-reason-unclassified';
+      process.stderr.write(`${canonicalJson({ kind: FAILURE_KIND, reasonCode })}\n`);
+      return 1;
+    }
     process.stdout.write(canonicalJson(result.outcome));
     return 0;
   } finally {

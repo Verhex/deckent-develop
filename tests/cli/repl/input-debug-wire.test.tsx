@@ -8,7 +8,7 @@ import { InputBar } from '../../../src/cli/repl/input-bar.js';
 
 const roots: string[] = [];
 const mount = (root: string, onSubmit = vi.fn(), active = true, strict = false) => {
-  const input = <InputBar active={active} onSubmit={onSubmit} onInterrupt={() => {}} menuMoreAbove="{n}" menuMoreBelow="{n}" reverseSearchLabel="search" historyProjectRoot={root} caretStyle="marker" />;
+  const input = <InputBar active={active} onSubmit={onSubmit} onInterrupt={() => {}} menuMoreAbove="{n}" menuMoreBelow="{n}" reverseSearchLabel="search" composerPasteChip="[paste {lines}/{bytes}]" historyProjectRoot={root} caretStyle="marker" />;
   return render(strict ? <StrictMode>{input}</StrictMode> : input);
 };
 

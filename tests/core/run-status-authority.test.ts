@@ -438,3 +438,38 @@ describe('canonical run status authority', () => {
     ]));
   });
 });
+
+describe('retained terminal projections across run scopes', () => {
+  function retained(root: string, live = false, mismatched = false): void {
+    const sprintId = 'sprint-old', flowId = 'old-flow';
+    const pid = live ? process.pid : 2_147_483_647;
+    json(root, '.dashboard', { sprint: { id: sprintId, phase: 'EXECUTE', status: 'ACTIVE' } });
+    json(root, '.deckent/sprint.lock', { sprintId, pid });
+    json(root, `.deckent/pids/${sprintId}.snapshot.json`, { sprintId, pid, startToken: 'old-generation' });
+    if (live) json(root, `.deckent/pids/${sprintId}.pid`, { pid, startToken: 'old-generation' });
+    savePlannedSprint(root, flowId, { revision: 1, sprint: { id: sprintId } });
+    saveRunHandle(root, { flowId, revision: 1, planDigest: 'legacy-opaque-digest',
+      handle: { flowId, jobId: 'old-job', logRef: 'old-log' }, startedAt: '2026-08-25T10:00:00.000Z',
+      pid, startToken: mismatched ? 'another-generation' : 'old-generation' });
+    appendFlowEvent(root, flowId, { schemaVersion: 1, flowId, type: 'RUN_FAILED',
+      timestamp: '2026-08-25T10:05:00.000Z', error: 'retained failure' });
+  }
+
+  it('retains identity-proven failed history without inventing foreign live conflicts', () => {
+    const root = fixture(); retained(root);
+    const status = readCanonicalRunStatus(root, { sprintIdHint: 'sprint-next' });
+    expect(status).toMatchObject({ lifecycle: 'IDLE', active: false, conflicts: [] });
+    expect(status.historicalProjections?.length).toBeGreaterThan(0);
+    expect(status.historicalProjections?.every(x => x.terminalFlowState === 'FAILED'
+      && x.projection.sprintId === 'sprint-old')).toBe(true);
+    expect(readCanonicalRunStatus(root, { sprintIdHint: 'sprint-next' })).toEqual(status);
+  });
+
+  it.each(['live', 'wrong-generation', 'missing-snapshot'] as const)('preserves %s authority as a conflict', kind => {
+    const root = fixture(); retained(root, kind === 'live', kind === 'wrong-generation');
+    if (kind === 'missing-snapshot') unlinkSync(join(root, '.deckent/pids/sprint-old.snapshot.json'));
+    const status = readCanonicalRunStatus(root, { sprintIdHint: 'sprint-next' });
+    expect(status.conflicts.some(x => x.sprintId === 'sprint-old')).toBe(true);
+    expect(status.historicalProjections).toBeUndefined();
+  });
+});

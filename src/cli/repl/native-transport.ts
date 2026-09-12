@@ -598,14 +598,52 @@ export interface NativeModelCandidate {
  * discovery published). Pure listing: availability/policy are judged by the
  * spec builder, and executability by resolveNativeSelection on commit.
  */
+/** Registry-declared local-llm model ids (config hint; live /v1/models is authority). */
+export function configuredLocalLlmRegistryModels(config: NativeTransportConfig): string[] {
+  const registryDefinition = config.providers?.registry?.find((entry) => entry.name === 'local-llm') as
+    | { models?: unknown }
+    | undefined;
+  const models = registryDefinition?.models;
+  if (!Array.isArray(models)) return [];
+  return models.filter((id): id is string => typeof id === 'string' && id.trim() !== '');
+}
+
+/** Config order first, then newly discovered ids; stable locale sort within each tier. */
+export function mergeLocalLlmPublishedModelIds(
+  configured: readonly string[],
+  discovered: readonly string[],
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const id of configured) {
+    const trimmed = id.trim();
+    if (trimmed.length === 0 || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  const extras: string[] = [];
+  for (const id of discovered) {
+    const trimmed = id.trim();
+    if (trimmed.length === 0 || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    extras.push(trimmed);
+  }
+  extras.sort((a, b) => a.localeCompare(b, 'en'));
+  return [...out, ...extras];
+}
+
 export function listNativeModelCandidates(
   provider: string,
   config: NativeTransportConfig,
   discovered: readonly string[] = [],
 ): NativeModelCandidate[] {
-  void config;
   if (provider === 'ollama') return OLLAMA_BUILTIN_MODELS.map((m) => ({ provider, id: m.id, definition: m }));
-  if (provider === 'local-llm') return discovered.map((id) => ({ provider, id, definition: null }));
+  if (provider === 'local-llm') {
+    const ids = discovered.length > 0
+      ? discovered
+      : mergeLocalLlmPublishedModelIds(configuredLocalLlmRegistryModels(config), []);
+    return ids.map((id) => ({ provider, id, definition: null }));
+  }
   const preset = (OPENAI_COMPAT_PRESET_META as Record<string, { models?: readonly string[] } | undefined>)[provider];
   if (preset?.models) return preset.models.map((id) => ({ provider, id, definition: null }));
   const registryProvider = registryProviderFor(provider);

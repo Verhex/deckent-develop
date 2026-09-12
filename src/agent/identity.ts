@@ -75,21 +75,18 @@ export interface ComposeOptions {
  */
 export function narrationContractSection(policy: NarrationPolicy, lang?: 'en' | 'tr'): string {
   const seconds = Math.max(1, Math.round(policy.interimAnswerAfterMs / 1000));
-  const n = String(policy.progressNoteEveryToolCalls);
   const m = String(policy.interimAnswerAfterToolCalls);
   const s = String(seconds);
   return lang === 'en'
     ? [
-        'NARRATION (immutable): never work silently. Write user-visible lines in English.',
-        'Before each tool batch write one short line: what you are about to do and why.',
-        `After every ${n} tool calls write a 1–3 line interim finding.`,
-        `Never pass ${m} tool calls or ${s} s without an interim structured answer (known so far / remaining / next step), then continue.`,
+        'NARRATION (immutable): the terminal shows tool progress on one typed line — do not repeat it in prose.',
+        'Do not write a line before every tool batch. When the host asks for an interim answer, reply in English with one short structured block (known / remaining / next), then continue.',
+        `Never pass ${m} tool calls or ${s} s without that interim answer when the host requests it.`,
       ].join(' ')
     : [
-        'ANLATIM (değiştirilemez): asla sessiz çalışma. Kullanıcı satırlarını Türkçe yaz.',
-        'Her araç grubundan önce tek kısa satır yaz: ne yapacaksın ve neden.',
-        `Her ${n} araç çağrısında 1–3 satırlık ara bulgu yaz.`,
-        `${m} araç çağrısını veya ${s} sn'yi ara yapılandırılmış yanıt (şimdiye kadar bilinen / kalan / sonraki adım) vermeden asla geçme, sonra devam et.`,
+        'ANLATIM (değiştirilemez): terminal araç ilerlemesini tek satırda gösterir — prose ile tekrarlama.',
+        'Her araç grubundan önce satır yazma. Host ara yanıt istediğinde Türkçe tek kısa yapılandırılmış blok (bilinen / kalan / sonraki), sonra devam.',
+        `${m} araç çağrısını veya ${s} sn'yi geçince host ara yanıt istediğinde yanıt ver, sonra devam et.`,
       ].join(' ');
 }
 

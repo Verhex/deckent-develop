@@ -17772,3 +17772,370 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 724-001: Recovery 3357 canary notuna kanıt satırını ekle (DONE)
 
 ---
+## Sprint 731 — sprint-731
+
+**Status:** ABORTED
+**Date:** 2026-09-11
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 731-001: Canary proof satırını tek kez ekle (EXECUTING)
+
+---
+## Sprint 732 — sprint-732
+
+**Status:** ABORTED
+**Date:** 2026-09-11
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 732-001: Archive retention authority — enforceKeepLastN no-op'unu gerçek politikayla değiştir (PENDING)
+- 732-002: Size-trigger ingress — shouldRotate zincirini metrics writer'a bağla (PENDING)
+
+---
+## Sprint 733 — sprint-733
+
+**Status:** ABORTED
+**Date:** 2026-09-11
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 733-001: Archive retention authority — enforceKeepLastN no-op'unu gerçek politikayla değiştir (PENDING)
+- 733-002: Size-trigger ingress — shouldRotate zincirini metrics writer'a bağla (PENDING)
+
+---
+## Sprint 734 — sprint-734
+
+**Status:** ABORTED
+**Date:** 2026-09-11
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 734-001: Archive retention authority — enforceKeepLastN no-op'unu gerçek politikayla değiştir (PENDING)
+- 734-002: Size-trigger ingress — shouldRotate zincirini metrics writer'a bağla (PENDING)
+
+---
+## Sprint 735 — sprint-735
+
+**Status:** ABORTED
+**Date:** 2026-09-11
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 735-001: Archive retention authority — enforceKeepLastN no-op'unu gerçek politikayla değiştir (PENDING)
+- 735-002: Size-trigger ingress — shouldRotate zincirini metrics writer'a bağla (PENDING)
+
+---
+## Sprint 736 — sprint-736
+
+**Status:** ABORTED
+**Date:** 2026-09-11
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 736-001: Archive retention authority — enforceKeepLastN no-op'unu gerçek politikayla değiştir (PENDING)
+- 736-002: Size-trigger ingress — shouldRotate zincirini metrics writer'a bağla (PENDING)
+
+---
+## Sprint 737 — sprint-737
+
+**Status:** ABORTED
+**Date:** 2026-09-11
+**Duration:** 180s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 179849ms |
+
+### Tasks
+
+- 737-001: Archive retention authority — enforceKeepLastN no-op'unu gerçek politikayla değiştir (EXECUTING)
+- 737-002: Size-trigger ingress — shouldRotate zincirini metrics writer'a bağla (PENDING)
+
+---
+## Sprint 738 — sprint-738
+
+**Status:** ABORTED
+**Date:** 2026-09-11
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 738-001: Archive retention authority — enforceKeepLastN no-op'unu gerçek politikayla değiştir (PENDING)
+- 738-002: Size-trigger ingress — shouldRotate zincirini metrics writer'a bağla (PENDING)
+
+---
+## Sprint 739 — sprint-739
+
+**Status:** ABORTED
+**Date:** 2026-09-11
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 739-001: Archive retention authority — enforceKeepLastN no-op'unu gerçek politikayla değiştir (PENDING)
+- 739-002: Size-trigger ingress — shouldRotate zincirini metrics writer'a bağla (PENDING)
+
+---
+## Sprint 740 — sprint-740
+
+**Status:** ABORTED
+**Date:** 2026-09-11
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 740-001: Archive retention authority — enforceKeepLastN no-op'unu gerçek politikayla değiştir (PENDING)
+- 740-002: Size-trigger ingress — shouldRotate zincirini metrics writer'a bağla (PENDING)
+
+---
+## Sprint 741 — sprint-741
+
+**Status:** ABORTED
+**Date:** 2026-09-11
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 741-001: Archive retention authority — enforceKeepLastN no-op'unu gerçek politikayla değiştir (PENDING)
+- 741-002: Size-trigger ingress — shouldRotate zincirini metrics writer'a bağla (PENDING)
+
+---
+## Sprint 742 — sprint-742
+
+**Status:** ABORTED
+**Date:** 2026-09-11
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 742-001: Archive retention authority — enforceKeepLastN no-op'unu gerçek politikayla değiştir (PENDING)
+- 742-002: Size-trigger ingress — shouldRotate zincirini metrics writer'a bağla (PENDING)
+
+---
+## Sprint 743 — sprint-743
+
+**Status:** ABORTED
+**Date:** 2026-09-11
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 743-001: Archive retention authority — enforceKeepLastN no-op'unu gerçek politikayla değiştir (PENDING)
+- 743-002: Size-trigger ingress — shouldRotate zincirini metrics writer'a bağla (PENDING)
+
+---
+## Sprint 744 — sprint-744
+
+**Status:** ABORTED
+**Date:** 2026-09-11
+**Duration:** 1047s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1046511ms |
+
+### Tasks
+
+- 744-001: Archive retention authority — enforceKeepLastN no-op'unu gerçek politikayla değiştir (EXECUTING)
+- 744-002: Size-trigger ingress — shouldRotate zincirini metrics writer'a bağla (EXECUTING)
+
+---
+## Sprint 745 — sprint-745
+
+**Status:** ABORTED
+**Date:** 2026-09-11
+**Duration:** 0s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 0ms |
+
+### Tasks
+
+- 745-001: Archive retention authority — enforceKeepLastN no-op'unu gerçek politikayla değiştir (PENDING)
+- 745-002: Size-trigger ingress — shouldRotate zincirini metrics writer'a bağla (PENDING)
+
+---
+## Sprint 746 — sprint-746
+
+**Status:** ABORTED
+**Date:** 2026-09-11
+**Duration:** 991s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 991012ms |
+
+### Tasks
+
+- 746-001: Archive retention authority — enforceKeepLastN no-op'unu gerçek politikayla değiştir (EXECUTING)
+- 746-002: Size-trigger ingress — shouldRotate zincirini metrics writer'a bağla (EXECUTING)
+
+---

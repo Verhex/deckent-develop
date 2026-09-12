@@ -1,0 +1,11 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/orchestra/execution-effect-store-adapter.test.ts (24 tests | 23 skipped) 5031ms
+   ✓ execution effect Store adapter > proves a committed coordinator journal without mutating Store bytes  5030ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 23 skipped (24)
+   Start at  20:56:54
+   Duration  6.96s (transform 566ms, setup 15ms, collect 678ms, tests 5.03s, environment 0ms, prepare 33ms)
+

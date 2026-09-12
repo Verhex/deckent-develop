@@ -1,0 +1,103 @@
+{
+  "health": {
+    "observedAt": "2026-09-12T16:52:01.919Z",
+    "durationMs": 201403.293565,
+    "health": {
+      "state": "ready",
+      "unresolved": [],
+      "recoveryListReceiptDigest": "sha256:6ca3cae022cb5cf15f5527e7d1ab3d32b1fc8652db9c71d1dafbc48a620b4a79"
+    }
+  },
+  "topSelfMs": [
+    {
+      "function": "captured",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 3311,
+      "ms": 83299
+    },
+    {
+      "function": "",
+      "url": "",
+      "line": 0,
+      "ms": 11416
+    },
+    {
+      "function": "(garbage collector)",
+      "url": "",
+      "line": 0,
+      "ms": 11346
+    },
+    {
+      "function": "ownData",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 574,
+      "ms": 5166
+    },
+    {
+      "function": "canonicalJson",
+      "url": "file:///home/alperen/deckent-dev/dist/core/execution-effect-containment.js",
+      "line": 29,
+      "ms": 5023
+    },
+    {
+      "function": "sortedOwnStringKeys",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 549,
+      "ms": 4856
+    },
+    {
+      "function": "portableEffectPathFailure",
+      "url": "file:///home/alperen/deckent-dev/dist/core/execution-write-scope-policy.js",
+      "line": 124,
+      "ms": 4808
+    },
+    {
+      "function": "exactRecord",
+      "url": "file:///home/alperen/deckent-dev/dist/core/execution-effect-containment.js",
+      "line": 55,
+      "ms": 4734
+    },
+    {
+      "function": "isWindowsReservedName",
+      "url": "file:///home/alperen/deckent-dev/dist/core/execution-write-scope-policy.js",
+      "line": 112,
+      "ms": 4123
+    },
+    {
+      "function": "canonicalJson",
+      "url": "file:///home/alperen/deckent-dev/dist/orchestra/execution-effect-docker-lifecycle.js",
+      "line": 32,
+      "ms": 3829
+    },
+    {
+      "function": "validateManifest",
+      "url": "file:///home/alperen/deckent-dev/dist/core/execution-effect-containment.js",
+      "line": 185,
+      "ms": 3066
+    },
+    {
+      "function": "update",
+      "url": "node:internal/crypto/hash",
+      "line": 134,
+      "ms": 2857
+    },
+    {
+      "function": "serializeCanonicalJson",
+      "url": "file:///home/alperen/deckent-dev/dist/core/task-attempt-custody-store.js",
+      "line": 619,
+      "ms": 2793
+    },
+    {
+      "function": "(program)",
+      "url": "",
+      "line": 0,
+      "ms": 2446
+    },
+    {
+      "function": "FastBuffer",
+      "url": "node:internal/buffer",
+      "line": 960,
+      "ms": 2372
+    }
+  ]
+}

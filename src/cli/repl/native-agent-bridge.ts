@@ -110,6 +110,8 @@ export interface ReplEngine {
       /** Privacy-safe admission fact for an actual provider request. An
        * admitted measurement never means the request completed or was sent. */
       onRequestMeasurement?: (event: RequestMeasurementEvent) => void;
+      /** false → accumulate for persistence but do not stream plan narration during tools. */
+      onAssistantStreamGate?: (open: boolean) => void;
     },
     referenceInput?: StructuredTurnInput,
   ): Promise<void>;
@@ -767,7 +769,7 @@ export function mapToolResultToTranscript(
   },
 ): { operatorSignalLine: string | null; sink: { verb: string; target: string; note?: string; failed?: boolean } } {
   const withheldFromContext = isToolResultContextWithheld(ev);
-  const operatorSignalLine = ev.code && (!ev.ok || withheldFromContext)
+  const operatorSignalLine = ev.code && !ev.ok
     ? localizeNativeAgentSignal(input.t, ev.code, ev.code)
     : null;
   const notes = [
@@ -1191,6 +1193,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   const runTurnInner: ReplEngine = async (input, cbs, referenceInput) => {
     permissionWaitAbort = new AbortController();
     cancelRequestedForTurn = false;
+    cbs.onAssistantStreamGate?.(true);
     const turnStartedMs = nowMs();
     let toolResultsThisTurn = 0;
     let inputTokens = 0;
@@ -1339,6 +1342,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
         case 'tool-executing':
           roundTracker.observeExecution();
           readOnlyMarker.observeExecuting(ev);
+          cbs.onAssistantStreamGate?.(false);
           clearActiveTool();
           clearReasoningIndicator();
           activeToolId = ev.id;
@@ -1476,6 +1480,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
                 : ev.demand === 'failure-stop' ? INTERIM_DELIVERABLE_FAILURE_STOP_KEY : INTERIM_DELIVERABLE_REQUIRED_KEY
               : undefined;
           if (interimKey) {
+            cbs.onAssistantStreamGate?.(true);
             cbs.output(`\n[${t(interimKey)
               // The budget line names the TURN's own count, not the count since
               // the last delivery: those are different facts.

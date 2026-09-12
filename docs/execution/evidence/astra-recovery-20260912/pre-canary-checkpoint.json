@@ -1,0 +1,1128 @@
+{
+  "observedAt": "2026-09-12T18:30:25.098863+00:00",
+  "purpose": "Owner-requested checkpoint before one real start and one real do; no new manual repair first.",
+  "authority": "epoch7; owner-live current turn authorizes checkpoint commit and sequential canaries beyond previous no751 boundary.",
+  "status": "CHECKPOINT_ONLY; DOGFOOD_HEALTH=DEGRADED; no product DONE; no push",
+  "custody": "Aggregate checkpoint preserves transferred Opus A/B, parked Cursor C, historical D, and Astra recovery deltas. File inclusion is preservation, not authorship or independent acceptance. Exact historical attribution: committed v3 handoff filesChanged; Astra R0/R0B evidence manifests.",
+  "excluded": [
+    ".deckent/runtime/containers",
+    "auth",
+    "task/runtime stores",
+    "communication.md",
+    "iletisim.md"
+  ],
+  "files": [
+    {
+      "path": "DIRECTIVES.md",
+      "sha256": "e2b6c66c5776168f82d264e0886e9b7f0b3666f27f775efd0d1ed27455d7c345"
+    },
+    {
+      "path": "deckent-test-12092026.md",
+      "sha256": "ef5698a90155253475b219449266ce8e2284d631cc17215f15c8be55d3962c1d"
+    },
+    {
+      "path": "docs/MASTER-PLAN.md",
+      "sha256": "fb823d9d98c4768a25b8892a7b58acddc584166a4a35f56e21b8292f40a37938"
+    },
+    {
+      "path": "docs/SPRINT-LOG.md",
+      "sha256": "279762776214f797224222f90797ad3986c89e64ac8ebd7301d1cb0fb8faedbe"
+    },
+    {
+      "path": "docs/design/DECKENT-TERMINAL-SINGLE-SURFACE.md",
+      "sha256": "38d0aef675c7c8e77c761ff1dce7110f68900d557a518df7e53bb81259f49906"
+    },
+    {
+      "path": "docs/execution/active/DOGFOOD-RESTORATION-2026-09-12.md",
+      "sha256": "3c478e086f3aebe41566e32a1d1fa8e62cd8747a7b3b01a3df28705c0e48ca94"
+    },
+    {
+      "path": "docs/execution/active/RECOVERY-DO-DOGFOOD-001-R0B.md",
+      "sha256": "711c8c156ee0b3d90811a0fc640b302e6da02bab50a97749402d896e991241db"
+    },
+    {
+      "path": "docs/execution/active/RECOVERY-DO-DOGFOOD-001-REPAIR-PLAN.md",
+      "sha256": "b4aa068672ce0a096983b0d5885de2f5a94ed9dd67c65f6536bbc3ad47eb46a6"
+    },
+    {
+      "path": "docs/execution/active/RECOVERY-DO-DOGFOOD-001.md",
+      "sha256": "68df8b30be460f609cab6f5abe44f614d6aa3564938d1a2b91abeda61289b16b"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/cold-discovery-1.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/cold-discovery-1.stdout.json",
+      "sha256": "a0091012900b723ae497b892e3595e020f12109557505525526c3d1a1626e98f"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/cold-discovery-2.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/cold-discovery-2.stdout.json",
+      "sha256": "cf42451d15e3e6a833b4fe3c65d31449fe103562c39c0dd80b8307714c0e6ef5"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/cold-discovery-summary.json",
+      "sha256": "820a2491a0080b778cd323789dafd9bd27612443a59dcfcb2a58ceced92608e8"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/dogfood-memory-adr-d-007.json",
+      "sha256": "5d9e68d386c369f6b52ad7aa9520735ce09ba22cf9c9f1b077a90fc3d30f303c"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/dogfood-memory-adr-g-020.json",
+      "sha256": "ab6519a816321d78566d8299b678bbeb9dba9bbace12822bb66b7075fe77c69d"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/dogfood-memory-adr-g-022.json",
+      "sha256": "bdaf1dcdea4cb8e60c496e3408fccc5609896c6e1b27549ab37154f8da62bf4e"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/dogfood-memory-adr-g-031.json",
+      "sha256": "fc3d3b7aa60828772e0e762cd815872b7fc7aa210838a2118ac964f39e7d5540"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/dogfood-restoration-inventory.json",
+      "sha256": "67c89b8f42e3c95a7d8fb9924350f3712e10c737aa75eb7eb2deb4609be2d65c"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/dogfood-restoration-manifest.json",
+      "sha256": "533ae2fe3e9cccd37c624d36a316b7df282d170b422597f123c6ad5fa4766851"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/dogfood-restoration-observation.json",
+      "sha256": "17808bf610495f66ef33fab6f9b2650e9de0135abf01acd7816d19fb4525c216"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/entry219-receipt.json",
+      "sha256": "974316e3a1e339562befca194d6312b030e79720909df2e7899c7747bde7a37d"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/entry219.md",
+      "sha256": "7dff94a5d61e2eaee08e54e5e5873ff394d1c76f1749f4d99dd9bb689fcf0407"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/manifest.json",
+      "sha256": "1d54a23b5c8f85b818bbb89e36c6b9879bc97fd89a56d1c3da87cb5f1844e8ab"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/owner-close-preflight.json",
+      "sha256": "9079eee59fad97e2c78c99e41cf937af144db42119921c8eaaf3d55331dc0cb2"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/planning-recovery-health.json",
+      "sha256": "50b9769231a2c0155cfaf4fdc04bf79f8dfa8ef8cb02775a2a8a73f6c22979e3"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/post-opus-analysis.md",
+      "sha256": "b3104c71d78b950a5408f5d26163903cf388fa330cc069e20da4ae1480b150a7"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/749-fresh-archive-classification.json",
+      "sha256": "55a6fed67c0c0c713288b39726d9b81eee2dcec45cbaa34598d82460874786a6"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/MANIFEST.json",
+      "sha256": "9fd462caa3365be0d9f335497efcb49f4b54bff9c5df22144a82731b6aeca9eb"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/RESULT.md",
+      "sha256": "e7f721afed0d067f961af86b3c5d763268fee654e27c877846ab0499b9ac6993"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/archive-748-command.json",
+      "sha256": "ddc8d6d4c8bb01efa0d4c94b351160437cc781295c799f2c2bf4e71350611254"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/archive-748.json",
+      "sha256": "2d71582a5d6571092b902dc0520194fff1b2cf360b74f9145b3b9c267c596fe3"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/archive-748.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/archive-749-command.json",
+      "sha256": "1e2c9339adc685277df90c8f727da75ae6969fd7723b9a4683d0e56846701dcb"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/archive-749.json",
+      "sha256": "77095efd9bc8a5cffd8782eab6042f7f5b14eeea07b24d1be1acab6e0735f9f0"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/archive-749.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/archive-750-command.json",
+      "sha256": "8236d9181f08628429fbc9f7062063d496f03cd4f05dc197b979501379aeb166"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/archive-750.json",
+      "sha256": "87f8ba10fb4b25bf9a8a479a47294d33b3dc30ee37fef83ee9d4a957b14e3f71"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/archive-750.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/archive-preview-748-command.json",
+      "sha256": "428d354d2c6abb13bb8778e07805698f5f8f5a6632157ac541bc1c2814606b5a"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/archive-preview-748.json",
+      "sha256": "f53d2b835a7ef39efa442e19f13f2d1ac4817b0d1d0d620b3e9fe77a1e963b3b"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/archive-preview-749-command.json",
+      "sha256": "903070afd6c5324c7db4fb0b2b814052fb6571b5462dc374fc05c4ace65c5f4a"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/archive-preview-749.stderr",
+      "sha256": "820c1c0f259911d01586f898369bebeb1243fb80c743014b2334e57cf174f4d1"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/archive-preview-750-command.json",
+      "sha256": "a88cad64a4cf61f30231ebe8bb85c7c9b14960d1b96728bcc4a1f05fad9ce76e"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/archive-preview-750.json",
+      "sha256": "c686178e8f75653ff809210978fedefb11edf240fddba56c3691a97be9484852"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/build-final.log",
+      "sha256": "1effef5d72e999701cb5d3afa1668ddae549ca6293a41ecc69e9d19b31bde688"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/build-identity-final.json",
+      "sha256": "6971bb53d96b1a8722765f25ed26c18ee1032df4e4c71e400d3263c9ef14dade"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/build.log",
+      "sha256": "f86216329df7b464ef11cf51f5349feb7bdddf1e2812b7aa3d1b605a95f3a901"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/close-748-command.json",
+      "sha256": "1cf3c0e2345d4cf6a0d789fca53f6f1305441287255fc1ba86149f20aba9553d"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/close-748.json",
+      "sha256": "8af8904950ca192591f6d4507b10977a6951884c9c748c0fc044805a68e0d10d"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/close-748.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/closure-checkpoint.json",
+      "sha256": "7e1223cc576131d54e84f33963f868ac84937fbfcd0302130e1a1e38ff07b6ea"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/cold-negative-read-1-command.json",
+      "sha256": "18cf4c0ca8ae2ea93eeaf28a69be5a5203e4bcd00fde6c6cbbf4fe33493d5f4d"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/cold-negative-read-1.json",
+      "sha256": "dcc943679bda38e37a86a33929e3299097be9558a644a54257be02ae568fc1e4"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/cold-negative-read-1.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/cold-negative-read-2-command.json",
+      "sha256": "850921ff1c6f4d45b05545ec6dcb5639610b15924d67c77cf99867a095b0985b"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/cold-negative-read-2.json",
+      "sha256": "ec8317a09923e7165e709325e77a6a6b6f9a593aa0fbc6bf203aea176ab5aa00"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/cold-negative-read-2.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/early-tests.log",
+      "sha256": "95f676c5a6c4e54f8e3d0db9c7e7f99e629d795c1eda0f460fa4e2af2e0fd5f4"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/final-baseline-relative.patch",
+      "sha256": "b123f3e4e8c6ff89e130f027a17a1ef562707897b27f60e58ee31db54d557761"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/final-preview-748.json",
+      "sha256": "dba9474b7a41df84b28bb330a18ddaf851e3be85026d6c1dd359353e88c714a6"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/final-preview-748.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/final-runtime-read-1-command.json",
+      "sha256": "7e225f730a9efed2a8e7c3811da186dd0ff5e9eefceb7d7067ab484612f3f561"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/final-runtime-read-1.json",
+      "sha256": "38dd64d89257222ae2560d25b3f5585c36e8e73d65cb8d0bc6a4a8042a680454"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/final-runtime-read-1.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/final-runtime-read-2-command.json",
+      "sha256": "5c9a6115dfddb96f2e919a09beee9dfb6a56b01ed7da4193b758eba53b1c6575"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/final-runtime-read-2.json",
+      "sha256": "fdc561d01718ac77de2290e04212bb2d67a89219a963203a677531e25d344d4a"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/final-runtime-read-2.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/final-source-manifest.json",
+      "sha256": "7405ed4bd6528601e4a0a8fcc2c9108ca6ffe061933c5ae5f8404b0cf90af8d6"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/incremental.patch",
+      "sha256": "b3d06907cf90d3433def687510c246581b1432ab6ee58c06ed15db84de326c9d"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/mount-consumer-final-tests.log",
+      "sha256": "8a132065f77768166151c11dd2d63f84f7cd7b322fc45b4b2085c0a6b8ace4c3"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/mount-consumer-tests.log",
+      "sha256": "3bf3c7fc0b9e5a9399a30501a67e592fb541f7b291055f389a1650c53f1c1993"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/negative-receipt-disk.json",
+      "sha256": "395e8441fbe0c8677d16385f9992cba3795989a85f9d631e7eb52b5315f6d57e"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/planning-profile-inclusive.json",
+      "sha256": "453e9a204182445ea8728b398983bbaed278e47e65ea187931786a0f0b6a0cf1"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/planning-profile-summary.json",
+      "sha256": "03b0d950863e85a6354af368426f664089a650279c14ab06af7cc1c34f3dc055"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/post-close-health-command.json",
+      "sha256": "e9dc6fc0e6df7b7025fb23bd8fbbac39dec2be819ed688b7bf1c3a1afd6f42da"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/post-close-health.json",
+      "sha256": "1f85d1c3b056ccfe740b11003341c4d5bb95deaf050498a4e28657c4010a6339"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/profiler-artifact.json",
+      "sha256": "b61310d8e3857c97782ced55723f1d1151a01fd66c8074e6bc9e203fc3d04dc4"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/r0-final-tests.log",
+      "sha256": "1a2d1a0988f41c66c217a1962d3b9d52ca9a702a96084639347caf4bab828fb8"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/r0-final-tsc.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/r0-tests.log",
+      "sha256": "536af96655892f1c558c1882b4a6011c41b604f444549310967453c40dd9cc22"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/rejected-preview.json",
+      "sha256": "8bae94d31b2c1b35cf9dced38395b15accdd59358ed57ab596e5bd3fb65eb291"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/rejected-preview.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/remaining-tasks.json",
+      "sha256": "d17bd99b29c429b4335f3de8bf6238d12e034c345fc1043340081f43b381284d"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/source-reviewed.json",
+      "sha256": "9835dc054b55612f599639c852183f34bd4535be53d1d3f41242fd0ff5ccba2b"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/tsc-r0-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/xverify-claim.md",
+      "sha256": "841c5d4278f59196218f822f4fdb2bf68e2285cbb87d500661fc7df29bac8aa1"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/xverify-command.json",
+      "sha256": "e1af9fc6877c1d780af196f89953e92244ec78f9698d421779af9fe2b034874b"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/xverify-residue-observation.json",
+      "sha256": "0a390897def5d868bd2d451e1f1b93475079aeff57da634672df941387c9a49c"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/xverify-result.json",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0/xverify.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/RESULT.md",
+      "sha256": "c32887f4187c7ca75882804522bc63d8cb385c16cfe788e77cc4f9d9e9ae1f69"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/baseline.json",
+      "sha256": "a859689276dbbf321c80a9812a41d444ba5bce20e7f3df8423e9466c47202bcc"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-final-command.json",
+      "sha256": "d48fa7fd700f1b179caf439098895ec360613d44411a699504dc1ecef5e28f9a"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-gated-command.json",
+      "sha256": "cf962eb94d51ef6c8613977c3e2459539ffddcc2eb62bcebf0c5ea4b7d5f29ca"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-gated.log",
+      "sha256": "1884409a3f7d4cee79d88e04e9e430aa29478bdcf5e8391966acfb8488cd7f2f"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-gated.stderr",
+      "sha256": "a70ee20ab841ef89dcc772d6b5a69a9a2000ab7f6ba24133cf6f2cb4a470859f"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-identity-delivered-command.json",
+      "sha256": "38a5f46e2995df5120d7309e3b50411ff71cafdaca637933697053b900ba9139"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-identity-delivered.json",
+      "sha256": "fab784dbbc53ebdab2b73d3b40e559e524a301aca2b8385bd9054d59ef256b70"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-repaired-command.json",
+      "sha256": "52d785b6945d86a42ba56cddd470b8f90f43ff89ab604a8e17406ae1fa8dd730"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-repaired.stderr",
+      "sha256": "95a7556ec4849b891447834b61704b06c22d5305cae4a0c341c6152c450a5638"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-sequenced-command.json",
+      "sha256": "aa3232769ba64b0a760ef9340566c4f7ddacfe6e34f0b489a1d0b1eb3b4b025e"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-sequenced.stderr",
+      "sha256": "5d855a2448556fb560f6d84271f971c3ecc6300d1dccf29e4b75f457879926bf"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/candidate-final-diagnostic-command.json",
+      "sha256": "879b0b247e006247c74932497cac6fff09022b7f1366017fcec58ed5dc91a188"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/candidate-final-diagnostic.json",
+      "sha256": "790473cd8e9f883be54e47c0b2396efbc5be68c62b0a49be8009b27501f5f072"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/candidate-final-diagnostic.stderr",
+      "sha256": "c38e9069bf9692071f0df4d407ad48c2d3641e2eb06376eb6a7261cf80e35aed"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/command-exits.json",
+      "sha256": "6e148137411a499d8d002c5304e264a8a6b5870ee1fa8e26066ca2c3faec079b"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/external-profiles.json",
+      "sha256": "184fdb41bf66a15a3c778a6ada1aa0247203f618e4f3db22262fdcec8bef02dd"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-diagnostic.json",
+      "sha256": "6bff15b636c3c9be5447d1ef212246579d97d4746734612278b2b01dc09de44b"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-diagnostic.stderr",
+      "sha256": "b8bc3a87b8feac3cc9e722826d7a0aaa8ed00a87e4ac835d9643e45d490765a1"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-extended-diagnostic-command.json",
+      "sha256": "6ab35bd20e50a0b5cf216a1da4b9d53c1d68f695d59cdc4a3c45100affb6263a"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-extended-diagnostic.json",
+      "sha256": "fdfbb0e8616151dd710ba075139fd130a04f8c566da4a2b4308c71d506ce6dcf"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-extended-diagnostic.stderr",
+      "sha256": "e87f23c6e6aa145e8c330cdf1411024f6157ab3380d7554c295517c4934672f6"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-final-command.json",
+      "sha256": "409d15ba428bf0778babba3ed6f6e5c41c3307bc8c9cca2e01465c3bb158d041"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-final.json",
+      "sha256": "90123bd0d7285b28f67c1651070db1d737b30497a697f514ceb10ec0928b06c3"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-first-command.json",
+      "sha256": "3c07c511b35360f64d2825d850f7c792b81adad836c7a30b82f743177751084e"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-first.json",
+      "sha256": "ae6b5388c4e36779f4fb89801e47ea42aedfc6fa0a7fb9b42af35852c3a2766e"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-profile-command.json",
+      "sha256": "1ede4b37a02719ba121edb4ebf78b84d630ba68c96a723da8ded91d85214d213"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-profile.json",
+      "sha256": "853d904dc375861f4e1492acfb394c43bd295a7a684d3d0289ff2cbbc7b3df39"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-profile.stderr",
+      "sha256": "996d2cf43792dbd58d1ba16a5d7837281cdf9fd0bd61d708eb8d04a7f1ed38c3"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-repaired.json",
+      "sha256": "06ccf8152c2a415c6dae26143e247b1e7d67bff32e6851b49d668bfbcdd211bd"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-shared-diagnostic-command.json",
+      "sha256": "5999bb5fd48fb71a85f349b8e46aad932f1a540931f847544a5a2c192bf17d01"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-shared-diagnostic.json",
+      "sha256": "55591421450da5a5e5a55bfddc38fd701e341ecc3faa26e4627b5aaabd152e86"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/incremental.patch",
+      "sha256": "4bd11239053cca17cec4d8c1af22284c969094b1fa499288c32a6d7602c1d4d6"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/manifest.json",
+      "sha256": "b5f9766dc71a857edcdfe8ff66c2e7ac5a9ec08cebbc0f453febb8d2f5bd012e"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/production-default-health-command.json",
+      "sha256": "f1178d2ebf75a71a13c236d488021863e5fc42bdb67a311c38c27ded361d86f5"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/production-default-health.json",
+      "sha256": "8183221e6ecab8ef5a9520f4796b29894dd75625f4c8f89faa91d1891fd37cd2"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/production-default-health.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/profile-self-aggregate.json",
+      "sha256": "7c4d2dabbf113540d15fde1bc99fd036a732266ffe4ef99334e824b54322bf17"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/profile-summary.json",
+      "sha256": "d3ba1b5ffe12c555037e721f3fa960a6486098b580212b0e8e781184a9217986"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/runtime-delivered-command.json",
+      "sha256": "ef7d7d4d1c11f1107804489d8162abf67bdc59c8b5d91bc4e1c3b6437f55d22d"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/runtime-delivered.json",
+      "sha256": "64120858dbb149b46286b967d5a2f45375213e9e0732ab5f3ca00f50a1b0cfb4"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/source-manifest.json",
+      "sha256": "1ace327e294d14cfc6deda941200e45c5136b3244e23aa816d75beb1f7029542"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/test-lifecycle-fence.log",
+      "sha256": "d27df422dc3a487ead254314964cf3774d76ca9fbca7d4e9ff88c4198f3ae128"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/test-shared-reader-verified.log",
+      "sha256": "e9741d3646cd9ed40e1ee693904469451fb90f6ceff15262957ff81783fbdaef"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/tests-final.log",
+      "sha256": "ab135e7ee4895776e6428009bac86c27d14a213d9f4f10a9bbfe502d9dd5eab6"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/tests-lifecycle.log",
+      "sha256": "d43c59d4266bf4963b2257adc2aac46f17b7243084000dc504864f75c514a4dc"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/tests-quarantine-repair.log",
+      "sha256": "5fc0fa8b9c5fd272fc393f5ba57c645f980ed234e254f17329a751f0e31ce3c7"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/tests-quarantine.log",
+      "sha256": "977115d6ab5cb51c5212c83a12a2abbc120030ab1112e4db015f25909d98384f"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/tests-repaired.log",
+      "sha256": "35ce4d4a1f691c5c7e6acf39c8415b80d6b1d15a7f210a51a79de63ac5e8fced"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/tsc-gated.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/tsc-lifecycle.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/tsc-quarantine.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/tsc-shared-reader.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/recovery-candidate.patch",
+      "sha256": "209fa590a8603cbeddfc8e7743b72e5c0a6d7493d846adea7b6f0b5c6f215d1a"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/source-post-review.json",
+      "sha256": "3ef060046848848c5d37d0a2cd7041c898962a4b41b13df6a91651a8c4aee57f"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/source-snapshot.json",
+      "sha256": "a761a759c028d3372e555ebdeeb86e65aa9f0948ebf687218c34aad2576f7528"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/xverify-adjudication.json",
+      "sha256": "2fc7bdafdb60bc2c2fee8d846380dcb4347b0e463e72b2041a97343dec0c1218"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/xverify-claim.md",
+      "sha256": "0148a781b7f2cc03c7345ad49b4a2d41436fd7c0967ab5258fef800dcaf18969"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/xverify-command.json",
+      "sha256": "d15d48bde20ee0a6ca3d62c013dcaf65ba41175dbb05abb64ede39b7a729f8c6"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/xverify-durable-reread.json",
+      "sha256": "fca1712e2ae122f299b9a798b85cf3dc83bbbe6c48dcae9bb0d36c7be478a217"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/xverify-report.md",
+      "sha256": "b2b495858b7728a471f4b31441d0f6cd9e1b1b2a4555717dc3270fd86ad6223d"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/xverify-result.json",
+      "sha256": "f6d69c8e3a9ac92592f6f453f430e76dfb35a6e7df99143187c6ca97d2b4fd4d"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/xverify-stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/terminal-winddown-20260910/astra-opus-independent-review-20260911.md",
+      "sha256": "b46644fe5896a3be9d4c8f749fcb5a1966800eca39aeb603431b067b71863279"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v2/0001-prepared.json",
+      "sha256": "73241a5bde0a1b3d4201aeb77308d76f8ae0b344379e2e2e225dcdcefc27679a"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v2/0002-aborted.json",
+      "sha256": "92845153ebc62357156ec2326807b0bbb589bb45c80838fb999a29f51654826f"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v2/HANDOFF.md",
+      "sha256": "384d642fcdf202755284c87bfd9b2d933eb1f18c01ac35e346dcaeb8082fda04"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v2/files-changed.json",
+      "sha256": "283c7a52fdde36cdc98e641cb438c3f0cfbb2c8935a806964b6e0965b6e45c34"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v2/findings.json",
+      "sha256": "a7d154cd4d2c074ee71e9f83f285c602c41860fa5d3e6c098e85f648e449a4de"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v2/runtime-liveness.json",
+      "sha256": "eca214175a721a54f0017614c3b8900ad9ed94176cc396a5901aaa37b0ef0be9"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v2/verification.json",
+      "sha256": "18c4e3d0759c99a7419eba77362453bcb1df29324dbca242b42bf90a0b535844"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v2/verify-preexisting-red.log",
+      "sha256": "74c52c74cf4b801c768497f0b7d6e36461ed07daec7c81bf103b353f9abc5d8d"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v2/verify-session-tests.log",
+      "sha256": "0d34d1c494f1a3af638050046eea0e6d0edd12414c1f72417abeef0fb7a54a72"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v2/verify-tsc.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v3/0001-prepared.json",
+      "sha256": "b0f715839e13423d173c941912dd7876305863da3986dea64233165d9654decb"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v3/0002-verified.json",
+      "sha256": "552b4704277623d8c6a8bcbffe023c5623efc3d36cade679aa77db4de4279835"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v3/0003-committed.json",
+      "sha256": "f25a6ba1e3a452ad7b550f46d0e02b4d02bb907c013423db2ffed2f2cec84a41"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v3/HANDOFF.md",
+      "sha256": "8c9f304b789872c7733a7802d5b25fa4faa14a15bae49647c2333521f7ff227c"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v3/files-changed.json",
+      "sha256": "b4b72a578b5f363c121eb16687bc78ff100efccc6baf395e64d09c496ab58b14"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v3/findings.json",
+      "sha256": "fb9150600158743feb74040e849fabb7427e18a1b5d8e5e1638de51c33152816"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v3/runtime-liveness.json",
+      "sha256": "1ec76d66d893131f5fa82490f029943e2a295ae7756eb2e3a71213cae6402022"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v3/verification.json",
+      "sha256": "94221d74ae1c60b1a07106e81a63d4b2f3bbe1d654380e1850d16b0d2a1ab3cc"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v3/verify-preexisting-red.log",
+      "sha256": "26bf4752dacdb64924dce0ae2aa7cf07d04a5dcfb654a9f6b0a67f2a8ac390ea"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v3/verify-session-tests.log",
+      "sha256": "ad15a00a9c6f48a0ecf627fc02edca7c7e4f53fb0555aae52e08be83692b8129"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v3/verify-tsc.log",
+      "sha256": "7425285c5b5b68294b92331484fb791ade0b1faab643862918f2acdf9f836dee"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood/0001-prepared.json",
+      "sha256": "3ef8ce02cddd86d6566c824bf3c707551ff38748cff61845e5e05d6907844ab3"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood/0002-aborted.json",
+      "sha256": "b380bbb152d3bcdac5102ce7ef7c3f21300ce4131b3b3f5783cb0f080fdb7577"
+    },
+    {
+      "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood/HANDOFF.md",
+      "sha256": "5eb157b529663fa04c3b179eacb1b093f54db7292ab27f78090a5812951b118d"
+    },
+    {
+      "path": "docs/generated/master-plan-active.json",
+      "sha256": "923231fbd23d24ba64fa5d24f1281cfe463e96ecaeb4b412da5966f58532ea99"
+    },
+    {
+      "path": "docs/generated/master-plan-active.md",
+      "sha256": "1796c29a0694dfbbc458277a92ea115921e7957631bf3eeb5c89ca148f3977d5"
+    },
+    {
+      "path": "durum-raporu.md",
+      "sha256": "a21d05877949a27553cae8854965c85d07b64d31802709f729ab9efdef996051"
+    },
+    {
+      "path": "follow-up-works/current-flow.md",
+      "sha256": "36935108d4b874aaea111828a0eecc87efffae950d4e1681427a3365c9f68a28"
+    },
+    {
+      "path": "scripts/authority-handoff.mjs",
+      "sha256": "397ac534389f173e250f24d735973ec19fc55809682e184f00ad1f6204c4f04b"
+    },
+    {
+      "path": "scripts/gen-production-wiring-block.mjs",
+      "sha256": "cd45a7bfc1232ce928227f48a6ebc825de1344eb584ddc1801aa8ed4e695b0e9"
+    },
+    {
+      "path": "scripts/metrics-retention-host-proof-observer.mjs",
+      "sha256": "45a34b2ac13215e3d1aa84c9017c69289a1d4751411b45c94179355081b2ae52"
+    },
+    {
+      "path": "scripts/production-wiring-host-proof-harness.mjs",
+      "sha256": "26d56698a276bd20d02d4511f235f63b587bd9f12bdeb8858f291b9fab2defd0"
+    },
+    {
+      "path": "src/agent/guards/shell-risk.ts",
+      "sha256": "56a89341081d8759dab01f5625eaf1dab7e6b1725652a29b5966db229ac37fb2"
+    },
+    {
+      "path": "src/agent/identity.ts",
+      "sha256": "4ec62c499edd387f916797df3032176d1f6cd843f5d599fb76c0460e9b63ce39"
+    },
+    {
+      "path": "src/cli/commands/recover.ts",
+      "sha256": "89f474a3187db5443a7b0508c968c6d94364ce98fb3cd8f368fcb583dd421a80"
+    },
+    {
+      "path": "src/cli/commands/start.ts",
+      "sha256": "ed858f1f6127fee67234cf9095c8a97be2bb0f76f44dd911f4b80f500e18aaeb"
+    },
+    {
+      "path": "src/cli/helpers/message-catalog/cli-terminal-slash.ts",
+      "sha256": "f86fa7f12c5ebfade5c40bf3b94e4c2b1cff5608f23a7871aed84517bcda3529"
+    },
+    {
+      "path": "src/cli/helpers/messages.ts",
+      "sha256": "0a9c9ea1f6ccde98ec9e0c8942f72f14a47ebedd5569ea87048011f7c406fe21"
+    },
+    {
+      "path": "src/cli/repl/app.tsx",
+      "sha256": "9216f53471c34f993af0d18121065753086b038029590f7a9870a561a9228092"
+    },
+    {
+      "path": "src/cli/repl/chat-turn-queue.ts",
+      "sha256": "d20a4b10896f1265f2145f0f0bc24c7df827adbf6f5c03f299d6df20d940e4f1"
+    },
+    {
+      "path": "src/cli/repl/ink-palette.ts",
+      "sha256": "a9819e3042fe2807ca3a776f45c03812eb2ab4d88e333003c837acbc39f67539"
+    },
+    {
+      "path": "src/cli/repl/input-bar.tsx",
+      "sha256": "0823f29790e765ac7bf61ae9ce4b99d3ebf1e9282d627a7685d04a1efd18966b"
+    },
+    {
+      "path": "src/cli/repl/line-edit.ts",
+      "sha256": "15456e81d2364b96998b2ffb9250a981dc1ea093995fbec3978772fd158a673b"
+    },
+    {
+      "path": "src/cli/repl/live-operator-strip.tsx",
+      "sha256": "87501eb2036004b01b74549bd0f8116b1aa9f378d7578febe3fd36f2a4dec540"
+    },
+    {
+      "path": "src/cli/repl/native-agent-bridge.ts",
+      "sha256": "700209bdf1a4fa7bc1b09d0b937d3758f4ddc7434825b04a0f8dc74fc6d2bad1"
+    },
+    {
+      "path": "src/cli/repl/native-transport.ts",
+      "sha256": "13955614e6530e174733f991c76e1db92269053bcebdecaf2e9072c67f291512"
+    },
+    {
+      "path": "src/cli/repl/paste-composer.ts",
+      "sha256": "647066fe9e8200175add544f3cf726163acf0fb99ce136377dda7aaacf67f88e"
+    },
+    {
+      "path": "src/cli/repl/picker-card.tsx",
+      "sha256": "731b64076510a50a4357cb905f0ea5eb1343daa7c467aa48c690dbf87ea0bb0d"
+    },
+    {
+      "path": "src/cli/repl/run.tsx",
+      "sha256": "c884e2d4b6472b5fd8f2054203661b817f0765af510b513873ca80c36db9d058"
+    },
+    {
+      "path": "src/cli/repl/static-prose-batch.ts",
+      "sha256": "b722b66de825ba7c8a4f923377c89368cfa6dc9188d58b1101511c1a9ba44f29"
+    },
+    {
+      "path": "src/cli/repl/stream-segmenter.ts",
+      "sha256": "27aefa4ad17975f2de878229a7ac79e5e7453ef35608f5e9c7e98045177ae0d2"
+    },
+    {
+      "path": "src/cli/repl/term-gate.ts",
+      "sha256": "0a98d1ee9a69b8084ebf61b9f52f528e93e7ce501763b88dc07980ec034d3074"
+    },
+    {
+      "path": "src/cli/repl/transcript-turn-view.tsx",
+      "sha256": "430efb423c3075cbb8d232ba814fe37d656ad3df366163f1e1cd1c81d542b65b"
+    },
+    {
+      "path": "src/core/config-types.ts",
+      "sha256": "3bb761cfcd86b9a4a6f628bb3b075d87c10716d1e571a5f3720254e0c728eedb"
+    },
+    {
+      "path": "src/core/config.ts",
+      "sha256": "8a7285ab2b6063f0581ecb299cb0ff021fd97572b2646a764589dd3b3e67d8a8"
+    },
+    {
+      "path": "src/core/custody-read-snapshot.ts",
+      "sha256": "4a14d82fb350775f2f0d4e6c5bc2717ba6a2cb2c7914a6778c6b5241c1a9b1fe"
+    },
+    {
+      "path": "src/core/observability-rotation.ts",
+      "sha256": "d251243e427829b5b41a1d26fb8739ab6c2839d8b20c69bead1b9784a22e5c21"
+    },
+    {
+      "path": "src/core/observability.ts",
+      "sha256": "01f6d4d4699fa91f6675d876b03e721f4cc48504c468784d7317bdae4867b446"
+    },
+    {
+      "path": "src/core/production-wiring-host-proof.ts",
+      "sha256": "b7dba2a53d587dacec918b9204b969809cb1082ef9c66f488db64b1fb0b96a2e"
+    },
+    {
+      "path": "src/core/run-status-authority.ts",
+      "sha256": "7a33a3f68a7cbf67f9143662bd23b333a1f0816d9ff3215b14f1bdbc60b1a67c"
+    },
+    {
+      "path": "src/core/sprint-archive.ts",
+      "sha256": "58d3662e34a21fb39e91e6d0a64e2b96cda33108edf8bff410f6b54d73558a9c"
+    },
+    {
+      "path": "src/core/task-attempt-custody-store.ts",
+      "sha256": "4ae930f4988c8e0c4b7d4d45d098290e10469f8db952e0a228397fb14dc9099b"
+    },
+    {
+      "path": "src/core/terminal-workline-contract.ts",
+      "sha256": "a3aa66d99e6bd8a087ffacec635d298ef599929581bbad5592edb075ec6653d4"
+    },
+    {
+      "path": "src/orchestra/execution-effect-store-adapter.ts",
+      "sha256": "331a0464c9480fab2da43c9ed88923eaf2464bb566ebed8615a0339981877487"
+    },
+    {
+      "path": "src/orchestra/model-selector.ts",
+      "sha256": "8d0ab99647de028e761dff039a090005969ccd3faa46da2395fbad8e9372751f"
+    },
+    {
+      "path": "src/orchestra/planner.ts",
+      "sha256": "52dfe3960bd3c8b2e915948f124a7b1109c63b3fb96f922866c762c1b05ed666"
+    },
+    {
+      "path": "src/orchestra/production-wiring-host-proof-runner.ts",
+      "sha256": "5b7b6852eb20ea5c5bde151495de322246e2ffaffb19bc365a0616077844d2a5"
+    },
+    {
+      "path": "src/orchestra/prompt-god-template.ts",
+      "sha256": "1c05dd43ed13b66892253aa429cff23dacf3865ce35680cb75a38d2535fa76e5"
+    },
+    {
+      "path": "src/orchestra/result-ingress.ts",
+      "sha256": "e6e01856821f6bc6d48754eff7d67aca91f60a1fe930d537de3a8815f51d4e22"
+    },
+    {
+      "path": "src/orchestra/scheduler-effects.ts",
+      "sha256": "e0affd83395c614808992f6304decadcc20ff24acd9c1d96136dc8e28caef7bf"
+    },
+    {
+      "path": "src/orchestra/spawn-backend-docker.ts",
+      "sha256": "f1af0f38d31c44cde27bdeca8172384ffaabaf2fa4ee7f466eee03c8088eff0b"
+    },
+    {
+      "path": "src/orchestra/spawn-backend.ts",
+      "sha256": "9755fbfec15dec6f3fca351cd41f539158e386b07493f002224ca986cb606efc"
+    },
+    {
+      "path": "src/orchestra/spawn-failure-authority.ts",
+      "sha256": "c1548d519f078cf56022cd560d2471531d31e6db5c940cb2c55e846320001925"
+    },
+    {
+      "path": "src/orchestra/sprint-controller.ts",
+      "sha256": "7cf1f955d385a39aa564281b869787621eb438e213203a0da25c47fbf63e5925"
+    },
+    {
+      "path": "src/orchestra/sprint-finalizer.ts",
+      "sha256": "7a0335087c09153a7f39fc344da337c8fb3082a04faff049fb5c10e061a3f22e"
+    },
+    {
+      "path": "src/orchestra/sprint-pid-manager.ts",
+      "sha256": "67cae75487a5053a84f14a2f485a6679e3c0461b5027c2f2f870539a1460e02c"
+    },
+    {
+      "path": "src/orchestra/sprint-recovery-operation.ts",
+      "sha256": "396dfb18a468defbebca5ee0220d86451e91bc319a7b58f240d3478df4d6b79b"
+    },
+    {
+      "path": "src/orchestra/sprint-runner-entry.ts",
+      "sha256": "cc36ac571ecbd28c85e3e63348746efedd95cfa08d9e52953f94483e41700520"
+    },
+    {
+      "path": "tests/agent/shell-risk.test.ts",
+      "sha256": "c9b34004b210b14fb589b195fcc0c6a620cddf5e21f97548675dc5ed79d0fa18"
+    },
+    {
+      "path": "tests/cli/detached-start-terminal-result.test.ts",
+      "sha256": "ecec28f5968aa03bb509763cfd5ee8ee7b7a367544df60247bccf2bf877d3524"
+    },
+    {
+      "path": "tests/cli/native-agent-bridge.test.ts",
+      "sha256": "37c932251d064742757190af60773a74053f3c5a0beb9c358d1d9d27e0849686"
+    },
+    {
+      "path": "tests/cli/repl/approval-keyboard-transition.test.tsx",
+      "sha256": "5cccf83634d1a7b929339a1d150cf6c1e699a530cc1dc633b84d01c78e0effa7"
+    },
+    {
+      "path": "tests/cli/repl/context-slashes.test.tsx",
+      "sha256": "159d202b8583fe7dd7a965f1441993d94b91ecd64ed24ab44a82fea9994187f7"
+    },
+    {
+      "path": "tests/cli/repl/grapheme-caret.test.tsx",
+      "sha256": "4b838334ce99d08fb8871866d8287eeaa993d2b8fd65ef2637fdce87572b31d3"
+    },
+    {
+      "path": "tests/cli/repl/input-bar-caret-style.test.tsx",
+      "sha256": "93f5b96403733cc838b35a71928f2cdaf5ce2eae7ee059d63b8fadb34e2021eb"
+    },
+    {
+      "path": "tests/cli/repl/input-debug-wire.test.tsx",
+      "sha256": "6a7614290d2bbae06383c9503df77caa65abb97165eaf328b5c1e95d2601cb13"
+    },
+    {
+      "path": "tests/cli/repl/interrupt-policy.test.tsx",
+      "sha256": "6bfb14285fc17468b438eb2def9fc2ddc7556b2183f73d5806a692319609de6a"
+    },
+    {
+      "path": "tests/cli/repl/multiline-composer.test.tsx",
+      "sha256": "44758bfe41309bef9400935be531053eaa95f15b75c5e9333ce6f420de775738"
+    },
+    {
+      "path": "tests/cli/repl/operator-strip-lifecycle.test.tsx",
+      "sha256": "1d479c98b111096e38eae3f70d7b82a1ca77842f7809bb553172e4267f3b6a79"
+    },
+    {
+      "path": "tests/cli/repl/paste-composer.test.ts",
+      "sha256": "4682cae4f7382576250d03cb0b6bab58780f727af9ea571e20359bfe50faea78"
+    },
+    {
+      "path": "tests/cli/repl/picker-specs.test.ts",
+      "sha256": "db0f85304b50a7337cd702cc642425f9d303b325218fadac5c376c20a181fae5"
+    },
+    {
+      "path": "tests/cli/repl/slash-menu-more-labels.test.tsx",
+      "sha256": "e9d02aecc75594a43a3e3a0701a50b9ad09f4d540cab9926275ff21ebe555946"
+    },
+    {
+      "path": "tests/cli/repl/slash-menu-submit.test.ts",
+      "sha256": "5c5c290ae5d346d314e92cea373136009ac9fe2d7b124f763d9b9f1350a8ee80"
+    },
+    {
+      "path": "tests/cli/repl/string-free-closure.test.ts",
+      "sha256": "8d5e5b1b734c1215acb8118a23de980f4de4ea5b89b2e16dc968940076ca3335"
+    },
+    {
+      "path": "tests/cli/repl/transcript-turn-view.test.tsx",
+      "sha256": "87e689936d4a1ca0e6274368384d10bb8fdab20ec3ebee329374b49561baf406"
+    },
+    {
+      "path": "tests/cli/repl/turn-abort-wire.test.tsx",
+      "sha256": "5dcb69d4c94568d3ec9020184e337033c09aef2e153fa05af2f43b7b7edf93f6"
+    },
+    {
+      "path": "tests/cli/stream-segmenter.test.ts",
+      "sha256": "e50c1796161e2eb5f6fe5eedb93b27b37c0eba3870c82445c20c00d5476c0fde"
+    },
+    {
+      "path": "tests/core/custody-read-snapshot.test.ts",
+      "sha256": "727fe2166d5343f3066a3d316c6cdd1c0ea65c978bda479f4f373fa0f12658d6"
+    },
+    {
+      "path": "tests/core/memory-read-planner-profile.test.ts",
+      "sha256": "a47870e8292203ae7bb84041eb7a2c6858d2ac4e42eb2a8644c226947ff208bd"
+    },
+    {
+      "path": "tests/core/observability-rotation-tenant.test.ts",
+      "sha256": "05e5f708c41f002c55ec7b6d337b9b1820614566c655a3d28b47510e4a7ac7e3"
+    },
+    {
+      "path": "tests/core/observability-rotation.test.ts",
+      "sha256": "b24877a297484d0f3b258ea0b22bc5ea572d084cdbb438afe740f9353cda421a"
+    },
+    {
+      "path": "tests/core/observability.test.ts",
+      "sha256": "7c4b3e67de891333001407eea08a017e97d6a4a927b214fe49f79ed9e3fe3240"
+    },
+    {
+      "path": "tests/core/production-wiring-contract.test.ts",
+      "sha256": "9ad73d3890df7bb4cf862efedf21fd4dcf83bdfbcde1d4bc8cc7bd3435aac38c"
+    },
+    {
+      "path": "tests/core/run-status-authority.test.ts",
+      "sha256": "ec08d2f7f9f1ff0f402ef9824b3d25622ea9021fee03da320ec00ea7722bdb7d"
+    },
+    {
+      "path": "tests/core/task-attempt-custody-store.test.ts",
+      "sha256": "499a007bdf7bc1d69f5805bdc4c00c4fe289a304c6e3aff8cf6593bb88d0bf80"
+    },
+    {
+      "path": "tests/core/terminal-workline-contract.test.ts",
+      "sha256": "f1716304c778e2fd352cb504999c0638d9d02fc4f419bdc1765e6e71398ed0d4"
+    },
+    {
+      "path": "tests/helpers/exact-recovery-mount-adapter.ts",
+      "sha256": "4c20523452f953a401c6cbb0abcfe04da8b4eef21fefceb02274fd8f56ea9295"
+    },
+    {
+      "path": "tests/orchestra/archived-sprint-terminal-disposition.test.ts",
+      "sha256": "e2fea92e6d7d9c1ad8988b6d4150d226c4d11ab8f8a2ced30862d670f80589b3"
+    },
+    {
+      "path": "tests/orchestra/exact-committed-unsettled-recovery.test.ts",
+      "sha256": "3bfe501f2e079aaadb0c71fa607d3e4f622c836d0996ba751a4b4c4e254a02e9"
+    },
+    {
+      "path": "tests/orchestra/exact-controller-terminal-fanin.test.ts",
+      "sha256": "845e30f0ffa1a10b9033ab94dc7fa314e8104df16ac777cad71503288ad7b78a"
+    },
+    {
+      "path": "tests/orchestra/exact-rejected-result-closure.test.ts",
+      "sha256": "8e1466a28f7a301eb8d6e72eae1db1e677560d9f67e0e0b7fddc24702775075b"
+    },
+    {
+      "path": "tests/orchestra/execution-effect-store-adapter.test.ts",
+      "sha256": "7a25a4dad7b9f5d55e8cae455c36216ee0ac5f7ec6b6efcb7bebb29c0a5879ad"
+    },
+    {
+      "path": "tests/orchestra/model-selector-max-tier.test.ts",
+      "sha256": "d6c152ea4b6b7c7b5f6ff9e5d26d22f3b17f86a5c8a31c756249c7d01ee72321"
+    },
+    {
+      "path": "tests/orchestra/production-wiring-host-proof-absence.test.ts",
+      "sha256": "352ee0914ac64085e3157a29472fbbe59a5071f0e9a9ab1475fccc7b08ad14fc"
+    },
+    {
+      "path": "tests/orchestra/production-wiring-host-proof-failure-reason.test.ts",
+      "sha256": "e183dea3366d04b3e1d6082adb89038d39b534bbc794b52e5390506d28e39e43"
+    },
+    {
+      "path": "tests/orchestra/production-wiring-prompt.test.ts",
+      "sha256": "debb9c8152ff702cfaff78feb687c1b5ade9e0802fd60334f3bd77533e0c01a4"
+    },
+    {
+      "path": "tests/orchestra/production-wiring-worker-result-contract.test.ts",
+      "sha256": "24804dace9ccdda885fadf7d9ae2d0d16b41c2952be9022ae2887fb8f311b144"
+    },
+    {
+      "path": "tests/orchestra/recovery-resume-state-retention.test.ts",
+      "sha256": "adb7630c7c58aee0ce72def9ef4f5c19a4e8e539ae5246576fc6923195678053"
+    },
+    {
+      "path": "tests/orchestra/rejected-result-history.test.ts",
+      "sha256": "b94bea6a3ac783d718cba5f996e0cc31647ebec846c89bb39990685d6caafdd9"
+    },
+    {
+      "path": "tests/orchestra/spawn-backend-docker-container-registry.test.ts",
+      "sha256": "e554dbb054a9e5934b853a9b425b47bd81b1275ae93728c6fcd0372e1107bb13"
+    },
+    {
+      "path": "tests/orchestra/spawn-backend-docker-mounts.test.ts",
+      "sha256": "5da8e85859d0868afbb68e96e0f2ab96956be9de7e1d2efda67659ae02ee4cce"
+    },
+    {
+      "path": "tests/orchestra/sprint-pid-manager.test.ts",
+      "sha256": "225ed50cf16901d301c43a6a02ef6ef5191958144b998db9cd674b1996e20658"
+    },
+    {
+      "path": "tests/orchestra/sprint-runner-pid-snapshot-retention.test.ts",
+      "sha256": "c1aa32439be1a789cce9bd5c98280f5b10a119c839bf1b8350ff7b0d873283a9"
+    }
+  ]
+}

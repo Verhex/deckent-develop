@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "taskId": "xv-1789224472822-f22c7e59-41ec-4e85-9836-d95ea3e16872",
+  "at": "2026-09-12T14:51:20.645Z",
+  "schemaRejected": false,
+  "assertionBreakdown": [
+    {
+      "assertionId": "criterion-go-1b796265b6961af9b884b49f699689c578de17b7665dbdc821c0ff5126a005ff",
+      "status": "undecidable",
+      "citations": [
+        {
+          "evidenceId": "E-40777d62568d9af5ec10758ec5ef34105f0068e891f00fe6",
+          "locator": "docs/execution/evidence/astra-recovery-20260912/recovery-candidate.patch",
+          "evidenceSha256": "sha256:209fa590a8603cbeddfc8e7743b72e5c0a6d7493d846adea7b6f0b5c6f215d1a"
+        },
+        {
+          "evidenceId": "E-7ca3c3bcb0b16a48c87142d532ffa463cb654be9dc07df4b",
+          "locator": "docs/execution/evidence/astra-recovery-20260912/xverify-claim.md",
+          "evidenceSha256": "sha256:0148a781b7f2cc03c7345ad49b4a2d41436fd7c0967ab5258fef800dcaf18969"
+        },
+        {
+          "evidenceId": "E-f3f829c9e9f8746b48510e65a7dd537e1f2170b18c891973",
+          "locator": "src/cli/commands/start.ts:352-405",
+          "evidenceSha256": "sha256:e5125acec2d7c2419d7f129e1022395d162580b7d4c7375ffc56ae800c52105c"
+        },
+        {
+          "evidenceId": "E-012cbe6173e5a5668267e187ac8927f079c2562394e66037",
+          "locator": "src/orchestra/result-ingress.ts:210-250",
+          "evidenceSha256": "sha256:8ed1d5a36d2328fa23c0aef47d16cdba5d80bb8fe18b9c9a7cdeed4d18470a5b"
+        },
+        {
+          "evidenceId": "E-9871f1b027b05dadac8601a043e4150eb8f0d1555fc57ca4",
+          "locator": "src/orchestra/scheduler-effects.ts:1120-1145",
+          "evidenceSha256": "sha256:6fdfd58bdd85ed43528e59e4d3b621c8bbf672aba90a1d872680fa61774947c6"
+        },
+        {
+          "evidenceId": "E-a89c42da5a01b60bf4f6a03b56e313ca33aa9da41fc9bfb4",
+          "locator": "src/orchestra/scheduler-effects.ts:970-1005",
+          "evidenceSha256": "sha256:2a4999e71c4d2dc9d27b629635ef147ce9312b9d042166db02d4a87eeffcd135"
+        },
+        {
+          "evidenceId": "E-8857a2bfa8858c5977a902af641e6efa7faebc149122a5b4",
+          "locator": "src/orchestra/spawn-backend-docker.ts:14707-14732",
+          "evidenceSha256": "sha256:4683e294e1a5bce27858c7101c7f28c68be53a48951cbfee488189e61ce78949"
+        },
+        {
+          "evidenceId": "E-1d8c67786111856e71b5c05dec983776edb48eb2acfb445b",
+          "locator": "src/orchestra/spawn-backend-docker.ts:15020-15090",
+          "evidenceSha256": "sha256:d538ea742f6d25294896b9cf862593d91ad2ed0a981e57d5c8527d588953f8b1"
+        },
+        {
+          "evidenceId": "E-1bef497ed419d8d605ad968104ca4d9a88ef978f1143e911",
+          "locator": "src/orchestra/spawn-backend-docker.ts:21230-21300",
+          "evidenceSha256": "sha256:a8be9be906505d5d383b88b33d65903fbacaadb0b372e56f34a69cfde09cfc80"
+        },
+        {
+          "evidenceId": "E-58829a2b14048ee76fed4cce4473faf4aba2f9b146b89ea0",
+          "locator": "src/orchestra/sprint-controller.ts:1780-1895",
+          "evidenceSha256": "sha256:40b876052e80597e5b308c5cf7e4c71cfc1456e06ec7050a0e300b6fe9df21c3"
+        },
+        {
+          "evidenceId": "E-6dc24751d08ed01fa20b2d42e70a6a9686aaa8b1427ea617",
+          "locator": "tests/orchestra/rejected-result-history.test.ts",
+          "evidenceSha256": "sha256:b94bea6a3ac783d718cba5f996e0cc31647ebec846c89bb39990685d6caafdd9"
+        }
+      ],
+      "missingRequirementIds": [
+        "R-95022f75f5a3180c67a5d88092eebe10abbdfce4d601fb9f",
+        "R-bd4ea1888bd1e12968618ead2a03027250fac4589dd1a492",
+        "R-ebdc4628d7f64bb50ff2dfdf74df5a6aca822ddc6b337491"
+      ],
+      "reason": "Source-level core of the claim is corroborated. A rejection is produced only when assembleCanonicalIngressResultV2 throws WorkerResultSchemaError (spawn-backend-docker.ts:15020-15090), a distinct AssemblerError subclass so host-authority faults still propagate (result-ingress.ts:210-250); the producer returns a frozen rejected-result before acceptedBytes/effect-landing/publishHostArtifact/appendChain, so no accepted receipt, chain append or settlement is manufactured and no evidence is deleted. verifyExactDockerRejectedResult (14707-14732) is read-only, demands the backend-issued WeakMap reader plus object identity, refuses if any cold accepted result exists, requires identical sourceResultDigest/custodyRef/projectionFence, requires daemon state absent, rereads exit+completion+acceptance after the await, and catches to false. The registry (scheduler-effects.ts:970-1005, 1120-1145) maps the outcome to hold, exposes it only while state is hold, and rechecks entries.get(taskId)===entry after the async verify. The controller (sprint-controller.ts:1780-1895) retires only on authority-hold with matching holdReason, derivable strictly earlier owning ordinal, isBoundRecoveredAttemptIdentity, terminal owning run, verified===true, a cache-bypassing fresh terminal reread and an unchanged rejected reference; optional-method absence yields undefined===true, i.e. fail-closed HOLD. Tests cover current/future/unbound candidate, nonterminal/unknown owning run, false/throwing verify, post-await lifecycle flip, replaced entry, foreign and spread reader, daemon present/unknown, and each changed-authority axis. Undecidable overall because three claim components cannot be settled from the mounted excerpts. (1) Authority asymmetry: the accepted-result branch gates retirement on !candidateUnprovable, settled.origin!=='terminal-reread' and isDecidedExactSettlementHold, while the new rejected branch omits candidateUnprovable entirely; whether that is blocking depends on candidateUnprovable and isBoundRecoveredAttemptIdentity, whose definitions lie outside sprint-controller.ts:1780-1895. (2) Cold restart: exactRejectedRecoveryResults is an in-process Map and exactRejectedResults a WeakMap, and the only durable trace is the recovery-inventory entry demoted to kind 'released' (21230-21300); the test labelled cold registry replay constructs a fresh registry plus stub backend inside one process with a fabricated rejection, so genuine post-restart behaviour (re-derivation versus permanent HOLD) is unproven and no persistence source is mounted. (3) CLI orphan preflight boundary: start.ts:352-405 shows archiveOrphan executing under --auto-approve on PID-death evidence alone, before any controller or typed recovery authority, with last_sprint_id injected via an untyped config cast and the excerpt ending mid-statement; detectOrphan, archiveOrphan, listPidFiles and the caller that propagates process.exitCode (directly relevant to the reported external start exit0 versus Flow FAILED 11:56:19Z) are not in evidence, so the exact safe boundary cannot be fixed from this snapshot. Residual race noted but not adjudicable: the post-await recheck rereads exit, completion and acceptance but never re-observes daemon container state, so a restart-policy container can reappear after the absent observation. Production closure remains unproven and the claim states this: the live fan-in from acceptExactDockerCustodyResult through the registry to the controller has no observed run (748 schema-rejected, successor 750 failed at CLI preflight before worker/controller). Missing evidence required to decide: detectOrphan/archiveOrphan/listPidFiles and the start.ts exit path with its caller; candidateUnprovable, isDecidedExactSettlementHold, isBoundRecoveredAttemptIdentity; any durable rejection persistence plus a real new-process restart test; a live fan-in receipt."
+    }
+  ]
+}

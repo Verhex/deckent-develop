@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { types as nodeTypes } from 'node:util';
+import { CustodyReadSnapshot, type CustodyReadSnapshotBounds, type CustodyReadSnapshotStatistics } from './custody-read-snapshot.js';
 
 import {
   extractTaskAttemptEffectLandingBindingV2,
@@ -1303,6 +1304,36 @@ export interface TaskAttemptCustodyStartedFailedDispatchV2 extends Omit<
   readonly schemaVersion: typeof TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION;
   readonly kind: 'task-attempt-custody-started-failed-dispatch';
   readonly state: 'STARTED_FAILED_RETAINED';
+  readonly custodyRootId: Sha256Digest;
+  readonly custodyCapabilityEvidenceDigest: Sha256Digest;
+  readonly recoveryAuthority: TaskAttemptCustodyDispatchRecoveryAuthorityV2;
+  readonly recoveryAuthorityDigest: Sha256Digest;
+  readonly stoppedExecutionEvidenceDigest: Sha256Digest;
+  readonly recordedAt: string;
+  readonly receiptDigest: Sha256Digest;
+}
+
+/** Negative terminal disposition after effect landing/release. The immutable
+ * worker bytes remain rejected, never canonical-accepted-result. The issuing
+ * host proves schema rejection and stopped execution; Store binds the complete
+ * durable provider/effect history and prevents subsequent attempt resurrection. */
+export interface TaskAttemptCustodyRejectedResultCandidateV2 extends Omit<
+  TaskAttemptCustodyStartedFailedCandidateV2, 'state'
+> {
+  readonly state: 'REJECTED_RESULT_CANDIDATE';
+  readonly reasonCode: 'WORKER_RESULT_SCHEMA_INVALID';
+  readonly sourceResultDigest: Sha256Digest;
+  readonly sourceResultReceiptDigest: Sha256Digest;
+  readonly effectLandingChainDigest: Sha256Digest;
+  readonly effectLandingOccurredAt: string;
+}
+
+export interface TaskAttemptCustodyRejectedResultDispatchV2 extends Omit<
+  TaskAttemptCustodyRejectedResultCandidateV2, 'state'
+> {
+  readonly schemaVersion: typeof TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION;
+  readonly kind: 'task-attempt-custody-rejected-result-dispatch';
+  readonly state: 'REJECTED_RESULT_CLOSED';
   readonly custodyRootId: Sha256Digest;
   readonly custodyCapabilityEvidenceDigest: Sha256Digest;
   readonly recoveryAuthority: TaskAttemptCustodyDispatchRecoveryAuthorityV2;
@@ -5859,6 +5890,71 @@ export class TaskAttemptCustodyStore {
     private readonly expectedProjectRootSha256: string,
   ) {
     this.root = Object.freeze({ ...root });
+    const guarded = Object.create(null) as Record<string, unknown>;
+    const reads = new Set(['readPrivateDirectory', 'scanPrivateDirectoryBounded',
+      'readDurableEffectMarker', 'readFirstWriter', 'readVerified', 'issuePathCapability']);
+    for (const key of Object.keys(adapter) as (keyof TaskAttemptCustodyAdapter)[]) {
+      const method = adapter[key];
+      guarded[key] = typeof method === 'function' ? (...args: unknown[]) => {
+        const operation = this.readSnapshot ?? this.verifyingReadSnapshot;
+        if (operation && !reads.has(key)) operation.denyMutation();
+        if (this.readSnapshot && key === 'scanPrivateDirectoryBounded') {
+          const encode = (value: unknown): string => Buffer.from(canonicalTaskAttemptCustodyJson(value,
+            TASK_ATTEMPT_CUSTODY_JSON_HARD_BOUNDS)).toString('utf8');
+          return this.readSnapshot.observe(`scan:${encode(args)}`, () => Reflect.apply(method, adapter, args),
+            encode, value => Buffer.byteLength(encode(value)), value => value);
+        }
+        return Reflect.apply(method, adapter, args);
+      } : method;
+    }
+    this.adapter = Object.freeze(guarded) as unknown as TaskAttemptCustodyAdapter;
+  }
+
+  private readSnapshot: CustodyReadSnapshot | null = null;
+  private readSnapshotAdmissionProbe = false;
+  private verifyingReadSnapshot: CustodyReadSnapshot | null = null;
+  private readonly readSnapshotCapabilities = new Set<TaskAttemptCustodyPathCapability>();
+
+  /** Read-only operation; its decision escapes only after native rereads. A
+   * capability needed by historical readers is revoked before returning. */
+  withVerifiedReadSnapshot<T>(bounds: CustodyReadSnapshotBounds, read: () => T): {
+    readonly value: T; readonly statistics: CustodyReadSnapshotStatistics;
+  } {
+    if (this.readSnapshot ?? this.verifyingReadSnapshot) (this.readSnapshot ?? this.verifyingReadSnapshot)!.denyMutation();
+    if (typeof read !== 'function' || nodeTypes.isAsyncFunction(read)) hold('CAPABILITY_UNVERIFIED', 'read');
+    const snapshot = new CustodyReadSnapshot(Object.freeze({ ...bounds }), reason => hold(
+      reason === 'budget' ? 'DISPATCH_DISCOVERY_BOUNDS_EXCEEDED'
+        : reason === 'deadline' ? 'DISPATCH_DISCOVERY_DEADLINE_EXCEEDED'
+          : reason === 'mutation' ? 'CAPABILITY_UNVERIFIED' : 'ARTIFACT_CHANGED', 'read'));
+    this.readSnapshot = snapshot;
+    try {
+      const value = read();
+      if (nodeTypes.isPromise(value)) snapshot.denyMutation();
+      this.readSnapshot = null;
+      this.verifyingReadSnapshot = snapshot;
+      const statistics = snapshot.verify();
+      return Object.freeze({ value, statistics });
+    } finally {
+      this.readSnapshot = null;
+      this.verifyingReadSnapshot = null;
+      for (const capability of this.readSnapshotCapabilities) this.revokedPathCapabilities.add(capability);
+      this.readSnapshotCapabilities.clear();
+    }
+  }
+
+  private snapshotMemo<T>(method: string, input: unknown, read: () => T): T {
+    if (!this.readSnapshot || this.readSnapshotAdmissionProbe) return read();
+    const key = `${method}:${Buffer.from(canonicalTaskAttemptCustodyJson(input, TASK_ATTEMPT_CUSTODY_JSON_HARD_BOUNDS)).toString('utf8')}`;
+    return this.readSnapshot.memo(key, read);
+  }
+
+  /** Immutable consumer facts share this operation's native read fence. Each
+   * consumer keeps its namespace object private; context carries full authority. */
+  readVerifiedSnapshotFact<T>(owner: object, context: unknown, read: () => T): T {
+    if (!this.readSnapshot || this.readSnapshotAdmissionProbe) return read();
+    const key = Buffer.from(canonicalTaskAttemptCustodyJson(context,
+      TASK_ATTEMPT_CUSTODY_JSON_HARD_BOUNDS)).toString('utf8');
+    return this.readSnapshot.memoForOwner(owner, key, read);
   }
 
   private assertStoreIdentity(
@@ -5915,6 +6011,17 @@ export class TaskAttemptCustodyStore {
   }
 
   private readDurableEffectMarker(
+    descriptor: DurableEffectDescriptor,
+    phase: TaskAttemptCustodyDurableEffectMarker['phase'],
+    policy: TaskAttemptCustodyPolicyV2,
+  ): TaskAttemptCustodyDurableEffectMarker | null {
+    const read = () => this.readDurableEffectMarkerUncached(descriptor, phase, policy);
+    if (!this.readSnapshot) return read();
+    return this.readSnapshot.observe(`marker:${descriptor.opDigest}:${phase}:${policy.policyDigest}`,
+      read, value => JSON.stringify(value), value => Buffer.byteLength(JSON.stringify(value)), value => value);
+  }
+
+  private readDurableEffectMarkerUncached(
     descriptor: DurableEffectDescriptor,
     phase: TaskAttemptCustodyDurableEffectMarker['phase'],
     policy: TaskAttemptCustodyPolicyV2,
@@ -7338,10 +7445,20 @@ export class TaskAttemptCustodyStore {
       ) hold('DISPATCH_DISCOVERY_TAMPERED_CANDIDATE', 'list-dispatch');
       let admitted: TaskAttemptCustodyDispatchAdmissionReadV2;
       try {
-        admitted = this.readDispatchAdmission({
-          dispatchRequestId: reservation.dispatchRequestId,
-          policy,
-        });
+        // Only this canonical discovery probe can classify a rejected proof
+        // through the separately verified no-effect quarantine below. Do not
+        // memoize its semantic failure as either valid authority or a fatal
+        // operation failure; physical positive/negative reads remain fenced.
+        const previousProbe = this.readSnapshotAdmissionProbe;
+        this.readSnapshotAdmissionProbe = true;
+        try {
+          admitted = this.readDispatchAdmission({
+            dispatchRequestId: reservation.dispatchRequestId,
+            policy,
+          });
+        } finally {
+          this.readSnapshotAdmissionProbe = previousProbe;
+        }
       } catch (error) {
         if (error instanceof TaskAttemptCustodyHold) {
           const quarantined = this.readHistoricalAdmissionQuarantine(
@@ -7443,6 +7560,10 @@ export class TaskAttemptCustodyStore {
     return childPath(dispatchAuthorityDirectory(identity), 'started-failed-retained.json');
   }
 
+  private rejectedResultDispatchPath(identity: TaskAttemptCustodyIdentityV2): TaskAttemptCustodyRelativePath {
+    return childPath(dispatchAuthorityDirectory(identity), 'rejected-result-closed.json');
+  }
+
   private effectCommittedReleasePendingDispatchPath(
     identity: TaskAttemptCustodyIdentityV2,
   ): TaskAttemptCustodyRelativePath {
@@ -7456,7 +7577,9 @@ export class TaskAttemptCustodyStore {
   ): void {
     // Any marker, including corrupt/incomplete authority, prevents resurrection.
     // This raw read deliberately does not call requireDispatchAdmissionRef.
-    if (this.readFirstWriterSnapshot(this.startedFailedDispatchPath(identity),
+    if (this.readFirstWriterSnapshot(this.rejectedResultDispatchPath(identity),
+      metadataLimit(policy), operation, 'DISPATCH_AUTHORITY_INVALID') !== null
+      || this.readFirstWriterSnapshot(this.startedFailedDispatchPath(identity),
       metadataLimit(policy), operation, 'DISPATCH_AUTHORITY_INVALID') !== null
       || this.readFirstWriterSnapshot(this.effectCommittedReleasePendingDispatchPath(identity),
         metadataLimit(policy), operation, 'DISPATCH_AUTHORITY_INVALID') !== null) {
@@ -7697,6 +7820,137 @@ export class TaskAttemptCustodyStore {
       || Date.parse(recordedAt) < earliestRecordedAt) {
       hold(operation === 'read' ? 'DISPATCH_AUTHORITY_INVALID' : 'DISPATCH_REQUEST_INVALID', operation);
     }
+  }
+
+  inspectRejectedResultDispatchCandidate(input: {
+    readonly admissionRef: TaskAttemptCustodyDispatchAdmissionRefV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+  }): TaskAttemptCustodyRejectedResultCandidateV2 {
+    const row = requireExactDataRecord(input, ['admissionRef', 'policy'], 'DISPATCH_AUTHORITY_INVALID', 'read');
+    const policy = snapshotPolicy(row.policy);
+    const admitted = this.requireDispatchAdmissionRef(row.admissionRef, policy, 'read');
+    const { terminal, observations, start, execution, exit } = this.inspectExactReleasedProviderLifecycle(admitted, policy);
+    const landing = this.readChain(admitted.ref.identity, policy, 'effect-landing');
+    if (!landing || this.readChain(admitted.ref.identity, policy, 'accepted-result') !== null) {
+      hold('DISPATCH_TRANSITION_INVALID', 'read');
+    }
+    // This path requires released, verified effects, not an APPLYING journal or
+    // a COMMITTED journal whose resource release is still pending.
+    const verifiedLanding = this.readVerifiedEffectLanding({
+      identity: admitted.ref.identity, policy, artifactKey: landing.artifactKey,
+    });
+    const landingArtifact = this.readArtifactReceipt({ identity: admitted.ref.identity, policy,
+      artifactClass: 'execution-effect-landing-receipt', artifactKey: landing.artifactKey });
+    if (!verifiedLanding || landingArtifact?.receiptDigest !== landing.artifactReceiptDigest) {
+      hold('ARTIFACT_REPLAY_MISMATCH', 'read');
+    }
+    const preserved = this.inspectPreservedArtifactInventory(admitted, policy, new Set([
+      'canonical-accepted-result', 'production-wiring-host-settlement',
+      'evaluation-receipt', 'finalizer-receipt', 'settlement-receipt', 'archive-receipt',
+    ])).artifacts;
+    const sources = preserved.filter(artifact => artifact.artifactClass === 'worker-result');
+    if (sources.length !== 1) hold('DISPATCH_AUTHORITY_INVALID', 'read');
+    const source = sources[0]!;
+    const preservationManifestDigest = taskAttemptCustodyDigest('rejected-result-preservation', {
+      taskSnapshotDigest: admitted.admission.taskSnapshot.sha256,
+      observations: observations.filter(entry => entry !== null).map(entry => entry!.receipt),
+      artifacts: preserved, effectLandingChainDigest: landing.receiptDigest,
+    }, policy.jsonBounds);
+    const body = freezeObject({
+      state: 'REJECTED_RESULT_CANDIDATE' as const,
+      reasonCode: 'WORKER_RESULT_SCHEMA_INVALID' as const,
+      identity: cloneIdentity(admitted.ref.identity),
+      admissionRefDigest: admitted.ref.refDigest, admissionReceiptDigest: admitted.admission.receiptDigest,
+      releasedDispatchReceiptDigest: terminal.receiptDigest,
+      providerStartObservationReceiptDigest: start.receipt.receiptDigest,
+      providerExecutionObservationReceiptDigest: execution.receipt.receiptDigest,
+      providerExitObservationReceiptDigest: exit.receipt.receiptDigest,
+      providerExitObservedAt: exit.receipt.observedAt,
+      sourceResultDigest: source.contentDigest, sourceResultReceiptDigest: source.receiptDigest,
+      effectLandingChainDigest: landing.receiptDigest,
+      effectLandingOccurredAt: landing.occurredAt,
+      preservationManifestDigest, preservedArtifacts: preserved,
+    });
+    return freezeObject({ ...body, evidenceDigest: taskAttemptCustodyDigest('rejected-result-candidate', body, policy.jsonBounds) });
+  }
+
+  readRejectedResultDispatch(input: {
+    readonly admissionRef: TaskAttemptCustodyDispatchAdmissionRefV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+  }): TaskAttemptCustodyRejectedResultDispatchV2 | null {
+    const row = requireExactDataRecord(input, ['admissionRef', 'policy'], 'DISPATCH_AUTHORITY_INVALID', 'read');
+    const policy = snapshotPolicy(row.policy);
+    const admitted = this.requireDispatchAdmissionRef(row.admissionRef, policy, 'read');
+    const observed = this.readFirstWriterSnapshot(this.rejectedResultDispatchPath(admitted.ref.identity),
+      metadataLimit(policy), 'read', 'DISPATCH_AUTHORITY_INVALID');
+    if (observed === null) return null;
+    let decoded: unknown;
+    try { decoded = JSON.parse(Buffer.from(observed.bytes).toString('utf8')); }
+    catch { return hold('DISPATCH_AUTHORITY_INVALID', 'read'); }
+    const value = snapshotExactDataRecord(decoded, [
+      'schemaVersion', 'kind', 'state', 'reasonCode', 'identity', 'admissionRefDigest', 'admissionReceiptDigest',
+      'releasedDispatchReceiptDigest', 'providerStartObservationReceiptDigest',
+      'providerExecutionObservationReceiptDigest', 'providerExitObservationReceiptDigest',
+      'providerExitObservedAt', 'sourceResultDigest', 'sourceResultReceiptDigest', 'effectLandingChainDigest', 'effectLandingOccurredAt',
+      'preservationManifestDigest', 'preservedArtifacts', 'evidenceDigest',
+      'custodyRootId', 'custodyCapabilityEvidenceDigest', 'recoveryAuthority', 'recoveryAuthorityDigest',
+      'stoppedExecutionEvidenceDigest', 'recordedAt', 'receiptDigest',
+    ]);
+    const authority = value ? snapshotDispatchRecoveryAuthority(value.recoveryAuthority) : null;
+    if (!value || !authority || !isTimestamp(value.recordedAt) || !isDigest(value.stoppedExecutionEvidenceDigest)) {
+      hold('DISPATCH_AUTHORITY_INVALID', 'read');
+    }
+    const candidate = this.inspectRejectedResultDispatchCandidate({ admissionRef: admitted.ref, policy });
+    this.assertRecoveryAuthorityBoundToCandidate(authority, candidate.identity, value.recordedAt,
+      Math.max(Date.parse(candidate.providerExitObservedAt), Date.parse(candidate.effectLandingOccurredAt)), 'read');
+    const body = freezeObject({ ...candidate, schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      kind: 'task-attempt-custody-rejected-result-dispatch' as const, state: 'REJECTED_RESULT_CLOSED' as const,
+      custodyRootId: this.root.rootId, custodyCapabilityEvidenceDigest: this.root.capabilityEvidenceDigest,
+      recoveryAuthority: authority, recoveryAuthorityDigest: dispatchRecoveryAuthorityDigest(authority, policy.jsonBounds),
+      stoppedExecutionEvidenceDigest: value.stoppedExecutionEvidenceDigest as Sha256Digest, recordedAt: value.recordedAt,
+    });
+    const disposition = freezeObject({ ...body, receiptDigest: taskAttemptCustodyDigest('rejected-result-dispatch', body, policy.jsonBounds) });
+    if (!sameBytes(observed.bytes, canonicalTaskAttemptCustodyJson(disposition, policy.jsonBounds))) {
+      hold('DISPATCH_AUTHORITY_INVALID', 'read');
+    }
+    return disposition;
+  }
+
+  closeRejectedResultDispatch(input: {
+    readonly admissionRef: TaskAttemptCustodyDispatchAdmissionRefV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly recoveryAuthority: TaskAttemptCustodyDispatchRecoveryAuthorityV2;
+    readonly sourceResultDigest: Sha256Digest;
+    readonly recordedAt: string;
+    readonly stoppedExecutionEvidenceDigest: Sha256Digest;
+  }): TaskAttemptCustodyRejectedResultDispatchV2 {
+    const row = requireExactDataRecord(input, ['admissionRef', 'policy', 'recoveryAuthority', 'sourceResultDigest',
+      'recordedAt', 'stoppedExecutionEvidenceDigest'], 'DISPATCH_REQUEST_INVALID', 'settle-dispatch');
+    const policy = snapshotPolicy(row.policy);
+    const admitted = this.requireDispatchAdmissionRef(row.admissionRef, policy, 'settle-dispatch');
+    const authority = snapshotDispatchRecoveryAuthority(row.recoveryAuthority);
+    if (!authority || !isTimestamp(row.recordedAt) || !isDigest(row.stoppedExecutionEvidenceDigest)
+      || !isDigest(row.sourceResultDigest)) hold('DISPATCH_REQUEST_INVALID', 'settle-dispatch');
+    for (const conflictingPath of [this.startedFailedDispatchPath(admitted.ref.identity),
+      this.effectCommittedReleasePendingDispatchPath(admitted.ref.identity)]) {
+      this.assertNoConflictingRetainedDisposition(policy, conflictingPath);
+    }
+    const candidate = this.inspectRejectedResultDispatchCandidate({ admissionRef: admitted.ref, policy });
+    if (candidate.sourceResultDigest !== row.sourceResultDigest) hold('ARTIFACT_REPLAY_MISMATCH', 'settle-dispatch');
+    this.assertRecoveryAuthorityBoundToCandidate(authority, candidate.identity, row.recordedAt,
+      Math.max(Date.parse(candidate.providerExitObservedAt), Date.parse(candidate.effectLandingOccurredAt)), 'settle-dispatch');
+    const body = freezeObject({ ...candidate, schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      kind: 'task-attempt-custody-rejected-result-dispatch' as const, state: 'REJECTED_RESULT_CLOSED' as const,
+      custodyRootId: this.root.rootId, custodyCapabilityEvidenceDigest: this.root.capabilityEvidenceDigest,
+      recoveryAuthority: authority, recoveryAuthorityDigest: dispatchRecoveryAuthorityDigest(authority, policy.jsonBounds),
+      stoppedExecutionEvidenceDigest: row.stoppedExecutionEvidenceDigest as Sha256Digest, recordedAt: row.recordedAt,
+    });
+    const disposition = freezeObject({ ...body, receiptDigest: taskAttemptCustodyDigest('rejected-result-dispatch', body, policy.jsonBounds) });
+    this.publishDispatchFirstWriter(this.rejectedResultDispatchPath(admitted.ref.identity),
+      canonicalTaskAttemptCustodyJson(disposition, policy.jsonBounds), metadataLimit(policy), 'settle-dispatch');
+    const reread = this.readRejectedResultDispatch({ admissionRef: admitted.ref, policy });
+    if (!reread || reread.receiptDigest !== disposition.receiptDigest) hold('DISPATCH_REQUEST_CONFLICT', 'settle-dispatch');
+    return reread;
   }
 
   inspectStartedFailedDispatchCandidate(input: {
@@ -9330,6 +9584,13 @@ export class TaskAttemptCustodyStore {
   }
 
   readAdmission(
+    identity: TaskAttemptCustodyIdentityV2,
+    policy: TaskAttemptCustodyPolicyV2,
+  ): TaskAttemptCustodyAdmissionV2 | null {
+    return this.snapshotMemo('readAdmission', { identity, policy }, () => this.readAdmissionUncached(identity, policy));
+  }
+
+  private readAdmissionUncached(
     identity: TaskAttemptCustodyIdentityV2,
     policy: TaskAttemptCustodyPolicyV2,
   ): TaskAttemptCustodyAdmissionV2 | null {
@@ -11854,6 +12115,18 @@ export class TaskAttemptCustodyStore {
     >;
     readonly artifactKey: string;
   }): TaskAttemptCustodyArtifactReceiptV2 | null {
+    return this.snapshotMemo('readArtifactReceipt', input, () => this.readArtifactReceiptUncached(input));
+  }
+
+  private readArtifactReceiptUncached(input: {
+    readonly identity: TaskAttemptCustodyIdentityV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly artifactClass: Exclude<
+      TaskAttemptCustodyArtifactClass,
+      'task-admission-snapshot'
+    >;
+    readonly artifactKey: string;
+  }): TaskAttemptCustodyArtifactReceiptV2 | null {
     const inputRecord = requireExactDataRecord(input, [
       'identity',
       'policy',
@@ -11954,6 +12227,14 @@ export class TaskAttemptCustodyStore {
   }
 
   readVerifiedEffectLanding(input: {
+    readonly identity: TaskAttemptCustodyIdentityV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly artifactKey: string;
+  }): TaskAttemptCustodyVerifiedEffectLandingV2 | null {
+    return this.snapshotMemo('readVerifiedEffectLanding', input, () => this.readVerifiedEffectLandingUncached(input));
+  }
+
+  private readVerifiedEffectLandingUncached(input: {
     readonly identity: TaskAttemptCustodyIdentityV2;
     readonly policy: TaskAttemptCustodyPolicyV2;
     readonly artifactKey: string;
@@ -12153,6 +12434,14 @@ export class TaskAttemptCustodyStore {
   }
 
   readChain(
+    identity: TaskAttemptCustodyIdentityV2,
+    policy: TaskAttemptCustodyPolicyV2,
+    stage: TaskAttemptCustodyChainStage,
+  ): TaskAttemptCustodyChainReceiptV2 | null {
+    return this.snapshotMemo('readChain', { identity, policy, stage }, () => this.readChainUncached(identity, policy, stage));
+  }
+
+  private readChainUncached(
     identity: TaskAttemptCustodyIdentityV2,
     policy: TaskAttemptCustodyPolicyV2,
     stage: TaskAttemptCustodyChainStage,
@@ -12784,6 +13073,7 @@ export class TaskAttemptCustodyStore {
     }
     assertPathCapability(capability, this.root, input.access, input.scopeDigest);
     this.issuedPathCapabilities.set(capability, nextScope);
+    if (this.readSnapshot ?? this.verifyingReadSnapshot) this.readSnapshotCapabilities.add(capability);
     return capability;
   }
 
@@ -12819,6 +13109,40 @@ export class TaskAttemptCustodyStore {
     operation: TaskAttemptCustodyOperation,
     fallback: TaskAttemptCustodyHoldCode = 'CAPABILITY_UNVERIFIED',
   ): TaskAttemptCustodyRead | null {
+    const read = () => this.readFirstWriterSnapshotUncached(relativePath, policy, operation, fallback);
+    return this.observeSnapshotFile(`first:${relativePath}:${JSON.stringify(policy)}:${operation}:${fallback}`, read);
+  }
+
+  private observeSnapshotFile(key: string, read: () => TaskAttemptCustodyRead | null): TaskAttemptCustodyRead | null {
+    if (!this.readSnapshot) return read();
+    // A rejected old-epoch proof can be an expected input to the canonical
+    // no-effect quarantine reader. Retain the negative observation, never turn
+    // it into absence/success, and require the same native rejection at exit.
+    type Outcome = { readonly value: TaskAttemptCustodyRead | null; readonly error?: never }
+      | { readonly value?: never; readonly error: TaskAttemptCustodyHold };
+    const allowRejectedProof = this.readSnapshotAdmissionProbe;
+    const observe = (): Outcome => {
+      try { return { value: read() }; } catch (error) {
+        if (!allowRejectedProof || !(error instanceof TaskAttemptCustodyHold)) throw error;
+        return { error };
+      }
+    };
+    const observed = this.readSnapshot.observe<Outcome>(key, observe,
+      outcome => outcome.error ? `hold:${outcome.error.code}:${outcome.error.operation}`
+        : outcome.value === null ? 'absent' : JSON.stringify(outcome.value.proof),
+      outcome => (outcome.value?.bytes.byteLength ?? 0) + 512,
+      outcome => outcome.error ? outcome : { value: outcome.value === null ? null
+        : Object.freeze({ proof: outcome.value.proof, bytes: new Uint8Array(outcome.value.bytes) }) });
+    if (observed.error) throw observed.error;
+    return observed.value;
+  }
+
+  private readFirstWriterSnapshotUncached(
+    relativePath: TaskAttemptCustodyRelativePath,
+    policy: TaskAttemptCustodyArtifactLimit,
+    operation: TaskAttemptCustodyOperation,
+    fallback: TaskAttemptCustodyHoldCode = 'CAPABILITY_UNVERIFIED',
+  ): TaskAttemptCustodyRead | null {
     let value: TaskAttemptCustodyRead | null;
     try {
       value = this.adapter.readFirstWriter({
@@ -12842,6 +13166,18 @@ export class TaskAttemptCustodyStore {
   ): TaskAttemptCustodyRead | null {
     const proof = parseFileProof(proofValue);
     if (proof === null) hold('CAPABILITY_UNVERIFIED', operation);
+    const read = () => this.readVerifiedSnapshotUncached(proof, policy, operation, fallback);
+    return this.observeSnapshotFile(`verified:${JSON.stringify(proof)}:${JSON.stringify(policy)}:${operation}:${fallback}`, read);
+  }
+
+  private readVerifiedSnapshotUncached(
+    proofValue: TaskAttemptCustodyFileProof,
+    policy: TaskAttemptCustodyArtifactLimit,
+    operation: TaskAttemptCustodyOperation,
+    fallback: TaskAttemptCustodyHoldCode = 'CAPABILITY_UNVERIFIED',
+  ): TaskAttemptCustodyRead | null {
+    const proof = parseFileProof(proofValue);
+    if (proof === null) hold('CAPABILITY_UNVERIFIED', operation);
     let value: TaskAttemptCustodyRead | null;
     try {
       value = this.adapter.readVerified({ root: this.root, proof, policy });
@@ -12854,6 +13190,17 @@ export class TaskAttemptCustodyStore {
   }
 
   private readPrivateDirectorySnapshot(
+    relativePath: TaskAttemptCustodyRelativePath,
+    operation: TaskAttemptCustodyOperation = 'read',
+    fallback: TaskAttemptCustodyHoldCode = 'CAPABILITY_UNVERIFIED',
+  ): TaskAttemptCustodyDirectoryProof | null {
+    const read = () => this.readPrivateDirectorySnapshotUncached(relativePath, operation, fallback);
+    if (!this.readSnapshot) return read();
+    return this.readSnapshot.observe(`directory:${relativePath}:${operation}:${fallback}`, read,
+      value => JSON.stringify(value), value => Buffer.byteLength(JSON.stringify(value)), value => value);
+  }
+
+  private readPrivateDirectorySnapshotUncached(
     relativePath: TaskAttemptCustodyRelativePath,
     operation: TaskAttemptCustodyOperation = 'read',
     fallback: TaskAttemptCustodyHoldCode = 'CAPABILITY_UNVERIFIED',

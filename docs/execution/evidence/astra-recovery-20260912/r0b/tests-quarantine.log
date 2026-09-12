@@ -1,0 +1,195 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/core/custody-read-snapshot.test.ts (3 tests) 4ms
+ ❯ tests/core/task-attempt-custody-store.test.ts (176 tests | 1 failed) 24911ms
+   ✓ TaskAttemptCustodyStore V2 kernel > canonicalizes JSON independently of object key order and rejects non-JSON/bounded overflow 3ms
+   ✓ TaskAttemptCustodyStore V2 kernel > matches a hard-coded canonical byte and domain-separated digest golden vector 1ms
+   ✓ TaskAttemptCustodyStore V2 kernel > derives Docker mount transfer evidence deterministically from every exact evidence field 5ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects caller-authored mount summaries and incomplete or malformed Docker evidence 2ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects sparse, accessor, symbol and extra-property array/object collisions 1ms
+   ✓ TaskAttemptCustodyStore V2 kernel > derives a stable, domain-bound policy digest regardless of map insertion order 2ms
+   ✓ TaskAttemptCustodyStore V2 kernel > keeps frozen artifact authority stable under exported and Array prototype mutation 74ms
+   ✓ TaskAttemptCustodyStore V2 kernel > fails closed on impossible metadata, artifact and JSON policy bounds 2ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects unknown, symbol and accessor fields in nested policy records 1ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects unsafe cross-platform relative path /absolute 0ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects unsafe cross-platform relative path ../escape 0ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects unsafe cross-platform relative path safe/../escape 0ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects unsafe cross-platform relative path C:/windows 0ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects unsafe cross-platform relative path safe\windows 0ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects unsafe cross-platform relative path safe/CON 0ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects unsafe cross-platform relative path safe/name:stream 0ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects unsafe cross-platform relative path safe/trailing. 0ms
+   ✓ TaskAttemptCustodyStore V2 kernel > binds one Store to the exact canonical project root and project id 3ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects Proxy/accessor authority before reflection and captures adapter methods once 15ms
+   ✓ TaskAttemptCustodyStore V2 kernel > classifies malformed post-create directory evidence as CREATE_UNCONFIRMED 2ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects uppercase UUID aliases at the identity boundary 1ms
+   ✓ TaskAttemptCustodyStore V2 kernel > requires durable admission before any attempt artifact 2ms
+   ✓ TaskAttemptCustodyStore V2 kernel > creates admission first-writer state idempotently and binds root capability proof 27ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects publication/readback physical proof substitution 2ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects accessor adapter envelopes and exposes only one opaque mount lease 14ms
+   ✓ TaskAttemptCustodyStore V2 kernel > returns only finite frozen HOLD truth and never exposes a raw adapter cause 0ms
+   ✓ TaskAttemptCustodyStore V2 kernel > maps every adapter read primitive to cause-less finite HOLD truth 18ms
+   ✓ TaskAttemptCustodyStore V2 kernel > uses conservative typed HOLDs for post-effect readback failures 39ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects foreign and stale-generation mount authority before adapter consumption 20ms
+   ✓ TaskAttemptCustodyStore V2 kernel > moves a mount lease to CONSUMING before await and never reopens on rejection 17ms
+   ✓ TaskAttemptCustodyStore V2 kernel > keeps cleanup-uncertain mount consumption terminal 8ms
+   ✓ TaskAttemptCustodyStore V2 kernel > persists mount intent before issue and never mints a replacement lease 14ms
+   ✓ TaskAttemptCustodyStore V2 kernel > blocks restart reissuance when an issued opaque mount lease is abandoned 12ms
+   ✓ TaskAttemptCustodyStore V2 kernel > binds mount receipt evidence durably and rejects same-store and restart reissuance 13ms
+   ✓ TaskAttemptCustodyStore V2 kernel > terminalizes malformed mount transfer receipts and never replays them after restart 12ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects forged, extra, missing and null-on-success mount receipt snapshots 39ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects a self-consistent mount receipt bound to another generation 7ms
+   ✓ TaskAttemptCustodyStore V2 kernel > keeps exact mount transfer success in reconciliation when OUTCOME durability fails 11ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects a self-consistent OUTCOME carrying substituted transfer evidence 12ms
+   ✓ TaskAttemptCustodyStore V2 kernel > accepts an identical artifact replay and rejects conflicting first-writer bytes 14ms
+   ✓ TaskAttemptCustodyStore V2 kernel > persists a canonical zero-byte staged chunk only when policy explicitly permits it 12ms
+   ✓ TaskAttemptCustodyStore V2 kernel > keeps execution-effect evidence host-only and rejects arbitrary artifact classes 6ms
+   ✓ TaskAttemptCustodyStore V2 kernel > publishes and reads only an exact committed effect-landing receipt 212ms
+   ✓ TaskAttemptCustodyStore V2 kernel > publishes a host-authoritative IPC answer separately from exact worker delivery bytes 21ms
+   ✓ TaskAttemptCustodyStore V2 kernel > probes an exact worker-output question without minting authority 10ms
+   ✓ TaskAttemptCustodyStore V2 kernel > reconstructs IPC answer delivery after restart and keeps same-sequence replay idempotent 40ms
+   ✓ TaskAttemptCustodyStore V2 kernel > does not replay an earlier durable effect when a later sequence carries identical bytes 38ms
+   ✓ TaskAttemptCustodyStore V2 kernel > owns a durable contiguous IPC cursor across answer, restart, and the next sealed question 86ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects IPC gaps, duplicate open questions, reused source epochs, and stale answer publishers 96ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects deleted cursor prefixes, later-record gaps, and answered records without their open record 189ms
+   ✓ TaskAttemptCustodyStore V2 kernel > settles the bounded final IPC sequence without exposing or publishing sequence max plus one  10108ms
+   ✓ TaskAttemptCustodyStore V2 kernel > does not recover cursor authority from first-writer bytes without a durable publication outcome 20ms
+   ✓ TaskAttemptCustodyStore V2 kernel > binds fixed worker destination and immutable artifact key to the exact IPC sequence 11ms
+   ✓ TaskAttemptCustodyStore V2 kernel > does not turn partial IPC answer publication into delivered truth after restart 22ms
+   ✓ TaskAttemptCustodyStore V2 kernel > keeps a delivered destination in reconciliation when its durable receipt is unconfirmed 22ms
+   ✓ TaskAttemptCustodyStore V2 kernel > keeps caller bytes authoritative against Proxy, SAB, subclass and adapter mutation 6ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects exact-prototype byte authority overrides without executing accessors or effects 4ms
+   ✓ TaskAttemptCustodyStore V2 kernel > requires separate reconciliation authority for an exact intent-only restart 8ms
+   ✓ TaskAttemptCustodyStore V2 kernel > never replays a mismatched durable effect marker 11ms
+   ✓ TaskAttemptCustodyStore V2 kernel > does not revive an opaque publication session from durable markers after restart 8ms
+   ✓ TaskAttemptCustodyStore V2 kernel > exposes verified bytes while mount authority stays adapter-owned and opaque 15ms
+   ✓ TaskAttemptCustodyStore V2 kernel > captures and verifies exact worker landing and provider-observation attempt outputs 20ms
+   ✓ TaskAttemptCustodyStore V2 kernel > binds each output source to one exact class and key with receipt-equal replay only 17ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects replay of a process-local output source after Store restart 8ms
+   ✓ TaskAttemptCustodyStore V2 kernel > preserves exact NO_EFFECT_ABORTED adapter truth when publication custody cannot begin 5ms
+   ✓ TaskAttemptCustodyStore V2 kernel > preserves exact CREATE_UNCONFIRMED adapter truth when publication custody cannot begin 5ms
+   ✓ TaskAttemptCustodyStore V2 kernel > preserves exact CLEANUP_UNCONFIRMED adapter truth when publication custody cannot begin 6ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects adapter publication-token reuse and terminalizes the original wrapper 7ms
+   ✓ TaskAttemptCustodyStore V2 kernel > seals a bounded Store-owned pristine stream into an exact artifact receipt 10ms
+   ✓ TaskAttemptCustodyStore V2 kernel > binds append and abort outcomes to exact adapter receipt evidence 6ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects stale append and abort receipts without reopening publication custody 8ms
+   ✓ TaskAttemptCustodyStore V2 kernel > fences reentrant append, seal and abort calls before every adapter effect 10ms
+   ✓ TaskAttemptCustodyStore V2 kernel > preserves exact NO_EFFECT_ABORTED terminal seal disposition without abort guessing 5ms
+   ✓ TaskAttemptCustodyStore V2 kernel > preserves exact PUBLISHED_UNCONFIRMED terminal seal disposition without abort guessing 5ms
+   ✓ TaskAttemptCustodyStore V2 kernel > preserves exact CLEANUP_UNCONFIRMED terminal seal disposition without abort guessing 6ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects a stream adapter that seals different bytes with the same length 5ms
+   ✓ TaskAttemptCustodyStore V2 kernel > keeps a stream PUBLISHED_UNCONFIRMED when its durable receipt cannot be published 6ms
+   ✓ TaskAttemptCustodyStore V2 kernel > never accepts a receipt file whose durable OUTCOME persistence failed 7ms
+   ✓ TaskAttemptCustodyStore V2 kernel > terminally aborts adapter custody for invalid timestamp before returning replay HOLD 6ms
+   ✓ TaskAttemptCustodyStore V2 kernel > terminally aborts adapter custody for pre-admission timestamp before returning replay HOLD 6ms
+   ✓ TaskAttemptCustodyStore V2 kernel > terminally aborts adapter custody for under-minimum stream before returning replay HOLD 5ms
+   ✓ TaskAttemptCustodyStore V2 kernel > snapshots the stream seal descriptor once and aborts accessor substitution 5ms
+   ✓ TaskAttemptCustodyStore V2 kernel > makes explicit stream abort monotonic and idempotent 5ms
+   ✓ TaskAttemptCustodyStore V2 kernel > makes append uncertainty abort-only and never retries the append effect 6ms
+   ✓ TaskAttemptCustodyStore V2 kernel > passes an isolated stream chunk copy and terminalizes adapter mutation 11ms
+   ✓ TaskAttemptCustodyStore V2 kernel > persists stream publication outcome before any receipt publication 6ms
+   ✓ TaskAttemptCustodyStore V2 kernel > does not abort or reseal after a namespace-effect seal failure 6ms
+   ✓ TaskAttemptCustodyStore V2 kernel > keeps the outer stream terminal when adapter abort cleanup cannot be confirmed 5ms
+   ✓ TaskAttemptCustodyStore V2 kernel > binds artifact class to its only valid capture mode and rejects laundering 10ms
+   ✓ TaskAttemptCustodyStore V2 kernel > aborts an overflowing stream so a caller cannot seal a truncated prefix 5ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects an unissued capture capability and an artifact timestamp before admission 4ms
+   ✓ TaskAttemptCustodyStore V2 kernel > revokes an opaque capability object if an adapter reuses it for another output path 5ms
+   ✓ TaskAttemptCustodyStore V2 kernel > revokes the original access when its capability object is reused across access classes 7ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects sibling generation admission replay 12ms
+   ✓ TaskAttemptCustodyStore V2 kernel > requires the persisted exact N-1 admission instead of an arbitrary digest 1ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects cross-task, cross-attempt and skipped-generation predecessor identities 4ms
+   ✓ TaskAttemptCustodyStore V2 kernel > requires monotonic admission time across generation lineage 4ms
+   ✓ TaskAttemptCustodyStore V2 kernel > builds an exact accepted-result to archive predecessor chain  991ms
+   ✓ TaskAttemptCustodyStore V2 kernel > reads each predecessor once at the late validation boundary without an exponential traversal  994ms
+   ✓ TaskAttemptCustodyStore V2 kernel > holds when current artifact IO changes the predecessor receipt by corrupt before late validation  909ms
+   ✓ TaskAttemptCustodyStore V2 kernel > holds when current artifact IO changes the predecessor receipt by delete before late validation  907ms
+   ✓ TaskAttemptCustodyStore V2 kernel > holds when current artifact IO changes the predecessor artifact by corrupt before late validation  918ms
+   ✓ TaskAttemptCustodyStore V2 kernel > holds when current artifact IO changes the predecessor artifact by delete before late validation  899ms
+   ✓ TaskAttemptCustodyStore V2 kernel > does not reuse predecessor authority across top-level reads after tampering  982ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects accepted-result bindings with a foreign attempt, landing transaction, or chain 235ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects a chain stage with the wrong predecessor or artifact class 242ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects accepted-result before the committed effect-landing chain exists 8ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects a stage artifact captured before its predecessor chain event  363ms
+   ✓ TaskAttemptCustodyStore V2 kernel > fails closed when durable admission bytes change behind their proof 3ms
+   ✓ TaskAttemptCustodyStore V2 kernel > distinguishes true absence from orphaned admission and artifact publication 11ms
+   ✓ TaskAttemptCustodyStore V2 kernel > detects a missing earlier chain stage when a later durable stage exists  426ms
+   ✓ TaskAttemptCustodyStore V2 kernel > parses only an explicit frozen historical V1 sentinel 1ms
+   ✓ TaskAttemptCustodyStore V2 kernel > atomically reserves canonical dispatch identity and reopens same request after restart 8ms
+   ✓ TaskAttemptCustodyStore V2 kernel > discovers the bounded canonical dispatch directory and semantically rereads every admission 23ms
+   ✓ TaskAttemptCustodyStore V2 kernel > preserves reserved-pending-admission during bounded restart discovery 2ms
+   ✓ TaskAttemptCustodyStore V2 kernel > reconciles a current reservation crash from the host-staged task snapshot 8ms
+   ✓ TaskAttemptCustodyStore V2 kernel > retires one legacy reservation before admission with append-only exact recovery authority 5ms
+   ✓ TaskAttemptCustodyStore V2 kernel > isolates an identity-bound unreadable admission during recovery without trusting or suppressing its valid sibling 16ms
+   × TaskAttemptCustodyStore V2 kernel > quarantines only an old-epoch admitted no-effect terminal with append-only recovery authority 20ms
+     → TASK_ATTEMPT_CUSTODY_HOLD:ARTIFACT_CHANGED
+   ✓ TaskAttemptCustodyStore V2 kernel > distinguishes malformed and hash-tampered dispatch discovery candidates 14ms
+   ✓ TaskAttemptCustodyStore V2 kernel > fails dispatch discovery closed on missing native scan and mutated scan receipts 11ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects extra-key, accessor and proxy authority at every dispatch ingress 8ms
+   ✓ TaskAttemptCustodyStore V2 kernel > publishes and restart-rereads path-free immutable dispatch observations by class 65ms
+   ✓ TaskAttemptCustodyStore V2 kernel > keeps observation bytes-without-receipt as HOLD and exact retry completes it 18ms
+   ✓ TaskAttemptCustodyStore V2 kernel > keeps observation claim-without-bytes as HOLD and only exact retry may complete 17ms
+   ✓ TaskAttemptCustodyStore V2 kernel > resolves dispatch observation first-writer races and rejects forged ingress 17ms
+   ✓ TaskAttemptCustodyStore V2 kernel > leaves a typed pending reservation on admission interruption and completes exact retry 6ms
+   ✓ TaskAttemptCustodyStore V2 kernel > recovers exact material-first crash but exposes the orphan as HOLD to ordinary readers 6ms
+   ✓ TaskAttemptCustodyStore V2 kernel > enforces predecessor monotonicity and one first-writer child generation slot 23ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects PROVIDER_START while mount outcome is confirmed but RELEASED is pending 17ms
+   ✓ TaskAttemptCustodyStore V2 kernel > settles RELEASED only from exact mount outcome and durable gated release evidence  367ms
+   ✓ TaskAttemptCustodyStore V2 kernel > retains committed-journal release-pending truth with complete immutable inventory  420ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects partial artifact publication and binds recovery time after committed evidence 251ms
+   ✓ TaskAttemptCustodyStore V2 kernel > refuses committed release-pending disposition when forbidden execution-workspace-release directory exists empty 118ms
+   ✓ TaskAttemptCustodyStore V2 kernel > refuses committed release-pending disposition when forbidden execution-effect-landing-receipt directory exists empty 110ms
+   ✓ TaskAttemptCustodyStore V2 kernel > refuses committed release-pending disposition when forbidden canonical-accepted-result directory exists empty 107ms
+   ✓ TaskAttemptCustodyStore V2 kernel > refuses committed release-pending disposition when forbidden production-wiring-host-settlement directory exists empty 120ms
+   ✓ TaskAttemptCustodyStore V2 kernel > refuses committed release-pending disposition when forbidden evaluation-receipt directory exists empty 107ms
+   ✓ TaskAttemptCustodyStore V2 kernel > refuses committed release-pending disposition when forbidden finalizer-receipt directory exists empty 120ms
+   ✓ TaskAttemptCustodyStore V2 kernel > refuses committed release-pending disposition when forbidden settlement-receipt directory exists empty 118ms
+   ✓ TaskAttemptCustodyStore V2 kernel > refuses committed release-pending disposition when forbidden archive-receipt directory exists empty 108ms
+   ✓ TaskAttemptCustodyStore V2 kernel > requires an exactly empty chain and exact structural evidence refs  360ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects stale/sibling authority, provider-observation substitution and disposition conflicts  432ms
+   ✓ TaskAttemptCustodyStore V2 kernel > roundtrips real Store domain-separated EFFECT_DIAGNOSTIC through the Docker publisher and reader 96ms
+   ✓ TaskAttemptCustodyStore V2 kernel > keeps sibling and byte-tampered diagnostics on HOLD through the real Store boundary 96ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects a cryptographically intact diagnostic carrying a sibling identity 86ms
+   ✓ TaskAttemptCustodyStore V2 kernel > preserves READY lifecycle artifact bytes and a real diagnostic in a failed-unlanded candidate 192ms
+   ✓ TaskAttemptCustodyStore V2 kernel > retains started failure without erasing usage or reclassifying RELEASED as no-effect 199ms
+   ✓ TaskAttemptCustodyStore V2 kernel > refuses started-failed disposition even for an empty execution-effect-landing-journal directory 76ms
+   ✓ TaskAttemptCustodyStore V2 kernel > refuses started-failed disposition even for an empty execution-effect-landing-receipt-evidence directory 74ms
+   ✓ TaskAttemptCustodyStore V2 kernel > refuses started-failed disposition even for an empty execution-effect-landing-receipt directory 76ms
+   ✓ TaskAttemptCustodyStore V2 kernel > refuses started-failed disposition even for an empty canonical-accepted-result directory 76ms
+   ✓ TaskAttemptCustodyStore V2 kernel > refuses started-failed disposition even for an empty execution-workspace-release directory 75ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects stale authority replay, foreign identity, corrupt evidence and an old custody epoch 159ms
+   ✓ TaskAttemptCustodyStore V2 kernel > does not invent started-failed authority from a reservation without provider execution 10ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects semantically invalid provider exit despite a valid observation receipt (container) 75ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects semantically invalid provider exit despite a valid observation receipt (code) 75ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects semantically invalid provider exit despite a valid observation receipt (payload) 74ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects semantically invalid provider exit despite a valid observation receipt (digest) 76ms
+   ✓ TaskAttemptCustodyStore V2 kernel > settles proven NOT_DISPATCHED at zero public attempts and blocks later mount 58ms
+   ✓ TaskAttemptCustodyStore V2 kernel > lets Docker reserve generation+1 only from the exact durable NOT_DISPATCHED receipt 46ms
+   ✓ TaskAttemptCustodyStore V2 kernel > arbitrates NOT observation versus MOUNT claim with one immutable winner 27ms
+   ✓ TaskAttemptCustodyStore V2 kernel > arbitrates MOUNT terminal check versus NOT claim without publishing mount intent 20ms
+   ✓ TaskAttemptCustodyStore V2 kernel > reports MOUNT claim crash as transition-pending and exact retry writes intent 15ms
+   ✓ TaskAttemptCustodyStore V2 kernel > reports NOT claim crash as transition-pending and exact retry terminalizes it 19ms
+   ✓ TaskAttemptCustodyStore V2 kernel > keeps AMBIGUOUS nonterminal and permits one exact later RELEASED transition 66ms
+   ✓ TaskAttemptCustodyStore V2 kernel > retains committed-journal release-pending truth with complete immutable inventory  401ms
+   ✓ TaskAttemptCustodyStore V2 kernel > retains started failure without erasing usage or reclassifying RELEASED as no-effect 196ms
+   ✓ TaskAttemptCustodyStore V2 kernel > propagates a typed platform capability HOLD instead of fabricating support 0ms
+   ✓ operation-local verified custody read snapshot > reuses immutable admission facts only within an operation and rechecks native evidence 8ms
+   ✓ operation-local verified custody read snapshot > rejects changed evidence even when a cached semantic result would match 5ms
+   ✓ operation-local verified custody read snapshot > rechecks absence when another Store publishes before the operation ends 4ms
+   ✓ operation-local verified custody read snapshot > cannot hide a mutation attempt by catching its error 1ms
+   ✓ operation-local verified custody read snapshot > bounds retained memory and rejects asynchronous or nested operations 4ms
+   ✓ operation-local verified custody read snapshot > does not reuse a policy or sibling identity and detects a removed durable marker 7ms
+   ✓ keeps the same Store mutation fence active during final native rereads 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/core/task-attempt-custody-store.test.ts > TaskAttemptCustodyStore V2 kernel > quarantines only an old-epoch admitted no-effect terminal with append-only recovery authority
+TaskAttemptCustodyHold: TASK_ATTEMPT_CUSTODY_HOLD:ARTIFACT_CHANGED
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 178 passed (179)
+   Start at  20:41:37
+   Duration  28.73s (transform 1.91s, setup 28ms, collect 2.53s, tests 24.91s, environment 0ms, prepare 67ms)
+

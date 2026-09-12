@@ -4,9 +4,13 @@
 // .deckent/metrics.jsonl (append-only, line-delimited JSON).
 // Sprint 134 — Task 011
 
-import { appendFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
+import { appendFileSync, readFileSync, existsSync, mkdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { RECENT_WORKS_DIR } from './constants.js';
+import { RECENT_WORKS_DIR, DECKENT_DIR } from './constants.js';
+import { debugLog } from './utils.js';
+// Rotation is a sibling module and does not import back into this one, so the
+// direct edge is safe; a lazy require would only hide the dependency.
+import { shouldRotate, rotateMetricsFile } from './observability-rotation.js';
 import { ErrorRegistry } from './errors.js';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -51,7 +55,9 @@ export interface LoadReportSection {
 // ─── Constants ───────────────────────────────────────────────────
 
 const METRICS_FILENAME = 'metrics.jsonl';
-const METRICS_DIR = '.deckent';
+// Single source for the project-state directory (KANUN 10): this used to be a
+// second literal that could drift from `constants.DECKENT_DIR` silently.
+const METRICS_DIR: string = DECKENT_DIR;
 
 /** Data locality: telemetry is ALWAYS disabled. No network calls ever. */
 export const TELEMETRY_ENABLED = false;
@@ -60,6 +66,19 @@ export const TELEMETRY_ENABLED = false;
 
 let _projectRoot: string | null = null;
 let _sprintId: string | null = null;
+
+// ─── Size-triggered rotation (STATE-RETENTION-001 / 747-001) ────────────────
+// `shouldRotate` and the configured `maxSizeMB` ceiling existed but nothing on
+// the WRITE path consumed them: rotation only ever happened at sprint finalize,
+// so the ceiling never actually bounded anything and `.deckent/archive` grew
+// without limit.
+//
+// Checks are scheduled from observed metric-file bytes rather than a local
+// threshold. `shouldRotate` remains the sole policy resolver; this writer only
+// decides when the next policy query is worthwhile. That gives geometric
+// checks as a file grows without duplicating the configured ceiling here.
+let _bytesUntilRotationCheck = 0;
+let _rotationRetryBytes = 0;
 let _perSprintFile = false;
 
 /**
@@ -79,6 +98,8 @@ export function initObservability(
   _projectRoot = projectRoot;
   _sprintId = sprintId ?? null;
   _perSprintFile = opts?.perSprintFile ?? false;
+  _bytesUntilRotationCheck = 0;
+  _rotationRetryBytes = 0;
 }
 
 /**
@@ -88,6 +109,8 @@ export function resetObservability(): void {
   _projectRoot = null;
   _sprintId = null;
   _perSprintFile = false;
+  _bytesUntilRotationCheck = 0;
+  _rotationRetryBytes = 0;
 }
 
 /**
@@ -453,10 +476,65 @@ function injectSprintId<T extends ObservabilityEntry>(entry: T): T {
  * Silently discards if observability is not initialized.
  * Auto-injects sprintId tag when sprint is active.
  */
+/**
+ * Size-triggered rotation at the canonical writer ingress (747-001).
+ *
+ * Contract: crossing the configured ceiling must rotate WITHOUT waiting for
+ * sprint finalize, and must do so BEFORE the record that would cross it is
+ * written — so the record lands in the fresh file and the ceiling actually
+ * bounds `.deckent/metrics.jsonl`.
+ *
+ *  - The ceiling itself is never named here. `shouldRotate` resolves it from
+ *    effective configuration (`observability.rotation.maxSizeMB`, via
+ *    `readConfiguredRotationConfig`), so this path carries no literal.
+ *  - A rotation failure never loses the metric and never reaches the caller —
+ *    telemetry must not be able to break a run.
+ *  - A failing rotation backs off by observed write bytes, then retries in the
+ *    same session. It never latches the size trigger off permanently.
+ */
+function rotateBeforeAppend(projectRoot: string, upcomingBytes: number): void {
+  if (_bytesUntilRotationCheck > upcomingBytes) {
+    _bytesUntilRotationCheck -= upcomingBytes;
+    return;
+  }
+
+  try {
+    const rotate = shouldRotate(projectRoot);
+    const metricsPath = getMetricsPath(projectRoot);
+    const sizeBeforeAppend = existsSync(metricsPath) ? statSync(metricsPath).size : 0;
+    // The archive is per-sprint; without a bound sprint there is no canonical
+    // destination, so rotation stays with finalize rather than inventing one.
+    const sprintId = _sprintId;
+    if (rotate && sprintId) {
+      const result = rotateMetricsFile(projectRoot, sprintId);
+      if (result.rotated) {
+        // The current append creates the first bytes of the fresh hot file.
+        _bytesUntilRotationCheck = upcomingBytes;
+        _rotationRetryBytes = 0;
+        return;
+      }
+    }
+
+    // A negative decision (or an unavailable archive destination) is safe
+    // until the hot file has grown by its observed size. This is a byte-based
+    // geometric schedule, not an independently tuned rotation policy.
+    _bytesUntilRotationCheck = Math.max(sizeBeforeAppend, upcomingBytes);
+    _rotationRetryBytes = 0;
+  } catch (error) {
+    // Retry from the same session after an observed-byte backoff. Doubling the
+    // prior backoff prevents a persistent failure from turning into per-append
+    // filesystem work, while any successful policy query resets it above.
+    _rotationRetryBytes = Math.max(_rotationRetryBytes * 2, upcomingBytes);
+    _bytesUntilRotationCheck = _rotationRetryBytes;
+    debugLog('observability:size-trigger', error);
+  }
+}
+
 function appendEntry(entry: ObservabilityEntry): void {
   if (!_projectRoot) return;
 
   const taggedEntry = injectSprintId(entry);
+  const line = JSON.stringify(taggedEntry) + '\n';
 
   try {
     // Always write to main metrics file
@@ -465,7 +543,10 @@ function appendEntry(entry: ObservabilityEntry): void {
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true });
     }
-    appendFileSync(metricsPath, JSON.stringify(taggedEntry) + '\n', 'utf-8');
+    // Consult the existing policy authority only at an observed-byte gate,
+    // before the record is written so a triggered rotation preserves ordering.
+    rotateBeforeAppend(_projectRoot, Buffer.byteLength(line));
+    appendFileSync(metricsPath, line, 'utf-8');
 
     // Also write to per-sprint file if enabled
     if (_perSprintFile && _sprintId) {

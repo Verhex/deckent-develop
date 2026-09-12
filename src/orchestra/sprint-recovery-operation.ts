@@ -17,9 +17,11 @@ import { DEFAULT_LIFECYCLE_RECOVERY_CONFIG } from '../core/config-types.js';
 import { decideExecutionRecovery } from '../core/execution-recovery.js';
 import { previewFinalizeCleanup } from '../core/orphan-cleaner.js';
 import { readCanonicalRunStatus } from '../core/run-status-authority.js';
+import { readRunFlowTerminalClosureForSprint } from '../core/run-jobs-read.js';
 import { publishCanonicalRunStatusReadModel } from '../core/run-status-read-model.js';
 import {
   resolveTaskArtifactArchiveDir,
+  readArchivedSprintTerminalOutcome,
   TASK_ARTIFACT_PRESERVED_SUBDIR,
   writeTaskArtifactPreservationMarker,
 } from '../core/sprint-archive.js';
@@ -39,6 +41,7 @@ import {
   reconcileExactDockerPendingReservationsForSprint,
   retainExactDockerCommittedUnsettledAttempt,
   retainExactDockerStartedFailedAttempt,
+  closeExactDockerRejectedResultAttempt,
   type ExactDockerPlanningRecoveryHealth,
   type ExactDockerReservationRecoveryReport,
 } from './spawn-backend-docker.js';
@@ -79,6 +82,7 @@ export class SprintRecoveryOperationError extends Error {
 }
 
 export interface SprintRecoveryReport {
+  rejectedResultAttempt?: Awaited<ReturnType<typeof closeExactDockerRejectedResultAttempt>>;
   startedFailedAttempt?: Awaited<ReturnType<typeof retainExactDockerStartedFailedAttempt>>;
   committedUnsettledAttempt?: Awaited<ReturnType<typeof retainExactDockerCommittedUnsettledAttempt>>;
   identity: SprintRecoverySettlementIdentity;
@@ -114,6 +118,8 @@ export interface SprintRecoveryReport {
 }
 
 export interface SprintRecoveryOperationOptions {
+  readonly rejectedResultDispatchRequestId?: string;
+  readonly exactRejectedResultRecovery?: typeof closeExactDockerRejectedResultAttempt;
   readonly startedFailedDispatchRequestId?: string;
   readonly exactStartedFailedRecovery?: typeof retainExactDockerStartedFailedAttempt;
   readonly committedUnsettledDispatchRequestId?: string;
@@ -502,12 +508,18 @@ export async function runSprintRecoveryOperation(
   assertSprintId(sprintId);
   const identity = readSprintRecoverySettlementIdentity(root, sprintId);
   const authorityBeforeMutation = readCanonicalRunStatus(root, { sprintIdHint: sprintId });
-  if (opts.startedFailedDispatchRequestId !== undefined
-    && opts.committedUnsettledDispatchRequestId !== undefined) {
+  if ([opts.startedFailedDispatchRequestId, opts.committedUnsettledDispatchRequestId,
+    opts.rejectedResultDispatchRequestId].filter(value => value !== undefined).length > 1) {
     throw new SprintRecoveryOperationError('RETENTION_MODE_CONFLICT', { sprintId });
   }
-  if (opts.committedUnsettledDispatchRequestId !== undefined) {
-    const dispatchRequestId = opts.committedUnsettledDispatchRequestId;
+  if (opts.committedUnsettledDispatchRequestId !== undefined || opts.rejectedResultDispatchRequestId !== undefined) {
+    const dispatchRequestId = (opts.rejectedResultDispatchRequestId ?? opts.committedUnsettledDispatchRequestId)!;
+    if (opts.rejectedResultDispatchRequestId !== undefined) {
+      const terminal = readRunFlowTerminalClosureForSprint(root, sprintId);
+      if (!terminal || terminal.state !== 'FAILED') {
+        throw new SprintRecoveryOperationError('ACTIVE_AUTHORITY', { sprintId });
+      }
+    }
     if (!/^dreq-[a-f0-9]{64}$/u.test(dispatchRequestId)) {
       throw new SprintRecoveryOperationError('INVALID_DISPATCH_REQUEST_ID', { sprintId });
     }
@@ -549,8 +561,9 @@ export async function runSprintRecoveryOperation(
       }
       assertFreshFence();
     }
-    const committedUnsettledAttempt = await (opts.exactCommittedUnsettledRecovery
-      ?? retainExactDockerCommittedUnsettledAttempt)({
+    const retainedAttempt = await (opts.rejectedResultDispatchRequestId !== undefined
+      ? opts.exactRejectedResultRecovery ?? closeExactDockerRejectedResultAttempt
+      : opts.exactCommittedUnsettledRecovery ?? retainExactDockerCommittedUnsettledAttempt)({
       projectRoot: root, sprintId, dispatchRequestId, dryRun: opts.dryRun === true,
       recoveryAuthority: {
         executionId: identity.executionId, taskId: identity.taskId, attemptId: identity.attemptId,
@@ -558,7 +571,13 @@ export async function runSprintRecoveryOperation(
         approvalRef: approval?.approvalRef ?? 'preview-only',
         idempotencyKey: approval?.idempotencyKey ?? 'preview-only',
       },
-      beforePublish: assertFreshFence,
+      beforePublish: () => {
+        assertFreshFence();
+        if (opts.rejectedResultDispatchRequestId !== undefined
+          && readRunFlowTerminalClosureForSprint(root, sprintId)?.state !== 'FAILED') {
+          throw new SprintRecoveryOperationError('ACTIVE_AUTHORITY', { sprintId });
+        }
+      },
     });
     if (!opts.dryRun) {
       // Retention is intentionally not a terminal settlement: do not archive,
@@ -572,7 +591,9 @@ export async function runSprintRecoveryOperation(
       });
     }
     return {
-      identity, committedUnsettledAttempt, audit: { overallGate: 'SKIPPED' }, orphanIpcDirs: [],
+      identity,
+      ...('outcome' in retainedAttempt ? { rejectedResultAttempt: retainedAttempt } : { committedUnsettledAttempt: retainedAttempt }),
+      audit: { overallGate: 'SKIPPED' }, orphanIpcDirs: [],
       staleLocksCleaned: 0, staleSpawnLocksCleaned: 0, taskFilesArchived: 0, taskFilesPreserved: 0,
       exactCustodyReservations: { pendingBeforeAdmission: 0, heldAdmissionGraphs: 0,
         unresolvedBeforeRecovery: 0, admittedFromStagedSnapshot: 0, retiredBeforeAdmission: 0,
@@ -821,9 +842,20 @@ export async function runSprintRecoveryOperation(
       // terminal event. Retire live `.pid` authority, but retain the paired
       // snapshot as evidence until checkpoint supersession owns both.
       clearPid: id => clearPid(root, id, {
-        preserveSnapshot: checkpointDisposition.disposition === 'preserved',
+        dropSnapshot: checkpointDisposition.disposition !== 'preserved',
       }),
       clearMatchingSprintState: id => {
+        // A retained checkpoint still needs its state unless durable terminal
+        // authority proves it is history. FAILED text in sprint-state alone
+        // does not provide that proof; use the sealed archive or the existing
+        // process-generation-bound Flow closure reader. Otherwise recovery
+        // destroys resume's prerequisite and strands the exact run.
+        if (checkpointDisposition.disposition === 'preserved') {
+          const archived = readArchivedSprintTerminalOutcome(root, id);
+          const closure = readRunFlowTerminalClosureForSprint(root, id);
+          if (archived !== 'COMPLETE' && archived !== 'ABORTED'
+            && closure?.state !== 'COMPLETED' && closure?.state !== 'FAILED') return;
+        }
         const state = readSprintState(root);
         if (state?.sprintId === id) clearSprintState(root);
       },

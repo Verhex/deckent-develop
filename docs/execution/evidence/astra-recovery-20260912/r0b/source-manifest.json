@@ -1,0 +1,42 @@
+{
+  "observedAt": "2026-09-12T18:09:47.497065+00:00",
+  "scope": "R0B exact sources; mixed main is not wholly attributed",
+  "files": [
+    {
+      "path": "src/core/custody-read-snapshot.ts",
+      "sha256": "4a14d82fb350775f2f0d4e6c5bc2717ba6a2cb2c7914a6778c6b5241c1a9b1fe"
+    },
+    {
+      "path": "src/core/task-attempt-custody-store.ts",
+      "sha256": "4ae930f4988c8e0c4b7d4d45d098290e10469f8db952e0a228397fb14dc9099b"
+    },
+    {
+      "path": "src/core/run-status-authority.ts",
+      "sha256": "7a33a3f68a7cbf67f9143662bd23b333a1f0816d9ff3215b14f1bdbc60b1a67c"
+    },
+    {
+      "path": "src/orchestra/spawn-backend-docker.ts",
+      "sha256": "f1af0f38d31c44cde27bdeca8172384ffaabaf2fa4ee7f466eee03c8088eff0b"
+    },
+    {
+      "path": "src/orchestra/execution-effect-store-adapter.ts",
+      "sha256": "331a0464c9480fab2da43c9ed88923eaf2464bb566ebed8615a0339981877487"
+    },
+    {
+      "path": "tests/core/custody-read-snapshot.test.ts",
+      "sha256": "727fe2166d5343f3066a3d316c6cdd1c0ea65c978bda479f4f373fa0f12658d6"
+    },
+    {
+      "path": "tests/core/task-attempt-custody-store.test.ts",
+      "sha256": "499a007bdf7bc1d69f5805bdc4c00c4fe289a304c6e3aff8cf6593bb88d0bf80"
+    },
+    {
+      "path": "tests/core/run-status-authority.test.ts",
+      "sha256": "ec08d2f7f9f1ff0f402ef9824b3d25622ea9021fee03da320ec00ea7722bdb7d"
+    },
+    {
+      "path": "tests/orchestra/execution-effect-store-adapter.test.ts",
+      "sha256": "7a25a4dad7b9f5d55e8cae455c36216ee0ac5f7ec6b6efcb7bebb29c0a5879ad"
+    }
+  ]
+}

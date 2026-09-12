@@ -30,13 +30,9 @@ export function buildCommittedOperatorTurn(id: number, tool: ToolInfo): { id: nu
   return { id, role: 'operator', text: '', tool };
 }
 
-/** Pure transition: prior live strip becomes scrollback when the next tool lands. */
-export function scrollbackPriorOperatorStrip(
-  prior: ToolInfo | null,
-  nextId: number,
-): { scrollbackTurn: ReturnType<typeof buildCommittedOperatorTurn> | null; nextId: number } {
-  if (!prior) return { scrollbackTurn: null, nextId };
-  return { scrollbackTurn: buildCommittedOperatorTurn(nextId, prior), nextId: nextId + 1 };
+/** Hard failures only — routine context-withhold notes stay on the live strip. */
+export function isOperatorPhaseSignal(tool: ToolInfo): boolean {
+  return Boolean(tool.failed);
 }
 
 /** Same epoch contract as app.tsx `isTurnLive` — stale tool sinks after /clear must not repaint. */

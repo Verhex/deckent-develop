@@ -19,6 +19,21 @@ import { requireInjectedLabel } from '../helpers/injected-label.js';
 import { useInkPalette } from './ink-palette-context.js';
 import { useTerminalGlyphs } from './terminal-glyph-context.js';
 import { createInputDebugSink, debugKeylogPath } from './input-debug.js';
+import {
+  countPasteLines,
+  createPasteAttachment,
+  expandComposerSubmit,
+  insertPasteChip,
+  reconcilePasteChipDisplay,
+  DEFAULT_PASTE_COMPOSER_POLICY,
+  shouldCollapsePaste,
+  snapCaretOutsidePasteChips,
+  stripTerminalCopyArtifactLines,
+  type PasteComposerPolicy,
+  uniquePasteChipText,
+  type ComposerSubmitParts,
+  type PasteAttachment,
+} from './paste-composer.js';
 
 // TERMINAL-READABILITY-001 — no color literal: the frame and chevrons take the
 // decorative accent role, the selected menu row the focus role (inverse), key
@@ -28,8 +43,12 @@ import { createInputDebugSink, debugKeylogPath } from './input-debug.js';
 export interface InputBarProps {
   /** Active only when the REPL is accepting input (false during a confirm modal). */
   active: boolean;
-  /** Submit a completed line (already trimmed by the caller if desired). */
-  onSubmit: (line: string) => void;
+  /** Submit wire payload; optional parts carry display/rawIntent for transcript. */
+  onSubmit: (wire: string, parts?: ComposerSubmitParts) => void;
+  /** Paste chip template (`{lines}`, `{bytes}`) — REQUIRED injected label. */
+  composerPasteChip: string;
+  /** Collapse thresholds — from `terminal.workline.composer` when wired by run.tsx. */
+  pasteComposerPolicy?: PasteComposerPolicy;
   /** Ctrl-C ('int') / Ctrl-D on an empty buffer ('eof'). TERMINAL-TOOLS-006:
    * the bar reports whether a draft was present (it clears the draft itself on
    * 'int'); the caller decides (interrupt-policy.ts) — never exits blindly. */
@@ -238,7 +257,13 @@ export interface ShortcutsPanel {
  *  the caret cell is the whole grapheme cluster under the cursor (an emoji, a
  *  ZWJ family, a flag) — `slice(cursor, cursor + 1)` used to take half of a
  *  surrogate pair and the terminal drew garbage. */
-function CaretText({ state, caretStyle }: { state: InputState; caretStyle: CaretStyle }): ReactElement {
+function CaretText({
+  state,
+  caretStyle,
+}: {
+  state: InputState;
+  caretStyle: CaretStyle;
+}): ReactElement {
   const { buffer, cursor } = state;
   const before = buffer.slice(0, cursor);
   const atCluster = segmentGraphemes(buffer.slice(cursor))[0] ?? '';
@@ -261,8 +286,28 @@ export function formatMenuMore(template: string, n: number): string {
   return template.replace('{n}', String(n));
 }
 
+function submitComposer(
+  onSubmit: InputBarProps['onSubmit'],
+  projectRoot: string,
+  persistentHistory: HistoryController,
+  history: InputHistory,
+  state: InputState,
+  attachments: Map<string, PasteAttachment>,
+  pasteChipLabel: string,
+): void {
+  const display = stripTerminalCopyArtifactLines(state.buffer);
+  const parts = expandComposerSubmit(display, attachments, { chip: pasteChipLabel });
+  history.push(parts.rawIntent);
+  recordHistoryEntry(projectRoot, persistentHistory, parts.rawIntent);
+  onSubmit(parts.wire.trim(), parts);
+}
+
 export function InputBar(props: InputBarProps): ReactElement {
   const { active, onSubmit, onInterrupt, onClear, onEscape, slashRegistry, menuHint, pathProvider, atMenuHint, atMenuIndexingHint, shortcutsPanel } = props;
+  const pasteChip = requireInjectedLabel('composerPasteChip', props.composerPasteChip);
+  const pastePolicy = props.pasteComposerPolicy !== undefined
+    ? props.pasteComposerPolicy
+    : DEFAULT_PASTE_COMPOSER_POLICY;
   // TERMINAL-TOOLS-010 — `?` shortcuts panel (open/closed).
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const palette = useInkPalette();
@@ -290,7 +335,23 @@ export function InputBar(props: InputBarProps): ReactElement {
   const persistentHistoryRef = useRef<HistoryController | null>(null);
   if (persistentHistoryRef.current === null) persistentHistoryRef.current = createHistoryController(projectRoot);
   const persistentHistory = persistentHistoryRef.current;
+  const pasteAttachments = useRef(new Map<string, PasteAttachment>());
   const debugSink = useRef<ReturnType<typeof createInputDebugSink> | null>(null);
+
+  const applyPasteText = (text: string, base: InputState): InputState => {
+    const { buffer, cursor } = base;
+    const cleaned = stripTerminalCopyArtifactLines(text.replace(/\r\n?/g, '\n'));
+    if (!shouldCollapsePaste(cleaned, pastePolicy)) {
+      return { buffer: buffer.slice(0, cursor) + cleaned + buffer.slice(cursor), cursor: cursor + cleaned.length };
+    }
+    const normalized = cleaned;
+    const usedChips = new Set([...pasteAttachments.current.values()].map((a) => a.chipText));
+    const chipText = uniquePasteChipText({ chip: pasteChip }, { lineCount: countPasteLines(normalized), byteLength: normalized.length }, usedChips);
+    const attachment = createPasteAttachment(normalized, chipText);
+    pasteAttachments.current.set(attachment.id, attachment);
+    const inserted = insertPasteChip(buffer, cursor, chipText);
+    return { buffer: inserted.buffer, cursor: inserted.cursor };
+  };
   useEffect(() => {
     if (process.env['DECKENT_INK_DEBUG'] !== '1') return undefined;
     const ownedSink = createInputDebugSink();
@@ -356,7 +417,12 @@ export function InputBar(props: InputBarProps): ReactElement {
       if (key.downArrow) { setSel((sel + 1) % n); return; }
       if (key.escape) { set(EMPTY_INPUT); setSel(0); return; }
       if (key.tab) { const name = matches[sel]?.name ?? ''; set({ buffer: name + ' ', cursor: name.length + 1 }); setSel(0); return; }
-      if (key.return) { onSubmit(resolveMenuSubmit(stateRef.current.buffer, matches, sel)); set(EMPTY_INPUT); setSel(0); setAtDismissedBoth(null); return; }
+      if (key.return) {
+        const line = resolveMenuSubmit(stateRef.current.buffer, matches, sel);
+        const submitState = { buffer: line, cursor: line.length };
+        submitComposer(onSubmit, projectRoot, persistentHistory, history.current, submitState, pasteAttachments.current, pasteChip);
+        set(EMPTY_INPUT); pasteAttachments.current = new Map(); setSel(0); setAtDismissedBoth(null); return;
+      }
       // any other key falls through to editInput → re-filters; reset selection
     }
 
@@ -387,17 +453,20 @@ export function InputBar(props: InputBarProps): ReactElement {
     if (!key.return && input !== '\n' && /[\r\n]/.test(input)) {
       const result = resolvePasteChunk(stateRef.current.buffer, input);
       if (result.kind === 'insert') {
-        const s = stateRef.current;
-        set({ buffer: s.buffer.slice(0, s.cursor) + result.text + s.buffer.slice(s.cursor), cursor: s.cursor + result.text.length });
+        set(applyPasteText(result.text, stateRef.current));
       } else if (result.kind === 'submit') {
-        history.current.push(result.line); // keep history (Ctrl-R) consistent with the lone-Enter path
-        recordHistoryEntry(projectRoot, persistentHistory, result.line);
-        onSubmit(result.line);
-        set(EMPTY_INPUT);
+        submitComposer(onSubmit, projectRoot, persistentHistory, history.current, { buffer: result.line, cursor: result.line.length }, pasteAttachments.current, pasteChip);
+        set(EMPTY_INPUT); pasteAttachments.current = new Map();
         setAtDismissedBoth(null);
       } else {
-        set(EMPTY_INPUT); // chunk was purely \r/\n bytes → no submit, no history pollution
+        set(EMPTY_INPUT); pasteAttachments.current = new Map();
       }
+      return;
+    }
+
+    if (!key.return && !key.ctrl && !key.meta && input.length > 1 && !/[\r\n]/.test(input) && shouldCollapsePaste(input, pastePolicy)) {
+      set(applyPasteText(input, stateRef.current));
+      setSel(0);
       return;
     }
 
@@ -405,10 +474,28 @@ export function InputBar(props: InputBarProps): ReactElement {
     // menu: hand it to the caller (turn interrupt). Never edits the buffer.
     if (key.escape) { onEscape?.(); return; }
 
-    const res = editInput(stateRef.current, inkToKey(input, key));
+    let editBase = stateRef.current;
+    if (
+      pasteAttachments.current.size > 0
+      && input.length > 0
+      && !key.ctrl
+      && !key.meta
+      && !key.return
+      && !key.backspace
+      && !key.delete
+      && !key.leftArrow
+      && !key.rightArrow
+      && !key.upArrow
+      && !key.downArrow
+      && input.charCodeAt(0) >= 0x20
+    ) {
+      const snapped = snapCaretOutsidePasteChips(editBase.buffer, editBase.cursor, pasteChip);
+      if (snapped !== editBase.cursor) editBase = { ...editBase, cursor: snapped };
+    }
+    const res = editInput(editBase, inkToKey(input, key));
     if (res.signal === 'int') {
       const draftNonEmpty = stateRef.current.buffer.length > 0;
-      set(EMPTY_INPUT); setAtDismissedBoth(null); setSel(0);
+      set(EMPTY_INPUT); pasteAttachments.current = new Map(); setAtDismissedBoth(null); setSel(0);
       onInterrupt('int', draftNonEmpty);
       return;
     }
@@ -418,14 +505,22 @@ export function InputBar(props: InputBarProps): ReactElement {
       return;
     }
     if (res.submit !== undefined) {
-      history.current.push(res.submit);
-      recordHistoryEntry(projectRoot, persistentHistory, res.submit);
-      onSubmit(res.submit);
-      set(EMPTY_INPUT);
+      const submitState = { buffer: res.submit, cursor: res.submit.length };
+      submitComposer(onSubmit, projectRoot, persistentHistory, history.current, submitState, pasteAttachments.current, pasteChip);
+      set(EMPTY_INPUT); pasteAttachments.current = new Map();
       setAtDismissedBoth(null);
       return;
     }
-    set(res.state);
+    if (res.state.buffer.length === 0) {
+      pasteAttachments.current = new Map();
+      set(EMPTY_INPUT);
+    } else if (pasteAttachments.current.size > 0) {
+      const buffer = reconcilePasteChipDisplay(res.state.buffer, pasteAttachments.current, pasteChip);
+      const cursor = snapCaretOutsidePasteChips(buffer, res.state.cursor, pasteChip);
+      set({ buffer, cursor });
+    } else {
+      set(res.state);
+    }
     setSel(0); // buffer changed → re-filter from the top
     // TERM-AT-REF: an Esc-dismissal only pins THAT token — once the cursor's
     // active `@` token no longer starts at the dismissed index (token deleted,

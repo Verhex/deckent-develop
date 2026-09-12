@@ -12,7 +12,13 @@
 
 import { describe, it, expect } from 'vitest';
 import { buildModelPickerSpec, buildProviderPickerSpec, type PickerSpecContext } from '../../../src/cli/repl/picker-specs.js';
-import { listNativeModelCandidates, registryProviderFor, NATIVE_PROVIDER_NAMES } from '../../../src/cli/repl/native-transport.js';
+import {
+  configuredLocalLlmRegistryModels,
+  listNativeModelCandidates,
+  mergeLocalLlmPublishedModelIds,
+  registryProviderFor,
+  NATIVE_PROVIDER_NAMES,
+} from '../../../src/cli/repl/native-transport.js';
 import { modelRegistry } from '../../../src/core/model-registry.js';
 import { OLLAMA_BUILTIN_MODELS } from '../../../src/core/ollama-models.js';
 import { OPENAI_COMPAT_PRESET_META } from '../../../src/providers/openai-compatible.js';
@@ -117,5 +123,29 @@ describe('native-transport candidate listing (real registry, no literals in the 
     expect(listNativeModelCandidates('local-llm', {}, ['served-model'])).toEqual([{ provider: 'local-llm', id: 'served-model', definition: null }]);
     expect(listNativeModelCandidates('unknown', {})).toEqual([]);
     expect(NATIVE_PROVIDER_NAMES.every((p) => Array.isArray(listNativeModelCandidates(p, {})))).toBe(true);
+  });
+
+  it('mergeLocalLlmPublishedModelIds keeps config order then discovered extras sorted', () => {
+    expect(mergeLocalLlmPublishedModelIds(
+      ['Qwen3.8-27B-Q4_K_M', 'Qwen3.8-27B-Uncensored-OrcaRouter-Q6_K'],
+      ['Qwen3.8-27B-CRACK-Q6_K_L', 'Qwen3.8-27B-Q4_K_M'],
+    )).toEqual([
+      'Qwen3.8-27B-Q4_K_M',
+      'Qwen3.8-27B-Uncensored-OrcaRouter-Q6_K',
+      'Qwen3.8-27B-CRACK-Q6_K_L',
+    ]);
+  });
+
+  it('listNativeModelCandidates local-llm falls back to registry models when discovery is empty', () => {
+    const cfg = {
+      providers: {
+        registry: [{
+          name: 'local-llm',
+          models: ['alpha', 'beta'],
+        }],
+      },
+    };
+    expect(configuredLocalLlmRegistryModels(cfg)).toEqual(['alpha', 'beta']);
+    expect(listNativeModelCandidates('local-llm', cfg, []).map((c) => c.id)).toEqual(['alpha', 'beta']);
   });
 });

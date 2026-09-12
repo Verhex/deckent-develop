@@ -1,0 +1,1 @@
+{"observedAt":"2026-09-12T17:40:23.039Z","durationMs":492.62505699999997,"error":{"name":"TaskAttemptCustodyHold","code":"ARTIFACT_CHANGED","message":"TASK_ATTEMPT_CUSTODY_HOLD:ARTIFACT_CHANGED","stack":"TaskAttemptCustodyHold: TASK_ATTEMPT_CUSTODY_HOLD:ARTIFACT_CHANGED"}}

@@ -310,6 +310,9 @@ export function classifyShellCommand(command: string, options: ShellRiskOptions 
   if (scan.malformed) result = combine(result, { risk: 'modify', reason: 'shell.modify.unparseable' });
   if (scan.outputRedirect) result = combine(result, { risk: 'modify', reason: 'shell.modify.output-redirection' });
   if (result.risk === 'destructive') return result;
+  // 7111 — output redirection and segment-level modify must not be demoted by the
+  // read-only parser (e.g. `mkdir … && printf … > file` must stay ask-tier).
+  if (result.risk === 'modify') return result;
   const readOnly = classifyReadOnlyShellCommand(command, {
     dialect: options.dialect ?? 'posix',
     projectRoot: options.projectRoot ?? null,

@@ -22,6 +22,8 @@ taşınır.
 
 > **Terminal ilerleme kaydı — owner 2026-09-11:** 7099 / 7107 / 7109 kapsamındaki cc70d0c05 main teslimi sonrası owner local-llm MASTER analizi yaklaşık 262 s içinde tamamlandı; Cursor 73 test ve build:all exit0 bildiriyor. Recover argv bypass source-review ile kapalı; context custody/control-allocation, gerçek deny PTY ve formal closure HOLD. **Disposition/DONE değişmedi.** Ayrıntı: [terminal aktif capsule](execution/active/TERMINAL-OPERATOR-SURFACE-CLOSURE-001.md) ve [gece review/temizlik kanıtı](execution/evidence/terminal-winddown-20260910/astra-night-close-20260911.json). Yeni gecelik implementation başlatılmadı.
 
+> **Dogfood recovery owner kararı — 2026-09-12:** Alperen, epoch-7 Astra devri sonrası mevcut iş sırasını ve **kalıcı recover/restore/settlement onarımını (A)** kabul etti. Mevcut 747 vakası kanıta bağlı kurtarılırken aynı kilidin tekrarını önleyen genel sözleşme uygulanacak; sabit sprint/task/model adına bağlı akış, geçici state yaması veya MVP çözüm yok. İlgili iş: **120 STATE-RETENTION-001** önündeki `RECOVERY-DO-DOGFOOD-001` yürütme engeli. Önce main remainder sahiplik/doğrulama ve temiz teslim noktası; sonra bounded recovery, gerçek worker evidence ve durable settlement. Model tercihi project config'te Codex/Astra brain, Sol varsayılan worker; Terra/Luna iş gereğine göre. **OPEN/DONE ve closure disposition değişmedi.** Ayrıntı: [durum raporu EK-5](../durum-raporu.md#ek-5--astra-epoch-7-başlangıç-planı-ve-worker-imajı-incelemesi-2026-09-12).
+
 ## 1. North Star ve bitiş sözleşmesi
 
 Deckent; solo kullanıcıdan dünyanın en büyük kurumlarına kadar aynı çekirdeği kullanan,

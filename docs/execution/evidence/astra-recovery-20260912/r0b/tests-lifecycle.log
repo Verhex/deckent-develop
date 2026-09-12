@@ -1,0 +1,60 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/orchestra/exact-rejected-result-closure.test.ts (5 tests) 20415ms
+   ✓ released effect with rejected result: durable negative closure > survives a new Store and replays without acceptance or duplicate publication  4647ms
+   ✓ released effect with rejected result: durable negative closure > rejects a wrong source digest or foreign recovery authority  3953ms
+   ✓ released effect with rejected result: durable negative closure > prevents publishing acceptance after the negative terminal marker  3884ms
+   ✓ released effect with rejected result: durable negative closure > fails closed when the first-writer terminal record is corrupted  3835ms
+   ✓ released effect with rejected result: durable negative closure > rejects a backdated decision and a conflicting first-writer replay  4095ms
+ ✓ tests/core/run-status-authority.test.ts (19 tests) 823ms
+ ✓ tests/orchestra/spawn-backend-docker-mounts.test.ts (92 tests) 396ms
+ ✓ tests/core/run-status-read-model.test.ts (5 tests) 207ms
+ ✓ tests/core/custody-read-snapshot.test.ts (4 tests) 4ms
+ ✓ tests/core/task-attempt-custody-store.test.ts (176 tests) 25533ms
+   ✓ TaskAttemptCustodyStore V2 kernel > settles the bounded final IPC sequence without exposing or publishing sequence max plus one  10295ms
+   ✓ TaskAttemptCustodyStore V2 kernel > builds an exact accepted-result to archive predecessor chain  1041ms
+   ✓ TaskAttemptCustodyStore V2 kernel > reads each predecessor once at the late validation boundary without an exponential traversal  1042ms
+   ✓ TaskAttemptCustodyStore V2 kernel > holds when current artifact IO changes the predecessor receipt by corrupt before late validation  946ms
+   ✓ TaskAttemptCustodyStore V2 kernel > holds when current artifact IO changes the predecessor receipt by delete before late validation  943ms
+   ✓ TaskAttemptCustodyStore V2 kernel > holds when current artifact IO changes the predecessor artifact by corrupt before late validation  933ms
+   ✓ TaskAttemptCustodyStore V2 kernel > holds when current artifact IO changes the predecessor artifact by delete before late validation  940ms
+   ✓ TaskAttemptCustodyStore V2 kernel > does not reuse predecessor authority across top-level reads after tampering  1013ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects a stage artifact captured before its predecessor chain event  366ms
+   ✓ TaskAttemptCustodyStore V2 kernel > detects a missing earlier chain stage when a later durable stage exists  430ms
+   ✓ TaskAttemptCustodyStore V2 kernel > settles RELEASED only from exact mount outcome and durable gated release evidence  370ms
+   ✓ TaskAttemptCustodyStore V2 kernel > retains committed-journal release-pending truth with complete immutable inventory  415ms
+   ✓ TaskAttemptCustodyStore V2 kernel > requires an exactly empty chain and exact structural evidence refs  372ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects stale/sibling authority, provider-observation substitution and disposition conflicts  437ms
+   ✓ TaskAttemptCustodyStore V2 kernel > retains committed-journal release-pending truth with complete immutable inventory  396ms
+ ✓ tests/orchestra/execution-effect-store-adapter.test.ts (24 tests) 92231ms
+   ✓ execution effect Store adapter > fails closed when a later cleanup artifact exists behind a missing predecessor  3557ms
+   ✓ execution effect Store adapter > publishes and rereads ALLOCATING before project-root landing authority exists  5241ms
+   ✓ execution effect Store adapter > publishes coordinator journals and exposes accepted authority only after full Store fan-in  3557ms
+   ✓ execution effect Store adapter > proves a committed coordinator journal without mutating Store bytes  4786ms
+   ✓ execution effect Store adapter > rejects prepared evidence when immutable bytes are missing  5487ms
+   ✓ execution effect Store adapter > rejects prepared evidence when immutable bytes are tampered  5410ms
+   ✓ execution effect Store adapter > rejects native evidence when immutable bytes are missing  5535ms
+   ✓ execution effect Store adapter > rejects native evidence when immutable bytes are tampered  5533ms
+   ✓ execution effect Store adapter > rejects final evidence when immutable bytes are missing  5416ms
+   ✓ execution effect Store adapter > rejects final evidence when immutable bytes are tampered  5431ms
+   ✓ execution effect Store adapter > rejects lease evidence when immutable bytes are missing  5449ms
+   ✓ execution effect Store adapter > rejects lease evidence when immutable bytes are tampered  5379ms
+   ✓ execution effect Store adapter > rejects committed-pending evidence after release progress is durable  6018ms
+   ✓ execution effect Store adapter > rejects journal replacement, forged references, missing landings and policy-null authority  3561ms
+   ✓ execution effect Store adapter > proves a production-shaped coordinator commit before release or accepted-result publication  1730ms
+   ✓ execution effect Store adapter > rejects prepared evidence when immutable bytes are missing  2139ms
+   ✓ execution effect Store adapter > rejects prepared evidence when immutable bytes are tampered  2135ms
+   ✓ execution effect Store adapter > rejects native evidence when immutable bytes are missing  2257ms
+   ✓ execution effect Store adapter > rejects native evidence when immutable bytes are tampered  2260ms
+   ✓ execution effect Store adapter > rejects final evidence when immutable bytes are missing  2177ms
+   ✓ execution effect Store adapter > rejects final evidence when immutable bytes are tampered  2172ms
+   ✓ execution effect Store adapter > rejects lease evidence when immutable bytes are missing  2135ms
+   ✓ execution effect Store adapter > rejects lease evidence when immutable bytes are tampered  2123ms
+   ✓ execution effect Store adapter > rejects committed-pending evidence after release progress is durable  2742ms
+
+ Test Files  7 passed (7)
+      Tests  325 passed (325)
+   Start at  20:54:34
+   Duration  121.60s (transform 3.79s, setup 58ms, collect 5.92s, tests 139.61s, environment 1ms, prepare 223ms)
+

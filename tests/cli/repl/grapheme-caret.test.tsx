@@ -114,6 +114,7 @@ describe('InputBar — the caret cell is a whole grapheme', () => {
         menuMoreAbove={en.menuMoreAbove}
         menuMoreBelow={en.menuMoreBelow}
         reverseSearchLabel={en.reverseSearch}
+        composerPasteChip={en.composerPasteChip}
         historyProjectRoot={root}
         caretStyle={caretStyle}
       />,

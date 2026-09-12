@@ -199,18 +199,30 @@ export function readPid(root: string, sprintId: string): number | null {
 
 export interface ClearSprintPidOptions {
   /**
-   * Keep the generation-bound snapshot as non-live correlation evidence.
-   * The `.pid` file is the liveness authority; a snapshot without it can
-   * never authorize signalling or project an ACTIVE coordinator.
+   * Retire the generation-bound snapshot along with the `.pid` file.
+   *
+   * Off by default, and only a settlement/retention authority should turn it
+   * on. Process teardown is not such an authority: the snapshot is the only
+   * durable binding between a finished run and its terminal RunFlow event, and
+   * `readOwningRunTerminalDisposition` reads it AFTER the coordinator is gone.
+   * Dropping it here is what made an owning run unprovably terminal and left
+   * its attempt permanently unretirable.
    */
-  readonly preserveSnapshot?: boolean;
+  readonly dropSnapshot?: boolean;
 }
 
 /**
- * Remove the PID file for a sprint (called on clean shutdown). By default the
- * paired snapshot is also removed. Fatal detached execution paths may retain
- * that snapshot solely to correlate the exact process generation to a
- * subsequently published terminal RunFlow event.
+ * Release the sprint's liveness claim by removing its `.pid` file.
+ *
+ * The paired generation snapshot is KEPT unless a caller holding settlement or
+ * retention authority passes `dropSnapshot`. The two artifacts answer different
+ * questions: `.pid` claims "a coordinator is running" — `detectOrphan` gates on
+ * its presence, so a retained snapshot alone can never fabricate an orphan or
+ * authorize signalling. The snapshot is evidence, and it is read after the
+ * process is gone to bind that exact generation to the run's terminal RunFlow
+ * event (`readRunFlowTerminalClosureForSprint`). Deleting evidence during
+ * teardown made every finished run unprovably terminal, which in turn left its
+ * accepted-result attempt unretirable and blocked every later cold start.
  */
 export function clearPid(
   root: string,
@@ -224,9 +236,8 @@ export function clearPid(
     }
   } catch { /* non-fatal */ }
 
-  if (options.preserveSnapshot === true) return;
+  if (options.dropSnapshot !== true) return;
 
-  // Also clean up snapshot file
   const snapPath = snapshotFilePath(root, sprintId);
   try {
     if (existsSync(snapPath)) {
@@ -505,18 +516,19 @@ export function detectOrphan(root: string, sprintId: string): OrphanInfo | null 
 
 /**
  * Archive orphaned sprint artifacts inside the canonical sprint namespace.
- * Moves PID file, snapshot, and sprint state to the archive directory.
+ * Retires the dead PID and copies its snapshot. Only canonical fenced recovery
+ * may retire snapshot/state prerequisites; orphan detection alone is insufficient.
  */
 export function archiveOrphan(root: string, orphan: OrphanInfo): void {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const prefix = `${orphan.sprintId}_${timestamp}`;
-  const settle = (source: string, target: string): void => {
+  const settle = (source: string, target: string, retireSource = true): void => {
     publishSprintArchiveArtifact(
       root,
       orphan.sprintId,
       source,
       join('orphan-authority', target),
-      { retireSource: true },
+      { retireSource },
     );
   };
 
@@ -531,18 +543,14 @@ export function archiveOrphan(root: string, orphan: OrphanInfo): void {
   if (orphan.snapshotPath) {
     try {
       if (existsSync(orphan.snapshotPath)) {
-        settle(orphan.snapshotPath, `${prefix}.snapshot.json`);
+        settle(orphan.snapshotPath, `${prefix}.snapshot.json`, false);
       }
     } catch { /* non-fatal */ }
   }
 
-  // Move sprint state file if it exists
-  const sprintStatePath = join(root, DECKENT_DIR, 'sprint-state.json');
-  try {
-    if (existsSync(sprintStatePath)) {
-      settle(sprintStatePath, `${prefix}.sprint-state.json`);
-    }
-  } catch { /* non-fatal */ }
+  // Do not copy or retire global sprint-state here. It may change ownership
+  // between a read and unlink, and even matching state can be required by a
+  // retained checkpoint. Canonical recovery owns this fenced decision.
 }
 
 /**

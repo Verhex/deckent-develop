@@ -271,6 +271,15 @@ export function releaseOwnedSprintPidFiles(
       // A recorded token that disagrees with our own means the file belongs to
       // a dead predecessor whose pid we inherited — not ours to remove.
       if (record.startToken && liveToken && record.startToken !== liveToken) continue;
+      // This runs from the detached runner's own exit handler — the "fatal
+      // detached execution path" `clearPid` documents. The `.pid` is liveness
+      // authority and must go; the generation snapshot must NOT, because it is
+      // the only thing that later binds this process generation to the terminal
+      // RunFlow event. Without it `readOwningRunTerminalDisposition` can never
+      // reach its closure path (B) for ANY detached run, so an accepted result
+      // owned by that run can never be retired and blocks every later start.
+      // Snapshot retention is now the default in `clearPid`; the plain call is
+      // the retaining one. Kept explicit here only as the call this path needs.
       clearPid(projectRoot, sprintId);
       released.push(sprintId);
     } catch { /* best-effort — one unreadable pid file never blocks the rest */ }

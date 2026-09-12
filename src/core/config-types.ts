@@ -13,6 +13,7 @@ import type { BotCapabilitiesConfig } from '../connectors/capabilities/types.js'
 import type { ApprovalPolicyRule } from './approval-policy.js';
 import type { ToolRiskLevel } from './tool-registry.js';
 import type { ComputerUseConfig } from './computer-use-contract.js';
+import type { TerminalWorklineConfig } from './terminal-workline-contract.js';
 import type { ExecutionBudget, TaskKind, TaskProfileConfig } from './work-model.js';
 import type {
   InvocationAuthMode,
@@ -123,6 +124,12 @@ export interface TerminalConfig {
    * literal true. The flag never authorizes a fallback to an unbound plan.
    */
   run_flow_v2?: boolean;
+  /**
+   * Causal Workline operator UX (composer, live operator strip, scrollback discipline).
+   * Shared contract: `src/core/terminal-workline-contract.ts` — Terminal and Desktop
+   * operator chat must resolve the same keys for semantic parity.
+   */
+  workline?: TerminalWorklineConfig;
 }
 
 // ─── Resource Monitor Config ────────────────────────────────────────
@@ -735,6 +742,22 @@ export interface PlanModeConfig {
   /** Tier-based minimum model tier. Preferred over haiku_allowed.
    *  When set, haiku_allowed is ignored. Backward compat: haiku_allowed=false → min_tier='standard'. */
   min_tier?: ModelTier;
+  /**
+   * Tier-based maximum model tier — the owner's binding ceiling for
+   * auto-selected worker task models. Mirror of {@link min_tier}: the floor was
+   * enforceable here since born-283, the ceiling was not, so an owner who
+   * wanted "workers never exceed standard tier" had no configuration that
+   * said it. `ModelStrategy.max_tier` (mode-presets.ts) documents the same
+   * contract — "tasks cannot exceed this" — but `resolveTaskModel` reads
+   * `PlanModeConfig`, not `ModelStrategy`, so the declared ceiling had no
+   * consumer on the task-model path and every score-inferred premium task
+   * resolved to a premium model regardless.
+   *
+   * Unset means no ceiling (today's behaviour, bit-for-bit). An explicit
+   * `- Model:` directive is a deliberate operator override and still wins
+   * outright: the ceiling governs auto-selection, never an explicit pin.
+   */
+  max_tier?: ModelTier;
   budget_per_sprint?: number;
   requires?: string;
   brain_planning?: BrainPlanningMode;
@@ -1738,6 +1761,41 @@ export interface DeckentConfig {
       archiveFormat?: 'gzip';
       /** Keep last N archived files (default: 10) */
       keepLastN?: number;
+    };
+    /**
+     * Combined age + count + size retention ceilings for archived,
+     * content-addressed metrics files (737-001, `enforceRetentionPolicy` in
+     * `core/observability-rotation.ts`). Read directly from this config block
+     * by that module (out of `config.ts`'s write scope for this task, same
+     * direct-read precedent as `sprint_file_retention.archive_path`); not
+     * threaded through `mergeConfigs`/`ResolvedConfig` beyond the existing
+     * whole-`observability`-block passthrough. All three ceilings apply
+     * together — the tightest one wins. Absent block/field = the module's
+     * own defaults (keepLastN 10, maxAgeDays 90, maxSizeMB 500). */
+    retention?: {
+      /** Maximum age in days before an archived metrics file is prunable. */
+      max_age_days?: number;
+      /** Maximum number of archived metrics files retained across sprints. */
+      max_count?: number;
+      /** Maximum aggregate size in MB for archived metrics files. */
+      max_size_mb?: number;
+      /**
+       * Per-tenant ceiling overrides, keyed by tenant id (747-001).
+       *
+       * `enforceRetentionPolicy` partitions archives by tenant scope and judges
+       * each scope ONLY by its own resolved ceilings, so one tenant's
+       * count/size ceiling can never prune another tenant's retained evidence.
+       * A tenant with no entry here inherits the ceilings above; a key the
+       * canonical `isValidTenantId` authority rejects is ignored. Same
+       * direct-read path as the base block — `observability-rotation.ts` reads
+       * this file directly rather than importing `config.ts` (which imports
+       * `observability.ts`, so the edge would be an import cycle).
+       */
+      tenants?: Record<string, {
+        max_age_days?: number;
+        max_count?: number;
+        max_size_mb?: number;
+      }>;
     };
   };
 

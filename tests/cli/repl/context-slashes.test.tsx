@@ -291,6 +291,7 @@ describe('shortcuts panel — catalog-built, shown on `?` from an empty composer
       <InputBar
         active onSubmit={onSubmit} onInterrupt={() => {}}
         menuMoreAbove={en.menuMoreAbove} menuMoreBelow={en.menuMoreBelow} reverseSearchLabel={en.reverseSearch}
+        composerPasteChip={en.composerPasteChip}
         shortcutsPanel={panel} historyProjectRoot={root} caretStyle="marker"
       />,
     );

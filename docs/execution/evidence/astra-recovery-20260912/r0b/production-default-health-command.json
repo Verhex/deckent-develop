@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "node",
+    "/tmp/deckent-r0b-astra-20260912/compiled-health.mjs"
+  ],
+  "startedAt": "2026-09-12T18:14:05.236523+00:00",
+  "finishedAt": "2026-09-12T18:17:23.491844+00:00",
+  "durationMs": 210906,
+  "exitCode": 0
+}

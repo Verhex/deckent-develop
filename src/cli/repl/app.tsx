@@ -28,9 +28,10 @@ import {
   buildCommittedOperatorTurn,
   isOperatorStripTurnLive,
   LiveOperatorStripView,
-  scrollbackPriorOperatorStrip,
+  isOperatorPhaseSignal,
 } from './live-operator-strip.js';
 import { InputBar, type CaretStyle, type ShortcutsPanel } from './input-bar.js';
+import type { ComposerSubmitParts, PasteComposerPolicy } from './paste-composer.js';
 import { StatusRow, formatSessionIdForTerminal } from './status-row.js';
 import { resolveCtrlC, CTRL_C_EXIT_WINDOW_MS } from './interrupt-policy.js';
 import { useTerminalColumns } from './use-terminal-columns.js';
@@ -1130,6 +1131,12 @@ export interface ReplLabels {
   transcriptAssistant: string;
   transcriptUserHint: string;
   transcriptAssistantHint: string;
+  /** Muted turn-end tool count when routine tools are not scrolled individually. */
+  transcriptToolsTurnSummary: string;
+  /** Localized paste collapse chip (`{lines}`, `{bytes}`). */
+  composerPasteChip: string;
+  /** From `terminal.workline.composer` — collapse thresholds. */
+  pasteComposerPolicy: PasteComposerPolicy;
 }
 
 interface StatusInspectCardProps {
@@ -1377,6 +1384,9 @@ export async function runNativeTurnLoop(
      * chat attribution without suppressing measurements from the next turn. */
     measurementAttribution?: () => number;
     onRequestMeasurement?: (event: RequestMeasurementEvent, turnId: number, attribution: number | undefined) => void;
+    /** When false, assistant text still persists but is not streamed to the Workline. */
+    shouldRenderAssistantOutput?: () => boolean;
+    onAssistantStreamGate?: (open: boolean) => void;
     /**
      * REPL-575 K3 — chat persistence for the native engine. Called once per
      * completed turn with the user's input line and the assistant text that was
@@ -1400,8 +1410,11 @@ export async function runNativeTurnLoop(
     // ran tools with no visible text yields '' — still persist the user line so
     // the session is recoverable.
     let assistantText = '';
-    const captureOutput = cbs.persistTurn
-      ? (text: string) => { assistantText += text; cbs.output(text); }
+    const captureOutput = cbs.persistTurn || cbs.shouldRenderAssistantOutput
+      ? (text: string) => {
+        assistantText += text;
+        if (cbs.shouldRenderAssistantOutput?.() !== false) cbs.output(text);
+      }
       : cbs.output;
     let turnOpen = true;
     try {
@@ -1426,6 +1439,11 @@ export async function runNativeTurnLoop(
         ...(cbs.onRequestMeasurement ? {
           onRequestMeasurement: (event) => {
             if (turnOpen) cbs.onRequestMeasurement?.(event, currentTurnId, measurementAttribution);
+          },
+        } : {}),
+        ...(cbs.onAssistantStreamGate ? {
+          onAssistantStreamGate: (open) => {
+            if (turnOpen) cbs.onAssistantStreamGate?.(open);
           },
         } : {}),
       };
@@ -1732,7 +1750,13 @@ interface TurnStats { elapsedMs: number; tokens?: number; }
 // complete, then a 'foot' (⏱ stats). Each lands in scrollback immediately, so
 // the user reads in real time and the dynamic region stays tiny (no drift).
 // Exported for buildSegmentTurns' tests (360-009) — shape-only, no behavior.
-export interface Turn { id: number; role: 'user' | 'head' | 'seg' | 'foot' | 'tool' | 'operator' | 'bg'; text: string; tool?: ToolInfo; stats?: TurnStats; }
+export interface Turn {
+  id: number;
+  role: 'user' | 'user-ingress' | 'head' | 'seg' | 'foot' | 'tool' | 'operator' | 'bg';
+  text: string;
+  tool?: ToolInfo;
+  stats?: TurnStats;
+}
 
 // TERMINAL-READABILITY-001 — no color literal in the App: every color is a
 // palette role (ink-palette-context) the host theme paints; emphasis is weight
@@ -1884,6 +1908,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // mirroring the confirmQueue pattern below.
   const queue = useRef<InputQueue | null>(null);
   if (queue.current === null) queue.current = createInputQueue();
+  const pendingSubmitMetaRef = useRef<ComposerSubmitParts | null>(null);
+  const assistantStreamOpenRef = useRef(true);
   const wake = useRef<(() => void) | null>(null);
   // FIFO confirm queue (replaces the single-slot resolver — H1 fix). Lazy-init
   // once; onChange mirrors the head into `confirm` state so React re-renders it.
@@ -2334,24 +2360,29 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     staticProseBatch.current?.flush();
   };
 
+  const discardStreamedProse = (): void => {
+    segmenter.current?.discard();
+    staticProseBatch.current?.discard();
+  };
+
+  const toolsThisTurnRef = useRef(0);
+
   const advanceLiveOperatorStrip = useCallback((next: ToolInfo): void => {
-    const { scrollbackTurn, nextId } = scrollbackPriorOperatorStrip(
-      liveOperatorStripRef.current,
-      idRef.current,
-    );
-    if (scrollbackTurn) {
-      idRef.current = nextId;
-      setTurns((t) => [...t, scrollbackTurn]);
-    }
     setLiveOperatorStrip(next);
   }, []);
 
   const flushLiveOperatorStripToScrollback = useCallback((): void => {
     const live = liveOperatorStripRef.current;
-    if (!live) return;
-    setTurns((t) => [...t, buildCommittedOperatorTurn(idRef.current++, live)]);
+    const toolCount = toolsThisTurnRef.current;
+    if (live && isOperatorPhaseSignal(live)) {
+      setTurns((t) => [...t, buildCommittedOperatorTurn(idRef.current++, live)]);
+    } else if (toolCount > 0 && replSurfaceEnabled) {
+      const summary = labels.transcriptToolsTurnSummary.replace('{n}', String(toolCount));
+      setTurns((t) => [...t, { id: idRef.current++, role: 'tool', text: '', tool: { verb: summary, target: '' } }]);
+    }
+    toolsThisTurnRef.current = 0;
     setLiveOperatorStrip(null);
-  }, []);
+  }, [labels.transcriptToolsTurnSummary, replSurfaceEnabled]);
 
   // F11-016-STAB (360-009): ONE clear routine for both clear surfaces (the
   // /clear command below + InputBar's Ctrl-L onClear — previously two drifting
@@ -2371,6 +2402,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     statusInspectGeneration.current += 1;
     invalidateSprintContext();
     setLiveOperatorStrip(null);
+    toolsThisTurnRef.current = 0;
     setTurns([]); setPartial(''); setStatusInspectLines(null); headPushed.current = false;
     wireStreamSegmenter();
   };
@@ -2409,12 +2441,20 @@ export function ReplApp(props: ReplAppProps): ReactElement {
 
   // Operator strip: live in the dynamic region (Ink Static never repaints updates).
   useEffect(() => {
-    registerToolSink((info: ToolInfo) => {
+      registerToolSink((info: ToolInfo) => {
       // 389-002: a stale (pre-clear) turn's tool-result block must not land
       // on the just-cleared screen either — same epoch guard as `output`.
       if (!isOperatorStripTurnLive(turnEpoch.current, clearEpoch.current)) return;
-      flushStreamedProse(); setPartial(''); // commit any in-flight reply first
-      advanceLiveOperatorStrip(info);
+      if (assistantStreamOpenRef.current) flushStreamedProse();
+      else discardStreamedProse();
+      setPartial('');
+      toolsThisTurnRef.current += 1;
+      if (isOperatorPhaseSignal(info)) {
+        setTurns((t) => [...t, buildCommittedOperatorTurn(idRef.current++, info)]);
+        setLiveOperatorStrip(null);
+      } else {
+        advanceLiveOperatorStrip(info);
+      }
       // TERM-FLOW-UNIFY Sprint-4 mount (426-002): a completed tool call may
       // have been `deckent_propose_run` (native-tool-registry.ts) — sync the
       // card's preview from the controller's OWN context (single source of
@@ -2482,7 +2522,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
 
     // One segmenter for the whole session: completed lines/blocks emit into
     // <Static> immediately (flow into scrollback, readable in real time, like
-    // Claude Code); the dynamic region only ever holds the in-progress partial
+    // Workline); the dynamic region only ever holds the in-progress partial
     // line → no tall re-render, no drift.
     wireStreamSegmenter();
 
@@ -2503,8 +2543,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       for (;;) {
         while (queue.current!.size() > 0) {
           const line = queue.current!.dequeue() as string;
+          const submitMeta = pendingSubmitMetaRef.current;
+          pendingSubmitMetaRef.current = null;
           setQueued([...queue.current!.snapshot()]);
-          pushTurn('user', line);
+          pushTurn('user-ingress', submitMeta?.rawIntent ?? line);
           setWorking(true);
           // 389-002: stamp the epoch THIS turn is starting under — output()/
           // the tool sink compare against clearEpoch.current on every call, so
@@ -2532,7 +2574,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
             contextBudgetGetter,
             transcriptCharsRef.current + line.length,
           );
-          const referenceRequests = nativeEngine?.largeReferencesEnabled && !line.startsWith('/') ? extractAtRefs(line) : [];
+          const intentLine = submitMeta?.rawIntent ?? line;
+          const referenceRequests = nativeEngine?.largeReferencesEnabled && !line.startsWith('/') ? extractAtRefs(intentLine) : [];
           const expanded = referenceRequests.length === 0 && atRefReader && !line.startsWith('/')
             ? expandAtRefs(line, atRefReader, expansionBudgetChars === undefined ? {} : { expansionBudgetChars }).prompt
             : line;
@@ -2546,8 +2589,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
             ? appendSprintHistoricalContext(shellPrefix + expanded, historicalContext)
             : shellPrefix + expanded;
           yield referenceRequests.length > 0
-            ? { rawIntent: line, expandedPayload: outbound, references: [], referenceRequests }
-            : outbound;
+            ? { rawIntent: intentLine, expandedPayload: outbound, references: [], referenceRequests }
+            : submitMeta && !line.startsWith('/')
+              ? { rawIntent: intentLine, expandedPayload: outbound, references: [] }
+              : outbound;
           finalizeReply(); // turn finished streaming → close it out
           // 358-006: turn-end steer drain (busy-controls markIdle) — the SAME
           // "never mid-turn" contract as the ChatTurnQueue drain below: notes
@@ -2564,7 +2609,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           if (replSurfaceEnabled) {
             bgQueue.current!.userTurnActive = false;
             // Drain buffered bg-completed work as brand-new turn(s) — never
-            // injected mid-turn (Hermes rule; drainAsTurns() itself no-ops
+            // injected mid-turn (background-queue rule; drainAsTurns() itself no-ops
             // while userTurnActive is true, so this can only fire post-turn).
             for (const text of bgPayloadsToTurnTexts(bgQueue.current!.drainAsTurns())) {
               pushTurn('bg', text);
@@ -2593,6 +2638,14 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       const generation = ++nativeToolGenerationRef.current;
       let nativeLoopActive = true;
       void runNativeTurnLoop(inputIter(), nativeEngine, {
+        shouldRenderAssistantOutput: () => assistantStreamOpenRef.current,
+        onAssistantStreamGate: (open) => {
+          assistantStreamOpenRef.current = open;
+          if (!open) {
+            discardStreamedProse();
+            setPartial('');
+          }
+        },
         output,
         onTurnStats: (st) => {
           lastStats.current = { elapsedMs: st.elapsedMs, ...(st.tokens !== undefined ? { tokens: st.tokens } : {}) };
@@ -2919,7 +2972,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       reportReadHold('READ_DETAIL_UNAVAILABLE');
     }
   };
-  const handleSubmit = async (line: string): Promise<void> => {
+  const handleSubmit = async (line: string, submitParts?: ComposerSubmitParts): Promise<void> => {
     let trimmed = line.trim();
     if (trimmed.length === 0) return;
     if (['/exit', '/quit', ':exit', ':quit'].includes(trimmed.toLowerCase())) { exit(); return; }
@@ -2935,8 +2988,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     // Any newer submitted intent supersedes an unresolved status read. A
     // completed card already owns stdin, so this only fences async overlap.
     if (!/^\/status(?:\s|$)/iu.test(trimmed)) statusInspectGeneration.current += 1;
-    // TERMINAL-TOOLS-011 — `!<cmd>` shell passthrough (parity: Claude Code /
-    // Codex / Hermes). Gated by the Ask/Run/Control ladder (Çalıştır), then
+    // TERMINAL-TOOLS-011 — `!<cmd>` shell passthrough. Gated by the Ask/Run/Control ladder, then
     // by the SAME exec dispatcher every bash tool call uses (approval modes,
     // y/n card, cwd scope, timeouts). The output is shown here and, unless
     // denied, rides ahead of the NEXT prompt as a bounded [shell] note —
@@ -3033,9 +3085,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     // retired /ask·/run·/control transition commands (those names stay free
     // for future first-class commands). Every branch prints a VISIBLE line —
     // a silent badge-only switch reads as "nothing happened".
-    // TERMINAL-TOOLS-008 — `/interrupt` aborts the turn in flight on EVERY
-    // surface-flag state (parity: Esc/`/interrupt` stop the turn in Claude
-    // Code and Codex). /queue and /steer stay behind the surface flag below.
+    // TERMINAL-TOOLS-008 — `/interrupt` aborts the turn in flight (Esc uses the
+    // same policy). /queue and /steer stay behind the repl surface flag below.
     const busyAction = parseBusyCommand(trimmed);
     if (busyAction.kind === 'interrupt') {
       pushTurn('user', trimmed);
@@ -3296,6 +3347,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         return;
       }
     }
+    pendingSubmitMetaRef.current = submitParts ?? null;
     const enq = queue.current!.enqueue(trimmed);
     if (enq.kind === 'swallowed') return; // double-fire Enter quirk — nothing new to queue or wake
     setQueued([...queue.current!.snapshot()]);
@@ -3648,31 +3700,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         />
       )}
 
-      {/* The authority posture remains persistent. Detailed runtime status is
-          disclosed only by `/status` in the bounded card above. */}
-      {replSurfaceEnabled && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text bold>{`[${resolveModeLabel(termMode.mode, labels)}]`}</Text>
-        </Box>
-      )}
-
-      {/* Persistent status anchor (always present → "where am I / busy or done"). */}
-      {healthAuthLine ? <Text {...palette.muted}>{healthAuthLine}</Text> : null}
-      <Box marginTop={1}>
-        {/* TERMINAL-TOOLS-013: while a card owns stdin the anchor SAYS so
-            instead of promising "your turn" (textual carrier, not layout). */}
-        {nativeToolActivityText
-          ? <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.warning}>{`${glyphs.separator} ${nativeToolActivityText}`}</Text></>
-          : nativeReferenceActivityText
-            ? <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`${glyphs.separator} ${nativeReferenceActivityText}`}</Text></>
-          : phase === 'idle'
-          ? <Text {...palette.muted}>{idleAnchorText}{nativeRequestMetricText ? ` ${glyphs.separator} ${nativeRequestMetricText}` : ''}</Text>
-          : <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`${glyphs.separator} ${phaseAnchorText}${nativeRequestMetricText ? ` ${glyphs.separator} ${nativeRequestMetricText}` : ''}`}</Text></>}
-        {/* TERMINAL-TOOLS-006: transient Ctrl-C hint (names the next key). */}
-        {interruptHint ? <Text {...palette.info}>{`  ${glyphs.separator} ${interruptHint.text}`}</Text> : null}
-      </Box>
-
-      {/* Pinned input with a VISIBLE cursor + interactive /menu — always last. */}
+      {/* Pinned input — directly above the consolidated footer (Workline layout). */}
       <InputBar
         // TERM-FLOW-UNIFY Sprint-4 mount (426-002): a pending plan-preview card is
         // a fourth stdin consumer — `runFlowPending` is always false when
@@ -3691,6 +3719,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         menuMoreAbove={labels.menuMoreAbove}
         menuMoreBelow={labels.menuMoreBelow}
         reverseSearchLabel={labels.reverseSearch}
+        composerPasteChip={labels.composerPasteChip}
+        pasteComposerPolicy={labels.pasteComposerPolicy}
         caretStyle={caretStyle}
         shortcutsPanel={shortcutsPanel}
         // TERM-AT-REF (583/N2b): `@` path menu — inert (menu never opens)
@@ -3700,23 +3730,35 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         atMenuIndexingHint={labels.atMenuIndexingHint}
       />
 
-      {/* TERMINAL-TOOLS-004: ONE width-aware line (status-row.tsx) — the old
-          flex row of separate <Text> items lost its spacing and wrapped the cwd
-          at ≤100 columns. `resumedId` is visible only after a /resume picker
-          switch (358-006, gated upstream). */}
-      <StatusRow
-        columns={columns}
-        input={{
-          brand: 'deckent',
-          provider: selection.provider,
-          model: selection.model ?? undefined,
-          cwd,
-          sessionTok,
-          approval: approval !== 'suggest' ? approval : undefined,
-          glyphs,
-          ...(activeSessionId ? { activeSession: { label: labels.activeChatSession, id: activeSessionId, overflowMarker: dualStreamOverflow ?? '...' } } : {}),
-        }}
-      />
+      {/* Footer stack: activity + posture/auth + session metadata (single scan line). */}
+      <Box flexDirection="column" marginTop={0}>
+        <Box>
+          {nativeToolActivityText
+            ? <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.warning}>{`${glyphs.separator} ${nativeToolActivityText}`}</Text></>
+            : nativeReferenceActivityText
+              ? <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`${glyphs.separator} ${nativeReferenceActivityText}`}</Text></>
+              : phase === 'idle'
+                ? <Text {...palette.muted}>{idleAnchorText}{nativeRequestMetricText ? ` ${glyphs.separator} ${nativeRequestMetricText}` : ''}</Text>
+                : <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`${glyphs.separator} ${phaseAnchorText}${nativeRequestMetricText ? ` ${glyphs.separator} ${nativeRequestMetricText}` : ''}`}</Text></>}
+          {interruptHint ? <Text {...palette.info}>{`  ${glyphs.separator} ${interruptHint.text}`}</Text> : null}
+        </Box>
+        {replSurfaceEnabled ? (
+          <Text {...palette.muted}>{`[${resolveModeLabel(termMode.mode, labels)}]`}{healthAuthLine ? ` ${glyphs.separator} ${healthAuthLine}` : ''}</Text>
+        ) : healthAuthLine ? <Text {...palette.muted}>{healthAuthLine}</Text> : null}
+        <StatusRow
+          columns={columns}
+          input={{
+            brand: 'deckent',
+            provider: selection.provider,
+            model: selection.model ?? undefined,
+            cwd,
+            sessionTok,
+            approval: approval !== 'suggest' ? approval : undefined,
+            glyphs,
+            ...(activeSessionId ? { activeSession: { label: labels.activeChatSession, id: activeSessionId, overflowMarker: dualStreamOverflow ?? '...' } } : {}),
+          }}
+        />
+      </Box>
     </Box>
   );
 }

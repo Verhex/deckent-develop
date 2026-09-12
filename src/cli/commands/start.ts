@@ -27,8 +27,83 @@ import { evaluateSpendAdmissionGate } from '../../orchestra/sprint-finalizer.js'
 import { evaluateScopeGate, applyScopeResolutions } from '../../core/scope-gate.js';
 import { writeEvent } from '../../core/event-stream.js';
 import { notifyAsync } from '../../core/notify.js';
-import { existsSync, unlinkSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, unlinkSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, openSync, readSync, closeSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { isPidAlive } from '../../core/pid-liveness.js';
+import { RUN_FLOW_TERMINAL_STATES } from '../../core/run-flow-contract.js';
+
+// ─── Detached child honesty (silent-start defect) ───────────────────────────
+// `deckent start` hands work to a DETACHED child, so the parent exits long
+// before the run finishes. That is fine — what was not fine is claiming the
+// child "executes it" without ever checking that it survived. A child can die
+// inside its own pre-execution gates (unknown model pricing, containment,
+// provider auth) milliseconds after spawn; the CLI still printed success and
+// exited 0, leaving PENDING tasks and no run. These helpers bound the check:
+// long enough to catch immediate deaths, short enough to keep start snappy.
+const CHILD_LIVENESS_WINDOW_MS = 1_500;
+const CHILD_LIVENESS_POLL_MS = 100;
+const CHILD_LOG_TAIL_BYTES = 600;
+const CHILD_LOG_TAIL_MAX_CHARS = 400;
+
+/**
+ * Admission handshake marker. The child writes it the moment it clears its own
+ * pre-execution gates (cost/pricing, containment, provider auth) — the first
+ * instant at which "it started" is a fact rather than a hope. Reaching
+ * DETACHED_RUNNING is NOT that instant: the flow records it before the gates,
+ * so the parent must wait for this marker, never for a wall-clock guess.
+ */
+function detachedAdmittedMarkerPath(root: string, flowId: string): string {
+  return join(root, '.deckent', 'runtime', 'logs', 'detached', `${flowId}.admitted`);
+}
+
+/** Newest detached start log for this flow; the spawn helper encodes flowId in the name. */
+function findDetachedStartLog(root: string, flowId: string): string | null {
+  const dir = join(root, '.deckent', 'runtime', 'logs', 'detached');
+  if (!existsSync(dir)) return null;
+  try {
+    const matches = readdirSync(dir)
+      .filter(name => name.startsWith('start-') && name.includes(flowId) && name.endsWith('.log'))
+      .sort();
+    const newest = matches[matches.length - 1];
+    return newest ? join(dir, newest) : null;
+  } catch { return null; }
+}
+
+/**
+ * Bounded, single-line tail so an operator sees the real refusal, not a stack.
+ * Seeks to the last CHILD_LOG_TAIL_BYTES instead of reading the file: a child
+ * that died in a retry storm can leave a large log, and the operator message
+ * must never depend on its size. Control characters are stripped because this
+ * string is printed straight to a terminal.
+ */
+function readLogTail(logPath: string | null): string {
+  if (!logPath || !existsSync(logPath)) return '-';
+  let fd: number | null = null;
+  try {
+    const size = statSync(logPath).size;
+    if (size === 0) return '-';
+    const length = Math.min(size, CHILD_LOG_TAIL_BYTES);
+    const buffer = Buffer.allocUnsafe(length);
+    fd = openSync(logPath, 'r');
+    // A short read leaves the rest of the buffer uninitialised (allocUnsafe);
+    // decoding the whole buffer would print unrelated heap bytes to the
+    // operator. Only the bytes the kernel actually returned are ever decoded.
+    const read = readSync(fd, buffer, 0, length, size - length);
+    if (read <= 0) return '-';
+    const text = buffer.subarray(0, read).toString('utf-8')
+      // A mid-character seek can leave a partial code point at the front.
+      .replace(/^[^\n]*\uFFFD/u, '')
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u0008\u000B-\u001F\u007F]/gu, ' ')
+      .trim();
+    if (!text) return '-';
+    const joined = text.split('\n').map(l => l.trim()).filter(Boolean).join(' | ');
+    return joined.length > CHILD_LOG_TAIL_MAX_CHARS
+      ? `…${joined.slice(-CHILD_LOG_TAIL_MAX_CHARS)}`
+      : joined;
+  } catch { return '-'; }
+  finally { if (fd !== null) { try { closeSync(fd); } catch { /* best effort */ } } }
+}
 import { spawnSync } from 'node:child_process';
 import { prepareZeroConfig, cleanupZeroConfig } from './quick-start.js';
 import { isSprintLocked } from '../../core/multi-ide.js';
@@ -278,6 +353,19 @@ interface StartCommandOpts {
 
 export interface StartCommandRuntime {
   readonly providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+}
+
+/** A child may settle before its parent observes RUN_STARTED. Terminal truth
+ * wins over process creation; a failed plan must never print a started success. */
+export function reportDetachedStartTerminalState(state: string | null, flowId: string, lang: string): boolean {
+  if (state === null) return false;
+  const message = getMessage('start.approved_flow_guard.child_terminal', lang, { flowId, state });
+  if (state === 'COMPLETED') print(message);
+  else {
+    printError(new Error(message));
+    process.exitCode = state === 'BLOCKED' ? 2 : 1;
+  }
+  return true;
 }
 
 async function runStartEnvironmentPreflight(input: {
@@ -568,6 +656,24 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
             return;
           }
 
+          // Model/pricing EVIDENCE must exist before the gate that judges it.
+          // Provider bootstrap is what registers config-resolved local models
+          // against live health evidence (`ensureLocalLlmModelRegistered`); it
+          // used to run AFTER the cost gate, so a healthy zero-cost local model
+          // was still `Unknown model` at estimate time and the child died with
+          // COST_PRICING_UNKNOWN before it could ever reach dispatch. Preparing
+          // the evidence first keeps the gate a pure judgement over a snapshot.
+          let childBootstrap: Awaited<ReturnType<typeof bootstrapProviders>> | undefined;
+          try {
+            childBootstrap = await bootstrapProviders(config);
+          } catch (err) {
+            const error = err instanceof Error ? err : new Error(String(err));
+            printError(error);
+            settleBlocked('EXACT_CHILD_PROVIDER_BOOTSTRAP_UNAVAILABLE', error.message);
+            process.exitCode = 1;
+            return;
+          }
+
           // The approved snapshot is the immutable plan authority for this
           // branch. Cost-admit those exact tasks before invoking runSprint;
           // never re-plan merely to estimate cost.
@@ -603,11 +709,30 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
 
           let sprintResult;
           try {
-            const bootstrap = await bootstrapProviders(config);
+            const bootstrap = childBootstrap;
             notifyDispatcher = bootstrapNotifyDispatcher({
               projectRoot: root,
               webhook: resolveWebhookBootstrapOption(config),
             });
+            // Handshake the parent waits on. Published only here — after EVERY
+            // pre-execution gate (environment preflight, provider bootstrap,
+            // cost admission, dispatcher bootstrap) and immediately before the
+            // run itself, so "admitted" can never outrun the gates it claims.
+            // Bound to the exact attempt: a marker left by a different flow,
+            // revision, plan or attempt must not satisfy a later start.
+            try {
+              const marker = detachedAdmittedMarkerPath(root, flowId);
+              mkdirSync(dirname(marker), { recursive: true });
+              writeFileSync(marker, `${JSON.stringify({
+                schemaVersion: 1,
+                kind: 'deckent-detached-admission-handshake-v1',
+                flowId,
+                revision: expectedRevision,
+                planDigest: expectedPlanDigest,
+                attemptId: freshCapability.attemptId,
+                admittedAt: new Date().toISOString(),
+              })}\n`, { encoding: 'utf-8', mode: 0o600 });
+            } catch { /* parent falls back to the honest "unconfirmed" report */ }
             sprintResult = await runSprint(root, config, {
               connector: bootstrap.connector,
               autoApprove: opts.autoApprove === true,
@@ -865,6 +990,16 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
                 planDigest: picked.planDigest.slice(0, 16),
               }));
               try {
+                // The child is detached, so the parent can never observe its full
+                // run — but it CAN prove the child survived its own admission gates.
+                // Capturing the pid here is what turns "we printed success" into
+                // "the child was alive after we asked for it".
+                let spawnedPid: number | null = null;
+                // A marker left by an earlier attempt on this flow would read as
+                // "admitted" before the new child has proven anything.
+                try { unlinkSync(detachedAdmittedMarkerPath(root, picked.flowId)); }
+                catch { /* absent is the normal case */ }
+                const spawnStart = buildFlowStartSpawn(root, picked.revision, picked.planDigest);
                 const started = startRunFlow(root, picked.flowId, {
                   lineage: {
                     tenantId: picked.proposal?.tenant ?? 'local',
@@ -875,11 +1010,89 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
                     sourceId: 'cli:start-consume',
                     authorization: { kind: 'approved-actor' },
                   },
-                  spawnStart: buildFlowStartSpawn(root, picked.revision, picked.planDigest),
+                  spawnStart: (context) => {
+                    const result = spawnStart(context);
+                    spawnedPid = result.pid;
+                    return result;
+                  },
                 });
                 if (started.status === 'noop-duplicate') {
                   print(getMessage('start.approved_flow_guard.consumed_duplicate', lang, {
                     state: started.attempt.state,
+                  }));
+                } else if (spawnedPid !== null) {
+                  // A child that dies inside its own pre-execution gates (unknown
+                  // model pricing, containment, auth) used to leave the CLI claiming
+                  // success with exit 0.
+                  //
+                  // The verdict comes from the DURABLE flow state, never from pid
+                  // liveness: a pid that is gone can mean the child already handed
+                  // off (fast success) just as easily as it crashed, and a recycled
+                  // pid proves nothing at all. `startRun` moves STARTING ->
+                  // DETACHED_RUNNING, so reaching any state past STARTING is the
+                  // child's own record that it began. Liveness only ends the wait
+                  // early; it decides nothing.
+                  const coordinator = getRunFlowCoordinator(root);
+                  const admittedMarker = detachedAdmittedMarkerPath(root, picked.flowId);
+                  // Presence is not proof — the record must name THIS attempt's
+                  // flow, revision and plan. A leftover from another attempt
+                  // would otherwise read as a successful start.
+                  const admitted = (): boolean => {
+                    try {
+                      if (!existsSync(admittedMarker)) return false;
+                      const record = JSON.parse(readFileSync(admittedMarker, 'utf-8')) as Record<string, unknown>;
+                      return record.kind === 'deckent-detached-admission-handshake-v1'
+                        && record.flowId === picked.flowId
+                        && record.revision === picked.revision
+                        && record.planDigest === picked.planDigest;
+                    } catch { return false; }
+                  };
+                  const settledState = (): string | null => {
+                    try {
+                      const state = coordinator.getFlow(picked.flowId).state;
+                      return RUN_FLOW_TERMINAL_STATES.has(state) ? state : null;
+                    } catch { return null; }
+                  };
+                  // Wait for a FACT, not a duration: the child either publishes its
+                  // admission handshake, settles, or dies. The window is only a cap
+                  // so `start` stays responsive — it never decides the verdict.
+                  const deadline = Date.now() + CHILD_LIVENESS_WINDOW_MS;
+                  while (Date.now() < deadline
+                    && !admitted()
+                    && settledState() === null
+                    && isPidAlive(spawnedPid)) {
+                    await new Promise((resolve) => setTimeout(resolve, CHILD_LIVENESS_POLL_MS));
+                  }
+                  const logPath = findDetachedStartLog(root, picked.flowId);
+                  if (reportDetachedStartTerminalState(settledState(), picked.flowId, lang)) return;
+                  if (!admitted() && settledState() === null && isPidAlive(spawnedPid)) {
+                    // Still inside its gates. Report the truth — unconfirmed is not
+                    // failure, and it is certainly not success.
+                    print(getMessage('start.approved_flow_guard.child_unconfirmed', lang, {
+                      pid: String(spawnedPid),
+                      waitMs: String(CHILD_LIVENESS_WINDOW_MS),
+                      logPath: logPath ?? '-',
+                    }));
+                    return;
+                  }
+                  if (!admitted() && settledState() === null) {
+                    // The owner process is gone while the flow still claims it is
+                    // starting or running — the STALE_DEAD shape the clean guard
+                    // already names via process-liveness. Reaching DETACHED_RUNNING
+                    // is NOT proof of work: the child records it before its own
+                    // admission gates (cost/pricing, containment, auth), so a death
+                    // one step later would otherwise be reported as success.
+                    printError(new Error(getMessage('start.approved_flow_guard.child_exited_early', lang, {
+                      pid: String(spawnedPid),
+                      tail: readLogTail(logPath),
+                      logPath: logPath ?? '-',
+                    })));
+                    process.exitCode = 1;
+                    return;
+                  }
+                  print(getMessage('start.approved_flow_guard.spawned', lang, {
+                    pid: String(spawnedPid),
+                    logPath: logPath ?? '-',
                   }));
                 }
               } catch (err) {

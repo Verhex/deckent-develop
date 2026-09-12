@@ -1,0 +1,9 @@
+
+(!) outDir /home/alperen/deckent-dev/.deckent/build/runs/a05beb79-3dfe-4e28-b351-c39fceeccadc/staging-dist/dashboard is not inside project root and will not be emptied.
+Use --emptyOutDir to override.
+
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.

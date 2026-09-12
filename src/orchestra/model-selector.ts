@@ -335,6 +335,32 @@ export function resolveTaskModel(
     currentTier = minTier;
   }
 
+  // Layer 1c: declared maximum tier — the symmetric ceiling to Layer 1b.
+  // `ModelStrategy.max_tier` has always been documented as "tasks cannot
+  // exceed this", but its only reader was `resolveConfiguredStrongerDefault`
+  // (an upgrade gate), so the ceiling never constrained anything: a
+  // score-inferred premium task resolved to a premium model even when the
+  // owner had declared a lower ceiling. The mode config is the authority
+  // (same precedence as min_tier); the mode-preset strategy is the fallback
+  // so a preset-only configuration still binds. Absent both, there is no
+  // ceiling and selection is unchanged.
+  const maxTier: ModelTier | undefined =
+    config.activeModeConfig.max_tier ?? config.model_strategy?.max_tier;
+  if (maxTier !== undefined) {
+    if (TIER_RANK[maxTier] < TIER_RANK[minTier]) {
+      // A ceiling below the floor is a contradictory operator declaration, not
+      // a selection problem. Failing loudly is the only honest reading: either
+      // silent choice would enact a policy the owner did not write.
+      throw new DeckentError(
+        'E_MODEL_TIER_BOUNDS_CONTRADICTORY',
+        `max_tier '${maxTier}' is below min_tier '${minTier}'; resolve the tier bounds in the active mode configuration`,
+      );
+    }
+    if (TIER_RANK[currentTier] > TIER_RANK[maxTier]) {
+      currentTier = maxTier;
+    }
+  }
+
   // Resolve tier to concrete model for target provider
   let model: ModelType = resolveTierToModel(currentTier, { ...config, worker_provider: targetProvider === 'claude' ? config.worker_provider : targetProvider } as ResolvedConfig);
 

@@ -336,8 +336,36 @@ const BASE_MESSAGES: MessageMap = {
     tr: 'Onaylı planı kanonik yolculukla yürütün (`deckent do` / REPL run-flow yüzeyi). Bilinçli olarak vazgeçip yine de sıfırdan planlamak için --force-replan ile tekrar çalıştırın.',
   },
   'start.approved_flow_guard.consuming': {
-    en: 'Consuming the approved plan through the canonical run-flow machinery: flow {flowId} · revision {revision} · planDigest {planDigest}. A detached run child executes it; follow with `deckent status` / `deckent watch`.',
-    tr: 'Onaylı plan kanonik run-flow makinesiyle tüketiliyor: flow {flowId} · revizyon {revision} · planDigest {planDigest}. Detached run child yürütüyor; `deckent status` / `deckent watch` ile izleyin.',
+    en: 'Consuming the approved plan through the canonical run-flow machinery: flow {flowId} · revision {revision} · planDigest {planDigest}.',
+    tr: 'Onaylı plan kanonik run-flow makinesiyle tüketiliyor: flow {flowId} · revizyon {revision} · planDigest {planDigest}.',
+  },
+  'start.approved_flow_guard.spawned': {
+    en: 'Run child started: pid {pid} · log {logPath}. Follow with `deckent status` / `deckent watch`.',
+    tr: 'Run child başlatıldı: pid {pid} · log {logPath}. `deckent status` / `deckent watch` ile izleyin.',
+  },
+  'start.approved_flow_guard.child_unconfirmed': {
+    en: 'Run child (pid {pid}) is still clearing its admission gates — start was not confirmed within {waitMs}ms. Follow with `deckent status` / `deckent watch`; log: {logPath}',
+    tr: 'Run child (pid {pid}) hâlâ admission kapılarından geçiyor — başlatma {waitMs}ms içinde doğrulanmadı. `deckent status` / `deckent watch` ile izleyin; log: {logPath}',
+  },
+  'start.approved_flow_guard.child_terminal': {
+    en: 'Run {flowId} has already ended: {state}. Inspect its result with `deckent status`.',
+    tr: 'Run {flowId} sonlandı: {state}. Sonucunu `deckent status` ile inceleyin.',
+  },
+  'recover.close_rejected_result_option': {
+    en: 'Close one schema-rejected result after verified provider exit and effect release; preserve all evidence.',
+    tr: 'Provider çıkışı ve etki bırakımı doğrulandıktan sonra bir şema-reddedilmiş sonucu kapat; tüm kanıtları koru.',
+  },
+  'recover.close_rejected_result_confirm': {
+    en: 'Close rejected result {dispatchRequestId} as unsuccessful. Original effects and provider evidence remain preserved.',
+    tr: 'Reddedilmiş {dispatchRequestId} sonucunu başarısız olarak kapat. Özgün etkiler ve provider kanıtları korunur.',
+  },
+  'recover.rejected_result_result': {
+    en: 'Rejected result: {state} · dispatch {dispatchRequestId} · evidence {evidenceDigest}. This is not successful task completion.',
+    tr: 'Reddedilmiş sonuç: {state} · dispatch {dispatchRequestId} · kanıt {evidenceDigest}. Bu, görevin başarıyla tamamlanması değildir.',
+  },
+  'start.approved_flow_guard.child_exited_early': {
+    en: 'The detached run child (pid {pid}) exited before execution began. Last output: {tail} · full log: {logPath}',
+    tr: 'Detached run child (pid {pid}) yürütme başlamadan sonlandı. Son çıktı: {tail} · tam log: {logPath}',
   },
   'start.approved_flow_guard.consumed_duplicate': {
     en: 'This approved flow already has a start attempt (state: {state}) — nothing new was started. Follow with `deckent status`.',

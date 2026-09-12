@@ -1601,6 +1601,72 @@ function isTerminalReceipt(value: unknown): value is SprintTerminalReceiptV1 {
     && Number.isSafeInteger(record.authorityVersion) && (record.authorityVersion ?? -1) >= 0;
 }
 
+/**
+ * Structural self-consistency of an archived terminal seal.
+ *
+ * Every field the seal duplicates from its own terminal receipt must agree, and
+ * the operator reason must match its recorded digest. This proves the record is
+ * an intact seal for THIS sprint; it does not re-verify the journal projection,
+ * which `verifySprintArchiveTerminalWithProjection` owns.
+ */
+function structurallyValidTerminalSeal(
+  seal: Partial<SprintArchiveTerminalSealReceipt> | null,
+  sprintId: string,
+): SprintArchiveTerminalSealReceipt | null {
+  const valid = seal?.kind === 'deckent.sprint-archive-terminal-seal'
+    && seal.version === 1 && seal.sprintId === sprintId && isTerminalReceipt(seal.terminalReceipt)
+    && typeof seal.operatorReason === 'string' && seal.operatorReason.trim() === seal.operatorReason
+    && seal.operatorReason.length > 0 && !OPERATOR_REASON_CONTROL_PATTERN.test(seal.operatorReason)
+    && typeof seal.operatorReasonSha256 === 'string' && seal.operatorReasonSha256 === sha256(seal.operatorReason)
+    && typeof seal.priorAuthorityVersion === 'number'
+    && seal.priorAuthorityVersion === seal.terminalReceipt.priorAuthorityVersion
+    && seal.runId === seal.terminalReceipt.runId
+    && seal.coordinatorGeneration === seal.terminalReceipt.coordinatorGeneration
+    && seal.terminalOutcome === seal.terminalReceipt.terminalOutcome
+    && seal.logicalSettlementDigest === seal.terminalReceipt.logicalSettlementDigest
+    && seal.authorityVersion === seal.terminalReceipt.authorityVersion
+    && typeof seal.brainAdoptionRequired === 'boolean'
+    && (seal.terminalEventsProjectionSha256 === null
+      || (typeof seal.terminalEventsProjectionSha256 === 'string'
+        && SHA256_HEX_PATTERN.test(seal.terminalEventsProjectionSha256)))
+    && (seal.postSealPolicySha256 === null
+      || (typeof seal.postSealPolicySha256 === 'string'
+        && SHA256_HEX_PATTERN.test(seal.postSealPolicySha256)));
+  return valid ? seal as SprintArchiveTerminalSealReceipt : null;
+}
+
+/**
+ * Terminal outcome of an ARCHIVED sprint, read from its sealed receipt.
+ *
+ * A sealed archive is the durable settlement record of a finished run: it
+ * outlives the coordinator, its `.pid`, and its generation snapshot. Recovery
+ * needs exactly this to decide whether an owning run is terminal — without it,
+ * terminality was inferred from process-liveness artifacts that teardown
+ * removes, so a genuinely finished run read back as `unknown` forever and its
+ * accepted-result attempt could never retire.
+ *
+ * Returns `null` unless an intact seal for this sprint is present. Absence, a
+ * malformed record and an unreadable file are all `null` — never a terminal
+ * claim.
+ */
+export function readArchivedSprintTerminalOutcome(
+  projectRoot: string,
+  sprintId: string,
+): 'COMPLETE' | 'ABORTED' | null {
+  if (!SPRINT_ID_PATTERN.test(sprintId)) return null;
+  const seal = structurallyValidTerminalSeal(
+    readJson(join(resolveSprintArchiveDir(projectRoot, sprintId), TERMINAL_SEAL_RECEIPT_FILE)) as
+      Partial<SprintArchiveTerminalSealReceipt> | null,
+    sprintId,
+  );
+  if (seal === null) return null;
+  // `isTerminalReceipt` already narrowed the receipt's outcome to the terminal
+  // pair, and the seal must equal it — re-assert so a widened seal type can
+  // never smuggle a non-terminal string through this reader.
+  const outcome = seal.terminalReceipt.terminalOutcome;
+  return outcome === 'COMPLETE' || outcome === 'ABORTED' ? outcome : null;
+}
+
 function exactReceiptEquals(value: unknown, receipt: SprintTerminalReceiptV1): boolean {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const wrapper = value as Record<string, unknown>;
@@ -2052,25 +2118,7 @@ function verifySprintArchiveTerminalWithProjection(
   const applicationValue = readJson(join(archiveDir, TERMINAL_SEAL_APPLICATION_FILE));
   const seal = sealValue as Partial<SprintArchiveTerminalSealReceipt> | null;
   const application = applicationValue as Partial<SprintArchiveTerminalApplicationReceipt> | null;
-  const sealStructurallyValid = seal?.kind === 'deckent.sprint-archive-terminal-seal'
-    && seal.version === 1 && seal.sprintId === sprintId && isTerminalReceipt(seal.terminalReceipt)
-    && typeof seal.operatorReason === 'string' && seal.operatorReason.trim() === seal.operatorReason
-    && seal.operatorReason.length > 0 && !OPERATOR_REASON_CONTROL_PATTERN.test(seal.operatorReason)
-    && typeof seal.operatorReasonSha256 === 'string' && seal.operatorReasonSha256 === sha256(seal.operatorReason)
-    && typeof seal.priorAuthorityVersion === 'number'
-    && seal.priorAuthorityVersion === seal.terminalReceipt.priorAuthorityVersion
-    && seal.runId === seal.terminalReceipt.runId
-    && seal.coordinatorGeneration === seal.terminalReceipt.coordinatorGeneration
-    && seal.terminalOutcome === seal.terminalReceipt.terminalOutcome
-    && seal.logicalSettlementDigest === seal.terminalReceipt.logicalSettlementDigest
-    && seal.authorityVersion === seal.terminalReceipt.authorityVersion
-    && typeof seal.brainAdoptionRequired === 'boolean'
-    && (seal.terminalEventsProjectionSha256 === null
-      || (typeof seal.terminalEventsProjectionSha256 === 'string'
-        && SHA256_HEX_PATTERN.test(seal.terminalEventsProjectionSha256)))
-    && (seal.postSealPolicySha256 === null
-      || (typeof seal.postSealPolicySha256 === 'string'
-        && SHA256_HEX_PATTERN.test(seal.postSealPolicySha256)));
+  const sealStructurallyValid = structurallyValidTerminalSeal(seal, sprintId) !== null;
   if (!sealStructurallyValid) reasons.push('terminal_identity_mismatch');
   const typedSeal = sealStructurallyValid ? seal as SprintArchiveTerminalSealReceipt : null;
   const sealSha = typedSeal ? sealReceiptDigest(typedSeal) : null;

@@ -108,6 +108,23 @@ const MEMORY_COMPACT_READ_EXPORT_HOST_PROOF_ASSETS = Object.freeze([
   }),
 ]);
 
+const METRICS_RETENTION_HOST_PROOF_ADAPTER_ID =
+  'deckent-metrics-retention-v1';
+const METRICS_RETENTION_HOST_PROOF_GROUP_ID =
+  'deckent:metrics-retention';
+const METRICS_RETENTION_HOST_PROOF_SCHEMA_ID =
+  'deckent.host-proof.metrics-retention.v1';
+const METRICS_RETENTION_HOST_PROOF_ASSETS = Object.freeze([
+  Object.freeze({
+    path: CLOSURE_OS_HOST_PROOF_HARNESS_PATH,
+    role: 'trusted-harness' as const,
+  }),
+  Object.freeze({
+    path: 'scripts/metrics-retention-host-proof-observer.mjs',
+    role: 'trusted-harness' as const,
+  }),
+]);
+
 export interface ProductionWiringHostProofIdentity {
   readonly producer: { readonly producerId: string };
   readonly canonicalConsumer: {
@@ -215,6 +232,42 @@ export const MEMORY_COMPACT_READ_EXPORT_PROOF_IDENTITY: ProductionWiringHostProo
       Object.freeze({
         proofTargetId: 'deckent.memory-export.meaning-unit-integrity',
         kind: 'consumer-execution' as const,
+      }),
+    ]),
+  });
+
+/** Prompt-safe identity for the metrics rotation/retention topology (STATE-RETENTION-001 residual). */
+export const METRICS_RETENTION_PROOF_IDENTITY: ProductionWiringHostProofIdentity =
+  Object.freeze({
+    producer: Object.freeze({
+      producerId: 'deckent.observability.metrics-append',
+    }),
+    canonicalConsumer: Object.freeze({
+      consumerId: 'deckent.observability-rotation.size-triggered-rotation',
+      relationship: 'invokes-producer' as const,
+    }),
+    affectedIngresses: Object.freeze([
+      Object.freeze({
+        ingressId: 'deckent.observability.record-metric',
+        kind: 'ingress' as const,
+      }),
+    ]),
+    enablementAuthority: Object.freeze({
+      authorityId: 'deckent.config.observability-rotation-policy',
+      mechanism: 'configuration' as const,
+    }),
+    proofTargets: Object.freeze([
+      Object.freeze({
+        proofTargetId: 'deckent.observability-rotation.size-triggered-rotation',
+        kind: 'consumer-execution' as const,
+      }),
+      Object.freeze({
+        proofTargetId: 'deckent.observability-rotation.retention-prune-receipt',
+        kind: 'consumer-execution' as const,
+      }),
+      Object.freeze({
+        proofTargetId: 'deckent.config.observability-rotation-policy-resolution',
+        kind: 'enablement-resolution' as const,
       }),
     ]),
   });
@@ -748,6 +801,21 @@ const REGISTERED_HOST_PROOF_PROFILES: readonly RegisteredHostProofProfile[] = Ob
     assets: MEMORY_COMPACT_READ_EXPORT_HOST_PROOF_ASSETS,
     targetKeys: Object.freeze(identityTargetKeys(MEMORY_COMPACT_READ_EXPORT_PROOF_IDENTITY)),
     proposalIdentity: MEMORY_COMPACT_READ_EXPORT_PROOF_IDENTITY,
+    platformPolicy: Object.freeze({
+      linux: 'supported' as const,
+      'wsl2-linux': 'supported' as const,
+      darwin: 'capability-unavailable' as const,
+      win32: 'capability-unavailable' as const,
+    }),
+  }),
+  Object.freeze({
+    adapterId: METRICS_RETENTION_HOST_PROOF_ADAPTER_ID,
+    observationGroupId: METRICS_RETENTION_HOST_PROOF_GROUP_ID,
+    harnessPath: CLOSURE_OS_HOST_PROOF_HARNESS_PATH,
+    schemaId: METRICS_RETENTION_HOST_PROOF_SCHEMA_ID,
+    assets: METRICS_RETENTION_HOST_PROOF_ASSETS,
+    targetKeys: Object.freeze(identityTargetKeys(METRICS_RETENTION_PROOF_IDENTITY)),
+    proposalIdentity: METRICS_RETENTION_PROOF_IDENTITY,
     platformPolicy: Object.freeze({
       linux: 'supported' as const,
       'wsl2-linux': 'supported' as const,

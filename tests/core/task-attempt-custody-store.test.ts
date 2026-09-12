@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   TASK_ATTEMPT_CUSTODY_ATTEMPT_OUTPUT_ARTIFACT_CLASSES,
@@ -6261,6 +6261,21 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
     expect(currentAdapter.publishedPaths.filter(path => (
       path.endsWith('/historical-admission-quarantine.json')
     ))).toHaveLength(1);
+    const readBounds = { maxEntries: 10_000, maxBytes: 8 * 1024 * 1024, maxDurationMs: 10_000 };
+    expect(currentStore.withVerifiedReadSnapshot(readBounds,
+      () => currentStore.listDispatchAdmissionsForRecovery(scanInput)).value).toMatchObject({
+      quarantinedHistoricalAdmissionCount: 1, heldAdmissionCount: 0,
+    });
+    // An immutable quarantine is separately verified; losing it after the read
+    // must invalidate the entire operation, even though the old proof still fails.
+    const quarantinePath = [...currentAdapter.files.keys()].find(path => path.endsWith('/historical-admission-quarantine.json'))!;
+    const retainedQuarantine = currentAdapter.files.get(quarantinePath)!;
+    expect(() => currentStore.withVerifiedReadSnapshot(readBounds, () => {
+      const result = currentStore.listDispatchAdmissionsForRecovery(scanInput);
+      currentAdapter.files.delete(quarantinePath);
+      return result;
+    })).toThrowError(expect.objectContaining({ code: 'ARTIFACT_CHANGED' }));
+    currentAdapter.files.set(quarantinePath, retainedQuarantine);
     expect(currentStore.listDispatchAdmissionsForRecovery(scanInput)).toMatchObject({
       candidateCount: 1,
       admittedCount: 0,
@@ -8402,4 +8417,120 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
       create: true,
     }), 'NATIVE_CAPABILITY_UNAVAILABLE');
   });
+});
+
+describe('operation-local verified custody read snapshot', () => {
+  const bounds = { maxEntries: 10_000, maxBytes: 16 * 1024 * 1024, maxDurationMs: 10_000 };
+
+  it('reuses immutable admission facts only within an operation and rechecks native evidence', () => {
+    const adapter = new InMemoryCustodyAdapter();
+    const reads = vi.spyOn(adapter, 'readFirstWriter');
+    const { store } = openedStore(adapter);
+    const p = policy(), id = identity();
+    const expected = admit(store, id, p);
+    reads.mockClear();
+    const result = store.withVerifiedReadSnapshot(bounds, () => {
+      const first = store.readAdmission(id, p);
+      for (let i = 0; i < 10; i++) expect(store.readAdmission(id, p)).toBe(first);
+      expect(Object.isFrozen(first?.identity)).toBe(true);
+      return first;
+    });
+    expect(result.value?.receiptDigest).toBe(expected.receiptDigest);
+    expect(result.statistics.semanticHits).toBeGreaterThanOrEqual(10);
+    expect(result.statistics.observations).toBeGreaterThan(0);
+    const previousReads = reads.mock.calls.length;
+    store.readAdmission(id, p);
+    expect(reads.mock.calls.length).toBeGreaterThan(previousReads);
+  });
+
+  it('rejects changed evidence even when a cached semantic result would match', () => {
+    const { store, adapter } = openedStore();
+    const p = policy(), id = identity();
+    admit(store, id, p);
+    expect(() => store.withVerifiedReadSnapshot(bounds, () => {
+      const first = store.readAdmission(id, p);
+      const [path, file] = [...adapter.files].find(([path]) => path.endsWith('/admission.json'))!;
+      adapter.files.set(path, { ...file, bytes: new Uint8Array(file.bytes.length) });
+      expect(store.readAdmission(id, p)).toBe(first);
+      return first;
+    })).toThrow(TaskAttemptCustodyHold);
+  });
+
+  it('rechecks absence when another Store publishes before the operation ends', () => {
+    const shared = memoryCustodyState();
+    const { store } = openedStore(new InMemoryCustodyAdapter(shared));
+    const { store: writer } = openedStore(new InMemoryCustodyAdapter(shared));
+    const p = policy(), id = identity();
+    expect(() => store.withVerifiedReadSnapshot(bounds, () => {
+      expect(store.readAdmission(id, p)).toBeNull();
+      admit(writer, id, p);
+      return store.readAdmission(id, p);
+    })).toThrow(TaskAttemptCustodyHold);
+  });
+
+  it('cannot hide a mutation attempt by catching its error', () => {
+    const { store, adapter } = openedStore();
+    const before = adapter.files.size;
+    expect(() => store.withVerifiedReadSnapshot(bounds, () => {
+      try { admit(store, identity(), policy()); } catch { /* intentionally swallowed */ }
+      return 'ready';
+    })).toThrow(TaskAttemptCustodyHold);
+    expect(adapter.files.size).toBe(before);
+  });
+
+  it('bounds retained memory and rejects asynchronous or nested operations', () => {
+    const { store } = openedStore();
+    const p = policy(), id = identity();
+    admit(store, id, p);
+    expect(() => store.withVerifiedReadSnapshot({ ...bounds, maxBytes: 1 }, () => store.readAdmission(id, p)))
+      .toThrow(TaskAttemptCustodyHold);
+    let invoked = false;
+    const asyncRead = async () => { invoked = true; return 'ready'; };
+    expect(() => store.withVerifiedReadSnapshot(bounds, asyncRead)).toThrow(TaskAttemptCustodyHold);
+    expect(invoked).toBe(false);
+    expect(() => store.withVerifiedReadSnapshot(bounds, () => {
+      try { store.withVerifiedReadSnapshot(bounds, () => 'nested'); } catch { /* swallowed */ }
+      return 'ready';
+    })).toThrow(TaskAttemptCustodyHold);
+  });
+
+  it('does not reuse a policy or sibling identity and detects a removed durable marker', () => {
+    const { store, adapter } = openedStore();
+    const p = policy(), id = identity();
+    admit(store, id, p);
+    expect(() => store.withVerifiedReadSnapshot(bounds, () => {
+      store.readAdmission(id, p);
+      expect(() => store.readAdmission({ ...id, projectId: 'another-project' }, p)).toThrow(TaskAttemptCustodyHold);
+      return 'ready';
+    })).toThrow(TaskAttemptCustodyHold);
+    expect(() => store.withVerifiedReadSnapshot(bounds, () => {
+      store.readAdmission(id, p);
+      adapter.effectMarkers.clear();
+      return 'ready';
+    })).toThrow(TaskAttemptCustodyHold);
+  });
+});
+
+it('keeps the same Store mutation fence active during final native rereads', () => {
+  const adapter = new InMemoryCustodyAdapter();
+  const original = adapter.readFirstWriter.bind(adapter);
+  let mutateDuringVerification = false;
+  let store: TaskAttemptCustodyStore;
+  const p = policy(), id = identity();
+  adapter.readFirstWriter = input => {
+    if (mutateDuringVerification) {
+      mutateDuringVerification = false;
+      try { admit(store, { ...id, taskId: 'sibling' }, p); } catch { /* swallowed */ }
+    }
+    return original(input);
+  };
+  store = openedStore(adapter).store;
+  admit(store, id, p);
+  const before = adapter.files.size;
+  expect(() => store.withVerifiedReadSnapshot({ maxEntries: 10_000, maxBytes: 16 * 1024 * 1024, maxDurationMs: 10_000 }, () => {
+    const result = store.readAdmission(id, p);
+    mutateDuringVerification = true;
+    return result;
+  })).toThrow(TaskAttemptCustodyHold);
+  expect(adapter.files.size).toBe(before);
 });

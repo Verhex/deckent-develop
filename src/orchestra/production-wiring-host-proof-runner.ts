@@ -529,14 +529,56 @@ function parseStructuredOutcome(
   return Object.freeze({ digest: sha256Json(record) });
 }
 
+/** Bounded machine-code vocabulary the harness is allowed to report. */
+const HARNESS_FAILURE_REASON_PATTERN = /^[a-z0-9][a-z0-9-]{0,95}$/u;
+
+/**
+ * Recover the harness's own typed hold reason from its stderr diagnostic.
+ *
+ * The harness decides a precise reason (an asset digest that no longer matches,
+ * a malformed request) and exits non-zero. Without this channel every such hold
+ * collapses into the generic `host-proof-process-failed`, which
+ * `isDecidedExactSettlementHold` can never classify — so a permanently
+ * unsettleable attempt blocks every later cold start instead of retiring.
+ *
+ * Untrusted by construction: the bytes come from a container process, so an
+ * exact kind, an exact key set and the bounded code vocabulary must all hold.
+ * Anything else returns `null` and the caller keeps its previous generic reason
+ * — a malformed diagnostic never widens what the runner will report.
+ *
+ * @internal Exported for the diagnostic-channel contract tests.
+ */
+export function parseHarnessFailureReason(bytes: Uint8Array): string | null {
+  const value = parseJson(bytes);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (!exactKeys(record, ['kind', 'reasonCode'])
+    || record.kind !== 'deckent-production-wiring-host-proof-failure-v1'
+    || typeof record.reasonCode !== 'string'
+    || !HARNESS_FAILURE_REASON_PATTERN.test(record.reasonCode)) return null;
+  return record.reasonCode;
+}
+
 function parseImageId(bytes: Uint8Array): `sha256:${string}` | null {
   const id = Buffer.from(bytes).toString('utf8').trim();
   return /^sha256:[a-f0-9]{64}$/u.test(id) ? id as `sha256:${string}` : null;
 }
 
-function exactDockerAbsence(result: ProductionWiringHostProofCommandResult): boolean {
+/**
+ * Absence is proven by the daemon's own refusal, never by a name guess.
+ *
+ * Docker's failure stdout is version-dependent: older CLIs print nothing, and
+ * current ones (verified against 29.1.3) print an empty JSON array before the
+ * "No such container" stderr. Treating a non-empty stdout as "not absent"
+ * therefore locked every proof on newer Docker into `proof-container-not-absent`
+ * forever. Only a LITERALLY empty result counts — an existing container inspects
+ * to a populated array, which still fails this check.
+ */
+export function exactDockerAbsence(result: ProductionWiringHostProofCommandResult): boolean {
   if (result.error || result.overflow || result.timedOut || result.cancelled || result.signal !== null
-    || result.status !== 1 || result.stdout.byteLength !== 0) return false;
+    || result.status !== 1) return false;
+  const stdout = Buffer.from(result.stdout).toString('utf8').trim();
+  if (stdout !== '' && stdout !== '[]') return false;
   const stderr = Buffer.from(result.stderr).toString('utf8');
   return /No such (object|container)/u.test(stderr);
 }
@@ -770,9 +812,15 @@ export async function runProductionWiringHostProof(input: Readonly<{
       return Object.freeze({ state: 'hold' as const, reasonCode: 'host-proof-timeout' });
     }
     if (!commandSucceeded(executed)) {
+      // Overflow is the runner's own observation and outranks anything the
+      // truncated process managed to say about itself.
+      if (executed.overflow) {
+        return Object.freeze({ state: 'hold' as const, reasonCode: 'host-proof-output-overflow' });
+      }
+      const reported = parseHarnessFailureReason(executed.stderr);
       return Object.freeze({
         state: 'hold' as const,
-        reasonCode: executed.overflow ? 'host-proof-output-overflow' : 'host-proof-process-failed',
+        reasonCode: reported ?? 'host-proof-process-failed',
       });
     }
     const structured = parseStructuredOutcome(

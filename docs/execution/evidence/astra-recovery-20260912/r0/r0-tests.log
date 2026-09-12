@@ -1,0 +1,23 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/orchestra/exact-committed-unsettled-recovery.test.ts (4 tests) 4487ms
+   ✓ exact committed-unsettled Docker recovery > publishes and idempotently rereads the real committed-anchor Store disposition  4482ms
+ ✓ tests/orchestra/exact-controller-terminal-fanin.test.ts (46 tests) 839ms
+ ✓ tests/orchestra/recovery-resume-state-retention.test.ts (6 tests) 206ms
+ ✓ tests/orchestra/sprint-pid-manager.test.ts (32 tests) 122ms
+ ✓ tests/orchestra/rejected-result-history.test.ts (21 tests) 25ms
+ ✓ tests/cli/detached-start-terminal-result.test.ts (6 tests) 5ms
+ ✓ tests/orchestra/exact-rejected-result-closure.test.ts (5 tests) 20023ms
+   ✓ released effect with rejected result: durable negative closure > survives a new Store and replays without acceptance or duplicate publication  4638ms
+   ✓ released effect with rejected result: durable negative closure > rejects a wrong source digest or foreign recovery authority  3936ms
+   ✓ released effect with rejected result: durable negative closure > prevents publishing acceptance after the negative terminal marker  3762ms
+   ✓ released effect with rejected result: durable negative closure > fails closed when the first-writer terminal record is corrupted  3711ms
+   ✓ released effect with rejected result: durable negative closure > rejects a backdated decision and a conflicting first-writer replay  3976ms
+ ✓ tests/cli/start-approved-flow-guard.test.ts (8 tests) 538ms
+
+ Test Files  8 passed (8)
+      Tests  128 passed (128)
+   Start at  19:28:02
+   Duration  23.83s (transform 4.18s, setup 66ms, collect 9.18s, tests 26.24s, environment 1ms, prepare 271ms)
+

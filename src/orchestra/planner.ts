@@ -1133,6 +1133,42 @@ async function beginPlannerReceipt(
   }
 }
 
+/**
+ * The receipt store's closed failure vocabulary. Kept as data rather than
+ * imported as a type so an unknown value coming back from a future store
+ * version is reported as unclassified instead of being echoed verbatim.
+ */
+const RECEIPT_STORE_FAILURE_CODES: ReadonlySet<string> = new Set([
+  'SCOPE_MISMATCH',
+  'IDEMPOTENCY_CONFLICT',
+  'INVOCATION_NOT_FOUND',
+  'INTEGRITY_FAILURE',
+  'INVALID_TRANSITION',
+  'RECONCILIATION_CONFLICT',
+  'READ_ONLY',
+]);
+
+/**
+ * Classify a caught receipt-store failure into one bounded machine code.
+ *
+ * Every receipt `catch` below used to discard the error entirely, so an
+ * operator saw `INVOCATION_RECEIPT_PRE_DISPATCH_WRITE_FAILED` with no way to
+ * tell a scope mismatch from a read-only store from a rejected transition —
+ * the store had already decided, and the decision was thrown away. Observed
+ * live (2026-09-12, koşum-7): receipt `inv-e0d26de5…` was declared, its first
+ * `dispatch_started` append failed, and the run reported only the opaque code;
+ * the invocation row exists with zero events and no recorded cause.
+ *
+ * Never a message, path or stack: those are unbounded, may carry a project
+ * path, and would turn an operator-facing failure string into a leak surface.
+ */
+function receiptStoreFailureCode(error: unknown): string {
+  const code = (error as { code?: unknown } | null | undefined)?.code;
+  return typeof code === 'string' && RECEIPT_STORE_FAILURE_CODES.has(code)
+    ? code
+    : 'UNCLASSIFIED';
+}
+
 function receiptFailure(message: string, receiptRef?: InvocationReceiptRef): PlannerCallFailure {
   return { ok: false, reason: 'receipt_failed', message, receiptRef };
 }
@@ -1385,8 +1421,8 @@ export async function callBrainPlannerWithReason(
     let receipt: PlannerReceiptSession;
     try {
       receipt = await beginPlannerReceipt(receiptContext, facts);
-    } catch {
-      return receiptFailure('INVOCATION_RECEIPT_DECLARE_FAILED');
+    } catch (error) {
+      return receiptFailure(`INVOCATION_RECEIPT_DECLARE_FAILED:${receiptStoreFailureCode(error)}`);
     }
     if (!receipt.created) {
       receipt.close();
@@ -1401,8 +1437,8 @@ export async function callBrainPlannerWithReason(
       receipt.append({ type: 'dispatch_rejected', payload: { reasonCode } });
       receipt.append({ type: 'consumer_settled', payload: { outcome: 'rejected', reasonCode } });
       return { ok: false, reason, message, receiptRef: receipt.ref };
-    } catch {
-      return receiptFailure('INVOCATION_RECEIPT_EVENT_WRITE_FAILED', receipt.ref);
+    } catch (error) {
+      return receiptFailure(`INVOCATION_RECEIPT_EVENT_WRITE_FAILED:${receiptStoreFailureCode(error)}`, receipt.ref);
     } finally {
       receipt.close();
     }
@@ -1485,8 +1521,8 @@ export async function callBrainPlannerWithReason(
         executionBackend: cmdInfo.executionBackend,
         missingReason: 'none',
       });
-    } catch {
-      return receiptFailure('INVOCATION_RECEIPT_DECLARE_FAILED');
+    } catch (error) {
+      return receiptFailure(`INVOCATION_RECEIPT_DECLARE_FAILED:${receiptStoreFailureCode(error)}`);
     }
     if (!receipt.created) {
       receipt.close();
@@ -1506,10 +1542,11 @@ export async function callBrainPlannerWithReason(
           calledModel: cmdInfo.calledModel,
         },
       });
-    } catch {
+    } catch (error) {
       const receiptRef = receipt.ref;
+      const failureCode = receiptStoreFailureCode(error);
       receipt.close();
-      return receiptFailure('INVOCATION_RECEIPT_PRE_DISPATCH_WRITE_FAILED', receiptRef);
+      return receiptFailure(`INVOCATION_RECEIPT_PRE_DISPATCH_WRITE_FAILED:${failureCode}`, receiptRef);
     }
   }
 
@@ -1521,8 +1558,8 @@ export async function callBrainPlannerWithReason(
     try {
       for (const event of events) receipt.append(event);
       return { ...result, receiptRef: receipt.ref };
-    } catch {
-      return receiptFailure('INVOCATION_RECEIPT_SETTLEMENT_WRITE_FAILED', receipt.ref);
+    } catch (error) {
+      return receiptFailure(`INVOCATION_RECEIPT_SETTLEMENT_WRITE_FAILED:${receiptStoreFailureCode(error)}`, receipt.ref);
     } finally {
       receipt.close();
     }
@@ -1964,8 +2001,8 @@ export async function callZeroConfigPlannerWithReason(
     let receipt: PlannerReceiptSession;
     try {
       receipt = await beginPlannerReceipt(context, facts);
-    } catch {
-      return receiptFailure('INVOCATION_RECEIPT_DECLARE_FAILED');
+    } catch (error) {
+      return receiptFailure(`INVOCATION_RECEIPT_DECLARE_FAILED:${receiptStoreFailureCode(error)}`);
     }
     if (!receipt.created) {
       receipt.close();
@@ -1980,8 +2017,8 @@ export async function callZeroConfigPlannerWithReason(
       receipt.append({ type: 'dispatch_rejected', payload: { reasonCode } });
       receipt.append({ type: 'consumer_settled', payload: { outcome: 'rejected', reasonCode } });
       return { ok: false, reason, message, receiptRef: receipt.ref };
-    } catch {
-      return receiptFailure('INVOCATION_RECEIPT_EVENT_WRITE_FAILED', receipt.ref);
+    } catch (error) {
+      return receiptFailure(`INVOCATION_RECEIPT_EVENT_WRITE_FAILED:${receiptStoreFailureCode(error)}`, receipt.ref);
     } finally {
       receipt.close();
     }
@@ -2098,14 +2135,15 @@ export async function callZeroConfigPlannerWithReason(
               calledModel: spec.calledModel,
             },
           });
-        } catch {
+        } catch (error) {
           const receiptRef = receipt.ref;
+          const failureCode = receiptStoreFailureCode(error);
           receipt.close();
           return {
             outcome: { status: null, signal: null, stdout: '', stderr: '' },
             durationMs: 0,
             preDispatchFailure: receiptFailure(
-              'INVOCATION_RECEIPT_PRE_DISPATCH_WRITE_FAILED',
+              `INVOCATION_RECEIPT_PRE_DISPATCH_WRITE_FAILED:${failureCode}`,
               receiptRef,
             ),
           };
@@ -2118,7 +2156,9 @@ export async function callZeroConfigPlannerWithReason(
             error: error instanceof Error ? error : new Error(String(error)),
           },
           durationMs: 0,
-          preDispatchFailure: receiptFailure('INVOCATION_RECEIPT_DECLARE_FAILED'),
+          preDispatchFailure: receiptFailure(
+            `INVOCATION_RECEIPT_DECLARE_FAILED:${receiptStoreFailureCode(error)}`,
+          ),
         };
       }
     }

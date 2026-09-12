@@ -19,6 +19,7 @@ import type { ApprovalStreamEvent } from '../../../src/core/approval-eventstream
 
 const inputProps = (historyProjectRoot: string) => ({
   menuMoreAbove: '{n}', menuMoreBelow: '{n}', reverseSearchLabel: 'search',
+  composerPasteChip: getMessage('tui.composer.paste_chip', 'en'),
   historyProjectRoot, onInterrupt: () => undefined,
 });
 

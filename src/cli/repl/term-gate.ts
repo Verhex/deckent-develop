@@ -8,7 +8,7 @@
 // and the three places a Terminal action is born:
 //   1. a slash-dispatched CLI-bridge tool (app.tsx → dispatcher),
 //   2. a model-proposed tool asking for confirmation (native engine → confirm),
-//   3. the `!<cmd>` shell passthrough (parity with Claude Code / Codex / Hermes).
+//   3. the `!<cmd>` shell passthrough (Ask/Run/Control gated).
 // It also keeps the bounded "shell notes" that ride ahead of the NEXT prompt,
 // so a `!` command's output reaches the model honestly — as part of the user's
 // next message, never as a fabricated transcript entry.

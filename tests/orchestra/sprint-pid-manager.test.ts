@@ -269,10 +269,33 @@ describe('sprint-pid-manager', () => {
     });
   });
 
-  // ── Test 7: clearPid removes PID and snapshot files ─────────────
+  // ── Test 7: clearPid releases liveness, retains evidence ────────
 
   describe('clearPid', () => {
-    it('should remove PID and snapshot files', () => {
+    it('releases the PID file but RETAINS the snapshot by default', () => {
+      // The snapshot is read after the coordinator is gone, to bind that exact
+      // process generation to the run's terminal RunFlow event. Teardown is not
+      // a settlement authority, so it must not destroy that evidence.
+      writePid(tmpRoot, 'sprint-retain');
+      writeStateSnapshot(tmpRoot, 'sprint-retain', {
+        sprintId: 'sprint-retain',
+        pid: process.pid,
+        startedAt: '2026-04-12T10:00:00Z',
+        currentWave: 0,
+        taskStatuses: {},
+        metricsJsonlSize: 0,
+        lastHeartbeat: '2026-04-12T10:00:00Z',
+      });
+      const pidPath = join(tmpRoot, '.deckent', 'pids', 'sprint-retain.pid');
+      const snapPath = join(tmpRoot, '.deckent', 'pids', 'sprint-retain.snapshot.json');
+
+      clearPid(tmpRoot, 'sprint-retain');
+
+      expect(existsSync(pidPath)).toBe(false);
+      expect(existsSync(snapPath)).toBe(true);
+    });
+
+    it('removes both only when a settlement authority passes dropSnapshot', () => {
       writePid(tmpRoot, 'sprint-clear');
 
       const snap: SprintStateSnapshot = {
@@ -292,7 +315,7 @@ describe('sprint-pid-manager', () => {
       expect(existsSync(pidPath)).toBe(true);
       expect(existsSync(snapPath)).toBe(true);
 
-      clearPid(tmpRoot, 'sprint-clear');
+      clearPid(tmpRoot, 'sprint-clear', { dropSnapshot: true });
 
       expect(existsSync(pidPath)).toBe(false);
       expect(existsSync(snapPath)).toBe(false);
@@ -306,6 +329,20 @@ describe('sprint-pid-manager', () => {
   // ── Test 8: archiveOrphan moves files to the canonical archive ──
 
   describe('archiveOrphan', () => {
+    it.each([
+      JSON.stringify({ sprintId: 'sprint-1000', phase: 'EXECUTE' }),
+      JSON.stringify({ phase: 'EXECUTE' }),
+      '{torn',
+    ])('preserves foreign or unprovable global state (%s)', (bytes) => {
+      const statePath = join(tmpRoot, '.deckent', 'sprint-state.json');
+      writeFileSync(statePath, bytes);
+      archiveOrphan(tmpRoot, {
+        sprintId: 'sprint-999', pid: 99999999,
+        pidFilePath: join(tmpRoot, '.deckent', 'pids', 'sprint-999.pid'),
+        snapshotPath: null, lastSnapshot: null, reason: 'test',
+      });
+      expect(readFileSync(statePath, 'utf8')).toBe(bytes);
+    });
     it('should move orphan artifacts to the canonical sprint namespace', () => {
       const pidDir = join(tmpRoot, '.deckent', 'pids');
       mkdirSync(pidDir, { recursive: true });
@@ -337,8 +374,8 @@ describe('sprint-pid-manager', () => {
 
       // Original files should be gone
       expect(existsSync(pidPath)).toBe(false);
-      expect(existsSync(snapPath)).toBe(false);
-      expect(existsSync(join(tmpRoot, '.deckent', 'sprint-state.json'))).toBe(false);
+      expect(existsSync(snapPath)).toBe(true);
+      expect(existsSync(join(tmpRoot, '.deckent', 'sprint-state.json'))).toBe(true);
 
       const archiveDir = join(
         tmpRoot, '.deckent', 'archive', 'sprints', 'sprint-999', 'orphan-authority',

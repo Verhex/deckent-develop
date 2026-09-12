@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/core/task-attempt-custody-store.test.ts (176 tests | 168 skipped) 202ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed | 168 skipped (176)
+   Start at  20:43:42
+   Duration  3.76s (transform 1.73s, setup 16ms, collect 2.26s, tests 202ms, environment 0ms, prepare 32ms)
+

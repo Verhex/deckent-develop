@@ -114,6 +114,7 @@ describe('InputBar — a multi-line draft renders on several lines and submits a
       <InputBar
         active onSubmit={onSubmit} onInterrupt={() => {}}
         menuMoreAbove={en.menuMoreAbove} menuMoreBelow={en.menuMoreBelow} reverseSearchLabel={en.reverseSearch}
+        composerPasteChip={en.composerPasteChip}
         historyProjectRoot={root} caretStyle="marker"
       />,
     );
@@ -136,7 +137,7 @@ describe('InputBar — a multi-line draft renders on several lines and submits a
     expect(onSubmit).not.toHaveBeenCalled();
     stdin.write('\r');
     await tick();
-    expect(onSubmit).toHaveBeenCalledWith('satır bir\nsatır iki\nüçüncü');
+    expect(onSubmit.mock.calls[0]?.[0]).toBe('satır bir\nsatır iki\nüçüncü');
     unmount();
   });
 });

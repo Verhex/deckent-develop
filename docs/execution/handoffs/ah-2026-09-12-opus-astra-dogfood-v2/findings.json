@@ -1,0 +1,47 @@
+[
+  {
+    "class": "BLOCKS_CURRENT_DONE",
+    "reasonCode": "BULGU-M/sprint-747-settlement-no-supported-surface",
+    "detail": "Every deckent do dies at EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD:747-001:hold:production-wiring-missing-worker-evidence. recover --force, resume (real run), recover --resume, recover --restore-tasks (source-read), cleanup, runs --close-stale and a fresh deckent do were all attempted. Mechanism + three owner options: durum-raporu.md EK-4 s3."
+  },
+  {
+    "class": "BLOCKS_CURRENT_DONE",
+    "reasonCode": "BUG-F/end-to-end-unproven",
+    "detail": "The worker result-contract directive is in the prompt (unit-pinned) and in dist, but no worker .result carrying productionWiringEvidence has ever been observed."
+  },
+  {
+    "class": "RELATED_BUT_NONBLOCKING",
+    "reasonCode": "BULGU-N/settlement-predicate-branch-too-narrow",
+    "detail": "isDecidedExactSettlementHold admits only 1 of the 11 production-wiring settlement codes emitted by task-result-settlement.ts. Measured NOT sufficient for 747 on its own: its archive terminal seal reads null. Evidence table: durum-raporu.md EK-4 s4. Deliberately not implemented."
+  },
+  {
+    "class": "RELATED_BUT_NONBLOCKING",
+    "reasonCode": "kosum-7a/receipt-pre-dispatch-write-undiagnosed",
+    "detail": "INVOCATION_RECEIPT_PRE_DISPATCH_WRITE_FAILED at 182s did not reproduce on the identical goal. Root cause unknown. BUG-H now appends the receipt-store failure code if it recurs; it does not fix it."
+  },
+  {
+    "class": "RELATED_BUT_NONBLOCKING",
+    "reasonCode": "BULGU-L/recover-dry-run-preview-understates",
+    "detail": "recover --dry-run counts only files to be archived, not files to be preserved nor the sprint-state removal, so it reads as 'nothing to do'."
+  },
+  {
+    "class": "RELATED_BUT_NONBLOCKING",
+    "reasonCode": "handoff-tooling/declared-fields-unimplemented",
+    "detail": "scripts/authority-handoff.mjs hardcoded filesChanged/verification/findings to [] although operating policy s8 declares them, and could only hash a raw session value so a transferor could not record a transferee-reported digest. Both fixed additively this session (defaults unchanged); this is the mechanical cause of the IDENTITY_MISMATCH on ah-2026-09-12-opus-astra-dogfood."
+  },
+  {
+    "class": "RELATED_BUT_NONBLOCKING",
+    "reasonCode": "BULGU-E-F-I-J-K/open-owner-decisions",
+    "detail": "plain deckent start vs exact-Docker custody; container registry not written on runSpawn; read-model staleness; runs --diff shows the whole tree. Recorded in follow-up-works/current-flow.md."
+  },
+  {
+    "class": "UNRELATED",
+    "reasonCode": "dirty-group-D-unattributed",
+    "detail": "14 dirty paths are not attributable to this session. Transferor does not own them. Channel entries 1272/1273 may resolve start.ts and container-registry attribution."
+  },
+  {
+    "class": "UNRELATED",
+    "reasonCode": "pre-existing-type-error",
+    "detail": "tests/orchestra/production-wiring-prompt.test.ts:251 carries a pre-existing type error (2|1 vs 2); transferor's diff is around line 180 and did not touch it. Excluded from the build tsconfig."
+  }
+]

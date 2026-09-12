@@ -2057,6 +2057,43 @@ const PRODUCTION_WIRING_REPORTING_CONTRACT = `If you cannot close this exact cha
 Settlement is host-owned: this block records the wiring authority, it never marks this task complete and it never overrides the task's own verification steps.`;
 
 /**
+ * The worker-side half of the wiring result contract.
+ *
+ * `settleProductionWiringResultEvidence` holds with `missing-worker-evidence`
+ * when `.result` carries no `productionWiringEvidence`, but the worker was never
+ * asked for it — the block above renders the chain and the `UNWIRED:` reporting
+ * path, and the result-contract line lists every other field. So a production
+ * mutation task could not settle no matter how well the worker performed.
+ * Observed live: run 838e9216 / task 747-001 landed a correct effect and then
+ * held on the one field nothing had requested.
+ *
+ * Shaped exactly like the proven `runPolicyEvidence` echo directive: name the
+ * field, bind it to this task's digest, and say what its absence costs.
+ *
+ * The admissible states deliberately exclude `complete`. A worker observes its
+ * own edit; only the host's independent consumer-execution observation may
+ * conclude that the chain is wired, so letting a worker claim completeness would
+ * turn self-report into a production-wired verdict.
+ */
+function productionWiringResultContract(boundDigest: string): string {
+  // Deliberately backtick-free: every backticked span in this block is an exact
+  // contract identity, and an instruction must never be mistaken for one.
+  const evidenceRefs = ['<replace with an actual inspected path or symbol>'];
+  const variants = [
+    { state: 'presence-only', basis: 'code-presence', evidenceRefs },
+    { state: 'incomplete', reasonCode: 'not-executed', evidenceRefs },
+    { state: 'unsupported', reasonCode: 'environment-unavailable', evidenceRefs },
+    { state: 'contradictory', reasonCode: 'observation-conflict', evidenceRefs },
+  ] satisfies Exclude<ProductionWiringEvidence, { state: 'complete' }>[];
+  const examples = variants.map(evidence => JSON.stringify({
+    version: 1, contractDigest: boundDigest, observedBy: 'worker', evidence,
+  }, null, 2)).join('\n');
+  return `Result contract (mandatory): record what you actually observed in your .result JSON under "productionWiringEvidence". Choose exactly one of these schema-valid shapes, replace the reference with real evidence, and retain the state-specific required field:
+${examples}
+Copy the contractDigest exactly — bare hex, with no sha256: prefix. These are shapes, not observations to copy as facts. "presence-only" requires basis: code-presence, test-presence, static-reachability, or import-count. "incomplete" requires reasonCode: absent, unresolved, or not-executed. "unsupported" requires reasonCode: adapter-unavailable, capability-unavailable, or environment-unavailable. "contradictory" requires reasonCode: authority-conflict, identity-conflict, or observation-conflict. Choose only the state and basis/reason you actually observed. There is deliberately no "complete" — only the host, from its own independent observation, may conclude that the chain is wired. The evidence reference list must be non-blank and must not retain the example placeholder. A missing or malformed object is a typed settlement HOLD, so write it on every outcome including NO_GO.`;
+}
+
+/**
  * Render the single digest-bound production-wiring block for the compiled worker
  * prompt (487-026 — consumer of the 487-025 `Task.productionWiring` authority).
  *
@@ -2115,7 +2152,8 @@ Settlement is host-owned: this block never marks this task complete.`;
 Contract digest: sha256:${boundDigest} · decision: ${decision.decision} · outer settlement: ${decision.outerSettlement}
 The bound wiring authority does not resolve to a closed chain. Exact delta (typed, from the contract resolver — treat each line as a required closure, not a suggestion):
 ${delta}
-${PRODUCTION_WIRING_REPORTING_CONTRACT}`;
+${PRODUCTION_WIRING_REPORTING_CONTRACT}
+${productionWiringResultContract(boundDigest)}`;
   }
 
   const stagedLine = decision.decision === 'staged-foundation'
@@ -2127,7 +2165,8 @@ Contract digest: sha256:${boundDigest} · contract version: ${evidence.contract.
 This block is the sole authority for what "wired" means for THIS task, addressed by the digest above rather than by repeating any directive text. The identities below are exact: match them symbol-for-symbol and never substitute a similarly named one.${stagedLine}
 Producer → canonical consumer → affected ingress → enablement authority → proof target:
 ${formatWiringChain(evidence.contract)}
-${PRODUCTION_WIRING_REPORTING_CONTRACT}`;
+${PRODUCTION_WIRING_REPORTING_CONTRACT}
+${productionWiringResultContract(boundDigest)}`;
 }
 
 // ─── Template Renderer ─────────────────────────────────────────────────

@@ -1,0 +1,562 @@
+[
+  {
+    "path": "DIRECTIVES.md",
+    "gitStatus": "M",
+    "sha256": "sha256:b7faa451048df0c8c04d6d15814154b1d5037d3e1c46eecac9a1d120bcc2496f",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood/",
+    "gitStatus": "??",
+    "sha256": null,
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "durum-raporu.md",
+    "gitStatus": "M",
+    "sha256": "sha256:83a86f630b870ab8f1414ff7cc3adb3845043237697b5741593fed352a52296b",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "follow-up-works/current-flow.md",
+    "gitStatus": "M",
+    "sha256": "sha256:54ccb2ef8cc6630a140cdfbfab5e7c8e4c0ed79d8ab6b3d5dc0357f85bf3186b",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "scripts/authority-handoff.mjs",
+    "gitStatus": "M",
+    "sha256": "sha256:397ac534389f173e250f24d735973ec19fc55809682e184f00ad1f6204c4f04b",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "scripts/metrics-retention-host-proof-observer.mjs",
+    "gitStatus": "??",
+    "sha256": "sha256:45a34b2ac13215e3d1aa84c9017c69289a1d4751411b45c94179355081b2ae52",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "scripts/production-wiring-host-proof-harness.mjs",
+    "gitStatus": "M",
+    "sha256": "sha256:26d56698a276bd20d02d4511f235f63b587bd9f12bdeb8858f291b9fab2defd0",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "src/core/config.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:8a7285ab2b6063f0581ecb299cb0ff021fd97572b2646a764589dd3b3e67d8a8",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "src/core/production-wiring-host-proof.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:b7dba2a53d587dacec918b9204b969809cb1082ef9c66f488db64b1fb0b96a2e",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "src/core/sprint-archive.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:58d3662e34a21fb39e91e6d0a64e2b96cda33108edf8bff410f6b54d73558a9c",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "src/orchestra/model-selector.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:8d0ab99647de028e761dff039a090005969ccd3faa46da2395fbad8e9372751f",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "src/orchestra/planner.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:52dfe3960bd3c8b2e915948f124a7b1109c63b3fb96f922866c762c1b05ed666",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "src/orchestra/production-wiring-host-proof-runner.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:5b7b6852eb20ea5c5bde151495de322246e2ffaffb19bc365a0616077844d2a5",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "src/orchestra/prompt-god-template.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:c0bb721cc31dbc41b29df44d9a37f3792aebcd5f6e1d54e65a85de344263e273",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "src/orchestra/spawn-failure-authority.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:c1548d519f078cf56022cd560d2471531d31e6db5c940cb2c55e846320001925",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "src/orchestra/sprint-controller.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:9ace2260dddbec4a889a48353879d4d4519bf9f515590bc0a2912e7047dcb29e",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "src/orchestra/sprint-finalizer.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:7a0335087c09153a7f39fc344da337c8fb3082a04faff049fb5c10e061a3f22e",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "src/orchestra/sprint-pid-manager.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:8de9cab8d5733b192c1b00628cbf8167761ffe5903184dbfe0658be642f03ce2",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "src/orchestra/sprint-recovery-operation.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:e8c14abf1116f44fe89e83cfe49172987759021282c5013a8490c6d491f6c0a5",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "src/orchestra/sprint-runner-entry.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:cc36ac571ecbd28c85e3e63348746efedd95cfa08d9e52953f94483e41700520",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "tests/core/memory-read-planner-profile.test.ts",
+    "gitStatus": "??",
+    "sha256": "sha256:a47870e8292203ae7bb84041eb7a2c6858d2ac4e42eb2a8644c226947ff208bd",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "tests/orchestra/archived-sprint-terminal-disposition.test.ts",
+    "gitStatus": "??",
+    "sha256": "sha256:e2fea92e6d7d9c1ad8988b6d4150d226c4d11ab8f8a2ced30862d670f80589b3",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "tests/orchestra/model-selector-max-tier.test.ts",
+    "gitStatus": "??",
+    "sha256": "sha256:d6c152ea4b6b7c7b5f6ff9e5d26d22f3b17f86a5c8a31c756249c7d01ee72321",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "tests/orchestra/production-wiring-host-proof-failure-reason.test.ts",
+    "gitStatus": "??",
+    "sha256": "sha256:e183dea3366d04b3e1d6082adb89038d39b534bbc794b52e5390506d28e39e43",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "tests/orchestra/production-wiring-prompt.test.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:dfbbf44c41b761aabb95d1a61a2de84cdb819f4a11cd1192ad662ce890839ac0",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "tests/orchestra/production-wiring-worker-result-contract.test.ts",
+    "gitStatus": "??",
+    "sha256": "sha256:24804dace9ccdda885fadf7d9ae2d0d16b41c2952be9022ae2887fb8f311b144",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "tests/orchestra/sprint-pid-manager.test.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:2f8e9f53314a931db936f5696293db742948148395e9993a2c1b6300e1517caa",
+    "group": "A",
+    "owner": "transferor (this session)"
+  },
+  {
+    "path": "src/core/config-types.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:3bb761cfcd86b9a4a6f628bb3b075d87c10716d1e571a5f3720254e0c728eedb",
+    "group": "A+B",
+    "owner": "CONFLICT: both transferor and sprint-747 worker"
+  },
+  {
+    "path": "src/core/observability-rotation.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:d251243e427829b5b41a1d26fb8739ab6c2839d8b20c69bead1b9784a22e5c21",
+    "group": "B",
+    "owner": "sprint-747 worker effect (engine-produced)"
+  },
+  {
+    "path": "src/core/observability.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:86b8bab8697423c7cfd36a2b1e480f702277019cf63d0618c10311cea4984025",
+    "group": "B",
+    "owner": "sprint-747 worker effect (engine-produced)"
+  },
+  {
+    "path": "tests/core/observability-rotation-tenant.test.ts",
+    "gitStatus": "??",
+    "sha256": "sha256:05e5f708c41f002c55ec7b6d337b9b1820614566c655a3d28b47510e4a7ac7e3",
+    "group": "B",
+    "owner": "sprint-747 worker effect (engine-produced)"
+  },
+  {
+    "path": "tests/core/observability-rotation.test.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:b24877a297484d0f3b258ea0b22bc5ea572d084cdbb438afe740f9353cda421a",
+    "group": "B",
+    "owner": "sprint-747 worker effect (engine-produced)"
+  },
+  {
+    "path": "tests/core/observability.test.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:fc2edc5873a89f03b2bb97dabe4f6b8f24a29bd4e013a7918831d45b2426149f",
+    "group": "B",
+    "owner": "sprint-747 worker effect (engine-produced)"
+  },
+  {
+    "path": "docs/design/DECKENT-TERMINAL-SINGLE-SURFACE.md",
+    "gitStatus": "M",
+    "sha256": "sha256:38d0aef675c7c8e77c761ff1dce7110f68900d557a518df7e53bb81259f49906",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "src/cli/helpers/message-catalog/cli-terminal-slash.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:f86fa7f12c5ebfade5c40bf3b94e4c2b1cff5608f23a7871aed84517bcda3529",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "src/cli/repl/app.tsx",
+    "gitStatus": "M",
+    "sha256": "sha256:9216f53471c34f993af0d18121065753086b038029590f7a9870a561a9228092",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "src/cli/repl/chat-turn-queue.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:d20a4b10896f1265f2145f0f0bc24c7df827adbf6f5c03f299d6df20d940e4f1",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "src/cli/repl/ink-palette.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:a9819e3042fe2807ca3a776f45c03812eb2ab4d88e333003c837acbc39f67539",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "src/cli/repl/input-bar.tsx",
+    "gitStatus": "M",
+    "sha256": "sha256:ec4eb25205e526fe91bd040b804819c381f1834fed0c64b280f681f66be18354",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "src/cli/repl/line-edit.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:15456e81d2364b96998b2ffb9250a981dc1ea093995fbec3978772fd158a673b",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "src/cli/repl/live-operator-strip.tsx",
+    "gitStatus": "M",
+    "sha256": "sha256:87501eb2036004b01b74549bd0f8116b1aa9f378d7578febe3fd36f2a4dec540",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "src/cli/repl/native-agent-bridge.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:700209bdf1a4fa7bc1b09d0b937d3758f4ddc7434825b04a0f8dc74fc6d2bad1",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "src/cli/repl/paste-composer.ts",
+    "gitStatus": "??",
+    "sha256": "sha256:899fcb1d1cd696daf47e5f6731bff339245e7b65bef6e8080d96d38e0e425313",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "src/cli/repl/picker-card.tsx",
+    "gitStatus": "M",
+    "sha256": "sha256:731b64076510a50a4357cb905f0ea5eb1343daa7c467aa48c690dbf87ea0bb0d",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "src/cli/repl/run.tsx",
+    "gitStatus": "M",
+    "sha256": "sha256:3e3ca448c5e721656fbaab9916d8a07940af54b15f6bf6cec242dbfc65c546f3",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "src/cli/repl/static-prose-batch.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:b722b66de825ba7c8a4f923377c89368cfa6dc9188d58b1101511c1a9ba44f29",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "src/cli/repl/stream-segmenter.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:27aefa4ad17975f2de878229a7ac79e5e7453ef35608f5e9c7e98045177ae0d2",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "src/cli/repl/term-gate.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:0a98d1ee9a69b8084ebf61b9f52f528e93e7ce501763b88dc07980ec034d3074",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "src/cli/repl/transcript-turn-view.tsx",
+    "gitStatus": "M",
+    "sha256": "sha256:430efb423c3075cbb8d232ba814fe37d656ad3df366163f1e1cd1c81d542b65b",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "src/core/terminal-workline-contract.ts",
+    "gitStatus": "??",
+    "sha256": "sha256:a3aa66d99e6bd8a087ffacec635d298ef599929581bbad5592edb075ec6653d4",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "tests/cli/native-agent-bridge.test.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:37c932251d064742757190af60773a74053f3c5a0beb9c358d1d9d27e0849686",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "tests/cli/repl/approval-keyboard-transition.test.tsx",
+    "gitStatus": "M",
+    "sha256": "sha256:5cccf83634d1a7b929339a1d150cf6c1e699a530cc1dc633b84d01c78e0effa7",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "tests/cli/repl/context-slashes.test.tsx",
+    "gitStatus": "M",
+    "sha256": "sha256:159d202b8583fe7dd7a965f1441993d94b91ecd64ed24ab44a82fea9994187f7",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "tests/cli/repl/grapheme-caret.test.tsx",
+    "gitStatus": "M",
+    "sha256": "sha256:4b838334ce99d08fb8871866d8287eeaa993d2b8fd65ef2637fdce87572b31d3",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "tests/cli/repl/input-bar-caret-style.test.tsx",
+    "gitStatus": "M",
+    "sha256": "sha256:93f5b96403733cc838b35a71928f2cdaf5ce2eae7ee059d63b8fadb34e2021eb",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "tests/cli/repl/input-debug-wire.test.tsx",
+    "gitStatus": "M",
+    "sha256": "sha256:6a7614290d2bbae06383c9503df77caa65abb97165eaf328b5c1e95d2601cb13",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "tests/cli/repl/interrupt-policy.test.tsx",
+    "gitStatus": "M",
+    "sha256": "sha256:6bfb14285fc17468b438eb2def9fc2ddc7556b2183f73d5806a692319609de6a",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "tests/cli/repl/multiline-composer.test.tsx",
+    "gitStatus": "M",
+    "sha256": "sha256:44758bfe41309bef9400935be531053eaa95f15b75c5e9333ce6f420de775738",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "tests/cli/repl/operator-strip-lifecycle.test.tsx",
+    "gitStatus": "M",
+    "sha256": "sha256:1d479c98b111096e38eae3f70d7b82a1ca77842f7809bb553172e4267f3b6a79",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "tests/cli/repl/paste-composer.test.ts",
+    "gitStatus": "??",
+    "sha256": "sha256:8173b58efbe36dbe5f23ed22c445eaf2010799bb7430f10c6371b11ca397f514",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "tests/cli/repl/slash-menu-more-labels.test.tsx",
+    "gitStatus": "M",
+    "sha256": "sha256:e9d02aecc75594a43a3e3a0701a50b9ad09f4d540cab9926275ff21ebe555946",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "tests/cli/repl/slash-menu-submit.test.ts",
+    "gitStatus": "??",
+    "sha256": "sha256:5c5c290ae5d346d314e92cea373136009ac9fe2d7b124f763d9b9f1350a8ee80",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "tests/cli/repl/string-free-closure.test.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:8d5e5b1b734c1215acb8118a23de980f4de4ea5b89b2e16dc968940076ca3335",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "tests/cli/repl/transcript-turn-view.test.tsx",
+    "gitStatus": "M",
+    "sha256": "sha256:87e689936d4a1ca0e6274368384d10bb8fdab20ec3ebee329374b49561baf406",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "tests/cli/repl/turn-abort-wire.test.tsx",
+    "gitStatus": "M",
+    "sha256": "sha256:5dcb69d4c94568d3ec9020184e337033c09aef2e153fa05af2f43b7b7edf93f6",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "tests/core/terminal-workline-contract.test.ts",
+    "gitStatus": "??",
+    "sha256": "sha256:f1716304c778e2fd352cb504999c0638d9d02fc4f419bdc1765e6e71398ed0d4",
+    "group": "C",
+    "owner": "Cursor terminal lane — NOT owned by transferor"
+  },
+  {
+    "path": "docs/SPRINT-LOG.md",
+    "gitStatus": "M",
+    "sha256": "sha256:279762776214f797224222f90797ad3986c89e64ac8ebd7301d1cb0fb8faedbe",
+    "group": "D",
+    "owner": "UNATTRIBUTED — attribute before commit"
+  },
+  {
+    "path": "docs/execution/evidence/terminal-winddown-20260910/astra-opus-independent-review-20260911.md",
+    "gitStatus": "??",
+    "sha256": "sha256:b46644fe5896a3be9d4c8f749fcb5a1966800eca39aeb603431b067b71863279",
+    "group": "D",
+    "owner": "UNATTRIBUTED — attribute before commit"
+  },
+  {
+    "path": "scripts/gen-production-wiring-block.mjs",
+    "gitStatus": "??",
+    "sha256": "sha256:cd45a7bfc1232ce928227f48a6ebc825de1344eb584ddc1801aa8ed4e695b0e9",
+    "group": "D",
+    "owner": "UNATTRIBUTED — attribute before commit"
+  },
+  {
+    "path": "src/agent/guards/shell-risk.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:56a89341081d8759dab01f5625eaf1dab7e6b1725652a29b5966db229ac37fb2",
+    "group": "D",
+    "owner": "UNATTRIBUTED — attribute before commit"
+  },
+  {
+    "path": "src/agent/identity.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:4ec62c499edd387f916797df3032176d1f6cd843f5d599fb76c0460e9b63ce39",
+    "group": "D",
+    "owner": "UNATTRIBUTED — attribute before commit"
+  },
+  {
+    "path": "src/cli/commands/start.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:d110ca0276bee6ae601f758ac1ccbe8c8188ad08b570a75801bbf514d1d5e989",
+    "group": "D",
+    "owner": "UNATTRIBUTED — attribute before commit"
+  },
+  {
+    "path": "src/cli/helpers/messages.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:a004971c4309f100c1f1f62417aabb8fba60955d8763f023572f0d18e29fa902",
+    "group": "D",
+    "owner": "UNATTRIBUTED — attribute before commit"
+  },
+  {
+    "path": "src/orchestra/spawn-backend-docker.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:50ede30d3aac35560785ffa9fcb5547cc50ecc9033a9460ab3f4c6cb49bdd1a0",
+    "group": "D",
+    "owner": "UNATTRIBUTED — attribute before commit"
+  },
+  {
+    "path": "tests/agent/shell-risk.test.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:c9b34004b210b14fb589b195fcc0c6a620cddf5e21f97548675dc5ed79d0fa18",
+    "group": "D",
+    "owner": "UNATTRIBUTED — attribute before commit"
+  },
+  {
+    "path": "tests/cli/stream-segmenter.test.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:e50c1796161e2eb5f6fe5eedb93b27b37c0eba3870c82445c20c00d5476c0fde",
+    "group": "D",
+    "owner": "UNATTRIBUTED — attribute before commit"
+  },
+  {
+    "path": "tests/core/production-wiring-contract.test.ts",
+    "gitStatus": "M",
+    "sha256": "sha256:9ad73d3890df7bb4cf862efedf21fd4dcf83bdfbcde1d4bc8cc7bd3435aac38c",
+    "group": "D",
+    "owner": "UNATTRIBUTED — attribute before commit"
+  },
+  {
+    "path": "tests/orchestra/production-wiring-host-proof-absence.test.ts",
+    "gitStatus": "??",
+    "sha256": "sha256:352ee0914ac64085e3157a29472fbbe59a5071f0e9a9ab1475fccc7b08ad14fc",
+    "group": "D",
+    "owner": "UNATTRIBUTED — attribute before commit"
+  },
+  {
+    "path": "tests/orchestra/spawn-backend-docker-container-registry.test.ts",
+    "gitStatus": "??",
+    "sha256": "sha256:e554dbb054a9e5934b853a9b425b47bd81b1275ae93728c6fcd0372e1107bb13",
+    "group": "D",
+    "owner": "UNATTRIBUTED — attribute before commit"
+  },
+  {
+    "path": "tests/orchestra/sprint-runner-pid-snapshot-retention.test.ts",
+    "gitStatus": "??",
+    "sha256": "sha256:c1aa32439be1a789cce9bd5c98280f5b10a119c839bf1b8350ff7b0d873283a9",
+    "group": "D",
+    "owner": "UNATTRIBUTED — attribute before commit"
+  }
+]

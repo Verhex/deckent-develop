@@ -52,7 +52,7 @@ describe('mapToolResultToTranscript — terminal consumer', () => {
     }, { t, target: 'src/a.ts', readOnlyNote: null, elapsedMs: 12 });
     expect(mapped.sink.failed).toBeUndefined();
     expect(mapped.sink.note).toContain(getMessage('native.tool_result_withheld', 'en'));
-    expect(mapped.operatorSignalLine).toBeTruthy();
+    expect(mapped.operatorSignalLine).toBeNull();
   });
 
   it('does not emit operator signal for ordinary successful delivery', () => {

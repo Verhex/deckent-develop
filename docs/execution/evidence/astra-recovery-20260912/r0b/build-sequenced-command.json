@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "node",
+    "/tmp/deckent-r0b-astra-20260912/build-with-detail.mjs"
+  ],
+  "startedAt": "2026-09-12T17:47:16.113994+00:00",
+  "finishedAt": "2026-09-12T17:51:00.324320+00:00",
+  "durationMs": 238404,
+  "exitCode": 0
+}

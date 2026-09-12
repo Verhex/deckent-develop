@@ -37,6 +37,7 @@ describe('InputBar — caretStyle', () => {
           menuMoreAbove={en.menuMoreAbove}
           menuMoreBelow={en.menuMoreBelow}
           reverseSearchLabel={en.reverseSearch}
+          composerPasteChip={en.composerPasteChip}
           historyProjectRoot={root}
           caretStyle={caretStyle}
         />

@@ -1,6 +1,6 @@
 // ═══ Transcript turn rendering — calm operator transcript (Workline) ═══
 //
-// User vs assistant: Cursor-like lanes — user text on inverse panel rows; assistant
+// User vs assistant: inverse user lane + flush-left assistant; user-ingress omits label.
 // prose flush-left with no shared chrome. Tools stay one-line metadata.
 
 import { type ReactElement } from 'react';
@@ -34,17 +34,19 @@ export function TranscriptTurnView({
   turn,
   hyperlinks,
   terminalColumns,
-  labels,
+  labels: _labels,
 }: {
   turn: Turn;
   hyperlinks: boolean;
   /** Visible TTY width for markdown table fallback (body is indented). */
   terminalColumns?: number;
+  /** Kept for caller injection parity (LiveOperatorStripView); user lanes are label-free. */
   labels: TranscriptTurnLabels;
 }): ReactElement {
+  void _labels;
   const palette = useInkPalette();
   const glyphs = useTerminalGlyphs();
-  const assistantIndent = 0;
+  const assistantIndent = 2;
   const panelWidth = terminalColumns !== undefined ? Math.max(1, terminalColumns) : undefined;
 
   const padInverseLine = (line: string): string => {
@@ -55,10 +57,24 @@ export function TranscriptTurnView({
     return (line.length === 0 ? '' : line) + ' '.repeat(pad);
   };
 
+  if (turn.role === 'user-ingress') {
+    // Same inverse lane as `user`, without the "Sen" label (paste chip / rawIntent).
+    return (
+      <Box flexDirection="column" marginTop={1} marginBottom={0}>
+        <Box flexDirection="column">
+          {turn.text.split('\n').map((line, i) => (
+            <Text key={i} {...palette.focus} wrap="wrap">
+              {padInverseLine(line)}
+            </Text>
+          ))}
+        </Box>
+      </Box>
+    );
+  }
+
   if (turn.role === 'user') {
     return (
       <Box flexDirection="column" marginTop={1} marginBottom={0}>
-        <Text {...palette.muted}>{labels.transcriptUser}</Text>
         <Box flexDirection="column">
           {turn.text.split('\n').map((line, i) => (
             <Text key={i} {...palette.focus} wrap="wrap">
@@ -75,9 +91,10 @@ export function TranscriptTurnView({
     const meta = [budgetNotice, note, added !== undefined ? `+${added}` : '', removed !== undefined ? `-${removed}` : '']
       .filter((s) => s !== '')
       .join(' · ');
-    const tone = turn.role === 'operator' ? palette.warning : palette.muted;
+    const phaseSignal = Boolean(budgetNotice || failed);
+    const tone = turn.role === 'operator' && phaseSignal ? palette.warning : palette.muted;
     return (
-      <Box flexDirection="row" marginTop={0} paddingLeft={assistantIndent}>
+      <Box flexDirection="row" marginTop={turn.role === 'operator' ? 0 : 0} marginBottom={0} paddingLeft={assistantIndent}>
         <Text {...tone}>
           {failed ? <Text {...palette.error}>{`${glyphs.failure} `}</Text> : null}
           <Text>{verb}</Text>
@@ -124,7 +141,7 @@ export function TranscriptTurnView({
     ...(markdownWidth !== undefined ? { maxTerminalWidth: markdownWidth } : {}),
   });
   return (
-    <Box flexDirection="column" marginTop={0} paddingLeft={assistantIndent}>
+    <Box flexDirection="column" marginTop={0} marginBottom={1} paddingLeft={assistantIndent}>
       {compactTranscriptLines(rendered.split('\n')).map((line, i) => (
         <Text key={i} wrap="wrap">
           {line}

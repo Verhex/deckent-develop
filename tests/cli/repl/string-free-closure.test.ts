@@ -45,11 +45,16 @@ function expectMissing(fn: () => unknown, label: string): void {
 describe('buildReplLabels — every field resolves from the catalog for en and tr', () => {
   for (const lang of ['en', 'tr'] as const) {
     it(`${lang}: no field is empty, undefined or a key echo`, () => {
-      const labels = buildReplLabels(tFor(lang)) as unknown as Record<string, string>;
+      const labels = buildReplLabels(tFor(lang)) as unknown as Record<string, unknown>;
       for (const [field, value] of Object.entries(labels)) {
+        if (field === 'pasteComposerPolicy') {
+          expect(value).toMatchObject({ maxLinesInline: expect.any(Number), maxCharsInline: expect.any(Number) });
+          continue;
+        }
+        if (field === 'requestMetric' || field === 'sessionLifecycle') continue;
         expect(typeof value, field).toBe('string');
-        expect(value.length, field).toBeGreaterThan(0);
-        expect(value.startsWith('tui.') || value.startsWith('approval.'), field).toBe(false);
+        expect((value as string).length, field).toBeGreaterThan(0);
+        expect((value as string).startsWith('tui.') || (value as string).startsWith('approval.'), field).toBe(false);
       }
     });
   }

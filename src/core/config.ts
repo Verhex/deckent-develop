@@ -2441,6 +2441,26 @@ type MemoryReadConfigLayer = Pick<DeckentConfig, 'memory_read' | 'memory_read_pr
 
 export const DEFAULT_MEMORY_READ_PROFILES = Object.freeze({
   worker: Object.freeze({ maxBytes: 131_072, maxLines: 512 }),
+  /**
+   * The planner's mandatory set is strictly larger than a worker's: on top of
+   * the ADRs a directive names explicitly it always carries project identity,
+   * the latest retro and every critical entry. A mandatory entry that does not
+   * fit is a hard `REQUIRED_ENTRY_OVERSIZE` hold — there is no truncation path —
+   * so a ceiling below that set makes planning fail closed and deterministically,
+   * however often it is retried.
+   *
+   * The planner had no profile at all and silently inherited the shared 200-line
+   * default, which a single accepted ADR already exceeds (largest measured: 287
+   * lines / 23 KB, and 3 of 52 exceed 200 on their own). Sized from the measured
+   * corpus so the realistic worst case — the five largest ADRs named at once,
+   * plus identity, latest retro and criticals — is admitted; the next step down
+   * (256 KB) is measurably not enough. Note the byte budget is charged against
+   * whole canonical records, roughly 3x the content that reaches the prompt.
+   *
+   * This is a ceiling, not a target: discretionary query matches beyond it are
+   * deferred, and a mandatory set that still does not fit stays a typed hold.
+   */
+  planner: Object.freeze({ maxBytes: 393_216, maxLines: 1_536 }),
 });
 
 /**
@@ -2479,7 +2499,9 @@ export function resolveMemoryReadProfiles(
   return Object.freeze(Object.fromEntries(MEMORY_READ_CONSUMERS.map(consumer => [
     consumer,
     resolveMemoryReadLimits({
-      ...(consumer === 'worker' ? DEFAULT_MEMORY_READ_PROFILES.worker : {}),
+      // Every consumer that declares a default profile gets it; an authored
+      // shared limit and an explicit named override still win, in that order.
+      ...(DEFAULT_MEMORY_READ_PROFILES[consumer as keyof typeof DEFAULT_MEMORY_READ_PROFILES] ?? {}),
       ...shared,
       ...named[consumer],
     }),
@@ -3363,6 +3385,28 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
     descriptionTr: 'Geçmiş sprint bağlamı için milisaniye cinsinden en fazla doğrulama süresi. Sprint bağlamı etkinken zorunludur.',
     type: 'positive safe integer',
     default: null,
+    category: 'Terminal',
+  },
+  'terminal.workline.composer.paste_max_lines_inline': {
+    description: 'Composer paste collapse: inline drafts at or below this line count; larger pastes render as a localized chip (wire still sends full text).',
+    descriptionTr: 'Composer yapıştırma: bu satır sayısına kadar satır içi; üzeri yerelleştirilmiş chip (wire tam metin gönderir).',
+    type: 'positive safe integer',
+    default: 3,
+    category: 'Terminal',
+  },
+  'terminal.workline.composer.paste_max_chars_inline': {
+    description: 'Composer paste collapse: inline drafts at or below this character count; larger pastes render as a chip.',
+    descriptionTr: 'Composer yapıştırma: bu karakter sayısına kadar satır içi; üzeri chip.',
+    type: 'positive safe integer',
+    default: 512,
+    category: 'Terminal',
+  },
+  'terminal.workline.operator.suppress_prose_during_tool_execution': {
+    description: 'When true, assistant prose is not committed to scrollback while tools are active; deliverable prose flushes at turn end.',
+    descriptionTr: 'true iken araç aktifken asistan metni scrollback\'e yazılmaz; teslim metni tur sonunda flush edilir.',
+    type: 'boolean',
+    default: true,
+    options: ['true', 'false'],
     category: 'Terminal',
   },
   mode: {

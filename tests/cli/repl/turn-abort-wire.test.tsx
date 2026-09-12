@@ -115,7 +115,8 @@ describe('InputBar — Esc reaches the caller only when no menu consumed it', ()
         active onSubmit={() => {}} onInterrupt={() => {}} onEscape={onEscape}
         slashRegistry={buildSlashRegistry('en')}
         menuHint={en.menuHint} menuMoreAbove={en.menuMoreAbove} menuMoreBelow={en.menuMoreBelow}
-        reverseSearchLabel={en.reverseSearch} historyProjectRoot={root} caretStyle="marker"
+        reverseSearchLabel={en.reverseSearch}
+        composerPasteChip={en.composerPasteChip} historyProjectRoot={root} caretStyle="marker"
       />,
     );
   }

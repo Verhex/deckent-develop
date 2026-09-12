@@ -119,6 +119,7 @@ import {
 } from './exact-evaluation-policy-authority.js';
 import type {
   ExactDockerAcceptedResultV2,
+  ExactDockerRejectedResultV2,
   ExactDockerCustodyPredecessorV2,
   ExactDockerCustodyDispatchOutcomeV2,
   ExactDockerCustodyIdentityRefV2,
@@ -320,6 +321,7 @@ type ExactNormalDockerRegistryEntry =
       reasonCode: string;
       /** Safe, Store-verified capture summary for operator-facing HOLD readers. */
       diagnosticReason?: string;
+      rejected?: ExactDockerRejectedResultV2;
       backend: SpawnBackend | null;
       lifecycleOwner: TaskExecutionLifecycleOwnerV2 | null;
     }>;
@@ -460,6 +462,8 @@ export interface ExactNormalDockerExecutionRegistryV2 {
   readonly revalidateExactAcceptedResultTerminalAuthority:
     RevalidateExactAcceptedResultTerminalAuthority;
   readExactTerminalAuthority(taskId: string): ExactAcceptedTaskTerminalAuthorityRead;
+  readRejectedResultAuthority?(taskId: string): ExactDockerRejectedResultV2 | null;
+  verifyRejectedResultAuthority?(taskId: string, expected: ExactDockerRejectedResultV2): Promise<boolean>;
   /**
    * Drop a recovered attempt that belongs to an earlier, already-terminal run
    * and can never settle under the current derivation.
@@ -978,6 +982,13 @@ export function createExactNormalDockerExecutionRegistry(
           }));
           return;
         }
+        if (outcome.kind === 'rejected-result') {
+          entries.set(taskId, Object.freeze({
+            state: 'hold', reasonCode: outcome.reasonCode, rejected: outcome,
+            backend, lifecycleOwner: backend,
+          }));
+          return;
+        }
         const captureDiagnostic = outcome.captureDiagnostic === undefined
           ? null
           : captureDiagnosticReason(query, outcome.captureDiagnostic);
@@ -1109,6 +1120,19 @@ export function createExactNormalDockerExecutionRegistry(
     settleExactAcceptedResult,
     revalidateExactAcceptedResultTerminalAuthority,
     readExactTerminalAuthority,
+    readRejectedResultAuthority(taskId: string): ExactDockerRejectedResultV2 | null {
+      const entry = entries.get(taskId);
+      return entry?.state === 'hold' ? entry.rejected ?? null : null;
+    },
+    async verifyRejectedResultAuthority(taskId: string, expected: ExactDockerRejectedResultV2): Promise<boolean> {
+      const entry = entries.get(taskId);
+      if (entry?.state !== 'hold' || entry.rejected !== expected
+        || !entry.backend?.verifyExactDockerRejectedResult) return false;
+      try {
+        const verified = await entry.backend.verifyExactDockerRejectedResult(expected);
+        return verified === true && entries.get(taskId) === entry;
+      } catch { return false; }
+    },
     retireHistoricalUnsettleableAttempt(taskId: string, reasonCode: string): void {
       entries.delete(taskId);
       historicalUnsettleable.set(taskId, Object.freeze({

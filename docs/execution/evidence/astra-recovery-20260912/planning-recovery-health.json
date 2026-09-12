@@ -1,0 +1,13 @@
+{
+  "observedAt": "2026-09-12T15:03:42.373Z",
+  "state": "hold",
+  "unresolved": [
+    {
+      "dispatchRequestId": "dreq-57f932e5eaaab94986733ff4ed3957919588c2ae1331d2676434611b143c13ef",
+      "taskId": "748-001",
+      "reasonCode": "STARTED_ATTEMPT_RECONCILIATION_REQUIRED",
+      "custodyHoldCode": null
+    }
+  ],
+  "recoveryListReceiptDigest": "sha256:675b1f791fd56cfe6b8e2a68c2b48ed38663af5c03f982ff8a8d71dcdf69de0b"
+}

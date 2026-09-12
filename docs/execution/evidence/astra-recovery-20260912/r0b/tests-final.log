@@ -1,0 +1,35 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/orchestra/exact-rejected-result-closure.test.ts (5 tests) 20715ms
+   ✓ released effect with rejected result: durable negative closure > survives a new Store and replays without acceptance or duplicate publication  4870ms
+   ✓ released effect with rejected result: durable negative closure > rejects a wrong source digest or foreign recovery authority  3970ms
+   ✓ released effect with rejected result: durable negative closure > prevents publishing acceptance after the negative terminal marker  3828ms
+   ✓ released effect with rejected result: durable negative closure > fails closed when the first-writer terminal record is corrupted  3924ms
+   ✓ released effect with rejected result: durable negative closure > rejects a backdated decision and a conflicting first-writer replay  4121ms
+ ✓ tests/core/run-status-authority.test.ts (19 tests) 827ms
+ ✓ tests/orchestra/spawn-backend-docker-mounts.test.ts (92 tests) 405ms
+ ✓ tests/core/run-status-read-model.test.ts (5 tests) 221ms
+ ✓ tests/core/task-attempt-custody-store.test.ts (176 tests) 26037ms
+   ✓ TaskAttemptCustodyStore V2 kernel > settles the bounded final IPC sequence without exposing or publishing sequence max plus one  10506ms
+   ✓ TaskAttemptCustodyStore V2 kernel > builds an exact accepted-result to archive predecessor chain  1059ms
+   ✓ TaskAttemptCustodyStore V2 kernel > reads each predecessor once at the late validation boundary without an exponential traversal  1061ms
+   ✓ TaskAttemptCustodyStore V2 kernel > holds when current artifact IO changes the predecessor receipt by corrupt before late validation  962ms
+   ✓ TaskAttemptCustodyStore V2 kernel > holds when current artifact IO changes the predecessor receipt by delete before late validation  956ms
+   ✓ TaskAttemptCustodyStore V2 kernel > holds when current artifact IO changes the predecessor artifact by corrupt before late validation  943ms
+   ✓ TaskAttemptCustodyStore V2 kernel > holds when current artifact IO changes the predecessor artifact by delete before late validation  928ms
+   ✓ TaskAttemptCustodyStore V2 kernel > does not reuse predecessor authority across top-level reads after tampering  1027ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects a stage artifact captured before its predecessor chain event  369ms
+   ✓ TaskAttemptCustodyStore V2 kernel > detects a missing earlier chain stage when a later durable stage exists  440ms
+   ✓ TaskAttemptCustodyStore V2 kernel > settles RELEASED only from exact mount outcome and durable gated release evidence  385ms
+   ✓ TaskAttemptCustodyStore V2 kernel > retains committed-journal release-pending truth with complete immutable inventory  427ms
+   ✓ TaskAttemptCustodyStore V2 kernel > requires an exactly empty chain and exact structural evidence refs  373ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects stale/sibling authority, provider-observation substitution and disposition conflicts  435ms
+   ✓ TaskAttemptCustodyStore V2 kernel > retains committed-journal release-pending truth with complete immutable inventory  399ms
+ ✓ tests/core/custody-read-snapshot.test.ts (3 tests) 3ms
+
+ Test Files  6 passed (6)
+      Tests  300 passed (300)
+   Start at  20:31:38
+   Duration  29.78s (transform 3.76s, setup 54ms, collect 5.98s, tests 48.21s, environment 1ms, prepare 195ms)
+

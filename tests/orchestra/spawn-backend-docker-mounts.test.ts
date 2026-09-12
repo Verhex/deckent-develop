@@ -1,3 +1,4 @@
+import * as resultIngressForRejection from '../../src/orchestra/result-ingress.js';
 // ─── 593-001 F2c: design-catalog mount mask (flag-gated, default OFF) ───────
 //
 // Measured leak: spawn-backend-docker bind-mounts the WHOLE project root read-write
@@ -324,6 +325,7 @@ function releasedReplayFixture() {
     projectionFence: authority.projectionFence,
   };
   const store = {
+    readRejectedResultDispatch: vi.fn((): unknown => null),
     readStartedFailedDispatch: vi.fn((): unknown => null),
     readEffectCommittedReleasePendingDispatch: vi.fn((): unknown => null),
     // No private seal-failure artifact exists in this normal monitor fixture.
@@ -693,6 +695,33 @@ function coldExactDockerCompletionFixture(timestampOverrides: Readonly<{
 }
 
 describe('exact Docker custody mounts', () => {
+  it('shares verified rejected-result closure between planning and startup without replaying effects', async () => {
+    const fixture = releasedReplayFixture();
+    const entry = { state: 'admitted', ref: fixture.admissionRef, admission: fixture.scope.admission, reservation: {} };
+    fixture.store.readRejectedResultDispatch.mockReturnValue({ state: 'REJECTED_RESULT_CLOSED' });
+    const store = { ...fixture.store,
+      listDispatchAdmissionsForRecovery: vi.fn(() => ({ entries: [entry], heldAdmissions: [] })),
+    };
+    const backend = new DockerSpawnBackend('/test/project');
+    const internals = backend as unknown as {
+      openExactDockerRecoveryStore: ReturnType<typeof vi.fn>;
+      reconstructExactDockerRecoveryScope: ReturnType<typeof vi.fn>;
+      rehydrateExactDockerEffectLaunch: ReturnType<typeof vi.fn>;
+    };
+    internals.openExactDockerRecoveryStore = vi.fn(() => ({ store, policy: fixture.scope.policy }));
+    internals.reconstructExactDockerRecoveryScope = vi.fn(() => ({ ...fixture.scope, store }));
+    internals.rehydrateExactDockerEffectLaunch = vi.fn();
+    expect(backend.inspectAdmissionResolvedForPlanning(store as never, fixture.scope.policy as never, entry as never)).toBe(true);
+    const report = await backend.reconcilePendingAttempts();
+    expect(report.closedRejectedResults).toEqual([fixture.identity.taskId]);
+    expect(report.closedStartedFailed ?? []).toEqual([]);
+    expect(report.closedNotDispatched).toEqual([]);
+    expect(report.adopted).toEqual([]);
+    expect(internals.rehydrateExactDockerEffectLaunch).not.toHaveBeenCalled();
+    fixture.store.readRejectedResultDispatch.mockImplementation(() => { throw new Error('tampered rejection'); });
+    expect(() => backend.inspectAdmissionResolvedForPlanning(store as never, fixture.scope.policy as never, entry as never)).toThrow('tampered rejection');
+  });
+
   it('treats verified retained failure as resolved history, never accepted or zero-work', async () => {
     const fixture = releasedReplayFixture();
     const entry = { state: 'admitted', ref: fixture.admissionRef, admission: fixture.scope.admission, reservation: {} };
@@ -4724,6 +4753,34 @@ describe('exact Docker custody mounts', () => {
       },
     } as never)).rejects.toThrow(/COMPLETION_IDENTITY_MISMATCH/);
     expect(store.publishHostArtifact).not.toHaveBeenCalled();
+    internals.exactCustodyCompletions.set(admissionRefDigest, {
+      scope, query, providerStartReceipt, providerExecutionReceipt,
+      promise: Promise.resolve(hotApiCompletion),
+    });
+
+    // A schema-invalid worker claim is a typed rejection, not a host-authority
+    // failure and never an accepted receipt. Run the real backend producer.
+    const ingressRejection = vi.spyOn(resultIngressForRejection, 'assembleCanonicalIngressResultV2')
+      .mockImplementationOnce(() => { throw new resultIngressForRejection.WorkerResultSchemaError(
+        'worker schema fixture rejection', ['productionWiringEvidence.evidence.basis'], ['basis: Required'],
+      ); });
+    const rejected = await backend.acceptExactDockerCustodyResult({
+      query,
+      authority: {
+        taskId: identity.taskId, workerId: 'worker-fixture-001', provider: 'codex',
+        model: 'gpt-5.6-terra', promptCompilePlanId: task.promptCompilePlanId,
+        isPriorityFix: false, fixForTaskId: null,
+      },
+    } as never);
+    ingressRejection.mockRestore();
+    expect(rejected).toMatchObject({
+      kind: 'rejected-result', reasonCode: 'WORKER_RESULT_SCHEMA_INVALID',
+      sourceResultDigest: sourceArtifactDigest, custodyRef: query.custodyRef,
+    });
+    expect(store.publishHostArtifact).not.toHaveBeenCalled();
+    expect(store.appendChain).not.toHaveBeenCalled();
+    expect(await backend.verifyExactDockerRejectedResult({ ...rejected } as never)).toBe(false);
+    expect(await backend.awaitExactDockerAcceptedResult(query as never)).toBe(rejected);
     internals.exactCustodyCompletions.set(admissionRefDigest, {
       scope, query, providerStartReceipt, providerExecutionReceipt,
       promise: Promise.resolve(hotApiCompletion),

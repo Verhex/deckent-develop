@@ -1,0 +1,15 @@
+{
+  "observedAt": "2026-09-12T14:48:25.985037+00:00",
+  "files": {
+    "src/orchestra/result-ingress.ts": "e6e01856821f6bc6d48754eff7d67aca91f60a1fe930d537de3a8815f51d4e22",
+    "src/orchestra/spawn-backend.ts": "bdf3d93bb027b6698a401f572e1c0a281fb280499dd4b813ee35e7b6614b02d5",
+    "src/orchestra/spawn-backend-docker.ts": "80148b5585d6e8c05a9df43b7fcef339b5f20a095bd6c9044981407dd93f8232",
+    "src/orchestra/scheduler-effects.ts": "e0affd83395c614808992f6304decadcc20ff24acd9c1d96136dc8e28caef7bf",
+    "src/orchestra/sprint-controller.ts": "7cf1f955d385a39aa564281b869787621eb438e213203a0da25c47fbf63e5925",
+    "src/cli/commands/start.ts": "d110ca0276bee6ae601f758ac1ccbe8c8188ad08b570a75801bbf514d1d5e989",
+    "tests/orchestra/rejected-result-history.test.ts": "b94bea6a3ac783d718cba5f996e0cc31647ebec846c89bb39990685d6caafdd9",
+    "docs/execution/evidence/astra-recovery-20260912/recovery-candidate.patch": "209fa590a8603cbeddfc8e7743b72e5c0a6d7493d846adea7b6f0b5c6f215d1a",
+    "docs/execution/evidence/astra-recovery-20260912/xverify-claim.md": "0148a781b7f2cc03c7345ad49b4a2d41436fd7c0967ab5258fef800dcaf18969"
+  },
+  "purpose": "Supervisor observed source pin; canonical XVerify broker snapshot remains its own authority"
+}

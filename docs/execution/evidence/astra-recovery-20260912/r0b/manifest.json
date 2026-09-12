@@ -1,0 +1,266 @@
+{
+  "observedAt": "2026-09-12T18:18:19.333225+00:00",
+  "disposition": "STATUS_LOCAL_VERIFIED; ACCELERATION_DEFAULT_OFF_HOLD; OUTER_R0_HOLD",
+  "files": [
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/RESULT.md",
+      "bytes": 6824,
+      "sha256": "c32887f4187c7ca75882804522bc63d8cb385c16cfe788e77cc4f9d9e9ae1f69"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/baseline.json",
+      "bytes": 1149,
+      "sha256": "a859689276dbbf321c80a9812a41d444ba5bce20e7f3df8423e9466c47202bcc"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-final-command.json",
+      "bytes": 236,
+      "sha256": "d48fa7fd700f1b179caf439098895ec360613d44411a699504dc1ecef5e28f9a"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-gated-command.json",
+      "bytes": 236,
+      "sha256": "cf962eb94d51ef6c8613977c3e2459539ffddcc2eb62bcebf0c5ea4b7d5f29ca"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-gated.log",
+      "bytes": 1898,
+      "sha256": "1884409a3f7d4cee79d88e04e9e430aa29478bdcf5e8391966acfb8488cd7f2f"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-gated.stderr",
+      "bytes": 534,
+      "sha256": "a70ee20ab841ef89dcc772d6b5a69a9a2000ab7f6ba24133cf6f2cb4a470859f"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-identity-delivered-command.json",
+      "bytes": 235,
+      "sha256": "38a5f46e2995df5120d7309e3b50411ff71cafdaca637933697053b900ba9139"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-identity-delivered.json",
+      "bytes": 588,
+      "sha256": "fab784dbbc53ebdab2b73d3b40e559e524a301aca2b8385bd9054d59ef256b70"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-repaired-command.json",
+      "bytes": 226,
+      "sha256": "52d785b6945d86a42ba56cddd470b8f90f43ff89ab604a8e17406ae1fa8dd730"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-repaired.stderr",
+      "bytes": 83,
+      "sha256": "95a7556ec4849b891447834b61704b06c22d5305cae4a0c341c6152c450a5638"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-sequenced-command.json",
+      "bytes": 236,
+      "sha256": "aa3232769ba64b0a760ef9340566c4f7ddacfe6e34f0b489a1d0b1eb3b4b025e"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/build-sequenced.stderr",
+      "bytes": 534,
+      "sha256": "5d855a2448556fb560f6d84271f971c3ecc6300d1dccf29e4b75f457879926bf"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/candidate-final-diagnostic-command.json",
+      "bytes": 257,
+      "sha256": "879b0b247e006247c74932497cac6fff09022b7f1366017fcec58ed5dc91a188"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/candidate-final-diagnostic.json",
+      "bytes": 321,
+      "sha256": "790473cd8e9f883be54e47c0b2396efbc5be68c62b0a49be8009b27501f5f072"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/candidate-final-diagnostic.stderr",
+      "bytes": 855,
+      "sha256": "c38e9069bf9692071f0df4d407ad48c2d3641e2eb06376eb6a7261cf80e35aed"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/command-exits.json",
+      "bytes": 513,
+      "sha256": "6e148137411a499d8d002c5304e264a8a6b5870ee1fa8e26066ca2c3faec079b"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/external-profiles.json",
+      "bytes": 658,
+      "sha256": "184fdb41bf66a15a3c778a6ada1aa0247203f618e4f3db22262fdcec8bef02dd"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-diagnostic.json",
+      "bytes": 274,
+      "sha256": "6bff15b636c3c9be5447d1ef212246579d97d4746734612278b2b01dc09de44b"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-diagnostic.stderr",
+      "bytes": 4209,
+      "sha256": "b8bc3a87b8feac3cc9e722826d7a0aaa8ed00a87e4ac835d9643e45d490765a1"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-extended-diagnostic-command.json",
+      "bytes": 372,
+      "sha256": "6ab35bd20e50a0b5cf216a1da4b9d53c1d68f695d59cdc4a3c45100affb6263a"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-extended-diagnostic.json",
+      "bytes": 322,
+      "sha256": "fdfbb0e8616151dd710ba075139fd130a04f8c566da4a2b4308c71d506ce6dcf"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-extended-diagnostic.stderr",
+      "bytes": 164,
+      "sha256": "e87f23c6e6aa145e8c330cdf1411024f6157ab3380d7554c295517c4934672f6"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-final-command.json",
+      "bytes": 233,
+      "sha256": "409d15ba428bf0778babba3ed6f6e5c41c3307bc8c9cca2e01465c3bb158d041"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-final.json",
+      "bytes": 328,
+      "sha256": "90123bd0d7285b28f67c1651070db1d737b30497a697f514ceb10ec0928b06c3"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-first-command.json",
+      "bytes": 231,
+      "sha256": "3c07c511b35360f64d2825d850f7c792b81adad836c7a30b82f743177751084e"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-first.json",
+      "bytes": 266,
+      "sha256": "ae6b5388c4e36779f4fb89801e47ea42aedfc6fa0a7fb9b42af35852c3a2766e"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-profile-command.json",
+      "bytes": 357,
+      "sha256": "1ede4b37a02719ba121edb4ebf78b84d630ba68c96a723da8ded91d85214d213"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-profile.json",
+      "bytes": 274,
+      "sha256": "853d904dc375861f4e1492acfb394c43bd295a7a684d3d0289ff2cbbc7b3df39"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-profile.stderr",
+      "bytes": 55490,
+      "sha256": "996d2cf43792dbd58d1ba16a5d7837281cdf9fd0bd61d708eb8d04a7f1ed38c3"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-repaired.json",
+      "bytes": 268,
+      "sha256": "06ccf8152c2a415c6dae26143e247b1e7d67bff32e6851b49d668bfbcdd211bd"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-shared-diagnostic-command.json",
+      "bytes": 241,
+      "sha256": "5999bb5fd48fb71a85f349b8e46aad932f1a540931f847544a5a2c192bf17d01"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/health-shared-diagnostic.json",
+      "bytes": 321,
+      "sha256": "55591421450da5a5e5a55bfddc38fd701e341ecc3faa26e4627b5aaabd152e86"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/incremental.patch",
+      "bytes": 24702,
+      "sha256": "4bd11239053cca17cec4d8c1af22284c969094b1fa499288c32a6d7602c1d4d6"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/production-default-health-command.json",
+      "bytes": 234,
+      "sha256": "f1178d2ebf75a71a13c236d488021863e5fc42bdb67a311c38c27ded361d86f5"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/production-default-health.json",
+      "bytes": 227,
+      "sha256": "8183221e6ecab8ef5a9520f4796b29894dd75625f4c8f89faa91d1891fd37cd2"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/production-default-health.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/profile-self-aggregate.json",
+      "bytes": 2917,
+      "sha256": "7c4d2dabbf113540d15fde1bc99fd036a732266ffe4ef99334e824b54322bf17"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/profile-summary.json",
+      "bytes": 12111,
+      "sha256": "d3ba1b5ffe12c555037e721f3fa960a6486098b580212b0e8e781184a9217986"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/runtime-delivered-command.json",
+      "bytes": 234,
+      "sha256": "ef7d7d4d1c11f1107804489d8162abf67bdc59c8b5d91bc4e1c3b6437f55d22d"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/runtime-delivered.json",
+      "bytes": 7179,
+      "sha256": "64120858dbb149b46286b967d5a2f45375213e9e0732ab5f3ca00f50a1b0cfb4"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/source-manifest.json",
+      "bytes": 1532,
+      "sha256": "1ace327e294d14cfc6deda941200e45c5136b3244e23aa816d75beb1f7029542"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/test-lifecycle-fence.log",
+      "bytes": 446,
+      "sha256": "d27df422dc3a487ead254314964cf3774d76ca9fbca7d4e9ff88c4198f3ae128"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/test-shared-reader-verified.log",
+      "bytes": 446,
+      "sha256": "e9741d3646cd9ed40e1ee693904469451fb90f6ceff15262957ff81783fbdaef"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/tests-final.log",
+      "bytes": 3384,
+      "sha256": "ab135e7ee4895776e6428009bac86c27d14a213d9f4f10a9bbfe502d9dd5eab6"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/tests-lifecycle.log",
+      "bytes": 6174,
+      "sha256": "d43c59d4266bf4963b2257adc2aac46f17b7243084000dc504864f75c514a4dc"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/tests-quarantine-repair.log",
+      "bytes": 324,
+      "sha256": "5fc0fa8b9c5fd272fc393f5ba57c645f980ed234e254f17329a751f0e31ce3c7"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/tests-quarantine.log",
+      "bytes": 23302,
+      "sha256": "977115d6ab5cb51c5212c83a12a2abbc120030ab1112e4db015f25909d98384f"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/tests-repaired.log",
+      "bytes": 3384,
+      "sha256": "35ce4d4a1f691c5c7e6acf39c8415b80d6b1d15a7f210a51a79de63ac5e8fced"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/tsc-gated.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/tsc-lifecycle.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/tsc-quarantine.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r0b/tsc-shared-reader.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

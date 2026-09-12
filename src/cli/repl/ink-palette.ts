@@ -10,7 +10,7 @@
 // → helpers/generated/palette.ts) onto Text props for the tier theme.ts admitted.
 //
 //   ansi16    named 16-colors — the HOST palette paints them, so a user's
-//             VS Code / Cursor / JetBrains / Windows Terminal theme decides the
+//             Host terminal theme (IDE or emulator) decides the
 //             actual pixels (the tier every IDE terminal gets by default)
 //   ansi256   `ansi256(n)` — only when a dark background is known
 //   truecolor the NOVA token hex — only when a dark background is known

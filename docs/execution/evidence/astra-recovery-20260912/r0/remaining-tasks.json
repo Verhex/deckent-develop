@@ -1,0 +1,78 @@
+[
+  {
+    "path": ".tasks/.task-cas-0f3f422b8dfad6e59c46afc7-a9df7f4af090739c77151fc9-49d8bb85aa36ded1dec51f7795addd102b371bc99c357e7ce98f8c2b7bcac7bf.previous",
+    "mtime": "2026-09-12T11:38:26.509368+00:00"
+  },
+  {
+    "path": ".tasks/.task-cas-17e5a88aa0ca15c663b8b465-7ca23e7874bd83ae53f2afdd-45055dba9ecdeab94ae5746abe13888a13dd118de24d6c2b407fb937cb630b22.previous",
+    "mtime": "2026-09-11T21:43:15.981159+00:00"
+  },
+  {
+    "path": ".tasks/.task-cas-4a2422d064adeb6c8d4a2758-05f8d803cd57c5e829d128ed-b0c6dd7d35e7ec3e49a4e2fbedcc28ca2540bca98585801c8a34428a3120eeb6.previous",
+    "mtime": "2026-09-11T18:36:27.121613+00:00"
+  },
+  {
+    "path": ".tasks/.task-cas-5bd97446da9002dea7764e2a-5d0b7b6cfe0f8e05ac265500-ad95207e084a5a329d9863ffad4f6376cd46cb52f4c63a0384565be886d8e46e.previous",
+    "mtime": "2026-09-11T21:43:15.985081+00:00"
+  },
+  {
+    "path": ".tasks/.task-cas-c721cde2166e31b6a52bf0fc-0365884480b6584556160963-9b0dcb8796252c8cd65d975ceb9cc1e16926f85b8c208c15c7b83fc47c00f76b.previous",
+    "mtime": "2026-09-11T22:10:12.498032+00:00"
+  },
+  {
+    "path": ".tasks/.task-cas-d7c02b2de6b4e240acdf368d-da99e7d08af783c575527b72-67e7901233dad0f56f6ef8d0a061fb173a0e190284e8c8ca92302399df7e051c.previous",
+    "mtime": "2026-09-11T22:10:12.502146+00:00"
+  },
+  {
+    "path": ".tasks/task-xv-1789224472822-f22c7e59-41ec-4e85-9836-d95ea3e16872-xverify.json",
+    "mtime": "2026-09-12T14:51:20.622895+00:00",
+    "id": "xv-1789224472822-f22c7e59-41ec-4e85-9836-d95ea3e16872-xverify",
+    "status": "DONE",
+    "provider": "claude",
+    "model": "claude-opus-5",
+    "updatedAt": "2026-09-12T14:48:16.576Z"
+  },
+  {
+    "path": ".tasks/task-xv-1789224472822-f22c7e59-41ec-4e85-9836-d95ea3e16872-xverify.plan",
+    "mtime": "2026-09-12T14:48:16.940113+00:00"
+  },
+  {
+    "path": ".tasks/task-xv-1789224472822-f22c7e59-41ec-4e85-9836-d95ea3e16872.json",
+    "mtime": "2026-09-12T14:47:59.357277+00:00",
+    "id": "xv-1789224472822-f22c7e59-41ec-4e85-9836-d95ea3e16872",
+    "status": "DONE",
+    "provider": "codex",
+    "model": "gpt-6-astra",
+    "updatedAt": null
+  },
+  {
+    "path": ".tasks/task-xv-1789224472822-f22c7e59-41ec-4e85-9836-d95ea3e16872.result",
+    "mtime": "2026-09-12T14:47:59.357277+00:00"
+  },
+  {
+    "path": ".tasks/task-xv-1789230815702-af4c4d11-e872-4e0b-950b-5d5ecf95e6ad-xverify.json",
+    "mtime": "2026-09-12T16:34:00.394513+00:00",
+    "id": "xv-1789230815702-af4c4d11-e872-4e0b-950b-5d5ecf95e6ad-xverify",
+    "status": "PENDING",
+    "provider": "claude",
+    "model": "claude-opus-5",
+    "updatedAt": "2026-09-12T16:34:00.044Z"
+  },
+  {
+    "path": ".tasks/task-xv-1789230815702-af4c4d11-e872-4e0b-950b-5d5ecf95e6ad-xverify.plan",
+    "mtime": "2026-09-12T16:34:00.394513+00:00"
+  },
+  {
+    "path": ".tasks/task-xv-1789230815702-af4c4d11-e872-4e0b-950b-5d5ecf95e6ad.json",
+    "mtime": "2026-09-12T16:33:44.547505+00:00",
+    "id": "xv-1789230815702-af4c4d11-e872-4e0b-950b-5d5ecf95e6ad",
+    "status": "DONE",
+    "provider": "codex",
+    "model": "gpt-6-astra",
+    "updatedAt": null
+  },
+  {
+    "path": ".tasks/task-xv-1789230815702-af4c4d11-e872-4e0b-950b-5d5ecf95e6ad.result",
+    "mtime": "2026-09-12T16:33:44.547505+00:00"
+  }
+]

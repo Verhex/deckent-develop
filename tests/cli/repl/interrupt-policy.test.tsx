@@ -102,6 +102,7 @@ describe('InputBar — hands the signal and the draft state to the caller', () =
         menuMoreAbove={en.menuMoreAbove}
         menuMoreBelow={en.menuMoreBelow}
         reverseSearchLabel={en.reverseSearch}
+        composerPasteChip={en.composerPasteChip}
         historyProjectRoot={root}
         caretStyle="marker"
       />,

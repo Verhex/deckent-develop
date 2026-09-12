@@ -1,7 +1,7 @@
-// ═══ ChatTurnQueue — Hermes user-msg bg-completed-work queue ═══════════════
+// ═══ ChatTurnQueue — background-completed work queue ═══════════════════════
 // TERM-2, DIRECTIVES.md Task 9 / MASTER-PLAN row 41.
 //
-// Hermes rule: work that finishes in the BACKGROUND while a user turn is in
+// Rule: work that finishes in the BACKGROUND while a user turn is in
 // flight must never be injected mid-turn — it is buffered and only surfaces
 // as brand-new turn(s) once the active turn ends. This module is the pure,
 // I/O-free core: no rendering, no chat-loop driving, no i18n. A REPL surface

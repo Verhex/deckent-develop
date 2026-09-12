@@ -31,6 +31,9 @@ import {
   type ProviderTerminalUsageEvidence,
 } from '../core/provider-terminal-usage-evidence.js';
 
+/** A worker claim failed the canonical result schema; host authority errors remain distinct. */
+export class WorkerResultSchemaError extends AssemblerError {}
+
 export interface CanonicalIngressAuthority {
   readonly taskId: string;
   readonly workerId: string;
@@ -238,7 +241,7 @@ export function assembleCanonicalIngressResult(
   };
   const validated = validateTaskResult(candidate);
   if (!validated.ok) {
-    throw new AssemblerError(
+    throw new WorkerResultSchemaError(
       `worker ingress for task ${authority.taskId} failed canonical assembly: ${validated.errors.join('; ')}`,
       validated.missingFields,
       validated.errors,
