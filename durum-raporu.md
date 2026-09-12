@@ -1762,3 +1762,12 @@ Host testi: candidate69/71 exit1, baseline70/71 exit1; eski transient-recovery k
 Son gözlem:751 ABORTED/FAILED, coordinator dead, worker yok. `.tasks/task-751-001.json`, skill-delivery, checkpoint/PID snapshot/native custody korunur; elle cleanup/kill/settlement yapılmadı. **752 veya yeni canary başlatmadan önce751 release/rehydration kilidini çöz.** Sonra start'ın ortak exact-admission yolu, bounded custody-read latency ve erken canonical status, worker dependency/verification-recipe parity; ardından retention candidate kabulü. Yeni manuel onarım bu turda başlamadı.
 
 Kalıcı analiz, kimlikler, UTC, digest, komut ve test çıkışları: [canary REPORT](docs/execution/evidence/astra-canary-20260912/REPORT.md), [manifest](docs/execution/evidence/astra-canary-20260912/MANIFEST.json). Bu dosya geçici özet; MASTER120'nin disposition'ı değiştirilmedi.
+
+
+## 2026-09-12 — 751 sonrası plan; owner başlangıç talimatı bekleniyor
+
+Owner: önce plan/rapor, yalnız “başla” sonrası uygulama. [R1 execution-ready plan](docs/execution/active/RECOVERY-DO-DOGFOOD-001-R1-PLAN.md) mevcut MASTER120 / RECOVERY-DO-DOGFOOD-001 kapsamında A release/negative settlement → B exact archive/cleanup → C dependency+verification → D start admission → E latency/status → F retention dogfood sırasını ve proof sınırlarını tanımlar. Planlama sırasında ürün veya runtime mutate edilmedi, yeni sprint/build/provider call yok.
+
+19:31:50.660Z snapshot: 751 ABORTED/FAILED, active=false, coordinator=dead, terminalReceipt=null; task EXECUTING kalmış. `.tasks` 20 dosya: 751(2), historical CAS(6), XVerify(4+7), heartbeat identity(1). Henüz hiçbiri silinmedi. [Snapshot](docs/execution/evidence/astra-canary-20260912/r1-plan-snapshot.json) SHA256 c7b07cf4fa138d7ebc396ecede8ca5c63ce8f824597dc5df225ff67822e1bb24.
+
+Canary raporuna iki netleştirme: npm-shrinkwrap.json var ve Ink7.0.5 kilitli; host7.1.1 ile dependency/source compatibility uyuşmazlığı mevcut. 751 açıklaması test komutunu taşıyor fakat yapılandırılmış task.verification yok; mevcut sözleşmenin wiring’i tamamlanacak. Mevcut 69/71 test exit1, host tsc0 ve 0/1 kabul durumları değişmedi; yeni test/ürün kabulü iddiası yok.

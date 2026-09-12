@@ -1004,3 +1004,8 @@ Cursor219 CHECKPOINT/pause korunuyor, toparlama220 açık; yeni ASSIGN yok.
 Önceki no751 / henüz-canary-yok kayıtları bu owner-authorized deneme için tarihsel kaldı. Pre-canary commit3eaa44da5. Start:416748ms/exit1/EXACT_DOCKER_TASK_PROJECTION_ADMISSION_REQUIRED. Do: gerçek Flow963bbc69-bfff-4b5f-b5ac-6ba130853feb →751-001 worker→main etkisi→RUN_FAILED. Worker NO_GO; EFFECT_RELEASE_HOLD / ARTIFACT_REPLAY_MISMATCH, recovery REHYDRATE_AUTHORITY_MISMATCH. Son durumda coordinator/worker yok, effect settlement HOLD; task/checkpoint/native custody korunuyor.
 
 Aktif outcome MASTER120 / recovery; yeni implementation başlamadı. İlk sonraki bounded iş751 release/rehydration artifact farkını bulup exact settlement'ı kapatmak; yeni sprint/cleanup/force-finalize ile atlanmaz. Worker candidate3dosya +24/-16; baseline70/71, candidate69/71, tsc0. Checkpoint koruma, ACCEPT değil. Dist candidate öncesine ait. [Kalıcı canary kanıtı](../docs/execution/evidence/astra-canary-20260912/REPORT.md).
+
+
+## 2026-09-12 — R1 planlandı, execution başlamadı
+
+Epoch7 / MASTER120 / RECOVERY-DO-DOGFOOD-001. Owner “önce plan, başla deyince uygula” talimatı bağlayıcı. [R1 planı](../docs/execution/active/RECOVERY-DO-DOGFOOD-001-R1-PLAN.md): 751 effect release/negative settlement → archive/.tasks cleanup → dependency+verification → start ortak admission → latency/status → gerçek retention dogfood. 19:31:50Z: 751 dead/ABORTED, terminalReceipt yok, task EXECUTING; 20 task-artifact korunuyor. Plan dokümanı yeni run veya cleanup yetkisi değildir. Sonraki eylem, owner “başla” sonrası fresh identity kontrolü ve exact mismatch analizi.
