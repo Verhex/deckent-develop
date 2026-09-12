@@ -26,6 +26,11 @@ function workerImageExists(): boolean {
 }
 
 describe('Dockerfile.worker — provider CLI readiness (static analysis)', () => {
+  it('ships the same worker recipe for repository and packaged installations', () => {
+    expect(readFileSync(packagedDockerfileWorkerPath, 'utf-8'))
+      .toBe(readFileSync(dockerfileWorkerPath, 'utf-8'));
+  });
+
   it('Dockerfile.worker exists', () => {
     expect(existsSync(dockerfileWorkerPath)).toBe(true);
   });

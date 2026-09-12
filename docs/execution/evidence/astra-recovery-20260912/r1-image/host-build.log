@@ -1,0 +1,50 @@
+
+> deckent@0.100.0 build:all
+> npm run clean && npm run clean:native && npm run build:native && tsc && node scripts/copy-assets.mjs && npm run build:dashboard
+
+
+> deckent@0.100.0 clean
+> node scripts/clean.mjs
+
+{"schemaVersion":1,"decision":"ALLOW","code":"CLEAN_COMPLETED","removed":19,"preserved":["dashboard"],"admission":{"schemaVersion":1,"authority":"deckent.clean.active-execution.v1","decision":"ALLOW","code":"CLEAN_ACTIVE_EXECUTION_CLEAR","projectRootDigest":"b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27","reasons":[],"projections":[{"surface":"run-flow","id":"2f42f845-acaa-418e-9f2e-1f946cd5a91c","rawStatus":"DETACHED_RUNNING","effectiveStatus":"STALE_DEAD","authority":"process-liveness","evidenceRefs":[".deckent/runtime/run-flow-store/2f42f845-acaa-418e-9f2e-1f946cd5a91c.handle.jsonl"]},{"surface":"run-flow","id":"63aedcaf-7573-484c-9ad6-dc4b0e4fda9f","rawStatus":"DETACHED_RUNNING","effectiveStatus":"STALE_DEAD","authority":"process-liveness","evidenceRefs":[".deckent/runtime/run-flow-store/63aedcaf-7573-484c-9ad6-dc4b0e4fda9f.handle.jsonl"]},{"surface":"run-flow","id":"a7e3c2d2-cd53-4b30-822b-5f79e14f4f5f","rawStatus":"DETACHED_RUNNING","effectiveStatus":"STALE_DEAD","authority":"process-liveness","evidenceRefs":[".deckent/runtime/run-flow-store/a7e3c2d2-cd53-4b30-822b-5f79e14f4f5f.handle.jsonl"]},{"surface":"run-job","id":"run-mnomfzeq","rawStatus":"RUNNING","effectiveStatus":"STALE","authority":"adjacent-execution-authority","evidenceRefs":[".deckent/runtime/jobs/run-mnomfzeq.json"]},{"surface":"run-job","id":"run-mp3qgy0b","rawStatus":"RUNNING","effectiveStatus":"STALE","authority":"adjacent-execution-authority","evidenceRefs":[".deckent/runtime/jobs/run-mp3qgy0b.json"]},{"surface":"run-job","id":"run-mp3x8bm3","rawStatus":"RUNNING","effectiveStatus":"STALE","authority":"adjacent-execution-authority","evidenceRefs":[".deckent/runtime/jobs/run-mp3x8bm3.json"]},{"surface":"run-job","id":"run-mp3xpqai","rawStatus":"RUNNING","effectiveStatus":"STALE","authority":"adjacent-execution-authority","evidenceRefs":[".deckent/runtime/jobs/run-mp3xpqai.json"]},{"surface":"run-job","id":"run-mp3xq48s","rawStatus":"RUNNING","effectiveStatus":"STALE","authority":"adjacent-execution-authority","evidenceRefs":[".deckent/runtime/jobs/run-mp3xq48s.json"]},{"surface":"run-job","id":"run-mp47cm54","rawStatus":"RUNNING","effectiveStatus":"STALE","authority":"adjacent-execution-authority","evidenceRefs":[".deckent/runtime/jobs/run-mp47cm54.json"]},{"surface":"run-job","id":"sprint-1774372905891","rawStatus":"RUNNING","effectiveStatus":"STALE","authority":"adjacent-execution-authority","evidenceRefs":[".deckent/runtime/jobs/sprint-1774372905891.json"]},{"surface":"run-job","id":"sprint-1774518414470","rawStatus":"RUNNING","effectiveStatus":"STALE","authority":"adjacent-execution-authority","evidenceRefs":[".deckent/runtime/jobs/sprint-1774518414470.json"]},{"surface":"run-job","id":"sprint-1775137674743","rawStatus":"RUNNING","effectiveStatus":"STALE","authority":"adjacent-execution-authority","evidenceRefs":[".deckent/runtime/jobs/sprint-1775137674743.json"]},{"surface":"run-job","id":"sprint-1775645251541","rawStatus":"RUNNING","effectiveStatus":"STALE","authority":"adjacent-execution-authority","evidenceRefs":[".deckent/runtime/jobs/sprint-1775645251541.json"]},{"surface":"run-job","id":"sprint-1776143355175","rawStatus":"RUNNING","effectiveStatus":"STALE","authority":"adjacent-execution-authority","evidenceRefs":[".deckent/runtime/jobs/sprint-1776143355175.json"]},{"surface":"run-job","id":"sprint-1776160612606","rawStatus":"RUNNING","effectiveStatus":"STALE","authority":"adjacent-execution-authority","evidenceRefs":[".deckent/runtime/jobs/sprint-1776160612606.json"]},{"surface":"run-job","id":"sprint-1776233719361","rawStatus":"RUNNING","effectiveStatus":"STALE","authority":"adjacent-execution-authority","evidenceRefs":[".deckent/runtime/jobs/sprint-1776233719361.json"]},{"surface":"run-job","id":"sprint-1776255236722","rawStatus":"RUNNING","effectiveStatus":"STALE","authority":"adjacent-execution-authority","evidenceRefs":[".deckent/runtime/jobs/sprint-1776255236722.json"]},{"surface":"run-job","id":"sprint-1776347467563","rawStatus":"RUNNING","effectiveStatus":"STALE","authority":"adjacent-execution-authority","evidenceRefs":[".deckent/runtime/jobs/sprint-1776347467563.json"]},{"surface":"run-job","id":"sprint-1776358979460","rawStatus":"RUNNING","effectiveStatus":"STALE","authority":"adjacent-execution-authority","evidenceRefs":[".deckent/runtime/jobs/sprint-1776358979460.json"]}],"inspected":{"taskFiles":0,"heartbeatFiles":0,"workerPidFiles":0,"sprintPidFiles":0,"processEntries":5,"receiptRows":0,"spawnLockFiles":0,"executionLockFiles":1,"jobFiles":587,"runFlowFiles":381,"missionRows":10},"disposedOrphans":[]}}
+
+> deckent@0.100.0 clean:native
+> node scripts/build-exec-authority-native.mjs --clean
+
+{"event":"EXEC_AUTHORITY_NATIVE_CLEANED"}
+
+> deckent@0.100.0 build:native
+> node scripts/build-exec-authority-native.mjs
+
+{"event":"EXEC_AUTHORITY_NATIVE_BUILT","platform":"linux","arch":"x64","binarySha256":"sha256:4e4dd558785cced4688979b219ac2648623f8bbf1f89a9f9fba8abab9913597f","nativeSourceTreeSha256":"sha256:ef06f44f070e07061cacb7672e0812a88f44a8235e7002f338c2786f32d69a8d"}
+{"schemaVersion":1,"event":"BUILD_ASSETS_COMPLETED","outputDirectory":"dist","copied":123,"chmodCount":2,"buildIdentityWritten":true}
+
+> deckent@0.100.0 build:dashboard
+> node scripts/build-dashboard.mjs
+
+vite v6.4.1 building for production...
+transforming...
+✓ 2291 modules transformed.
+rendering chunks...
+computing gzip size...
+../../dist/dashboard/index.html                           0.59 kB │ gzip:   0.38 kB
+../../dist/dashboard/assets/index-Dzal6fCm.css           67.92 kB │ gzip:  12.76 kB
+../../dist/dashboard/assets/MemoryPage-MM2w0pPg.js        0.29 kB │ gzip:   0.23 kB
+../../dist/dashboard/assets/list-todo-D1RhDQM2.js         0.47 kB │ gzip:   0.32 kB
+../../dist/dashboard/assets/CallbackPage-CsUS4QTR.js      1.76 kB │ gzip:   0.87 kB
+../../dist/dashboard/assets/oidc-flow-BP3n7By_.js         2.24 kB │ gzip:   0.96 kB
+../../dist/dashboard/assets/DocsHealthPage-zu1tcpyF.js    3.14 kB │ gzip:   1.17 kB
+../../dist/dashboard/assets/AutonomousPage-IS5au6uy.js    4.41 kB │ gzip:   1.32 kB
+../../dist/dashboard/assets/MissionsPage-plpVfIaK.js      5.18 kB │ gzip:   1.88 kB
+../../dist/dashboard/assets/LoginPage-CiSOS48t.js         6.37 kB │ gzip:   2.70 kB
+../../dist/dashboard/assets/StatusPage-BG7_gMXV.js       14.08 kB │ gzip:   3.82 kB
+../../dist/dashboard/assets/ConfigPage-DhZ77A6P.js       17.41 kB │ gzip:   5.13 kB
+../../dist/dashboard/assets/HistoryPage-USzZv5fj.js     399.43 kB │ gzip: 109.67 kB
+../../dist/dashboard/assets/index-DdprnStb.js           760.54 kB │ gzip: 206.59 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 3.65s
+{"schemaVersion":1,"event":"DASHBOARD_BUILD_COMPLETED","outputDirectory":"dist/dashboard"}

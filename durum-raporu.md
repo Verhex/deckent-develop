@@ -1787,3 +1787,10 @@ Planner→compiler doğrulama komutu aktarımı onarıldı; scoped115/115,tsc0.
 Geniş prompt paketi2FAIL; genel ürün kapanışı yok. Read-only planning kontrolü
 192.26s sonunda sonuçsuz sonlandırıldı; yeni worker açılmadı.
 [Kanıt ve kalan işler](docs/execution/evidence/astra-recovery-20260912/r1-close/RESULT.md).
+
+## 2026-09-12 — R1-C worker dependency/image kanıtı
+
+Ink lock7.1.1; iki Dockerfile eşit. Aday image gerçek tsc0, retention69/71 exit1;
+host build0, image unit31PASS/3SKIP. Eski image etiketi korunuyor; native HOLD ve
+ikiretention hatası kapanmadı. Cursor'a223 ile terminal/start.ts kapanış paketi
+atandı; ACK henüz yok. [Tam kanıt ve kalan işler](docs/execution/evidence/astra-recovery-20260912/r1-image/RESULT.md).

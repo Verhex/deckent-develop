@@ -1,0 +1,21 @@
+{
+  "utc": "2026-09-12T20:33:26.040Z",
+  "files": [
+    {
+      "path": "package.json",
+      "sha256": "8edfc3ab43d42fc282b5836ef3ff6c79b53629d0e0d28107fe96c3a5715e87c9"
+    },
+    {
+      "path": "npm-shrinkwrap.json",
+      "sha256": "456f3a429baecaff6849c60e99e7f1be0801114856eb02f4bfecd9670d5142fd"
+    },
+    {
+      "path": "Dockerfile.worker",
+      "sha256": "98b3c9f08c139054b2abc7481f638989f0e56127db5b37e75bd585f75854331c"
+    },
+    {
+      "path": "assets/Dockerfile.worker",
+      "sha256": "98b3c9f08c139054b2abc7481f638989f0e56127db5b37e75bd585f75854331c"
+    }
+  ]
+}

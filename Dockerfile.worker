@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     util-linux \
+    zstd \
     && rm -rf /var/lib/apt/lists/*
 
 # Exact Docker custody executes its native capability probe from the immutable
@@ -49,7 +50,6 @@ RUN npm i -g @anthropic-ai/claude-code@$CLAUDE_CODE_VERSION
 # RUN npm i -g @openai/codex
 # RUN npm i -g @google/gemini-cli
 # RUN curl -fsSL https://ollama.ai/install.sh | sh
-# RUN curl https://cursor.com/install -fsS | bash
 ARG INSTALL_CODEX=false
 ARG CODEX_VERSION=0.148.0
 ARG INSTALL_GEMINI=false
@@ -58,15 +58,20 @@ ARG INSTALL_CURSOR=false
 RUN if [ "$INSTALL_CODEX" = "true" ]; then npm i -g "@openai/codex@$CODEX_VERSION"; fi
 RUN if [ "$INSTALL_GEMINI" = "true" ]; then npm i -g @google/gemini-cli; fi
 RUN if [ "$INSTALL_OLLAMA" = "true" ]; then curl -fsSL https://ollama.ai/install.sh | sh; fi
-# cursor-agent is binary-only (src/core/provider-packages.ts:71 — not an npm
-# package); the official installer (cursor.com/cli) drops the binary under
-# $HOME/.local/bin. HOME is reassigned to /tmp/deckent-home later in this
-# file (non-root writable home), so the binary is symlinked into
-# /usr/local/bin here — already on PATH for every user — instead of relying
-# on HOME-relative PATH entries that would break after the reassignment.
+# Cursor's official installer is HOME-scoped. Install into a shared, read-only
+# prefix instead of /root so DockerSpawnBackend's host UID/GID can execute the
+# CLI, then expose both official binary names on the system PATH. Download and
+# execution are separate so an HTTP failure cannot be hidden by a successful
+# empty shell pipeline.
 RUN if [ "$INSTALL_CURSOR" = "true" ]; then \
-      curl https://cursor.com/install -fsS | bash && \
-      ln -sf "$HOME/.local/bin/cursor-agent" /usr/local/bin/cursor-agent; \
+      mkdir -p /opt/cursor-agent && \
+      curl -fsSL https://cursor.com/install --output /tmp/cursor-agent-install.sh && \
+      HOME=/opt/cursor-agent bash /tmp/cursor-agent-install.sh && \
+      rm -f /tmp/cursor-agent-install.sh && \
+      chmod -R a+rX /opt/cursor-agent/.local && \
+      ln -s /opt/cursor-agent/.local/bin/cursor-agent /usr/local/bin/cursor-agent && \
+      ln -s /opt/cursor-agent/.local/bin/agent /usr/local/bin/agent && \
+      cursor-agent --version; \
     fi
 
 # Create writable home directory for non-root execution
