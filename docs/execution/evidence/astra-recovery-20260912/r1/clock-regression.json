@@ -1,0 +1,32 @@
+{
+  "observedAt": "2026-09-12T19:49:50.624771+00:00",
+  "sprintId": "sprint-751",
+  "attemptId": "9d2ee9c9-500c-82a2-8f44-8b668521df43",
+  "transactionDigest": "sha256:cb383ba3c14fdf5bf1694b57d9d51510e47f41df949bff1c464a3255e33b9946",
+  "preparedAt": "2026-09-12T18:54:51.893Z",
+  "applyingAt": "2026-09-12T18:54:51.608Z",
+  "regressionMilliseconds": 285,
+  "preparedPredecessorDigestMatches": true,
+  "fencingTokenDigestMatches": true,
+  "firstReject": "verifyExecutionEffectLandingJournalFanInV1: applyingAt < preparedAt",
+  "source": "src/core/execution-effect-persistence-contract.ts:2803",
+  "artifacts": [
+    {
+      "path": "/home/alperen/.local/state/deckent/runtime/task-attempt-custody/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/v2/projects/c382ed0187fa864185980851b324b929c3193aec707454b98fb40ef88dcdcf29/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/tasks/eacbc615ccf46051442b0b29d84cfab9b2313b02ed8a0d5cc327c700009a71d2/attempts/9d2ee9c9-500c-82a2-8f44-8b668521df43/generations/1/artifacts/execution-effect-landing-journal/el-cb383ba3c14fdf5bf1694b57d9d51510e47f41df949bff1c464a3255e33b9946-prepared.bin",
+      "sha256": "sha256:07055663b98e7ba3401b16dfb9c717dbe96369582b999384d3265c71d97baad8",
+      "receiptPath": "/home/alperen/.local/state/deckent/runtime/task-attempt-custody/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/v2/projects/c382ed0187fa864185980851b324b929c3193aec707454b98fb40ef88dcdcf29/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/tasks/eacbc615ccf46051442b0b29d84cfab9b2313b02ed8a0d5cc327c700009a71d2/attempts/9d2ee9c9-500c-82a2-8f44-8b668521df43/generations/1/artifacts/execution-effect-landing-journal/el-cb383ba3c14fdf5bf1694b57d9d51510e47f41df949bff1c464a3255e33b9946-prepared.receipt.json",
+      "receiptFileSha256": "7e64f5084384597ca85903d911f15e74167da40149451b6704ba4cd8d3c8b8fe",
+      "receiptDigest": "sha256:d57207128e2aa80492cf1b85e6e014fa4f005b59f07d8404ab590c7631aa3f20"
+    },
+    {
+      "path": "/home/alperen/.local/state/deckent/runtime/task-attempt-custody/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/v2/projects/c382ed0187fa864185980851b324b929c3193aec707454b98fb40ef88dcdcf29/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/tasks/eacbc615ccf46051442b0b29d84cfab9b2313b02ed8a0d5cc327c700009a71d2/attempts/9d2ee9c9-500c-82a2-8f44-8b668521df43/generations/1/artifacts/execution-effect-landing-journal/el-cb383ba3c14fdf5bf1694b57d9d51510e47f41df949bff1c464a3255e33b9946-applying.bin",
+      "sha256": "sha256:77b37de15bf0f40509a699bcddba688d3d46880bec98583f718b171ac66fd059",
+      "receiptPath": "/home/alperen/.local/state/deckent/runtime/task-attempt-custody/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/v2/projects/c382ed0187fa864185980851b324b929c3193aec707454b98fb40ef88dcdcf29/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/tasks/eacbc615ccf46051442b0b29d84cfab9b2313b02ed8a0d5cc327c700009a71d2/attempts/9d2ee9c9-500c-82a2-8f44-8b668521df43/generations/1/artifacts/execution-effect-landing-journal/el-cb383ba3c14fdf5bf1694b57d9d51510e47f41df949bff1c464a3255e33b9946-applying.receipt.json",
+      "receiptFileSha256": "6f4381e0eb0a35187bbde034114286d9cefdcb3c6decb4d47d021ccab6bb1707",
+      "receiptDigest": "sha256:4b448ecd126d0db3c7bdbc0d296dc3240eff74a9acb784bbc5c21e0fb2152fb9"
+    }
+  ],
+  "custodyMutation": false,
+  "negativeClosure": "UNAVAILABLE_IN_CURRENT_CONTRACT",
+  "reason": "Rejected-result requires verified effect landing; committed-unsettled retention excludes existing release progress and is not terminal settlement."
+}

@@ -1,0 +1,36 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/orchestra/execution-effect-landing-coordinator.test.ts (37 tests) 975ms
+   ✓ execution effect landing coordinator > bounds quarantine evidence after a late failure in a large operation set  680ms
+ ✓ tests/orchestra/execution-effect-store-adapter.test.ts (24 tests) 102501ms
+   ✓ execution effect Store adapter > fails closed when a later cleanup artifact exists behind a missing predecessor  3957ms
+   ✓ execution effect Store adapter > publishes and rereads ALLOCATING before project-root landing authority exists  5670ms
+   ✓ execution effect Store adapter > publishes coordinator journals and exposes accepted authority only after full Store fan-in  3858ms
+   ✓ execution effect Store adapter > proves a committed coordinator journal without mutating Store bytes  5255ms
+   ✓ execution effect Store adapter > rejects prepared evidence when immutable bytes are missing  5910ms
+   ✓ execution effect Store adapter > rejects prepared evidence when immutable bytes are tampered  5903ms
+   ✓ execution effect Store adapter > rejects native evidence when immutable bytes are missing  6020ms
+   ✓ execution effect Store adapter > rejects native evidence when immutable bytes are tampered  5995ms
+   ✓ execution effect Store adapter > rejects final evidence when immutable bytes are missing  5887ms
+   ✓ execution effect Store adapter > rejects final evidence when immutable bytes are tampered  5894ms
+   ✓ execution effect Store adapter > rejects lease evidence when immutable bytes are missing  5929ms
+   ✓ execution effect Store adapter > rejects lease evidence when immutable bytes are tampered  5895ms
+   ✓ execution effect Store adapter > rejects committed-pending evidence after release progress is durable  6602ms
+   ✓ execution effect Store adapter > rejects journal replacement, forged references, missing landings and policy-null authority  3866ms
+   ✓ execution effect Store adapter > proves a production-shaped coordinator commit before release or accepted-result publication  1898ms
+   ✓ execution effect Store adapter > rejects prepared evidence when immutable bytes are missing  2441ms
+   ✓ execution effect Store adapter > rejects prepared evidence when immutable bytes are tampered  2546ms
+   ✓ execution effect Store adapter > rejects native evidence when immutable bytes are missing  2695ms
+   ✓ execution effect Store adapter > rejects native evidence when immutable bytes are tampered  2718ms
+   ✓ execution effect Store adapter > rejects final evidence when immutable bytes are missing  2607ms
+   ✓ execution effect Store adapter > rejects final evidence when immutable bytes are tampered  2645ms
+   ✓ execution effect Store adapter > rejects lease evidence when immutable bytes are missing  2578ms
+   ✓ execution effect Store adapter > rejects lease evidence when immutable bytes are tampered  2536ms
+   ✓ execution effect Store adapter > rejects committed-pending evidence after release progress is durable  3194ms
+
+ Test Files  2 passed (2)
+      Tests  61 passed (61)
+   Start at  22:42:04
+   Duration  104.70s (transform 740ms, setup 30ms, collect 1.28s, tests 103.48s, environment 0ms, prepare 66ms)
+

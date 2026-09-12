@@ -1009,3 +1009,8 @@ Aktif outcome MASTER120 / recovery; yeni implementation başlamadı. İlk sonrak
 ## 2026-09-12 — R1 planlandı, execution başlamadı
 
 Epoch7 / MASTER120 / RECOVERY-DO-DOGFOOD-001. Owner “önce plan, başla deyince uygula” talimatı bağlayıcı. [R1 planı](../docs/execution/active/RECOVERY-DO-DOGFOOD-001-R1-PLAN.md): 751 effect release/negative settlement → archive/.tasks cleanup → dependency+verification → start ortak admission → latency/status → gerçek retention dogfood. 19:31:50Z: 751 dead/ABORTED, terminalReceipt yok, task EXECUTING; 20 task-artifact korunuyor. Plan dokümanı yeni run veya cleanup yetkisi değildir. Sonraki eylem, owner “başla” sonrası fresh identity kontrolü ve exact mismatch analizi.
+
+
+## 2026-09-12 — R1-A source repair; terminal closure HOLD
+
+Owner start alındı. [Kanıt](../docs/execution/evidence/astra-recovery-20260912/r1/RESULT.md): wall-clock rollback journal sırasını bozmuş; coordinator causal-time + Docker shared clock source düzeltmesi yerel doğrulandı. Eski751 malformed journal immutable kalıyor; negative effect disposition yok, build clean gate task751 ve XVerify pending receipt nedeniyle HOLD. `.tasks` silinmedi. R1-A kapanış contract’ı tamamlanmadan B/C/D/E/F veya yeni sprint yok. Cursor221 tüketildi/arşivlendi,222 ACK; REPL pause, start215/216 R1-D proof kapsamına alındı.

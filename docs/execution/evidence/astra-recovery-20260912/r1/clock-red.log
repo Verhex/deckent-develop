@@ -1,0 +1,77 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ❯ tests/orchestra/execution-effect-landing-coordinator.test.ts (37 tests | 2 failed | 35 skipped) 75ms
+   ↓ execution effect landing coordinator > derives landing intent through one deterministic strict authority helper
+   ↓ execution effect landing coordinator > distinguishes staged-source capture failure from project preimage mismatch
+   ↓ execution effect landing coordinator > distinguishes staged-source authority failure from project preimage mismatch
+   ↓ execution effect landing coordinator > preserves post-lease staged mismatch leaf and context even if quarantine publication throws
+   ↓ execution effect landing coordinator > preserves post-lease staged exception leaf and context even if quarantine publication throws
+   ↓ execution effect landing coordinator > preserves post-lease entry mismatch leaf and context even if quarantine publication throws
+   ↓ execution effect landing coordinator > preserves post-lease entry exception leaf and context even if quarantine publication throws
+   ↓ execution effect landing coordinator > preserves post-lease parent mismatch leaf and context even if quarantine publication throws
+   ↓ execution effect landing coordinator > preserves post-lease parent exception leaf and context even if quarantine publication throws
+   ↓ execution effect landing coordinator > passes the canonical landing intent from prepare into staged source authority
+   ↓ execution effect landing coordinator > never exposes an apply session before the durable locator and completes an exact retry
+   ↓ execution effect landing coordinator > recovers a locator-published apply-not-started crash without process-local session state
+   ↓ execution effect landing coordinator > fails closed for stale, sibling and tampered durable locators
+   ↓ execution effect landing coordinator > never backfills a missing locator after an APPLYING or COMMITTED journal exists
+   ↓ execution effect landing coordinator > lands only through staged chunks, immutable journal steps, final fan-in and terminal lease evidence
+   ↓ execution effect landing coordinator > commits an empty diff as COMMITTED_NO_CHANGE without opening an irreversible boundary
+   ↓ execution effect landing coordinator > fails closed when production adapters are missing, proxied or accessor-authored
+   ↓ execution effect landing coordinator > preserves an immutable authority snapshot after caller-owned manifest mutation
+   ↓ execution effect landing coordinator > derives missing parent creation before child add and binds the child parent CAS to that step
+   ↓ execution effect landing coordinator > lands an explicitly allowed empty directory as one real ADD_DIRECTORY effect
+   ↓ execution effect landing coordinator > derives every missing nested ancestor from the exact real child effect
+   ↓ execution effect landing coordinator > reconciles the exact applied crash prefix without replaying the native effect
+   × execution effect landing coordinator > keeps journal causal time after a wall-clock rollback during apply 48ms
+     → expected [ 1789239291893, 1789239291608, …(2) ] to deeply equal [ 1789239291608, 1789239291608, …(2) ]
+   × execution effect landing coordinator > keeps journal causal time after a wall-clock rollback during restart 26ms
+     → expected [ 1789239291893, 1789239291608, …(2) ] to deeply equal [ 1789239291608, 1789239291608, …(2) ]
+   ↓ execution effect landing coordinator > adopts a PREPARED-only crash from the immutable acquired lease snapshot
+   ↓ execution effect landing coordinator > finishes a verified changed COMMITTED journal whose terminal publication crashed
+   ↓ execution effect landing coordinator > finishes a verified no-change COMMITTED journal whose terminal publication crashed
+   ↓ execution effect landing coordinator > returns an already terminal transaction read-only without lease adoption
+   ↓ execution effect landing coordinator > bounds quarantine evidence after a late failure in a large operation set
+   ↓ execution effect landing coordinator > quarantines instead of committing when the native final full-postimage fan-in fails
+   ↓ execution effect landing coordinator > rejects a native hardlink postimage even when its semantic content matches
+   ↓ execution effect landing coordinator > holds after COMMITTED publication when durable lease terminal evidence is missing
+   ↓ execution effect landing coordinator > rejects malformed journal bytes and missing durable lease terminal evidence on reread
+   ↓ execution effect landing coordinator > rereads and rejects a corrupted STEP instead of trusting COMMITTED alone
+   ↓ execution effect landing coordinator > rejects a nested proxy before manifest parsing can execute proxy traps
+   ↓ execution effect landing coordinator > uses deterministic code-point ordering for Unicode paths
+   ↓ execution effect landing coordinator > rejects a forged opaque session and stale project preimage under the acquired lease
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/orchestra/execution-effect-landing-coordinator.test.ts > execution effect landing coordinator > keeps journal causal time after a wall-clock rollback during apply
+ FAIL  tests/orchestra/execution-effect-landing-coordinator.test.ts > execution effect landing coordinator > keeps journal causal time after a wall-clock rollback during restart
+AssertionError: expected [ 1789239291893, 1789239291608, …(2) ] to deeply equal [ 1789239291608, 1789239291608, …(2) ]
+
+- Expected
++ Received
+
+  [
++   1789239291893,
+    1789239291608,
+    1789239291608,
+    1789239291608,
+-   1789239291893,
+  ]
+
+ ❯ tests/orchestra/execution-effect-landing-coordinator.test.ts:1084:21
+    1082|       const times = [start.preparedAt, applying.applyingAt, ...steps.m…
+    1083|         .map(value => Date.parse(value));
+    1084|       expect(times).toEqual([...times].sort((a, b) => a - b));
+       |                     ^
+    1085|       expect(Buffer.from(before.bytes).toString('utf8')).toBe(original…
+    1086|       expect(steps).toHaveLength(change.decision.state === 'VERIFIED' …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 35 skipped (37)
+   Start at  22:41:32
+   Duration  2.26s (transform 573ms, setup 21ms, collect 651ms, tests 75ms, environment 0ms, prepare 46ms)
+

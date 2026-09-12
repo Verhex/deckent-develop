@@ -1,7 +1,9 @@
 # 751 sonrası onarım ve dogfood dönüş planı
 
-Statü: **PLANNED — WAITING_OWNER_START**. Bu doküman execution/cleanup izni üretmez.
-Owner son talimatı: önce plan ve rapor; yalnız sonraki **“başla”** talimatından sonra uygulama.
+Statü: **R1-A STARTED — PRODUCTION_CLOSURE_HOLD**. Owner sonraki “Evet başlayalım”
+talimatıyla uygulamayı başlattı. Aşağıdaki özgün başlangıç kapısı böylece sağlandı;
+cleanup ve sonraki dilimler teknik bağımlılıklarını bekliyor. İlk sonuç:
+[R1-A clock repair ve negative-closure eksikliği](../evidence/astra-recovery-20260912/r1/RESULT.md).
 Plan checkpoint tarihi: 2026-09-12 UTC. Ürün outcome: **MASTER 120 / STATE-RETENTION-001**;
 onarım bağı: **RECOVERY-DO-DOGFOOD-001**, epoch7 COMMITTED, DOGFOOD ON / HEALTH DEGRADED.
 Yeni MASTER outcome, disposition veya DONE sınıflandırması oluşturulmadı.
@@ -264,8 +266,9 @@ bu onarımın kapanışı tüm retention/scale/platform borcunu kapatmaz.
 - Kill/auth/mode/ledger signing yeni yetki değildir; onaysız genişletilmez. Recovery
   `--force` bir canlı process öldürme/başarı uydurma kaçamağı olarak kullanılmaz.
 
-Başla sonrası ilk eylem: git/751 identity ve canlılık tekrar kontrolü, R1-A exact artifact
+Owner başlangıç talimatıyla yapılan ilk eylem: git/751 identity ve canlılık tekrar kontrolü, R1-A exact artifact
 karşılaştırması. Ardından uygun `deckent recover sprint-751 --dry-run` typed seçeneği;
 `--close-rejected-result` ile `--retain-committed-unsettled` birbirinin alternatifi gibi
 kör denenmez. Native custody semantiğiyle doğru işlem seçilir; normal finalize/cleanup
-yalnız ilgili terminal önkoşulları sağlandığında. Bu dokümandaki komutlar henüz çalıştırılmadı.
+yalnız ilgili terminal önkoşulları sağlandığında. Recovery/finalize/cleanup komutları
+henüz çalıştırılmadı; R1-A test/build denemeleri bağlantılı RESULT'ta kayıtlıdır.

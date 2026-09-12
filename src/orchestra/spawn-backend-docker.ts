@@ -16806,6 +16806,7 @@ export class DockerSpawnBackend implements SpawnBackend {
         native: finalNative.adapter,
         journal: storeAdapter.journal,
         lease,
+        nowIso: () => this.nextExactDockerTimestamp(),
       });
       stage = 'LANDING_PREPARE';
       const located = readExecutionEffectLandingLocatorV1({

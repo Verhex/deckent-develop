@@ -1771,3 +1771,8 @@ Owner: önce plan/rapor, yalnız “başla” sonrası uygulama. [R1 execution-r
 19:31:50.660Z snapshot: 751 ABORTED/FAILED, active=false, coordinator=dead, terminalReceipt=null; task EXECUTING kalmış. `.tasks` 20 dosya: 751(2), historical CAS(6), XVerify(4+7), heartbeat identity(1). Henüz hiçbiri silinmedi. [Snapshot](docs/execution/evidence/astra-canary-20260912/r1-plan-snapshot.json) SHA256 c7b07cf4fa138d7ebc396ecede8ca5c63ce8f824597dc5df225ff67822e1bb24.
 
 Canary raporuna iki netleştirme: npm-shrinkwrap.json var ve Ink7.0.5 kilitli; host7.1.1 ile dependency/source compatibility uyuşmazlığı mevcut. 751 açıklaması test komutunu taşıyor fakat yapılandırılmış task.verification yok; mevcut sözleşmenin wiring’i tamamlanacak. Mevcut 69/71 test exit1, host tsc0 ve 0/1 kabul durumları değişmedi; yeni test/ürün kabulü iddiası yok.
+
+
+## 2026-09-12 — R1-A başladı: saat gerilemesi onarıldı, kapanış HOLD
+
+Owner “Evet başlayalım” talimatı alındı. [R1-A kanıt/sonuç](docs/execution/evidence/astra-recovery-20260912/r1/RESULT.md): 751 APPLYING zamanı PREPARED predecessor’ından285ms önce; artifact hashleri korunmuş. Journal producer predecessor-floor ve ortak host clock ile düzeltildi. İlk61/61 + son coordinator38/38, tsc0; build:all clean gate exit1 (751 EXECUTING + XVerify pending/no-receipt). Eski751 kayıtları değiştirilmedi; yeni sprint, cleanup ve auth mutation yok. Negatif closure için etkisi main’de olup geçerli landing receipt’i olmayan attempt disposition’ı mevcut sözleşmede eksik. R1-A production closure / R1-B cleanup HOLD; yeni producer fix’i ürün DONE değildir.

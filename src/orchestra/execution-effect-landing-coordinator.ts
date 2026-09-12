@@ -166,8 +166,16 @@ function validTimestamp(value: unknown): value is string {
     && new Date(Date.parse(value)).toISOString() === value;
 }
 
-function hostTimestamp(): string {
-  return new Date().toISOString();
+/** Logical wall time follows verified journal predecessors, including after restart. */
+function hostTimestamp(nowIso: () => string, ...verifiedPredecessors: readonly string[]): string {
+  const observed = nowIso();
+  if (!validTimestamp(observed)) throw new TypeError('Invalid landing journal clock');
+  let timestamp = Date.parse(observed);
+  for (const predecessor of verifiedPredecessors) {
+    if (!validTimestamp(predecessor)) throw new TypeError('Invalid landing journal predecessor time');
+    timestamp = Math.max(timestamp, Date.parse(predecessor));
+  }
+  return new Date(timestamp).toISOString();
 }
 
 function sameJson(left: unknown, right: unknown): boolean {
@@ -463,6 +471,8 @@ export interface ExecutionEffectLandingAdaptersV1 {
   readonly native: ExecutionEffectLandingNativeAdapterV1;
   readonly journal: ExecutionEffectLandingJournalAdapterV1;
   readonly lease: ExecutionEffectLandingLeaseAdapterV1;
+  /** Shared host causal clock; omitted by legacy adapters using the system clock. */
+  readonly nowIso?: () => string;
 }
 
 interface PreparedJournalV1 {
@@ -557,6 +567,7 @@ interface SnapshottedAdapters {
   readonly native: ExecutionEffectLandingNativeAdapterV1;
   readonly journal: ExecutionEffectLandingJournalAdapterV1;
   readonly lease: ExecutionEffectLandingLeaseAdapterV1;
+  readonly nowIso: () => string;
 }
 
 interface SnapshottedReadAdapters {
@@ -792,7 +803,10 @@ function method(value: Record<string, unknown>, key: string): ((...args: unknown
 }
 
 function snapshotAdapters(value: unknown): SnapshottedAdapters | null {
-  if (!exactDataObject(value, ['native', 'journal', 'lease'])) return null;
+  if (!exactDataObject(value, ['native', 'journal', 'lease'])
+    && !exactDataObject(value, ['native', 'journal', 'lease', 'nowIso'])) return null;
+  const clock = method(value, 'nowIso');
+  if (objectKeys(value).includes('nowIso') && !clock) return null;
   const nativeValue = value.native;
   const journalValue = value.journal;
   const leaseValue = value.lease;
@@ -839,6 +853,7 @@ function snapshotAdapters(value: unknown): SnapshottedAdapters | null {
     || !publish || !read || !acquire || !resume
     || !assert || !renew || !begin || !quarantine || !complete || !release || !verify) return null;
   return objectFreeze({
+    nowIso: clock ? () => reflectApply(clock, undefined, []) as string : () => new Date().toISOString(),
     native: objectFreeze({
       capability: nativeCapability,
       inspectProjectEntry: (path: string) => reflectApply(inspect, undefined, [path]) as ExecutionEffectLandingEntryStateV1,
@@ -1991,7 +2006,7 @@ function ensureLocator(
     nativeCapabilityDigest: prepared.nativeCapabilityDigest,
     journalCapabilityDigest: prepared.journalCapabilityDigest,
     leaseCapabilityDigest: prepared.leaseCapabilityDigest,
-    publishedAt: hostTimestamp(),
+    publishedAt: hostTimestamp(adapters.nowIso, prepared.preparedAt),
   });
   const locator = objectFreeze({
     ...body,
@@ -2746,7 +2761,7 @@ export async function prepareExecutionEffectLandingV1(
       journalCapabilityDigest: adapters.journal.capability.capabilityDigest,
       leaseCapabilityDigest: adapters.lease.capability.capabilityDigest,
       acquiredLease: lease,
-      preparedAt: hostTimestamp(),
+      preparedAt: hostTimestamp(adapters.nowIso, bundle.final.captureAuthority.completedAt),
     });
     const prepared = recordWithDigest('execution-effect-landing-prepared-journal-v1', preparedBody);
     const artifact = publishRecord(
@@ -2802,7 +2817,7 @@ function publishApplying(
     transactionDigest: authority.transaction.transactionDigest,
     preparedJournalDigest: authority.prepared.recordDigest,
     boundary,
-    applyingAt: hostTimestamp(),
+    applyingAt: hostTimestamp(authority.adapters.nowIso, authority.prepared.preparedAt),
   });
   const applying = recordWithDigest('execution-effect-landing-applying-journal-v1', body);
   const artifact = publishRecord(
@@ -2817,6 +2832,7 @@ function publishStep(
   authority: SessionAuthority,
   applying: ApplyingJournalV1,
   previousJournalDigest: string,
+  previousJournalTimestamp: string,
   operation: ExecutionEffectLandingOperationV1,
   receipt: ExecutionEffectLandingNativeMutationReceiptV1,
   reconciledAfterCrash: boolean,
@@ -2833,7 +2849,7 @@ function publishStep(
     operationDigest: operation.operationDigest,
     nativeReceipt: receipt,
     reconciledAfterCrash,
-    appliedAt: hostTimestamp(),
+    appliedAt: hostTimestamp(authority.adapters.nowIso, authority.prepared.preparedAt, applying.applyingAt, previousJournalTimestamp),
   });
   const step = recordWithDigest('execution-effect-landing-step-journal-v1', body);
   const artifact = publishRecord(
@@ -2848,6 +2864,7 @@ function publishCommitted(
   authority: SessionAuthority,
   applying: ApplyingJournalV1 | null,
   lastJournalDigest: string,
+  lastJournalTimestamp: string,
   receipts: readonly string[],
   finalVerificationReceipt: ExecutionEffectLandingFinalVerificationReceiptV1 | null,
 ): CommittedJournalV1 | null {
@@ -2864,7 +2881,7 @@ function publishCommitted(
     lastJournalDigest,
     operationReceiptDigests: objectFreeze([...receipts]),
     finalVerificationReceipt,
-    committedAt: hostTimestamp(),
+    committedAt: hostTimestamp(authority.adapters.nowIso, authority.prepared.preparedAt, lastJournalTimestamp),
   });
   const committed = recordWithDigest('execution-effect-landing-committed-journal-v1', body);
   const artifact = publishRecord(
@@ -2906,7 +2923,7 @@ function runApply(
     appendBoundedLandingEvidence(evidence, lease.leaseReceiptDigest);
     adapters.lease.assert(lease);
     if (prepared.operations.length === 0) {
-      const committed = publishCommitted(authority, null, prepared.recordDigest, [], null);
+      const committed = publishCommitted(authority, null, prepared.recordDigest, prepared.preparedAt, [], null);
       if (!committed) throw new Error('journal');
       committedPublished = true;
       const terminal = terminalSnapshot(
@@ -2940,6 +2957,7 @@ function runApply(
     evidence.applyingJournalDigest = applying.recordDigest;
     appendBoundedLandingEvidence(evidence, applying.recordDigest);
     let previous = applying.recordDigest;
+    let previousTimestamp = applying.applyingAt;
     const nativeReceipts: ExecutionEffectLandingNativeMutationReceiptV1[] = [];
     for (const operation of prepared.operations) {
       const key = journalKey(transaction.transactionDigest, `step-${String(operation.index).padStart(7, '0')}`);
@@ -2948,6 +2966,7 @@ function runApply(
         const step = stepSnapshot(existing.value, prepared, applying, previous, operation.index);
         if (!step) throw new Error('journal');
         previous = step.recordDigest;
+        previousTimestamp = step.appliedAt;
         nativeReceipts.push(step.nativeReceipt);
         continue;
       }
@@ -2988,10 +3007,11 @@ function runApply(
       }
       if (!nativeReceipt) throw new Error('native');
       const step = publishStep(
-        authority, applying, previous, operation, nativeReceipt, reconciledAfterCrash,
+        authority, applying, previous, previousTimestamp, operation, nativeReceipt, reconciledAfterCrash,
       );
       if (!step) throw new Error('journal');
       previous = step.recordDigest;
+      previousTimestamp = step.appliedAt;
       nativeReceipts.push(nativeReceipt);
       appendBoundedLandingEvidence(evidence, step.recordDigest);
       appendBoundedLandingEvidence(evidence, nativeReceipt.receiptDigest);
@@ -3012,6 +3032,7 @@ function runApply(
       authority,
       applying,
       previous,
+      previousTimestamp,
       nativeReceipts.map(receipt => receipt.receiptDigest),
       finalVerification,
     );

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   evaluateExecutionEffectContainment,
@@ -1050,6 +1050,64 @@ describe('execution effect landing coordinator', () => {
       .find(value => value.key.endsWith('/applying.json'))!;
     expect(environment.resumeCalls).toBe(1);
     expect(Buffer.from(applyingAfter.bytes).toString('utf8')).toBe(immutableApplyingBytes);
+  });
+
+  it.each(['apply', 'restart'] as const)('keeps journal causal time after a wall-clock rollback during %s', async (mode) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-09-12T18:54:51.893Z'));
+      const change = basicChange();
+      const environment = fakeEnvironment(change.baseline);
+      const prepared = await prepareExecutionEffectLandingV1({
+        planId: 'plan-clock-rollback', ...change, adapters: environment.adapters,
+      });
+      expect(prepared.state).toBe('PREPARED');
+      if (prepared.state !== 'PREPARED') return;
+      const before = [...environment.journalEntries.values()]
+        .find(value => value.key.endsWith('/prepared.json'))!;
+      const original = Buffer.from(before.bytes).toString('utf8');
+      vi.setSystemTime(new Date('2026-09-12T18:54:51.608Z'));
+      const outcome = mode === 'apply'
+        ? await applyExecutionEffectLandingV1(prepared.session)
+        : await reconcileExecutionEffectLandingV1({
+          transaction: prepared.transaction, adapters: environment.adapters,
+        });
+      expect(outcome.state).toBe('COMMITTED');
+      const records = [...environment.journalEntries.values()]
+        .map(value => JSON.parse(Buffer.from(value.bytes).toString('utf8')));
+      const start = records.find(value => value.phase === 'PREPARED');
+      const applying = records.find(value => value.phase === 'APPLYING');
+      const steps = records.filter(value => value.phase === 'STEP').sort((a, b) => a.index - b.index);
+      const committed = records.find(value => value.phase === 'COMMITTED');
+      const times = [start.preparedAt, applying.applyingAt, ...steps.map(value => value.appliedAt), committed.committedAt]
+        .map(value => Date.parse(value));
+      expect(times).toEqual([...times].sort((a, b) => a - b));
+      expect(Buffer.from(before.bytes).toString('utf8')).toBe(original);
+      expect(steps).toHaveLength(change.decision.state === 'VERIFIED' ? change.decision.effects.length : 0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('uses the shared host clock at the prepared boundary and rejects malformed clock authority', async () => {
+    const change = basicChange();
+    const environment = fakeEnvironment(change.baseline);
+    const preparedAt = '2099-01-01T00:00:00.000Z';
+    const prepared = await prepareExecutionEffectLandingV1({
+      planId: 'shared-clock', ...change,
+      adapters: { ...environment.adapters, nowIso: () => preparedAt },
+    });
+    expect(prepared.state).toBe('PREPARED');
+    const record = [...environment.journalEntries.values()]
+      .map(value => JSON.parse(Buffer.from(value.bytes).toString('utf8')))
+      .find(value => value.phase === 'PREPARED');
+    expect(record.preparedAt).toBe(preparedAt);
+    const invalid = fakeEnvironment(change.baseline);
+    expect(await prepareExecutionEffectLandingV1({
+      planId: 'invalid-clock', ...change,
+      adapters: { ...invalid.adapters, nowIso: () => 'not-a-timestamp' },
+    })).toMatchObject({ state: 'HOLD' });
+    expect(invalid.journalEntries.size).toBe(0);
   });
 
   it('adopts a PREPARED-only crash from the immutable acquired lease snapshot', async () => {
