@@ -1,0 +1,8 @@
+{
+  "observedAt": "2026-09-13T15:16:45.079Z",
+  "elapsedMs": 287.322537,
+  "status": null,
+  "error": true,
+  "signal": null,
+  "mode": "real Docker client against local nonresponding test socket; no daemon mutation"
+}

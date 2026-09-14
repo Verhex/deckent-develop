@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { savePlannedSprint, saveRunHandle } from '../../src/core/run-flow-store.js';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -142,6 +143,58 @@ describe('exact committed-unsettled retention isolation', () => {
   beforeEach(() => { root = mkdtempSync(join(tmpdir(), 'committed-unsettled-recovery-')); });
   afterEach(() => { rmSync(root, { recursive: true, force: true }); });
   const dispatchRequestId = `dreq-${'c'.repeat(64)}`;
+
+  it('refuses released-unaccepted retention without a canonical failed flow, even in dry-run', async () => {
+    const boundary = vi.fn<NonNullable<SprintRecoveryOperationOptions['exactReleasedUnacceptedRecovery']>>();
+    const publishStatus = vi.fn();
+    await expect(runSprintRecoveryOperation(root, 'sprint-482', {
+      dryRun: true, releasedUnacceptedDispatchRequestId: dispatchRequestId,
+      exactReleasedUnacceptedRecovery: boundary,
+      publishCanonicalRunStatusReadModel: publishStatus,
+    })).rejects.toMatchObject({ code: 'ACTIVE_AUTHORITY' });
+    expect(boundary).not.toHaveBeenCalled();
+    expect(publishStatus).not.toHaveBeenCalled();
+  });
+
+  it('binds released-unaccepted apply to the exact failed Flow without generic settlement', async () => {
+    const sprintId = 'sprint-482';
+    const flowId = 'released-unaccepted-flow';
+    mkdirSync(join(root, '.deckent', 'pids'), { recursive: true });
+    mkdirSync(join(root, '.deckent', 'runtime', 'jobs'), { recursive: true });
+    writeFileSync(join(root, '.deckent', 'pids', `${sprintId}.snapshot.json`), JSON.stringify({
+      sprintId, pid: 2_996_159, startToken: 'released-generation',
+    }));
+    savePlannedSprint(root, flowId, { revision: 1, sprint: { id: sprintId } } as never);
+    saveRunHandle(root, {
+      flowId, revision: 1, planDigest: 'fixture-only',
+      handle: { flowId, jobId: 'released-job', logRef: 'released-log' },
+      startedAt: '2026-09-12T00:00:00.000Z', pid: 2_996_159, startToken: 'released-generation',
+    } as never);
+    writeFileSync(join(root, '.deckent', 'runtime', 'jobs', 'released-job.json'), JSON.stringify({
+      status: 'FAILED', completionRecord: { flowId }, error: 'fixture failure',
+    }));
+    const identity = readSprintRecoverySettlementIdentity(root, sprintId);
+    const boundary = vi.fn<NonNullable<SprintRecoveryOperationOptions['exactReleasedUnacceptedRecovery']>>()
+      .mockImplementation(async input => {
+        input.beforePublish();
+        return { state: 'retained', dispatchRequestId, taskId: '482-001', attemptId: 'attempt-1',
+          generation: 1, receiptDigest: `sha256:${'e'.repeat(64)}`, evidenceDigest: `sha256:${'f'.repeat(64)}`,
+          phase: 'RELEASED_EFFECT_UNACCEPTED' };
+      });
+    const generic = vi.fn(() => { throw new Error('generic recovery forbidden'); });
+    const publishStatus = vi.fn();
+    const report = await runSprintRecoveryOperation(root, sprintId, {
+      approval: { identity, approvalRef: 'approval:test', idempotencyKey: 'released-once' },
+      releasedUnacceptedDispatchRequestId: dispatchRequestId,
+      exactReleasedUnacceptedRecovery: boundary, exactCustodyInspection: generic,
+      publishCanonicalRunStatusReadModel: publishStatus,
+    });
+    expect(report.releasedUnacceptedAttempt?.state).toBe('retained');
+    expect(report.taskFilesArchived).toBe(0);
+    expect(generic).not.toHaveBeenCalled();
+    expect(publishStatus).toHaveBeenCalledTimes(1);
+    expect(existsSync(join(root, '.deckent', 'recently-works', `${sprintId}-terminal-receipt.json`))).toBe(false);
+  });
 
   it('uses the distinct exact branch and preserves the unresolved disposition in dry-run', async () => {
     const boundary = vi.fn<NonNullable<SprintRecoveryOperationOptions['exactCommittedUnsettledRecovery']>>()

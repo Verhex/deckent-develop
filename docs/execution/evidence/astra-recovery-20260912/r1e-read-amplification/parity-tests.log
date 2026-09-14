@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/core/custody-read-snapshot.test.ts (6 tests) 6ms
+ ✓ tests/orchestra/exact-committed-unsettled-recovery.test.ts (5 tests) 4705ms
+   ✓ exact committed-unsettled Docker recovery > publishes and idempotently rereads the real committed-anchor Store disposition  4699ms
+
+ Test Files  2 passed (2)
+      Tests  11 passed (11)
+   Start at  01:21:40
+   Duration  9.12s (transform 2.17s, setup 26ms, collect 2.90s, tests 4.71s, environment 0ms, prepare 81ms)
+

@@ -1,3 +1,9 @@
+import { runIsolatedExactDockerCaptureWindow, type ExactDockerCaptureWindowResultV1 } from './exact-docker-command-transport.js';
+import { parseExactDockerCommandDiagnostic } from './exact-docker-command-diagnostic.js';
+import { runExactDockerWorkspaceCommand, type ExactDockerWorkspaceCommandResultV1, type ExactDockerWorkspaceCommandRunnerV1 } from './exact-docker-workspace-command.js';
+import { resolveExactDockerObservationRunner, isExactDockerProductionRunner } from './exact-docker-container-observation.js';
+export { runExactDockerWorkspaceCommand, type ExactDockerWorkspaceCommandInputV1, type ExactDockerWorkspaceCommandResultV1, type ExactDockerWorkspaceCommandRunnerV1 } from './exact-docker-workspace-command.js';
+import { HEARTBEAT_IDENTITY_HOLD, WORKER_ACTIVITY_HEARTBEAT_KIND, WORKER_ACTIVITY_HEARTBEAT_VERSION, renderWorkerActivityHeartbeatInstruction, bindWorkerPromptHeartbeatIdentity } from '../core/worker-activity-heartbeat.js';
 import type { ExactDockerRejectedResultV2, ExactDockerRejectedResultReaderV2 } from './spawn-backend.js';
 // ─── Docker Spawn Backend ─────────────────────────────────────────────────
 // Spawns workers in isolated Docker containers.
@@ -122,6 +128,7 @@ import {
   type TaskAttemptCustodyDispatchAdmissionRefV2,
   type TaskAttemptCustodyEffectCommittedReleasePendingDispatchV2,
   type TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2,
+  type TaskAttemptCustodyEffectReleasedUnacceptedEvidenceV2,
   type TaskAttemptCustodyDispatchNotDispatchedAuthorityV2,
   type TaskAttemptCustodyDispatchReleasedAuthorityV2,
   type TaskAttemptCustodyDispatchRecoveryAuthorityV2,
@@ -537,6 +544,11 @@ const baselinePath = '/run/deckent/scope-baseline.txt';
 const sha256 = value => 'sha256:' + createHash('sha256').update(value).digest('hex');
 const isDigest = value => typeof value === 'string' && /^sha256:[a-f0-9]{64}$/.test(value);
 const verifyProviderStartAuthorization = ${verifyExactDockerProviderStartAuthorization.toString()};
+const WORKER_ACTIVITY_HEARTBEAT_KIND = ${JSON.stringify(WORKER_ACTIVITY_HEARTBEAT_KIND)};
+const WORKER_ACTIVITY_HEARTBEAT_VERSION = ${JSON.stringify(WORKER_ACTIVITY_HEARTBEAT_VERSION)};
+const HEARTBEAT_IDENTITY_HOLD = ${JSON.stringify(HEARTBEAT_IDENTITY_HOLD)};
+const renderWorkerActivityHeartbeatInstruction = ${renderWorkerActivityHeartbeatInstruction.toString()};
+const bindWorkerPromptHeartbeatIdentity = ${bindWorkerPromptHeartbeatIdentity.toString()};
 const snapshot = JSON.parse(readFileSync(snapshotPath, 'utf8'));
 const dispatch = snapshot?.dispatch;
 if (!dispatch
@@ -548,7 +560,7 @@ if (!dispatch
   || (dispatch.systemPromptCore === null
     ? dispatch.systemPromptCoreSha256 !== null
     : sha256(dispatch.systemPromptCore) !== dispatch.systemPromptCoreSha256)) process.exit(78);
-writeFileSync(promptPath, dispatch.prompt, { flag: 'wx', mode: 0o400 });
+
 writeFileSync(baselinePath, dispatch.scopeBaseline, { flag: 'wx', mode: 0o400 });
 if (dispatch.systemPromptCore !== null) {
   writeFileSync(corePath, dispatch.systemPromptCore, { flag: 'wx', mode: 0o400 });
@@ -635,6 +647,16 @@ for (;;) {
   await new Promise(resolve => setTimeout(resolve, 25));
 }
 await readNonce(executionCommitPath, dispatch.executionCommitNonceSha256);
+// The durable provider-start authorization is available only now. Bind the
+// activity projection from that verified identity, never a guessed task id.
+if (!acceptedAuthorization) process.exit(78);
+const boundPrompt = bindWorkerPromptHeartbeatIdentity(dispatch.prompt, {
+  taskId: snapshot.taskId,
+  workerId: 'w-' + snapshot.taskId,
+  attemptId: acceptedAuthorization.providerExecutionAttemptId,
+  backend: 'docker',
+});
+writeFileSync(promptPath, boundPrompt, { flag: 'wx', mode: 0o400 });
 const child = spawn(process.execPath, ['/run/deckent/runner.mjs'], { stdio: 'inherit' });
 await new Promise((resolve, reject) => {
   const onSpawn = () => { child.off('error', onError); resolve(); };
@@ -835,7 +857,8 @@ function parseExactDockerEffectFailure(value: unknown): ExactDockerEffectFailure
     || (row.sourceEvidenceDigest !== null && !isExactDigest(row.sourceEvidenceDigest))) return null;
   let capture: ExactDockerEffectFailureV1['capture'] = null;
   if (row.capture !== null) {
-    const detail = exactOwnDataRecord(row.capture, ['schemaVersion', 'stage', 'adapterStage']);
+    const detail = exactOwnDataRecord(row.capture, ['schemaVersion', 'stage', 'adapterStage', 'command'])
+      ?? exactOwnDataRecord(row.capture, ['schemaVersion', 'stage', 'adapterStage']);
     if (row.stage !== 'FINAL_CAPTURE' || !detail || detail.schemaVersion !== 1
       || !EXECUTION_EFFECT_DOCKER_FINAL_STAGES.includes(
         detail.stage as NonNullable<ExactDockerEffectFailureV1['capture']>['stage'],
@@ -843,7 +866,10 @@ function parseExactDockerEffectFailure(value: unknown): ExactDockerEffectFailure
       || (detail.adapterStage !== null && !EXECUTION_EFFECT_DOCKER_CAPTURE_ADAPTER_STAGES.includes(
         detail.adapterStage as ExecutionEffectDockerCaptureAdapterStageV1,
       ))) return null;
+    const command = detail.command === undefined ? null : parseExactDockerCommandDiagnostic(detail.command);
+    if (detail.command !== undefined && !command) return null;
     capture = Object.freeze({
+      ...(command ? { command } : {}),
       schemaVersion: 1,
       stage: detail.stage as NonNullable<ExactDockerEffectFailureV1['capture']>['stage'],
       adapterStage: detail.adapterStage as ExecutionEffectDockerCaptureAdapterStageV1 | null,
@@ -2371,28 +2397,6 @@ export interface ExactDockerWorkspaceVolumeInspectV1 {
   readonly mountpoint: string;
 }
 
-export interface ExactDockerWorkspaceCommandInputV1 {
-  readonly command: 'git' | 'docker';
-  readonly args: readonly string[];
-  readonly stdin: Uint8Array;
-  readonly timeoutMs: number;
-  readonly stdoutCeiling: number;
-  readonly stderrCeiling: number;
-}
-
-export interface ExactDockerWorkspaceCommandResultV1 {
-  readonly status: number | null;
-  readonly signal: NodeJS.Signals | null;
-  readonly stdout: Uint8Array;
-  readonly stderr: Uint8Array;
-  readonly error: boolean;
-  readonly overflow: boolean;
-}
-
-export type ExactDockerWorkspaceCommandRunnerV1 = (
-  input: ExactDockerWorkspaceCommandInputV1,
-) => Promise<ExactDockerWorkspaceCommandResultV1>;
-
 function exactDockerWorkspaceCommandSucceeded(
   result: ExactDockerWorkspaceCommandResultV1,
 ): boolean {
@@ -2522,104 +2526,6 @@ export function parseExactDockerWorkspaceInventory(
     ? [] : raw.subarray(0, raw.byteLength - 1).toString('utf8').split('\0');
   const inventory = exactDockerWorkspaceInventoryFromPaths(segments);
   return inventory && Buffer.from(inventory.nulDelimitedPaths).equals(raw) ? inventory : null;
-}
-
-export function runExactDockerWorkspaceCommand(
-  input: ExactDockerWorkspaceCommandInputV1,
-): Promise<ExactDockerWorkspaceCommandResultV1> {
-  const valid = (input.command === 'git' || input.command === 'docker')
-    && Array.isArray(input.args) && input.args.length <= 512
-    && input.args.every(value => typeof value === 'string' && !value.includes('\0')
-      && Buffer.byteLength(value, 'utf8') <= 64 * 1024)
-    && input.stdin instanceof Uint8Array
-    && input.stdin.byteLength <= EXECUTION_EFFECT_PORTABLE_PATH_LIMITS.maxTotalPathBytes
-    && Number.isSafeInteger(input.timeoutMs) && input.timeoutMs > 0 && input.timeoutMs <= 3_600_000
-    && Number.isSafeInteger(input.stdoutCeiling) && input.stdoutCeiling >= 0
-    && input.stdoutCeiling <= 32 * 1024 * 1024
-    && Number.isSafeInteger(input.stderrCeiling) && input.stderrCeiling >= 0
-    && input.stderrCeiling <= 16 * 1024 * 1024;
-  if (!valid) {
-    return Promise.resolve(Object.freeze({
-      status: null,
-      signal: null,
-      stdout: Buffer.alloc(0),
-      stderr: Buffer.alloc(0),
-      error: true,
-      overflow: false,
-    }));
-  }
-  return new Promise(resolveCommand => {
-    let child: ReturnType<typeof nodeSpawn>;
-    let stdout: Buffer<ArrayBufferLike> = Buffer.alloc(0);
-    let stderr: Buffer<ArrayBufferLike> = Buffer.alloc(0);
-    let error = false;
-    let overflow = false;
-    let settled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const finish = (status: number | null, signal: NodeJS.Signals | null): void => {
-      if (settled) return;
-      settled = true;
-      if (timer) clearTimeout(timer);
-      resolveCommand(Object.freeze({
-        status,
-        signal,
-        stdout,
-        stderr,
-        error,
-        overflow,
-      }));
-    };
-    const append = (
-      current: Buffer<ArrayBufferLike>,
-      value: string | Buffer<ArrayBufferLike>,
-      ceiling: number,
-    ): Buffer<ArrayBufferLike> => {
-      const bytes = Buffer.isBuffer(value) ? value : Buffer.from(value);
-      const remaining = ceiling - current.byteLength;
-      if (bytes.byteLength > remaining) {
-        overflow = true;
-        try { child.kill('SIGKILL'); } catch { /* exact HOLD still follows */ }
-      }
-      return remaining <= 0
-        ? current : Buffer.concat([current, bytes.subarray(0, Math.max(0, remaining))]);
-    };
-    try {
-      child = nodeSpawn(input.command, [...input.args], {
-        shell: false,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        windowsHide: true,
-      });
-    } catch {
-      resolveCommand(Object.freeze({
-        status: null,
-        signal: null,
-        stdout,
-        stderr,
-        error: true,
-        overflow: false,
-      }));
-      return;
-    }
-    child.stdout?.on('data', value => {
-      stdout = append(stdout, value as string | Buffer<ArrayBufferLike>, input.stdoutCeiling);
-    });
-    child.stderr?.on('data', value => {
-      stderr = append(stderr, value as string | Buffer<ArrayBufferLike>, input.stderrCeiling);
-    });
-    child.stdin?.once('error', () => {
-      error = true;
-      try { child.kill('SIGKILL'); } catch { /* close resolves */ }
-    });
-    child.once('error', () => { error = true; });
-    child.once('close', (status, signal) => finish(status, signal));
-    child.stdin?.end(Buffer.from(input.stdin));
-    timer = setTimeout(() => {
-      error = true;
-      try { child.kill('SIGKILL'); } catch { /* close may already be pending */ }
-      finish(null, null);
-    }, input.timeoutMs);
-    timer.unref();
-  });
 }
 
 export async function readExactDockerWorkspaceInventory(
@@ -3015,6 +2921,8 @@ export class ExactDockerPopulationCaptureAdapterErrorV1
   ) {
     super(stage);
     this.reason = reason;
+    // Canonical bounded vocabulary survives the existing redacted failure projection.
+    this.message = `EXECUTION_EFFECT_DOCKER_POPULATION_HOLD:${reason}`;
     this.attempts = Object.freeze([...attempts]);
   }
 }
@@ -3713,7 +3621,10 @@ export function createExactDockerEffectLifecycleAdapterV1(
     })) {
     throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', true);
   }
-  const run = input.runner;
+  // Injected adapters retain their exact test/platform authority. Only the
+  // production runner's read-only daemon observations need deadline isolation;
+  // mutating commands continue through the existing execution path.
+  const run = resolveExactDockerObservationRunner(input.runner);
   const populationRetryMax = resolveExactDockerPopulationRetryMaxV1(input.populationRetryMax);
   const wallClockNow = input.nowIso;
   let lastTimestampMs: number | null = null;
@@ -3749,8 +3660,9 @@ export function createExactDockerEffectLifecycleAdapterV1(
       readonly mountPlanDigest: Sha256Digest;
       readonly volumeIdentityDigest: Sha256Digest;
     }>,
+    capturedObservation?: ExactDockerWorkspaceVolumeInspectV1 | null,
   ): Promise<ExactDockerWorkspaceVolumeInspectV1 | null> => {
-    const inspected = await inspectVolume(name);
+    const inspected = capturedObservation === undefined ? await inspectVolume(name) : capturedObservation;
     return inspected && verifyExactDockerWorkspaceVolumeInspect(inspected, {
       name,
       labels: authority.labels,
@@ -3816,6 +3728,7 @@ export function createExactDockerEffectLifecycleAdapterV1(
     let deadlineMs!: number;
     let deadlineAt!: string;
     let result: ExactDockerWorkspaceCommandResultV1;
+    let captureWindow: ExactDockerCaptureWindowResultV1 | null = null;
     for (let attempt = 1; ; attempt += 1) {
       startedAt = exactDockerEffectTimestamp(now);
       startedMs = Date.parse(startedAt);
@@ -3868,16 +3781,30 @@ export function createExactDockerEffectLifecycleAdapterV1(
         helperSource,
         encoded,
       ];
-      result = await run(Object.freeze({
+      const helperCommand = Object.freeze({
         command: 'docker' as const,
         args: Object.freeze(args),
         stdin: populate ? input.inventory.nulDelimitedPaths : Buffer.alloc(0),
         timeoutMs: EXACT_DOCKER_EFFECT_CAPTURE_TIMEOUT_MS,
         stdoutCeiling: EXACT_DOCKER_EFFECT_RECEIPT_CEILING,
         stderrCeiling: 64 * 1024,
-      }));
+      });
+      if (!populate && isExactDockerProductionRunner(input.runner)) {
+        // Keep the helper, post-generation observation and completion timestamp
+        // in one bounded IO window. Delayed parent delivery is not execution time.
+        captureWindow = await runIsolatedExactDockerCaptureWindow({
+          helper: helperCommand, volumeName: captureInput.plan.volumeName, deadlineUnixMs: deadlineMs,
+        });
+        if (!captureWindow) return unavailable('HELPER_RUN');
+        result = captureWindow.helper;
+      } else {
+        result = await run(helperCommand);
+      }
       if (exactDockerWorkspaceCommandSucceeded(result)) break;
-      if (!populate) unavailable('HELPER_RUN');
+      if (!populate) throw new ExecutionEffectDockerCaptureAdapterErrorV1('HELPER_RUN',
+        result.diagnostic ?? { reason: 'unavailable', exitCode: result.status,
+          signaled: result.signal !== null, timeoutMs: EXACT_DOCKER_EFFECT_CAPTURE_TIMEOUT_MS,
+          elapsedMs: null, stdoutBytes: result.stdout.byteLength, stderrBytes: result.stderr.byteLength });
       // Only a clean exit-78 refusal carries a helper verdict. A daemon failure,
       // a signal, a truncated stream or any other status stays unclassified even
       // when its stderr happens to contain digits.
@@ -3906,11 +3833,14 @@ export function createExactDockerEffectLifecycleAdapterV1(
     const afterGeneration = await inspectExactVolumeGeneration(
       captureInput.plan.volumeName,
       workspaceAuthority,
+      captureWindow === null ? undefined : captureWindow.postGeneration
+        && exactDockerWorkspaceCommandSucceeded(captureWindow.postGeneration)
+        ? parseExactDockerWorkspaceVolumeInspect(exactDockerWorkspaceCommandStdout(captureWindow.postGeneration)) : null,
     );
     if (!afterGeneration || beforeGeneration.createdAt !== afterGeneration.createdAt) {
       unavailable('POST_GENERATION');
     }
-    const completedAt = exactDockerEffectTimestamp(now);
+    const completedAt = captureWindow?.completedAt ?? exactDockerEffectTimestamp(now);
     if (Date.parse(completedAt) < startedMs || Date.parse(completedAt) > deadlineMs) {
       unavailable('CLOCK');
     }
@@ -5470,6 +5400,16 @@ export async function closeExactDockerRejectedResultAttempt(
   return new DockerSpawnBackend(input.projectRoot).closeRejectedResultAttempt(input);
 }
 
+export interface ExactDockerReleasedUnacceptedRecoveryResult extends ExactDockerStartedFailedRecoveryResult {
+  readonly phase: 'RELEASED_EFFECT_UNACCEPTED';
+}
+
+export async function retainExactDockerReleasedUnacceptedAttempt(
+  input: ExactDockerStartedFailedRecoveryInput,
+): Promise<ExactDockerReleasedUnacceptedRecoveryResult> {
+  return new DockerSpawnBackend(input.projectRoot).retainReleasedUnacceptedAttempt(input);
+}
+
 export interface ExactDockerCommittedUnsettledRecoveryInput {
   readonly projectRoot: string;
   readonly sprintId: string;
@@ -5573,6 +5513,8 @@ export function inspectExactDockerPlanningRecoveryHealth(
     }));
   }
   for (const entry of discovered.entries) {
+    // Keep global native fences while bounding cached payloads to one attempt.
+    store.releaseVerifiedReadSnapshotPayloads();
     if (entry.state === 'admitted') {
       try {
         if (backend.inspectAdmissionResolvedForPlanning(store, policy, entry)) continue;
@@ -11529,7 +11471,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     this.custodyStateDir = opts?.custodyStateDir;
     this.nowIso = opts?.nowIso ?? (() => new Date().toISOString());
     this.exactWorkspaceCommandRunner =
-      opts?.exactWorkspaceCommandRunner ?? runExactDockerWorkspaceCommand;
+      resolveExactDockerObservationRunner(opts?.exactWorkspaceCommandRunner ?? runExactDockerWorkspaceCommand);
     this.taskOutputLiveTransport = opts?.taskOutputLiveTransport ?? streamTaskOutputLive;
     this.productionWiringHostObserver = opts?.productionWiringHostObserver
       ?? opts?.productionWiringHostObserverFactory?.({
@@ -17791,7 +17733,11 @@ export class DockerSpawnBackend implements SpawnBackend {
       );
     }
     const scope = this.reconstructExactDockerRecoveryScope(store, policy, entry);
+    if (this.readExactReleasedUnacceptedDisposition(scope)) return true;
     if (this.readExactCommittedUnsettledDisposition(scope)) return true;
+    // Startup already treats a fully verified archive chain as terminal history.
+    // Planning must use that same reader instead of replaying cold acceptance.
+    if (this.readExactArchivedAttemptDisposition(scope)) return true;
     const startObservation = store.readDispatchObservationByClass({
       admissionRef: entry.ref, policy, observationClass: 'PROVIDER_START',
     });
@@ -17869,6 +17815,82 @@ export class DockerSpawnBackend implements SpawnBackend {
       }),
     });
     return result('closed', closed.receiptDigest, closed.evidenceDigest);
+  }
+
+  /** Retain a released, unaccepted effect without creating an acceptance chain. */
+  async retainReleasedUnacceptedAttempt(input: ExactDockerStartedFailedRecoveryInput): Promise<ExactDockerReleasedUnacceptedRecoveryResult> {
+    const refuse = (stage: string): never => {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED', true, stage);
+    };
+    if (!/^sprint-[0-9]+$/u.test(input.sprintId) || !/^dreq-[a-f0-9]{64}$/u.test(input.dispatchRequestId)
+      || input.recoveryAuthority.executionId !== input.sprintId || input.recoveryAuthority.taskId !== input.sprintId
+      || canonicalExactDockerProjectRoot(input.projectRoot) !== canonicalExactDockerProjectRoot(this.projectDir)) refuse('RECOVERY_SCOPE');
+    const opened = this.openExactDockerRecoveryStore();
+    if (!opened) return refuse('RECOVERY_STORE');
+    const admitted = opened.store.readDispatchAdmission({ dispatchRequestId: input.dispatchRequestId, policy: opened.policy });
+    if (admitted.state !== 'admitted' || !admitted.ref.identity.taskId.startsWith(`${input.sprintId.slice(7)}-`)) return refuse('RECOVERY_ADMISSION');
+    const scope = this.reconstructExactDockerRecoveryScope(opened.store, opened.policy, admitted);
+    const adapter = this.exactCommittedUnsettledSemanticAdapter(scope);
+    const evidence = adapter.readReleasedUnacceptedEvidence();
+    if (!evidence) return refuse('RECOVERY_RELEASE_EVIDENCE');
+    const candidate = opened.store.inspectEffectReleasedUnacceptedCandidate({ admissionRef: admitted.ref, policy: opened.policy, evidence });
+    const result = (state: 'eligible' | 'retained', receiptDigest: string | null): ExactDockerReleasedUnacceptedRecoveryResult => Object.freeze({
+      state, phase: 'RELEASED_EFFECT_UNACCEPTED', dispatchRequestId: input.dispatchRequestId, taskId: admitted.ref.identity.taskId,
+      attemptId: admitted.ref.identity.attemptId, generation: admitted.ref.identity.generation,
+      receiptDigest, evidenceDigest: candidate.evidenceDigest,
+    });
+    const existing = opened.store.readEffectReleasedUnacceptedDispatch({ admissionRef: admitted.ref, policy: opened.policy });
+    if (existing) {
+      if (canonicalJson(existing.evidence) !== canonicalJson(evidence)
+        || canonicalJson(existing.recoveryAuthority) !== canonicalJson(input.recoveryAuthority)) return refuse('RECOVERY_DISPOSITION_CONFLICT');
+      return result('retained', existing.receiptDigest);
+    }
+    const progress = adapter.readLatestReleaseProgress();
+    const ready = adapter.readLifecycleAuthority('READY_FOR_LANDING');
+    if (!progress || progress.state !== 'RELEASED' || !ready) return refuse('RECOVERY_RELEASE_EVIDENCE');
+    const exit = this.readExactDockerRecoveryProviderExit(scope);
+    if (!exit || ready.providerStopped.exitObservationReceiptDigest !== exit.observationReceiptDigest
+      || ready.providerStopped.stoppedAt !== exit.observedAt || ready.providerStopped.exitCode !== exit.exitCode) return refuse('RECOVERY_EXIT_MISSING');
+    const expected = new Map([
+      ['provider-container', ready.providerStopped.containerName],
+      ['workspace-volume', ready.workspacePlan.volumeName],
+      ['dependency-volume', ready.workspacePlan.dependencyPlan.volumeName],
+    ]);
+    if (progress.resources.length !== expected.size || new Set(progress.resources.map(r => r.resourceKind)).size !== expected.size
+      || progress.resources.some(r => expected.get(r.resourceKind) !== r.resourceName)) return refuse('RECOVERY_RESOURCE_IDENTITY');
+    const observeAbsence = async (): Promise<Sha256Digest> => {
+      const query = async (args: readonly string[]) => {
+        const value = await this.exactWorkspaceCommandRunner(Object.freeze({ command: 'docker' as const,
+          args: Object.freeze([...args]), stdin: Buffer.alloc(0), timeoutMs: 10_000,
+          stdoutCeiling: 8 * 1024 * 1024, stderrCeiling: 64 * 1024 }));
+        if (!exactDockerWorkspaceCommandSucceeded(value)) return refuse('RECOVERY_DAEMON_UNAVAILABLE');
+        return exactDockerWorkspaceCommandStdout(value);
+      };
+      const containers = await query(['ps', '--all', '--no-trunc', '--format', '{{.ID}} {{.Names}}']);
+      const volumes = await query(['volume', 'ls', '--format', '{{.Name}}']);
+      if (containers.split(/\r?\n/u).some(line => {
+        const [id, name] = line.trim().split(/\s+/u);
+        return id === exit.containerId || name === ready.providerStopped.containerName;
+      }) || volumes.split(/\r?\n/u).some(name => name.trim() === ready.workspacePlan.volumeName
+        || name.trim() === ready.workspacePlan.dependencyPlan.volumeName)) return refuse('RECOVERY_RESOURCE_PRESENT');
+      return exactCustodyJsonDigest({ kind: 'released-unaccepted-resource-absence-v1', identity: scope.identity,
+        admissionRefDigest: admitted.ref.refDigest, releaseProgressDigest: progress.progressDigest,
+        resources: progress.resources, containersDigest: exactCustodyDigest(containers), volumesDigest: exactCustodyDigest(volumes),
+        observedAt: this.nextExactDockerTimestamp(exit.observedAt, progress.progressedAt) });
+    };
+    await observeAbsence();
+    await this.inspectExactCommittedHostPostimages(scope, ready, evidence, adapter);
+    if (input.dryRun) return result('eligible', null);
+    input.beforePublish();
+    const stoppedResourceEvidenceDigest = await observeAbsence();
+    const fresh = adapter.readReleasedUnacceptedEvidence();
+    if (!fresh || canonicalJson(fresh) !== canonicalJson(evidence)) return refuse('RECOVERY_SEMANTIC_REREAD');
+    const hostObservationDigest = await this.inspectExactCommittedHostPostimages(scope, ready, fresh, adapter);
+    input.beforePublish();
+    const retained = opened.store.retainEffectReleasedUnacceptedDispatch({ admissionRef: admitted.ref, policy: opened.policy,
+      evidence, recoveryAuthority: input.recoveryAuthority, stoppedResourceEvidenceDigest, hostObservationDigest,
+      recordedAt: this.nextExactDockerTimestamp(exit.observedAt, progress.progressedAt) });
+    return result('retained', retained.receiptDigest);
   }
 
   /** Preserve a stopped, unlanded attempt under explicit canonical recovery authority. */
@@ -18490,6 +18512,17 @@ export class DockerSpawnBackend implements SpawnBackend {
     return retained;
   }
 
+  /** Verify a preserved negative disposition without replaying it as an accepted result. */
+  private readExactReleasedUnacceptedDisposition(scope: PreparedExactDockerCustodyScope): boolean {
+    const retained = scope.store.readEffectReleasedUnacceptedDispatch({ admissionRef: scope.admissionRef, policy: scope.policy });
+    if (!retained) return false;
+    const evidence = this.exactCommittedUnsettledSemanticAdapter(scope).readReleasedUnacceptedEvidence();
+    if (!evidence || canonicalJson(evidence) !== canonicalJson(retained.evidence)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED', true, 'RELEASED_UNACCEPTED_EVIDENCE_DRIFT');
+    }
+    return true;
+  }
+
   /**
    * Recognise an attempt whose custody chain is complete through `archive`.
    *
@@ -18547,7 +18580,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     ready: Extract<ExecutionEffectDockerLifecycleAuthorityV1, {
       readonly state: 'READY_FOR_LANDING';
     }>,
-    evidence: TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2,
+    evidence: TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2 | TaskAttemptCustodyEffectReleasedUnacceptedEvidenceV2,
     semanticAdapter: ExecutionEffectStoreAdapterV1,
   ): Promise<Sha256Digest> {
     const uid = process.getuid?.();
@@ -19637,6 +19670,11 @@ export class DockerSpawnBackend implements SpawnBackend {
           opened.policy,
           entry,
         );
+        if (this.readExactReleasedUnacceptedDisposition(scope)) {
+          const retained = report.retainedReleasedUnaccepted ?? (report.retainedReleasedUnaccepted = []);
+          if (!retained.includes(entry.ref.identity.taskId)) retained.push(entry.ref.identity.taskId);
+          continue;
+        }
         const committedUnsettled = this.readExactCommittedUnsettledDisposition(scope);
         if (committedUnsettled) {
           const retained = report.retainedCommittedUnsettled
@@ -20864,6 +20902,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       closedNotDispatched: [],
       closedBeforeAdmission: [],
       retainedCommittedUnsettled: [],
+      retainedReleasedUnaccepted: [],
       closedAbsentAfterExit: [],
       retiredLanded: [],
       resumedContinuations: [],

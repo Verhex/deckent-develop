@@ -39,7 +39,7 @@ import {
   loadCanonicalRunTasks,
   projectCanonicalRunLogicalProgress,
   resolveRunStatusReadiness,
-  runStatusReadModelMatchesAuthority,
+  runStatusReadModelMatchesCurrentGeneration,
   type CanonicalRunStatusReadModel,
 } from '../../core/run-status-read-model.js';
 import { DEFAULT_HEARTBEAT_TIMEOUT_MS, loadConfig } from '../../core/config.js';
@@ -314,7 +314,7 @@ function matchingRunStatusReadModel(
 ): CanonicalRunStatusReadModel | null {
   try {
     const model = readCanonicalRunStatusReadModel(root);
-    return model && runStatusReadModelMatchesAuthority(model, authority) ? model : null;
+    return model && runStatusReadModelMatchesCurrentGeneration(root, model, authority) ? model : null;
   } catch {
     return null;
   }
@@ -870,6 +870,7 @@ function noActiveStatusJsonFromAuthority(
     finalizeCommand: authority.finalizeCommand,
     terminalPublication: readModel?.terminalPublication ?? null,
     providerConcurrency: readModel?.providerConcurrency ?? [],
+    ...(readModel ? { progress: readModel.logicalProgress } : {}),
   };
 }
 
@@ -979,7 +980,8 @@ export function projectDashboardThroughRunAuthority(
       progress,
     }, livenessOptions);
   return {
-    dashboard,
+    // Worker process liveness must not overwrite logical task activity.
+    dashboard: canonicalProgress ? { ...dashboard, progress } : dashboard,
     metadata: {
       schemaVersion: 1,
       lifecycleAuthority: 'run-status-authority-v1',
@@ -1106,7 +1108,7 @@ export function buildStatusJsonSnapshot(
   }
 
   const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
-  const logicalProgress = tasks.length > 0 ? readModel?.logicalProgress ?? null : null;
+  const logicalProgress = readModel?.logicalProgress ?? null;
   const projection = projectDashboardThroughRunAuthority(
     state,
     tasks,
@@ -1130,6 +1132,7 @@ export function buildStatusJsonSnapshot(
     : { ...projectedState, taskSettlements };
   return {
     ...snapshot,
+    progress: readModel?.logicalProgress ?? (hasNoDurableRunIdentity(authority) ? snapshot.progress : null),
     active: authority.active,
     lifecycle: authority.lifecycle,
     resumable: authority.resumable,

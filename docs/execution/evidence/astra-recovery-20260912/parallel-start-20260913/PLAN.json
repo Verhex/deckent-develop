@@ -1,0 +1,125 @@
+{
+  "observedAt": "2026-09-13T13:45:46.979734+00:00",
+  "outcome": "MASTER3178 / parent120",
+  "ownerDecision": "live 2026-09-13 start-first parallel dogfood; Sol/Terra/Luna permitted",
+  "scope": "8 independent diagnostic reports -> supervisor fan-in -> evidence-bound repair via start",
+  "concurrency": "resolve runtime intersection; mode max8/root max2 discrepancy measured; no forced workers",
+  "taskCount": 8,
+  "lanes": [
+    {
+      "lane": "history",
+      "modelRequested": "gpt-5.6-sol",
+      "fileWrite": "docs/execution/evidence/parallel-start-20260913/parallel-history-analysis-20260913.md",
+      "reads": [
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/core/custody-read-snapshot.ts",
+        "src/orchestra/exact-docker-container-observation.ts",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/R3-RESULT.md",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/755-resource-summary.json"
+      ]
+    },
+    {
+      "lane": "timers",
+      "modelRequested": "gpt-5.6-terra",
+      "fileWrite": "docs/execution/evidence/parallel-start-20260913/parallel-timers-analysis-20260913.md",
+      "reads": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/sprint-phases.ts",
+        "src/orchestra/resource-report.ts",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/R3-RESULT.md",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/755-resource-summary.json"
+      ]
+    },
+    {
+      "lane": "scheduler",
+      "modelRequested": "gpt-5.6-sol",
+      "fileWrite": "docs/execution/evidence/parallel-start-20260913/parallel-scheduler-analysis-20260913.md",
+      "reads": [
+        "src/orchestra/dependency-scheduler.ts",
+        "src/orchestra/scheduler-driver.ts",
+        "src/orchestra/scheduler-reducer.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/provider-concurrency-runtime-reader.ts",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/R3-RESULT.md",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/755-resource-summary.json"
+      ]
+    },
+    {
+      "lane": "resources",
+      "modelRequested": "gpt-5.6-luna",
+      "fileWrite": "docs/execution/evidence/parallel-start-20260913/parallel-resources-analysis-20260913.md",
+      "reads": [
+        "src/orchestra/resource-monitor.ts",
+        "src/orchestra/resource-report.ts",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/R3-RESULT.md",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/755-resource-summary.json"
+      ]
+    },
+    {
+      "lane": "status",
+      "modelRequested": "gpt-5.6-terra",
+      "fileWrite": "docs/execution/evidence/parallel-start-20260913/parallel-status-analysis-20260913.md",
+      "reads": [
+        "src/core/run-status-read-model.ts",
+        "src/core/run-status-authority.ts",
+        "src/cli/commands/status.ts",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/R3-RESULT.md",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/755-resource-summary.json"
+      ]
+    },
+    {
+      "lane": "supervision",
+      "modelRequested": "gpt-5.6-sol",
+      "fileWrite": "docs/execution/evidence/parallel-start-20260913/parallel-supervision-analysis-20260913.md",
+      "reads": [
+        "src/nervous/bootstrap.ts",
+        "src/orchestra/sprint-controller.ts",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/R3-RESULT.md",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/755-resource-summary.json"
+      ]
+    },
+    {
+      "lane": "events",
+      "modelRequested": "gpt-5.6-terra",
+      "fileWrite": "docs/execution/evidence/parallel-start-20260913/parallel-events-analysis-20260913.md",
+      "reads": [
+        "src/api/run-flow-event-stream.ts",
+        "src/api/run-flow-routes.ts",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/R3-RESULT.md",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/755-resource-summary.json"
+      ]
+    },
+    {
+      "lane": "environment",
+      "modelRequested": "gpt-5.6-luna",
+      "fileWrite": "docs/execution/evidence/parallel-start-20260913/parallel-environment-analysis-20260913.md",
+      "reads": [
+        "Dockerfile.worker",
+        "assets/Dockerfile.worker",
+        "package.json",
+        "src/orchestra/exact-docker-workspace-command.ts",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/R3-RESULT.md",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/755-resource-summary.json"
+      ]
+    }
+  ],
+  "proof": "actual start provider call, task effect attribution, terminal settlement + interval and resource observations; documentation completion is not runtime repair closure",
+  "budgets": "existing effective finite worker/brain/fix policy; no unchanged-failure retry; 15/30 only after truthful fan-in",
+  "negativeScope": [
+    "source mutation in this run",
+    "live auth/config/build mutation",
+    "new coordinator",
+    "fake closure",
+    "commit/push"
+  ],
+  "directivesSha256": "0b0a5df07186e22e9905a58d175d7c55bebd1fc07e61f0d0367f84b4ee4b1ad2",
+  "scopeFailure756": "756-scope-failure.json",
+  "status": "revised artifact paths, gate preflight pending",
+  "scopePreflight": {
+    "observedAt": "2026-09-13T13:49:48.006943+00:00",
+    "exitCode": 0,
+    "ok": true,
+    "resolutions": [],
+    "source": "built evaluateScopeGate + actual git tracked inventory"
+  }
+}

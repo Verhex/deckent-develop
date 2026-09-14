@@ -42,6 +42,7 @@ import {
   retainExactDockerCommittedUnsettledAttempt,
   retainExactDockerStartedFailedAttempt,
   closeExactDockerRejectedResultAttempt,
+  retainExactDockerReleasedUnacceptedAttempt,
   type ExactDockerPlanningRecoveryHealth,
   type ExactDockerReservationRecoveryReport,
 } from './spawn-backend-docker.js';
@@ -82,6 +83,7 @@ export class SprintRecoveryOperationError extends Error {
 }
 
 export interface SprintRecoveryReport {
+  releasedUnacceptedAttempt?: Awaited<ReturnType<typeof retainExactDockerReleasedUnacceptedAttempt>>;
   rejectedResultAttempt?: Awaited<ReturnType<typeof closeExactDockerRejectedResultAttempt>>;
   startedFailedAttempt?: Awaited<ReturnType<typeof retainExactDockerStartedFailedAttempt>>;
   committedUnsettledAttempt?: Awaited<ReturnType<typeof retainExactDockerCommittedUnsettledAttempt>>;
@@ -118,6 +120,8 @@ export interface SprintRecoveryReport {
 }
 
 export interface SprintRecoveryOperationOptions {
+  readonly releasedUnacceptedDispatchRequestId?: string;
+  readonly exactReleasedUnacceptedRecovery?: typeof retainExactDockerReleasedUnacceptedAttempt;
   readonly rejectedResultDispatchRequestId?: string;
   readonly exactRejectedResultRecovery?: typeof closeExactDockerRejectedResultAttempt;
   readonly startedFailedDispatchRequestId?: string;
@@ -509,12 +513,12 @@ export async function runSprintRecoveryOperation(
   const identity = readSprintRecoverySettlementIdentity(root, sprintId);
   const authorityBeforeMutation = readCanonicalRunStatus(root, { sprintIdHint: sprintId });
   if ([opts.startedFailedDispatchRequestId, opts.committedUnsettledDispatchRequestId,
-    opts.rejectedResultDispatchRequestId].filter(value => value !== undefined).length > 1) {
+    opts.rejectedResultDispatchRequestId, opts.releasedUnacceptedDispatchRequestId].filter(value => value !== undefined).length > 1) {
     throw new SprintRecoveryOperationError('RETENTION_MODE_CONFLICT', { sprintId });
   }
-  if (opts.committedUnsettledDispatchRequestId !== undefined || opts.rejectedResultDispatchRequestId !== undefined) {
-    const dispatchRequestId = (opts.rejectedResultDispatchRequestId ?? opts.committedUnsettledDispatchRequestId)!;
-    if (opts.rejectedResultDispatchRequestId !== undefined) {
+  if (opts.committedUnsettledDispatchRequestId !== undefined || opts.rejectedResultDispatchRequestId !== undefined || opts.releasedUnacceptedDispatchRequestId !== undefined) {
+    const dispatchRequestId = (opts.releasedUnacceptedDispatchRequestId ?? opts.rejectedResultDispatchRequestId ?? opts.committedUnsettledDispatchRequestId)!;
+    if (opts.rejectedResultDispatchRequestId !== undefined || opts.releasedUnacceptedDispatchRequestId !== undefined) {
       const terminal = readRunFlowTerminalClosureForSprint(root, sprintId);
       if (!terminal || terminal.state !== 'FAILED') {
         throw new SprintRecoveryOperationError('ACTIVE_AUTHORITY', { sprintId });
@@ -561,7 +565,9 @@ export async function runSprintRecoveryOperation(
       }
       assertFreshFence();
     }
-    const retainedAttempt = await (opts.rejectedResultDispatchRequestId !== undefined
+    const retainedAttempt = await (opts.releasedUnacceptedDispatchRequestId !== undefined
+      ? opts.exactReleasedUnacceptedRecovery ?? retainExactDockerReleasedUnacceptedAttempt
+      : opts.rejectedResultDispatchRequestId !== undefined
       ? opts.exactRejectedResultRecovery ?? closeExactDockerRejectedResultAttempt
       : opts.exactCommittedUnsettledRecovery ?? retainExactDockerCommittedUnsettledAttempt)({
       projectRoot: root, sprintId, dispatchRequestId, dryRun: opts.dryRun === true,
@@ -573,7 +579,7 @@ export async function runSprintRecoveryOperation(
       },
       beforePublish: () => {
         assertFreshFence();
-        if (opts.rejectedResultDispatchRequestId !== undefined
+        if ((opts.rejectedResultDispatchRequestId !== undefined || opts.releasedUnacceptedDispatchRequestId !== undefined)
           && readRunFlowTerminalClosureForSprint(root, sprintId)?.state !== 'FAILED') {
           throw new SprintRecoveryOperationError('ACTIVE_AUTHORITY', { sprintId });
         }
@@ -592,7 +598,9 @@ export async function runSprintRecoveryOperation(
     }
     return {
       identity,
-      ...('outcome' in retainedAttempt ? { rejectedResultAttempt: retainedAttempt } : { committedUnsettledAttempt: retainedAttempt }),
+      ...('outcome' in retainedAttempt ? { rejectedResultAttempt: retainedAttempt }
+        : retainedAttempt.phase === 'COMMITTED_JOURNAL_RELEASE_PENDING' ? { committedUnsettledAttempt: retainedAttempt }
+        : { releasedUnacceptedAttempt: retainedAttempt }),
       audit: { overallGate: 'SKIPPED' }, orphanIpcDirs: [],
       staleLocksCleaned: 0, staleSpawnLocksCleaned: 0, taskFilesArchived: 0, taskFilesPreserved: 0,
       exactCustodyReservations: { pendingBeforeAdmission: 0, heldAdmissionGraphs: 0,

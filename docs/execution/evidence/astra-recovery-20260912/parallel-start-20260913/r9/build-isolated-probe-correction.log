@@ -1,0 +1,23 @@
+
+> deckent@0.100.0 build
+> npm run clean && npm run clean:native && npm run build:native && tsc && node scripts/copy-assets.mjs
+
+
+> deckent@0.100.0 clean
+> node scripts/clean.mjs
+
+{"schemaVersion":1,"decision":"ALLOW","code":"CLEAN_COMPLETED","removed":19,"preserved":[],"admission":{"schemaVersion":1,"authority":"deckent.clean.active-execution.v1","decision":"ALLOW","code":"CLEAN_ACTIVE_EXECUTION_CLEAR","projectRootDigest":"7de2a25072aa11df6c2e096f2c58a100114199d560aeda4108c920339c3fc051","reasons":[],"projections":[],"inspected":{"taskFiles":0,"heartbeatFiles":0,"workerPidFiles":0,"sprintPidFiles":0,"processEntries":0,"receiptRows":0,"spawnLockFiles":0,"executionLockFiles":1,"jobFiles":0,"runFlowFiles":0,"missionRows":0},"disposedOrphans":[]}}
+
+> deckent@0.100.0 clean:native
+> node scripts/build-exec-authority-native.mjs --clean
+
+{"event":"EXEC_AUTHORITY_NATIVE_CLEANED"}
+
+> deckent@0.100.0 build:native
+> node scripts/build-exec-authority-native.mjs
+
+{"event":"EXEC_AUTHORITY_NATIVE_BUILT","platform":"linux","arch":"x64","binarySha256":"sha256:4e4dd558785cced4688979b219ac2648623f8bbf1f89a9f9fba8abab9913597f","nativeSourceTreeSha256":"sha256:ef06f44f070e07061cacb7672e0812a88f44a8235e7002f338c2786f32d69a8d"}
+src/mcp/tools/status.ts(482,46): error TS2345: Argument of type '{ active: boolean; message: string; sprintId: string | null; job: JobState | null; lifecycle: CanonicalRunLifecycle; readiness: "READY" | "SELF_SUFFICIENT"; ... 8 more ...; pendingApprovals: PendingApproval[]; }' is not assignable to parameter of type 'StatusData'.
+  Types of property 'progress' are incompatible.
+    Type 'CanonicalRunLogicalProgress | null' is not assignable to type '{ done?: number | undefined; active?: number | undefined; total?: number | undefined; blocked?: number | undefined; } | undefined'.
+      Type 'null' is not assignable to type '{ done?: number | undefined; active?: number | undefined; total?: number | undefined; blocked?: number | undefined; } | undefined'.

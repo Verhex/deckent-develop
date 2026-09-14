@@ -1,3 +1,7 @@
+import { randomUUID } from 'node:crypto';
+import { principalToActor, resolveLocalOsPrincipal, resolveCallerTenant } from '../../core/principal.js';
+import { planRunFlow, decideRunFlowPlan, type PlanRunFlowResult } from '../../orchestra/run-flow-plan-service.js';
+import { createLiveExactSprintExecutor } from '../helpers/exact-sprint-runtime.js';
 import { Option, type Command } from 'commander';
 import { loadConfig, readAuthMode } from '../../core/config.js';
 import { bootstrapProviders } from '../../core/provider.js';
@@ -107,7 +111,8 @@ function readLogTail(logPath: string | null): string {
 import { spawnSync } from 'node:child_process';
 import { prepareZeroConfig, cleanupZeroConfig } from './quick-start.js';
 import { isSprintLocked } from '../../core/multi-ide.js';
-import { detectOrphan, archiveOrphan, listPidFiles } from '../../orchestra/sprint-pid-manager.js';
+import { detectOrphan, archiveOrphan, listPidFiles, clearPid, type OrphanInfo } from '../../orchestra/sprint-pid-manager.js';
+import { readOwningRunTerminalDisposition } from '../../orchestra/sprint-controller.js';
 import { createSandboxBackend } from '../../orchestra/spawn-backend.js';
 import { formatSpawnBackendRecoveryDiagnostic } from '../../orchestra/spawn-backend-recovery-diagnostic.js';
 import { captureGitBase } from '../../orchestra/run-diff-service.js';
@@ -368,6 +373,19 @@ export function reportDetachedStartTerminalState(state: string | null, flowId: s
   return true;
 }
 
+/**
+ * Dead PID files are liveness claims, not terminal truth. When durable
+ * disposition proves the owning run already settled, drop only the stale
+ * `.pid` (snapshot retained) instead of forcing `--force` across preflight.
+ */
+export function shouldClearStaleCoordinatorPid(
+  root: string,
+  sprintId: string,
+  _orphan: OrphanInfo,
+): boolean {
+  return readOwningRunTerminalDisposition(root, sprintId) === 'terminal';
+}
+
 async function runStartEnvironmentPreflight(input: {
   readonly root: string;
   readonly config: ResolvedConfig;
@@ -386,6 +404,11 @@ async function runStartEnvironmentPreflight(input: {
   for (const sprintId of pidSprintIds) {
     const orphan = detectOrphan(root, sprintId);
     if (!orphan) continue;
+    if (shouldClearStaleCoordinatorPid(root, sprintId, orphan)) {
+      clearPid(root, sprintId);
+      debugLog('start:preflight:stale-coordinator-pid-cleared', { sprintId, pid: orphan.pid });
+      continue;
+    }
     if (opts.autoApprove) {
       archiveOrphan(root, orphan);
       print(`Orphan sprint ${sprintId} (PID ${orphan.pid}) auto-archived.`);
@@ -707,7 +730,7 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
             return;
           }
 
-          let sprintResult;
+          let sprintResult: import('../../core/types.js').Sprint | undefined;
           try {
             const bootstrap = childBootstrap;
             notifyDispatcher = bootstrapNotifyDispatcher({
@@ -1017,9 +1040,14 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
                   },
                 });
                 if (started.status === 'noop-duplicate') {
+                  const duplicateTerminal = RUN_FLOW_TERMINAL_STATES.has(started.context.state)
+                    ? started.context.state
+                    : null;
+                  if (reportDetachedStartTerminalState(duplicateTerminal, picked.flowId, lang)) return;
                   print(getMessage('start.approved_flow_guard.consumed_duplicate', lang, {
                     state: started.attempt.state,
                   }));
+                  return;
                 } else if (spawnedPid !== null) {
                   // A child that dies inside its own pre-execution gates (unknown
                   // model pricing, containment, auth) used to leave the CLI claiming
@@ -1279,6 +1307,13 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
           return;
         }
 
+        // Plan once through the same durable authority used by do/API/Mission.
+        // Cost, approval and execution must refer to this exact task set.
+        const startPrincipal = resolveLocalOsPrincipal('cli');
+        const startActor = principalToActor(startPrincipal);
+        const startTenant = resolveCallerTenant(startPrincipal, config.strict_tenant_isolation === true);
+        const startFlowId = randomUUID();
+        let exactStartPlan: PlanRunFlowResult;
         // ─── PRE-SPRINT COST GATE (User Safety Shield — Sprint 141) ─
         // Runs before spawn — prevents Sprint 140 $42 disaster from repeating.
         // Sprint 189 Task 189-008: shared evaluateCostGate() helper — same
@@ -1298,9 +1333,25 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
             // host-owned backend attempts; a stale Docker settlement could then
             // block startup after the new sprint had already polluted `.tasks/`.
             // The authoritative live plan remains runSprint's post-recovery PLAN.
-            const planForCost = await planSprint(root, config, context, recommendation, {
-              dryRun: true,
+            exactStartPlan = await planRunFlow({
+              projectRoot: root,
+              config,
+              recommendation,
+              proposal: {
+                flowId: startFlowId, revision: 1, tenant: startTenant,
+                project: root, actor: startActor, origin: 'cli',
+                intentSummary: context.directives,
+              },
+              lineage: {
+                tenantId: startTenant, actor: startActor, origin: 'cli',
+                correlationId: startFlowId, idempotencyKey: `start:${startFlowId}`,
+                sourceRef: 'cli:start',
+              },
+              source: { sourceKind: 'directives', brainContext: context },
+              previewOptions: { acknowledgePromptGate: opts.forcePromptGate === true },
+              acknowledgeScopePaths: opts.forceScope === true,
             });
+            const planForCost = exactStartPlan.sprint;
             const cfgAuthMode = await readAuthMode(root);
             const costTasks: TaskCostInput[] = planForCost.tasks.map((t) => ({
               ...buildTaskCostInput(t, costConfig.estimator),
@@ -1388,35 +1439,56 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
 
         const timeoutMs = opts.timeout ? parseInt(opts.timeout, 10) : undefined;
         const sandboxSpawnBackend = opts.sandbox ? createSandboxBackend(root) : undefined;
-        let sprintResult;
+        let sprintResult: import('../../core/types.js').Sprint | undefined;
         try {
-          sprintResult = await runSprint(root, config, {
-            connector: bootstrap.connector,
-            // CLI/MCP parity (ADR-022-V2, born-561): honor the --auto-approve flag —
-            // commander leaves opts.autoApprove undefined when absent, so this
-            // normalizes to a strict boolean, default false — same semantics as
-            // deckent_start (src/mcp/tools/start.ts autoApprove === true).
-            autoApprove: opts.autoApprove === true,
-            // Dimension B: --force-scope bypasses the pre-spawn scope gate. Independent
-            // of --force (cost/doctor) — the scope shield protects even force-run sprints.
+          decideRunFlowPlan(root, exactStartPlan.flowId, {
+            decision: 'approve', actor: startActor,
             acknowledgeScopePaths: opts.forceScope === true,
-            // born-628: --force-prompt-gate bypasses the plan-time G-series prompt gate
-            // BLOCK (persona-capability / decision-space / scope-contract findings).
-            // Independent of --force / --force-scope — mirrors the scope-gate override UX.
             acknowledgePromptGate: opts.forcePromptGate === true,
-            sandboxMode: opts.sandboxMode,
-            timeoutMs,
-            spawnBackend: sandboxSpawnBackend,
-            ...(runtime.providerAuthority
-              ? { providerAuthority: runtime.providerAuthority }
-              : {}),
-            ...(approvalAuthority.state === 'ready'
-              ? {
-                  attendedExecutionApprovalAuthority:
-                    approvalAuthority.runtime.attendedExecutionApprovalAuthority,
-                }
-              : {}),
           });
+          const outcome = await createLiveExactSprintExecutor({
+            ...(runtime.providerAuthority ? { providerAuthority: runtime.providerAuthority } : {}),
+            approvalAuthority,
+            executionOptions: {
+              connector: bootstrap.connector,
+              autoApprove: opts.autoApprove === true,
+              acknowledgeScopePaths: opts.forceScope === true,
+              acknowledgePromptGate: opts.forcePromptGate === true,
+              sandboxMode: opts.sandboxMode, timeoutMs,
+              spawnBackend: sandboxSpawnBackend,
+            },
+            onSprintResult: (result) => { sprintResult = result; },
+          }).execute({
+            projectRoot: root, config,
+            source: {
+              kind: 'exact-ref',
+              ref: { schemaVersion: 1, flowId: exactStartPlan.flowId,
+                revision: exactStartPlan.revision, planDigest: exactStartPlan.planDigest },
+              ingress: { kind: 'cli', id: 'cli:start' },
+            },
+            lineage: {
+              tenantId: startTenant, actor: startActor, origin: 'cli',
+              correlationId: startFlowId, idempotencyKey: `start:${startFlowId}:foreground`,
+              sourceId: 'cli:start', authorization: { kind: 'approved-actor' },
+            },
+            executionMode: 'in-process',
+          });
+          if (outcome.status !== 'settled' || !sprintResult) {
+            throw new Error(outcome.status === 'settled'
+              ? `${outcome.settlement.code}:${outcome.settlement.detail ?? ''}`
+              : 'reasonCode' in outcome
+                ? `${outcome.reasonCode}:${outcome.detail ?? ''}`
+                : `EXACT_START_NOT_SETTLED:${outcome.status}`);
+          }
+          if (outcome.settlement.state !== 'COMPLETED' && sprintResult.status !== 'PAUSED') {
+            print(getMessage('do.exact_settled', lang, {
+              state: outcome.settlement.state, reason: outcome.settlement.code,
+            }));
+            process.exitCode = 1;
+            return;
+          }
+
+
         } finally {
           if (stopSubprocessWatch) stopSubprocessWatch();
         }

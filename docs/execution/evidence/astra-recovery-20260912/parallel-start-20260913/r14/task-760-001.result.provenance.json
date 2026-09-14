@@ -1,0 +1,8 @@
+{
+  "copiedAt": "2026-09-14T07:56:24.375415+00:00",
+  "source": "/home/alperen/.local/state/deckent/runtime/task-attempt-custody/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/v2/projects/c382ed0187fa864185980851b324b929c3193aec707454b98fb40ef88dcdcf29/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/tasks/e3bb7cd78cbf95200476c18dddf6cb8f3729808dbadbf9e6f11dd6b68075b812/attempts/026261f0-3f46-8443-8feb-f107ce7a9ab4/generations/1/artifacts/worker-result/result-026261f0-3f46-8443-8feb-f107ce7a9ab4.bin",
+  "destination": "/home/alperen/deckent-dev/task-760-001.result",
+  "sha256": "2836af91a997afbf994a44175a3173f596dec51a28ab129ba7e06d6338c038a2",
+  "receiptArtifactHashMatch": true,
+  "note": "Inspection copy; canonical custody artifact unchanged."
+}

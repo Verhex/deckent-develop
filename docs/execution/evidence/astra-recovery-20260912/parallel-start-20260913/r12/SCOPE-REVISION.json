@@ -1,0 +1,11 @@
+{
+  "observedAt": "2026-09-13T23:15:51.302Z",
+  "reason": "task-types.ts:475-480 exempts homogeneous test scope but not combined test/docs",
+  "priorExit": 1,
+  "priorElapsedSeconds": 15.059,
+  "newWrites": [
+    "tests/core/task-attempt-custody-posix-adapter.test.ts"
+  ],
+  "productionChange": false,
+  "attemptBudget": 1
+}

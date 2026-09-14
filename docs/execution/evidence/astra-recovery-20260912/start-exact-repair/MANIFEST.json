@@ -1,0 +1,122 @@
+{
+  "observedAt": "2026-09-13T00:10:29.956912+00:00",
+  "head": "c9a81dc6b9bd77cd90bf09aa6998a94a2d482b0a",
+  "status": "START_WORKER_BIRTH_PROVEN_OUTER_HOLD",
+  "exits": {
+    "testsInitial": 1,
+    "testsFinal": 0,
+    "tsc": 0,
+    "buildBeforeCanary": 0,
+    "startCanary": 1,
+    "finalBuild": 1,
+    "masterFinal": 0
+  },
+  "custody": [
+    {
+      "path": "/home/alperen/.local/state/deckent/runtime/task-attempt-custody/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/v2/projects/c382ed0187fa864185980851b324b929c3193aec707454b98fb40ef88dcdcf29/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/tasks/3e268563d598c23ac718ac3ff97ceaad30d13b693b37cab99622fa5244112703/attempts/73b051f9-8b97-8359-8f15-aae828921b36/generations/1/worker-output/task-752-001.result",
+      "sha256": "4ffee13a468953dfb390fcd6e4bda7b2779744ce5755800a41841d4ab014b255"
+    },
+    {
+      "path": "/home/alperen/.local/state/deckent/runtime/task-attempt-custody/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/v2/projects/c382ed0187fa864185980851b324b929c3193aec707454b98fb40ef88dcdcf29/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/tasks/3e268563d598c23ac718ac3ff97ceaad30d13b693b37cab99622fa5244112703/attempts/73b051f9-8b97-8359-8f15-aae828921b36/generations/1/chain/05-settlement.json",
+      "sha256": "8739be17587d8f6f4f3ce2b964d97f45aea1cc14f8d92209b5433f7043fbea7f"
+    },
+    {
+      "path": "/home/alperen/.local/state/deckent/runtime/task-attempt-custody/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/v2/projects/c382ed0187fa864185980851b324b929c3193aec707454b98fb40ef88dcdcf29/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/tasks/3e268563d598c23ac718ac3ff97ceaad30d13b693b37cab99622fa5244112703/attempts/73b051f9-8b97-8359-8f15-aae828921b36/generations/1/chain/06-archive.json",
+      "sha256": "25b4f2e428aea784dedb8a94d360c8440bdd5edcde50b864af1f26c4dd01f81e"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/tests-final.log",
+      "sha256": "dc5bcaaf47ad2d750fecd4ba023169a386b5c138b8763c8dcbb94a2e2b864149"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/observations.jsonl",
+      "sha256": "80e06a4baefa4883f5d6a6a72ba85ecaf48cc4fa8ba869597ea1087c6045d571"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/PACKAGE.json",
+      "sha256": "932c9a117b7807fd507c4c779fd9f8c370635ab064c71e2cb31a45427404a51c"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/master-3.log",
+      "sha256": "96ce21f56e16c419e72e9d4e7f14cbf465917c777c290d36f926e73d217e1af2"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/final-status.json",
+      "sha256": "7f7be3668f4c372fe91928ddbf7a38e6255045cdaa80ca2e2191c7430281f6ba"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/master.log",
+      "sha256": "19f6f92af2bd8f0b1e85df7371c3cd85a1f7836da37bfc694fa315810ad37c71"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/build.log",
+      "sha256": "4942f8a710336e953fef006e206891fc5a90297d9c3d6660eb793b783361a38b"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/05-settlement.json",
+      "sha256": "8739be17587d8f6f4f3ce2b964d97f45aea1cc14f8d92209b5433f7043fbea7f"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/RESULT.md",
+      "sha256": "0e588df2e106a470ec802ac7746515b3a2b03086f0920d5b568ed7006dd9a452"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/cursor-227-229.md",
+      "sha256": "a7f8df427983bd9a891da462c7fc46607b599a59a475ed3f651ae8f2bfc6fe42"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/skill-delivery-752-001.json",
+      "sha256": "ac9e5b5e2edd3e035ac2cd108045eb09dbd6a7bc187eb2f0a6e37fc90f4be6d6"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/master-4.log",
+      "sha256": "a3c76bd208e65e66662d00e2e78ac3857670ee875afb37932f11ac5853ee4894"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/06-archive.json",
+      "sha256": "25b4f2e428aea784dedb8a94d360c8440bdd5edcde50b864af1f26c4dd01f81e"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/tests-2.log",
+      "sha256": "6de7f80721ca620eefac4e2d205e1779d6a0db174849d51d562d728a1ce2f0c2"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/start-terminal.json",
+      "sha256": "340f502a50e84fce0cd7d7c52921811ccb7fd7791bb4a7588728b2e4c9c61d1f"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/current-flow-before.md",
+      "sha256": "21414269d6ac203654b2e7c1942e558c664e2c0e9b1683c915138712c2a5e393"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/build-final.log",
+      "sha256": "4f050a7763a0ae353ef3a2cdaac55aa87d7541c6ef5c813e0f10c94e4a51c4e1"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/master-2.log",
+      "sha256": "19f6f92af2bd8f0b1e85df7371c3cd85a1f7836da37bfc694fa315810ad37c71"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/tsc-2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/tsc.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/canary.log",
+      "sha256": "e85a6fc2e381a9d15fc0c9cd982b4bc4747ec00a115e85557e23308b407b5e08"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/task-752-001.result",
+      "sha256": "4ffee13a468953dfb390fcd6e4bda7b2779744ce5755800a41841d4ab014b255"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/start-exact-repair/tests.log",
+      "sha256": "226d7b6c42d85d9cf01f418b495fc16d499d22327bb0fa27e577b51465522993"
+    }
+  ]
+}

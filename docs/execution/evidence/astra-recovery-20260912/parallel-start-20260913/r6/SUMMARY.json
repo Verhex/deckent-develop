@@ -1,0 +1,25 @@
+{
+  "observedAt": "2026-09-13T17:48:56.334344+00:00",
+  "exitCode": 1,
+  "monotonicElapsedSeconds": 1974.3265306579997,
+  "utcElapsedSeconds": 1903.192216,
+  "coordinatorPeakKiB": 4211448,
+  "sampledCpuSeconds": 1656.97,
+  "workerPeaks": {
+    "deckent-x-139f645b-e8ae-80e1-8470-101cf1dc3783": {
+      "cpuPercent": 196.73,
+      "peakMiB": 1652.736
+    },
+    "deckent-x-b1e6b9b8-b08c-8127-8c08-3c99e52e1d34": {
+      "cpuPercent": 159.01,
+      "peakMiB": 1795.072
+    },
+    "deckent-x-0d8ba987-46e2-819f-8456-d6dc52e82192": {
+      "cpuPercent": 180.95,
+      "peakMiB": 1653.76
+    }
+  },
+  "closure": "RUN_FAILED;0/8 collected; three providers exit0; only002 six-stage chain; criteria must not be inferred",
+  "next": "capture helper failure attribution + IPC preserves primary failure + bounded history verification + result/projection parity",
+  "replayBudgetRemaining": 0
+}

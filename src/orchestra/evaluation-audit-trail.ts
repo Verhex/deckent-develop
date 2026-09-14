@@ -1,3 +1,4 @@
+import { canonicalJson } from '../core/audit-writer.js';
 // ═══ Evaluation Audit Trail — Sprint 157 T-001 ═════════════════════════
 // Forensic record of every Brain evaluation. Each evaluation attempt
 // produces a JSON file under <projectRoot>/<EVALUATIONS_DIR>/<sprintId>/
@@ -495,9 +496,9 @@ export function isCurrentExactAcceptedTaskTerminalAuthorityRead(
         value.terminalAuthority,
         expectedTerminalAuthority.acceptedAuthority,
       )
-      || JSON.stringify(value.terminalAuthority) !== JSON.stringify(expectedTerminalAuthority)
-      || JSON.stringify(value.terminalResultAuthority)
-        !== JSON.stringify(expectedTerminalAuthority.terminalResultAuthority)
+      || canonicalJson(value.terminalAuthority) !== canonicalJson(expectedTerminalAuthority)
+      || canonicalJson(value.terminalResultAuthority)
+        !== canonicalJson(expectedTerminalAuthority.terminalResultAuthority)
       || value.terminalAuthority.acceptedAuthority.identity.taskId !== taskId
       || value.result.taskId !== taskId
       || value.projectedResult.taskId !== taskId
@@ -506,8 +507,8 @@ export function isCurrentExactAcceptedTaskTerminalAuthorityRead(
       || value.finalizerReceipt.verdict !== value.evaluationReceipt.verdict
     ) return false;
     const resultIdentity = value.result.attemptCustody.identity;
-    return JSON.stringify(resultIdentity)
-      === JSON.stringify(expectedTerminalAuthority.acceptedAuthority.identity);
+    return canonicalJson(resultIdentity)
+      === canonicalJson(expectedTerminalAuthority.acceptedAuthority.identity);
   } catch {
     return false;
   }

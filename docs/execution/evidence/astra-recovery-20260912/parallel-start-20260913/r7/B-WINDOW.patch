@@ -1,0 +1,208 @@
+--- a/src/orchestra/spawn-backend-docker.ts
++++ b/src/orchestra/spawn-backend-docker.ts
+@@ -1,3 +1,4 @@
++import { runIsolatedExactDockerCaptureWindow, type ExactDockerCaptureWindowResultV1 } from './exact-docker-command-transport.js';
+ import { parseExactDockerCommandDiagnostic } from './exact-docker-command-diagnostic.js';
+ import { runExactDockerWorkspaceCommand, type ExactDockerWorkspaceCommandResultV1, type ExactDockerWorkspaceCommandRunnerV1 } from './exact-docker-workspace-command.js';
+ import { resolveExactDockerObservationRunner } from './exact-docker-container-observation.js';
+@@ -3657,8 +3658,9 @@
+       readonly mountPlanDigest: Sha256Digest;
+       readonly volumeIdentityDigest: Sha256Digest;
+     }>,
++    capturedObservation?: ExactDockerWorkspaceVolumeInspectV1 | null,
+   ): Promise<ExactDockerWorkspaceVolumeInspectV1 | null> => {
+-    const inspected = await inspectVolume(name);
++    const inspected = capturedObservation === undefined ? await inspectVolume(name) : capturedObservation;
+     return inspected && verifyExactDockerWorkspaceVolumeInspect(inspected, {
+       name,
+       labels: authority.labels,
+@@ -3724,6 +3726,7 @@
+     let deadlineMs!: number;
+     let deadlineAt!: string;
+     let result: ExactDockerWorkspaceCommandResultV1;
++    let captureWindow: ExactDockerCaptureWindowResultV1 | null = null;
+     for (let attempt = 1; ; attempt += 1) {
+       startedAt = exactDockerEffectTimestamp(now);
+       startedMs = Date.parse(startedAt);
+@@ -3776,14 +3779,25 @@
+         helperSource,
+         encoded,
+       ];
+-      result = await run(Object.freeze({
++      const helperCommand = Object.freeze({
+         command: 'docker' as const,
+         args: Object.freeze(args),
+         stdin: populate ? input.inventory.nulDelimitedPaths : Buffer.alloc(0),
+         timeoutMs: EXACT_DOCKER_EFFECT_CAPTURE_TIMEOUT_MS,
+         stdoutCeiling: EXACT_DOCKER_EFFECT_RECEIPT_CEILING,
+         stderrCeiling: 64 * 1024,
+-      }));
++      });
++      if (!populate && input.runner === runExactDockerWorkspaceCommand) {
++        // Keep the helper, post-generation observation and completion timestamp
++        // in one bounded IO window. Delayed parent delivery is not execution time.
++        captureWindow = await runIsolatedExactDockerCaptureWindow({
++          helper: helperCommand, volumeName: captureInput.plan.volumeName, deadlineUnixMs: deadlineMs,
++        });
++        if (!captureWindow) return unavailable('HELPER_RUN');
++        result = captureWindow.helper;
++      } else {
++        result = await run(helperCommand);
++      }
+       if (exactDockerWorkspaceCommandSucceeded(result)) break;
+       if (!populate) throw new ExecutionEffectDockerCaptureAdapterErrorV1('HELPER_RUN',
+         result.diagnostic ?? { reason: 'unavailable', exitCode: result.status,
+@@ -3817,11 +3831,14 @@
+     const afterGeneration = await inspectExactVolumeGeneration(
+       captureInput.plan.volumeName,
+       workspaceAuthority,
++      captureWindow === null ? undefined : captureWindow.postGeneration
++        && exactDockerWorkspaceCommandSucceeded(captureWindow.postGeneration)
++        ? parseExactDockerWorkspaceVolumeInspect(exactDockerWorkspaceCommandStdout(captureWindow.postGeneration)) : null,
+     );
+     if (!afterGeneration || beforeGeneration.createdAt !== afterGeneration.createdAt) {
+       unavailable('POST_GENERATION');
+     }
+-    const completedAt = exactDockerEffectTimestamp(now);
++    const completedAt = captureWindow?.completedAt ?? exactDockerEffectTimestamp(now);
+     if (Date.parse(completedAt) < startedMs || Date.parse(completedAt) > deadlineMs) {
+       unavailable('CLOCK');
+     }
+--- a/src/orchestra/exact-docker-command-transport.ts
++++ b/src/orchestra/exact-docker-command-transport.ts
+@@ -0,0 +1,54 @@
++import { Worker } from 'node:worker_threads';
++import { parseExactDockerCommandDiagnostic } from './exact-docker-command-diagnostic.js';
++import type { ExactDockerWorkspaceCommandInputV1, ExactDockerWorkspaceCommandResultV1 } from './exact-docker-workspace-command.js';
++
++export interface ExactDockerCaptureWindowInputV1 {
++  readonly helper: ExactDockerWorkspaceCommandInputV1;
++  readonly volumeName: string;
++  readonly deadlineUnixMs: number;
++}
++export interface ExactDockerCaptureWindowResultV1 {
++  readonly helper: ExactDockerWorkspaceCommandResultV1;
++  readonly postGeneration: ExactDockerWorkspaceCommandResultV1 | null;
++  readonly completedAt: string;
++}
++
++/** This transport owns no admission or settlement authority. The lifecycle
++ * supplies an admitted helper command and independently validates the returned
++ * volume generation, native capture and timestamps before creating a receipt. */
++export async function runIsolatedExactDockerCaptureWindow(
++  input: ExactDockerCaptureWindowInputV1,
++): Promise<ExactDockerCaptureWindowResultV1 | null> {
++  if (input.helper.command !== 'docker' || input.helper.args[0] !== 'run'
++    || input.helper.stdin.byteLength !== 0
++    || !/^deckent-xw-[a-f0-9]{48}$/u.test(input.volumeName)
++    || !Number.isSafeInteger(input.deadlineUnixMs) || input.deadlineUnixMs <= 0) return null;
++  const validResult = (value: ExactDockerWorkspaceCommandResultV1, stdoutCeiling: number, stderrCeiling: number): boolean =>
++    !!value && (value.status === null || Number.isSafeInteger(value.status))
++    && (value.signal === null || typeof value.signal === 'string')
++    && typeof value.error === 'boolean' && typeof value.overflow === 'boolean'
++    && value.stdout instanceof Uint8Array && value.stderr instanceof Uint8Array
++    && value.stdout.byteLength <= stdoutCeiling && value.stderr.byteLength <= stderrCeiling
++    && (value.diagnostic === undefined || parseExactDockerCommandDiagnostic(value.diagnostic) !== null);
++  return new Promise(resolveResult => {
++    let worker: Worker;
++    let result: ExactDockerCaptureWindowResultV1 | null = null;
++    try {
++      worker = new Worker(new URL('./exact-docker-capture-window-worker.js', import.meta.url), {
++        workerData: input,
++        execArgv: process.execArgv.filter(arg => !arg.startsWith('--input-type')),
++      });
++    } catch { resolveResult(null); return; }
++    worker.once('message', (message: ExactDockerCaptureWindowResultV1) => {
++      if (!message || !validResult(message.helper, input.helper.stdoutCeiling, input.helper.stderrCeiling)
++        || (message.postGeneration !== null && !validResult(message.postGeneration, 1024 * 1024, 64 * 1024))
++        || typeof message.completedAt !== 'string' || !Number.isFinite(Date.parse(message.completedAt))
++        || new Date(Date.parse(message.completedAt)).toISOString() !== message.completedAt) return;
++      result = Object.freeze(message);
++    });
++    worker.once('error', () => { result = null; });
++    // Child close precedes the message; thread exit precedes delivery. A busy
++    // coordinator can delay delivery, never change the observed completion time.
++    worker.once('exit', code => resolveResult(code === 0 ? result : null));
++  });
++}
+--- a/tests/orchestra/exact-docker-observation.test.ts
++++ b/tests/orchestra/exact-docker-observation.test.ts
+@@ -6,6 +6,8 @@
+ vi.mock('node:worker_threads', () => ({ Worker: doubles.worker }));
+ import { runExactDockerWorkspaceCommand } from '../../src/orchestra/exact-docker-workspace-command.js';
+ import { isExactDockerReadOnlyObservation, runIsolatedExactDockerReadOnlyObservation, resolveExactDockerObservationRunner } from '../../src/orchestra/exact-docker-container-observation.js';
++
++import { runIsolatedExactDockerCaptureWindow } from '../../src/orchestra/exact-docker-command-transport.js';
+ 
+ const input = (args: string[]) => ({ command: 'docker' as const, args, stdin: new Uint8Array(),
+   timeoutMs: 100, stdoutCeiling: 1024, stderrCeiling: 1024 });
+@@ -80,3 +82,38 @@
+     expect(await pending).toMatchObject({status: 0, error: false});
+   });
+ });
++
++
++describe('admitted capture IO window', () => {
++  const windowInput = () => ({ helper: input(['run', 'trusted-helper']),
++    volumeName: `deckent-xw-${'a'.repeat(48)}`, deadlineUnixMs: 1000 });
++  const commandResult = () => ({ status: 0, signal: null, error: false, overflow: false,
++    stdout: new Uint8Array(), stderr: new Uint8Array() });
++  it('preserves measured completion across delayed parent delivery and waits for retirement', async () => {
++    const worker = new EventEmitter(); doubles.worker.mockImplementation(function () { return worker; });
++    let settled = false;
++    const pending = runIsolatedExactDockerCaptureWindow(windowInput()).then(r => { settled = true; return r; });
++    const completedAt = new Date(900).toISOString();
++    worker.emit('message', { helper: commandResult(), postGeneration: commandResult(), completedAt });
++    await Promise.resolve(); expect(settled).toBe(false);
++    expect(doubles.spawn).not.toHaveBeenCalled();
++    worker.emit('exit', 0);
++    expect(await pending).toMatchObject({completedAt, helper: {status:0}, postGeneration: {status:0}});
++  });
++  it.each(['bad-post', 'bad-clock', 'worker-error', 'abnormal-exit'])(
++    'does not accept %s', async fault => {
++      const worker = new EventEmitter(); doubles.worker.mockImplementation(function () { return worker; });
++      const pending = runIsolatedExactDockerCaptureWindow(windowInput());
++      worker.emit('message', { helper: commandResult(),
++        postGeneration: fault === 'bad-post' ? {} : commandResult(),
++        completedAt: fault === 'bad-clock' ? 'invalid' : new Date(900).toISOString() });
++      if(fault === 'worker-error') worker.emit('error', new Error('failed'));
++      worker.emit('exit', fault === 'abnormal-exit' ? 1 : 0);
++      expect(await pending).toBeNull();
++    });
++  it('rejects population stdin and unbound volume targets before creating a thread', async () => {
++    expect(await runIsolatedExactDockerCaptureWindow({...windowInput(), volumeName:'--all'})).toBeNull();
++    expect(await runIsolatedExactDockerCaptureWindow({...windowInput(), helper:{...input(['run','image']),stdin:new Uint8Array([1])}})).toBeNull();
++    expect(doubles.worker).not.toHaveBeenCalled();
++  });
++});
+--- a/tests/orchestra/spawn-backend-docker-mounts.test.ts
++++ b/tests/orchestra/spawn-backend-docker-mounts.test.ts
+@@ -1640,7 +1640,7 @@
+     expect(source).toContain('EXACT_DOCKER_EFFECT_CLOCK_REGRESSION_TOLERANCE_MS');
+     expect(source).toContain('return new Date(lastTimestampMs).toISOString()');
+     const captureBefore = source.indexOf('const beforeGeneration = await inspectExactVolumeGeneration');
+-    const helperRun = source.indexOf('result = await run', captureBefore);
++    const helperRun = source.indexOf('const helperCommand = Object.freeze', captureBefore);
+     const captureAfter = source.indexOf('const afterGeneration = await inspectExactVolumeGeneration', helperRun);
+     expect(captureBefore).toBeGreaterThan(0);
+     expect(helperRun).toBeGreaterThan(captureBefore);
+--- a/src/orchestra/exact-docker-capture-window-worker.ts
++++ b/src/orchestra/exact-docker-capture-window-worker.ts
+@@ -0,0 +1,17 @@
++import { parentPort, workerData } from 'node:worker_threads';
++import { runExactDockerWorkspaceCommand } from './exact-docker-workspace-command.js';
++import type { ExactDockerCaptureWindowInputV1 } from './exact-docker-command-transport.js';
++
++// Only bounded subprocess IO. No coordinator, provider, custody store or receipt
++// producer. The parent performs all authority and native-manifest validation.
++const input = workerData as ExactDockerCaptureWindowInputV1;
++const remaining = (): number => Math.max(1, Math.min(input.helper.timeoutMs, input.deadlineUnixMs - Date.now()));
++const helper = await runExactDockerWorkspaceCommand({ ...input.helper, timeoutMs: remaining() });
++const succeeded = helper.status === 0 && helper.signal === null && !helper.error && !helper.overflow;
++const postGeneration = succeeded && Date.now() < input.deadlineUnixMs
++  ? await runExactDockerWorkspaceCommand({
++    command: 'docker', args: ['volume', 'inspect', input.volumeName], stdin: new Uint8Array(),
++    timeoutMs: Math.min(10_000, remaining()), stdoutCeiling: 1024 * 1024, stderrCeiling: 64 * 1024,
++  }) : null;
++parentPort?.postMessage({ helper, postGeneration, completedAt: new Date().toISOString() });
++parentPort?.close();

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
-import { mkdirSync, existsSync, readFileSync, writeFileSync, unlinkSync, rmSync, statSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync, writeFileSync, unlinkSync, rmSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 
 import {
@@ -24,7 +24,7 @@ import type {
 } from '../../src/core/observability.js';
 
 import {
-  shouldRotate,
+  resolveRotationMaxBytes,
   rotateMetricsFile,
   listArchives,
 } from '../../src/core/observability-rotation.js';
@@ -33,19 +33,11 @@ import {
 // size-trigger ingress amortizes configured-ceiling checks and that a rotation
 // failure never escapes to the caller. Every other export keeps its real implementation — only these
 // named bindings become vi.fn wrappers.
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs')>();
-  return {
-    ...actual,
-    statSync: vi.fn(actual.statSync),
-  };
-});
-
 vi.mock('../../src/core/observability-rotation.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/core/observability-rotation.js')>();
   return {
     ...actual,
-    shouldRotate: vi.fn(actual.shouldRotate),
+    resolveRotationMaxBytes: vi.fn(actual.resolveRotationMaxBytes),
     rotateMetricsFile: vi.fn(actual.rotateMetricsFile),
   };
 });
@@ -404,7 +396,7 @@ describe('getMetricsPath()', () => {
 });
 
 // ═══ 744-002: size-triggered rotation wired into the writer ingress ═══
-// `shouldRotate()`/`rotateMetricsFile()` existed but no production write path
+// Rotation authority existed but no production write path
 // called them — rotation only ever happened at sprint finalize. These tests
 // prove the append path (`metric()`, which every writer funnels through)
 // amortizes configured size checks and rotates without waiting for finalize, and
@@ -412,11 +404,9 @@ describe('getMetricsPath()', () => {
 // caller. The suppression latch is cleared by initObservability/
 // resetObservability (747-001), so test order no longer matters.
 describe('size-triggered rotation ingress (744-002 / 747-001)', () => {
-  it('amortizes configured size-ceiling checks via shouldRotate', () => {
-    const rotateSpy = vi.mocked(shouldRotate);
-    const statSpy = vi.mocked(statSync);
-    rotateSpy.mockClear();
-    statSpy.mockClear();
+  it('amortizes configured size-ceiling checks via the resolved policy', () => {
+    const policySpy = vi.mocked(resolveRotationMaxBytes);
+    policySpy.mockClear();
 
     for (let i = 0; i < 20; i++) {
       metric('ceiling.per.append.test', i, { i: String(i) });
@@ -424,38 +414,31 @@ describe('size-triggered rotation ingress (744-002 / 747-001)', () => {
 
     // The writer queries the existing resolver at observed-byte gates, not on
     // every append. No threshold is supplied by the ingress.
-    expect(rotateSpy.mock.calls.length).toBeGreaterThan(0);
-    expect(rotateSpy.mock.calls.length).toBeLessThan(20);
-    for (const call of rotateSpy.mock.calls) {
+    expect(policySpy.mock.calls.length).toBeGreaterThan(0);
+    expect(policySpy.mock.calls.length).toBeLessThan(20);
+    for (const call of policySpy.mock.calls) {
       expect(call[0]).toBe(TEST_ROOT);
       // No ceiling literal is passed at the ingress: the value is resolved
-      // from effective configuration inside shouldRotate.
+      // from effective configuration inside the canonical resolver.
       expect(call[1]).toBeUndefined();
     }
-    // The real (call-through) ceiling check genuinely measures the file, but
-    // fewer times than the append count.
-    expect(statSpy).toHaveBeenCalled();
     // The writes themselves still happened.
     expect(readMetricsLines()).toHaveLength(20);
   });
 
   it('evaluates the ceiling BEFORE the record is written', () => {
-    metric('ordering.seed', 1);
-    metric('ordering.seed', 2);
-    expect(readMetricsLines()).toHaveLength(2);
-
     const linesSeenAtCheck: number[] = [];
-    vi.mocked(shouldRotate).mockImplementationOnce(() => {
+    vi.mocked(resolveRotationMaxBytes).mockImplementationOnce(() => {
       linesSeenAtCheck.push(readMetricsLines().length);
-      return false;
+      return Number.MAX_SAFE_INTEGER;
     });
 
     metric('ordering.probe', 3);
 
-    // The ceiling saw the PRE-append state — the third record was not yet on
+    // The ceiling saw the PRE-append state — the record was not yet on
     // disk when the ceiling was evaluated.
-    expect(linesSeenAtCheck).toEqual([2]);
-    expect(readMetricsLines()).toHaveLength(3);
+    expect(linesSeenAtCheck).toEqual([0]);
+    expect(readMetricsLines()).toHaveLength(1);
   });
 
   it('rotates once the configured size ceiling is crossed, without waiting for sprint finalize', () => {
@@ -481,6 +464,7 @@ describe('size-triggered rotation ingress (744-002 / 747-001)', () => {
   });
 
   it('recovers from a transient rotation failure in the same session without losing or duplicating records', () => {
+    vi.mocked(resolveRotationMaxBytes).mockClear();
     writeFileSync(
       join(TEST_ROOT, '.deckent', 'config.json'),
       JSON.stringify({ observability: { rotation: { maxSizeMB: 0.001 } } }),
@@ -503,7 +487,7 @@ describe('size-triggered rotation ingress (744-002 / 747-001)', () => {
     }).not.toThrow();
 
     expect(vi.mocked(rotateMetricsFile).mock.calls.length).toBeGreaterThanOrEqual(2);
-    expect(vi.mocked(shouldRotate).mock.calls.length).toBeLessThan(20);
+    expect(vi.mocked(resolveRotationMaxBytes).mock.calls.length).toBeLessThan(20);
 
     const persistedNames = [
       ...readMetricsLines(),

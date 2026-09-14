@@ -718,6 +718,7 @@ describe('executeSpawnTask — exact normal-Docker publication order', () => {
           identity,
           admissionReceiptDigest: digest,
         },
+        notes: 'Worker observation\nSecond line\twith details',
         handoffNotes: 'use the terminal-bound exact API',
       },
       acceptedResultRef: {
@@ -804,9 +805,11 @@ describe('executeSpawnTask — exact normal-Docker publication order', () => {
       result: accepted.result,
       projectedResult: { taskId },
     } as never;
-    const reorderedResult = Object.fromEntries(
+    // The live Docker reader seals plain records with a null prototype;
+    // the settlement parser returns ordinary JSON records.
+    const reorderedResult = Object.assign(Object.create(null), Object.fromEntries(
       Object.entries(accepted.result).reverse(),
-    );
+    ));
     const reorderedCurrentRead = {
       ...currentRead,
       result: reorderedResult,

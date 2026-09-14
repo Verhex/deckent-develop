@@ -47,6 +47,7 @@ const RUN_STATUS_READ_MODEL_LOCK_RETRY_MS = 10;
 export type RunStatusReadModelHoldReason =
   | 'authority-conflict'
   | 'malformed-task-artifact'
+  | 'exact-result-authority-hold'
   | 'unresolved-provider-observation';
 
 export interface RunStatusReadModelHold {
@@ -193,7 +194,11 @@ export function projectCanonicalRunLogicalProgress(
   }
   return Object.freeze({
     ...projected.projection,
-    fixRetry: projectFixRetry(projected.projection.lineages, maxFixRetries),
+    // A queued task or an authority HOLD is not an admitted FIX. Only the
+    // current NO_GO attempt can project an outstanding evaluation retry.
+    fixRetry: projectFixRetry(projected.projection.lineages.filter(lineage =>
+      tasksById.get(lineage.attemptIds.at(-1)!)?.status === TaskStatus.NO_GO,
+    ), maxFixRetries),
   });
 }
 
@@ -411,6 +416,19 @@ export function runStatusReadModelMatchesAuthority(
   return canonicalJson(model.authority) === canonicalJson(authority);
 }
 
+/** IO ingress fence; pure renderers receive only an already-fenced model. */
+export function runStatusReadModelMatchesCurrentGeneration(
+  projectRoot: string,
+  model: CanonicalRunStatusReadModel,
+  authority: CanonicalRunStatus,
+): boolean {
+  if (!runStatusReadModelMatchesAuthority(model, authority)) return false;
+  const generation = readRunGeneration(projectRoot, authority);
+  // A live generation without an identity cannot authenticate persisted counts.
+  if (authority.active && generation === null) return false;
+  return model.runGeneration === generation;
+}
+
 export type RunStatusReadiness =
   | { readonly state: 'READY'; readonly model: CanonicalRunStatusReadModel }
   | {
@@ -482,12 +500,60 @@ function acquirePublicationLock(lockPath: string): void {
   }
 }
 
+/** Coordinator-owned state after commit, never raw worker result claims. */
+export interface CoordinatorRunStatusSnapshot {
+  readonly sprintId: string;
+  readonly runGeneration: string;
+  readonly tasks: readonly Task[];
+  readonly heldTaskIds: readonly string[];
+}
+
+function coordinatorTasks(
+  snapshot: CoordinatorRunStatusSnapshot,
+  authority: CanonicalRunStatus,
+  runGeneration: string | null,
+): { tasks: readonly Task[]; holds: RunStatusReadModelHold[] } {
+  const ids = new Set(snapshot.tasks.map(task => task.id));
+  if (
+    !authority.active || authority.coordinator !== 'alive'
+    || snapshot.sprintId !== authority.sprintId
+    || !runGeneration || snapshot.runGeneration !== runGeneration
+    || ids.size !== snapshot.tasks.length
+    || snapshot.tasks.some(task => !task.id || task.sprintId !== snapshot.sprintId
+      || !Object.values(TaskStatus).includes(task.status))
+    || snapshot.heldTaskIds.some(id => !ids.has(id))
+  ) throw new RunStatusReadModelError('INVALID_MODEL', 'Coordinator status snapshot authority mismatch');
+  const held = new Set(snapshot.heldTaskIds);
+  return {
+    tasks: snapshot.tasks.map(task => held.has(task.id)
+      ? { ...task, status: TaskStatus.PAUSED }
+      : task),
+    holds: [...held].sort().map(taskId => ({
+      reasonCode: 'exact-result-authority-hold',
+      evidenceRef: `coordinator:${snapshot.runGeneration}:task:${taskId}`,
+      detail: 'EXACT_RESULT_AUTHORITY_HOLD',
+    })),
+  };
+}
+
 export function publishCanonicalRunStatusReadModel(
   projectRoot: string,
-  options: { readonly publishedAt?: string; readonly authority?: CanonicalRunStatus } = {},
+  options: {
+    readonly publishedAt?: string;
+    readonly authority?: CanonicalRunStatus;
+    readonly coordinatorSnapshot?: CoordinatorRunStatusSnapshot;
+  } = {},
 ): CanonicalRunStatusReadModel {
-  const authority = options.authority ?? readCanonicalRunStatus(projectRoot);
-  const loaded = loadCanonicalRunTasks(projectRoot, authority);
+  // Fresh coordinator publication precedes lifecycle/task projection. Resolve its
+  // exact sprint through the existing hint; persisted authority and lease checks
+  // still take precedence and reject stale or foreign writers.
+  const authority = options.authority ?? readCanonicalRunStatus(projectRoot, {
+    sprintIdHint: options.coordinatorSnapshot?.sprintId,
+  });
+  const runGeneration = readRunGeneration(projectRoot, authority);
+  const loaded = options.coordinatorSnapshot
+    ? coordinatorTasks(options.coordinatorSnapshot, authority, runGeneration)
+    : loadCanonicalRunTasks(projectRoot, authority);
   const currentTaskIds = new Set(loaded.tasks.map(task => task.id));
   const currentAttemptIdsByTaskId = new Map<string, ReadonlySet<string>>();
   for (const task of loaded.tasks) {
@@ -519,7 +585,7 @@ export function publishCanonicalRunStatusReadModel(
     ...(exactTerminalProgress ? { logicalProgress: exactTerminalProgress } : {}),
     providerConcurrency,
     terminalPublication,
-    runGeneration: readRunGeneration(projectRoot, authority),
+    runGeneration,
     holds: [
       ...loaded.holds,
       ...projectionHolds(
@@ -542,6 +608,10 @@ export function publishCanonicalRunStatusReadModel(
   acquirePublicationLock(lockPath);
   let temporary: string | null = null;
   try {
+    if (options.coordinatorSnapshot
+      && readRunGeneration(projectRoot, authority) !== runGeneration) {
+      throw new RunStatusReadModelError('CAS_CONFLICT', 'Coordinator generation changed before publication');
+    }
     const current = readCanonicalRunStatusReadModel(projectRoot);
     const candidate = current?.revision === previous?.revision
       ? model

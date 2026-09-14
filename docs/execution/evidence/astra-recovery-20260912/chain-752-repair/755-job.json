@@ -1,0 +1,305 @@
+{
+  "status": "COMPLETE",
+  "sprintId": "sprint-755",
+  "summary": "Sprint sprint-755 tamamlandı (26dk 49sn) — 1/1 task başarılı: 1 DONE, 0 TECH_DEBT, 0 NO_GO | Agent: implementer(1)",
+  "completedAt": "2026-09-13T12:38:11.059Z",
+  "metrics": {
+    "totalTasks": 1,
+    "done": 1,
+    "techDebt": 0,
+    "noGo": 0,
+    "duration": "26dk 49sn",
+    "durationMs": 1609874,
+    "billedCostUsd": 0,
+    "referenceCostUsd": 0,
+    "unknownBillingTaskCount": 0
+  },
+  "agentBreakdown": {
+    "implementer": 1
+  },
+  "evaluations": {
+    "755-001": {
+      "evaluation": "DONE",
+      "title": "Repair transient rotation recovery and amortized writer checks",
+      "agent": "implementer",
+      "skills": [
+        "ci-testing",
+        "react-specialist",
+        "rpc-protocol",
+        "typescript-expert"
+      ],
+      "reason": "Diagnosed the 45-call failure as recursive telemetry during rotation/config/retention work re-entering the writer threshold path. Added a session-local reentrancy guard so nested telemetry is still serialized exactly once but cannot recursively rotate, and capped observed-byte exponential retry at the already resolved canonical policy ceiling. The public writer API, rotation authority, retention behavior, and configuration precedence are unchanged. Verification: declared Vitest command exited 0; 2 files, 71 tests passed. Host production-wiring settlement is not claimed; the registered host proof remains pending independent host observation. docImpact: none.",
+      "filesChanged": [
+        "src/core/observability.ts"
+      ],
+      "linesAdded": 23,
+      "linesRemoved": 2,
+      "testsPassed": true,
+      "coverage": 0,
+      "selfAssessment": "DONE",
+      "techDebtDetail": ""
+    }
+  },
+  "completionRecord": {
+    "verdictSummary": {
+      "done": 1,
+      "techDebt": 0,
+      "noGo": 0
+    },
+    "taskSummary": [
+      {
+        "taskId": "755-001",
+        "title": "Repair transient rotation recovery and amortized writer checks",
+        "evaluation": "DONE",
+        "selfAssessment": "DONE",
+        "filesChanged": 1,
+        "linesAdded": 23,
+        "linesRemoved": 2,
+        "testsPassed": true,
+        "coverage": 0,
+        "workAttributionState": "VERIFIED",
+        "attemptId": "d71cebfb-3c5b-8b0b-8584-a759418f3e19",
+        "attributionReason": null
+      }
+    ],
+    "flowId": "9034863d-f080-4024-8889-43fa392184d4",
+    "attemptEvidence": [
+      {
+        "logicalTaskId": "755-001",
+        "identity": {
+          "taskId": "755-001",
+          "attemptId": "d71cebfb-3c5b-8b0b-8584-a759418f3e19"
+        },
+        "authority": {
+          "state": "TERMINAL",
+          "verdict": "DONE",
+          "evidenceRef": "exact-terminal-authority:sha256:0137d9015c63db36ed282409786d2c51a8a03ed4d7abc05d435be5594d65af5f"
+        },
+        "result": {
+          "state": "COMPLETE",
+          "verdict": "DONE",
+          "evidenceRef": "exact-settled-result:sha256:e10ad74b78950468766e740b88264bbc9955e31b9cf5d32594786b88f9fc89ec",
+          "payload": {
+            "taskId": "755-001",
+            "workerId": "w-755-001",
+            "promptCompilePlanId": "prompt-compile-plan:sha256:fe874fb1e1e559ce7b34bfaa95ec7fdd0128bbef1a349b4e860eb818e02468f1",
+            "filesChanged": [
+              "src/core/observability.ts"
+            ],
+            "linesAdded": 23,
+            "linesRemoved": 2,
+            "diskVerified": true,
+            "workAttribution": {
+              "state": "VERIFIED",
+              "attemptId": "d71cebfb-3c5b-8b0b-8584-a759418f3e19",
+              "baselineRef": "task-attempt-custody-provider-exit:sha256:0b1f1936e2daf1a57076a5052a1bf8b5cbb31a29bb96b1a1b9268c01d9dcbcd1#scope-baseline:sha256:3f944ff836b86212ef5d35f0ca35767b71ebafa70a425fe658574659e767296c",
+              "baselineSha256": "3f944ff836b86212ef5d35f0ca35767b71ebafa70a425fe658574659e767296c",
+              "scopeDigest": "b39d9879c30f5c0fd87b8f90ce24d5d96234ac0b70ebaa3d5f646286b3334949"
+            },
+            "testsPassed": true,
+            "testCommands": [
+              "VITEST_MAX_FORKS=2 npx vitest run --configLoader runner --no-cache tests/core/observability.test.ts tests/core/observability-rotation.test.ts"
+            ],
+            "testVerification": {
+              "applicability": "REQUIRED",
+              "outcome": "PASSED",
+              "commands": [
+                "VITEST_MAX_FORKS=2 npx vitest run --configLoader runner --no-cache tests/core/observability.test.ts tests/core/observability-rotation.test.ts"
+              ]
+            },
+            "criteriaEvidence": [
+              {
+                "criterionId": "criterion-go-174026d22eb680e8cbe95d9c520469d78b6b5c8c743d8907b7c84d8662900d1b",
+                "outcome": "MET",
+                "evidence": [
+                  "rotateBeforeAppend schedules checks by resolved maxBytes and caps exponential retry bytes at _resolvedRotationMaxBytes; targeted tests passed."
+                ]
+              },
+              {
+                "criterionId": "criterion-go-2f383c6022ff9e45b0c9cb056d300627af19a84cd2b9b0876a3aeae74477af8a",
+                "outcome": "MET",
+                "evidence": [
+                  "Execution used the plan-resolved route without adding any model-name acceptance condition or fallback behavior."
+                ]
+              },
+              {
+                "criterionId": "criterion-go-7f92d66c3269893d04a13c95d86d0f7ca768fd5ec7473a7465d1e9e2abd467c5",
+                "outcome": "MET",
+                "evidence": [
+                  "Canonical resolveRotationMaxBytes remains the sole ceiling authority; rotation is pre-append and the outer appendEntry catch continues isolating serialization/rotation failures; 71 tests passed."
+                ]
+              },
+              {
+                "criterionId": "criterion-go-97bbbaf95b68a3606560d0d72158e6772c2a35be4a26a97c2775c6bee4c711b9",
+                "outcome": "MET",
+                "evidence": [
+                  "Declared --configLoader runner --no-cache command exited 0 with 2 files and 71 tests passed; production evidence is presence-only, not host settlement."
+                ]
+              },
+              {
+                "criterionId": "criterion-go-a7e5b385aed555f67f58a9bf057f6f3e8dc0bc475becb6daa945c2e4f2bef963",
+                "outcome": "MET",
+                "evidence": [
+                  "Strict TypeScript-compatible implementation uses ReturnType<typeof rotateMetricsFile>; declared Vitest verification transformed and executed successfully."
+                ]
+              },
+              {
+                "criterionId": "criterion-go-b1d861b68d6fcb5071a86697061bcc22bdcc81f641ea541307607484c8285eae",
+                "outcome": "MET",
+                "evidence": [
+                  "Only src/core/observability.ts was mutated; the real-policy transient recovery test and both declared test files passed without perpetual-due mocks."
+                ]
+              },
+              {
+                "criterionId": "criterion-go-b8d00826c9bde7ad228078bef9607d841c9dc3d630e29f12e0a1a25441f90448",
+                "outcome": "MET",
+                "evidence": [
+                  "Result contains digest-bound worker presence-only productionWiringEvidence; host proof program remains explicitly host-owned."
+                ]
+              },
+              {
+                "criterionId": "criterion-go-d21e301502e7875bc2b0d01c62f177cb7bae659e904eb53cc76cff1aaf38e9bf",
+                "outcome": "MET",
+                "evidence": [
+                  "Transient recovery test accounts for all 20 failure.isolation.test records and one after.failure record across hot file and archives; public exports were unchanged."
+                ]
+              },
+              {
+                "criterionId": "criterion-go-d654e46661cff363af7bcc32e80bfb05fb0ad35c1841e7daca54d30034219379",
+                "outcome": "MET",
+                "evidence": [
+                  "Same-session test observes at least two rotateMetricsFile calls after one injected transient failure and passes without init/reset."
+                ]
+              },
+              {
+                "criterionId": "criterion-no-go-11b588a0d1ee99694892a09753bac932d84132a1a4e6d02b6117d4ee74d2bfb9",
+                "outcome": "UNMET",
+                "evidence": [
+                  "Worker evidence is labeled presence-only and does not claim host/provider completion."
+                ]
+              },
+              {
+                "criterionId": "criterion-no-go-2120e849fc0dcd9ab3caf9f791814b7abf24429c21d5750d160730442399d626",
+                "outcome": "UNMET",
+                "evidence": [
+                  "Retry remains enabled in-session, is byte-backoff amortized, and recursive rotation-owned telemetry bypasses threshold checks."
+                ]
+              },
+              {
+                "criterionId": "criterion-no-go-6d390b6b96af93c9d4cd2a4c472e0e664259122847d254dc78a17263d6dd3dcf",
+                "outcome": "UNMET",
+                "evidence": [
+                  "Exact-once record assertions passed; no threshold literal or out-of-scope project write was added."
+                ]
+              },
+              {
+                "criterionId": "criterion-no-go-fc594d10a78178485c24651ed7bb614e0a6d0eabb7fe3b8d2e9133e6c8314e00",
+                "outcome": "UNMET",
+                "evidence": [
+                  "Declared targeted verification passed all 71 tests and all required behavior criteria have direct code/test evidence."
+                ]
+              }
+            ],
+            "techDebtCriterionIds": [],
+            "coverage": 0,
+            "selfAssessment": "DONE",
+            "notes": "Diagnosed the 45-call failure as recursive telemetry during rotation/config/retention work re-entering the writer threshold path. Added a session-local reentrancy guard so nested telemetry is still serialized exactly once but cannot recursively rotate, and capped observed-byte exponential retry at the already resolved canonical policy ceiling. The public writer API, rotation authority, retention behavior, and configuration precedence are unchanged. Verification: declared Vitest command exited 0; 2 files, 71 tests passed. Host production-wiring settlement is not claimed; the registered host proof remains pending independent host observation. docImpact: none.",
+            "promptDeliveryAttribution": {
+              "state": "CURRENT"
+            },
+            "tokenUsage": {
+              "inputTokens": 70658,
+              "outputTokens": 4630,
+              "cacheReadTokens": 573824,
+              "cacheCreationTokens": 0,
+              "reasoningTokens": 957,
+              "totalTokens": 649112,
+              "source": "provider-adapter"
+            },
+            "cost": {
+              "usd": 0,
+              "currency": "USD",
+              "billingMode": "subscription",
+              "pricingSource": "subscription-no-provider-price-envelope",
+              "isLocal": false
+            },
+            "productionWiringEvidence": {
+              "version": 1,
+              "contractDigest": "70ab2aba53128268eea1b4eddc98aa3880127fc0a7c1e9b8fc2997e86580421c",
+              "observedBy": "worker",
+              "evidence": {
+                "state": "presence-only",
+                "basis": "static-reachability",
+                "evidenceRefs": [
+                  "src/core/observability.ts: appendEntry -> rotateBeforeAppend -> rotateMetricsFile",
+                  "src/core/observability-rotation.ts: resolveRotationMaxBytes and rotateMetricsFile"
+                ]
+              }
+            }
+          }
+        },
+        "attribution": {
+          "state": "VERIFIED",
+          "evidenceRef": "exact-docker-host-work-attribution:sha256:1d01c36bf3014d70de1895ddb27edabcc140fc38f24454ed07c7454304d035a0:sha256:0840588591aad829c29ea27fda08b1c523f587834259f489a7fe413508cb8db3",
+          "filesChanged": [
+            "src/core/observability.ts"
+          ],
+          "linesAdded": 23,
+          "linesRemoved": 2
+        },
+        "writeScope": [
+          "src/core/observability-rotation.ts",
+          "src/core/observability.ts",
+          "tests/core/observability-rotation.test.ts",
+          "tests/core/observability.test.ts"
+        ]
+      }
+    ],
+    "lineageUsage": [
+      {
+        "logicalRootTaskId": "755-001",
+        "billingAuthority": "subscription",
+        "attempts": [
+          {
+            "id": "d71cebfb-3c5b-8b0b-8584-a759418f3e19",
+            "taskId": "755-001",
+            "logicalRootTaskId": "755-001",
+            "inputTokens": 70658,
+            "outputTokens": 4630,
+            "cacheReadTokens": 573824,
+            "cacheCreationTokens": 0,
+            "referenceCostUsd": 0
+          }
+        ],
+        "tokenUsage": {
+          "inputTokens": 70658,
+          "outputTokens": 4630,
+          "cacheReadTokens": 573824,
+          "cacheCreationTokens": 0
+        },
+        "referenceCostUsd": 0,
+        "billedUsd": {
+          "state": "known",
+          "usd": 0
+        }
+      }
+    ],
+    "logicalProgress": {
+      "done": 1,
+      "active": 0,
+      "blocked": 0,
+      "total": 1,
+      "attemptCount": 1,
+      "lineages": [
+        {
+          "logicalTaskId": "755-001",
+          "attemptIds": [
+            "755-001"
+          ],
+          "attemptCount": 1,
+          "status": "done"
+        }
+      ]
+    }
+  }
+}

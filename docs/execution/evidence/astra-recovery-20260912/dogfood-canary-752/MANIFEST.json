@@ -1,0 +1,32 @@
+{
+  "observedAt": "2026-09-12T23:07:49.662607+00:00",
+  "status": "CANARY_PLAN_FAILED",
+  "exits": {
+    "imageCheck": 0,
+    "configSet": 0,
+    "start": 1,
+    "finalStatusRead": 0
+  },
+  "artifacts": [
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/dogfood-canary-752/RESULT.md",
+      "sha256": "56dd4111630e8c874c6f27b3d3e0d8099108398737470cbfee3783fb4d05bf80"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/dogfood-canary-752/final-status.json",
+      "sha256": "b00b9b11230c7ff54df05b159b6301b71ba63394f2145466c8f09f125e57c434"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/dogfood-canary-752/image-check.log",
+      "sha256": "460d6ad6aa2ecadeb2f014dbfc581d9ec364f5e121561e7bab9aaf5a2f88ad36"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/dogfood-canary-752/image-select.log",
+      "sha256": "9e0bc386debca9f2b52b2f187ebdf7190f33104287711aeb05fc6d95c1adeebf"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/dogfood-canary-752/start.log",
+      "sha256": "c0ca90eff27afc5c8ac912f40079064206543daeb6f2bda4eb209077019e0d5b"
+    }
+  ]
+}

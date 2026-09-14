@@ -32,6 +32,7 @@ import { readWorkerProgress, type ProgressReaderFs, type WorkerProgressSummary }
 import {
   readCanonicalRunStatusReadModel,
   runStatusReadModelMatchesAuthority,
+  runStatusReadModelMatchesCurrentGeneration,
   type CanonicalRunStatusReadModel,
 } from '../../core/run-status-read-model.js';
 import {
@@ -539,7 +540,7 @@ export function readLiveFooterState(options: StateFeedOptions): StateFeedState {
   if (
     runStatusReadModel
     && runStatusAuthority
-    && !runStatusReadModelMatchesAuthority(runStatusReadModel, runStatusAuthority)
+    && !runStatusReadModelMatchesCurrentGeneration(options.projectRoot, runStatusReadModel, runStatusAuthority)
   ) {
     runStatusReadModel = null;
     runStatusReadModelStale = true;

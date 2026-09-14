@@ -26,7 +26,7 @@ describe('scheduler effects repair disposition gate', () => {
       testsPassed: false, coverage: 0, selfAssessment: 'NO_GO', notes: 'host rejection',
       preDispatchSettlement: { state: 'NOT_DISPATCHED', reasonCode: 'PROVIDER_ADAPTER_UNAVAILABLE', attemptId: 'a', evidenceRef: 'e' },
     }));
-    const task = { id: 'root-fix', fixForTaskId: 'root', isPriorityFix: true, status: TaskStatus.PENDING } as Task;
+    const task = { id: 'root-fix', provider: 'codex', fixForTaskId: 'root', isPriorityFix: true, status: TaskStatus.PENDING } as Task;
     const resolveAgentPrompt = vi.fn(async () => undefined);
 
     await expect(executeSpawnTask({ task }, {

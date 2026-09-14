@@ -1,0 +1,11 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/core/observability.test.ts (29 tests) 140ms
+ ✓ tests/core/observability-rotation.test.ts (42 tests) 140ms
+
+ Test Files  2 passed (2)
+      Tests  71 passed (71)
+   Start at  13:49:19
+   Duration  1.81s (transform 437ms, setup 32ms, collect 960ms, tests 280ms, environment 0ms, prepare 61ms)
+

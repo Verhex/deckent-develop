@@ -1,0 +1,14 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/cli/helpers/exact-sprint-runtime.test.ts (2 tests) 623ms
+   ✓ createLiveExactSprintExecutor > projects settled completion through the real coordinator and keeps duplicate replay terminal  532ms
+ ✓ tests/orchestra/exact-plan-start-service.test.ts (18 tests) 1593ms
+ ✓ tests/cli/commands/start.test.ts (54 tests) 83ms
+ ✓ tests/cli/start-environment-orphan-preflight.test.ts (3 tests) 5ms
+
+ Test Files  4 passed (4)
+      Tests  77 passed (77)
+   Start at  03:07:02
+   Duration  8.11s (transform 3.43s, setup 38ms, collect 9.79s, tests 2.30s, environment 0ms, prepare 135ms)
+

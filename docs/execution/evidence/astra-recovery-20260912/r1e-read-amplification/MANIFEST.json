@@ -1,0 +1,45 @@
+{
+  "observedAt": "2026-09-12T22:24:33.775022+00:00",
+  "status": "LOCAL_VERIFIED_LATENCY_HOLD",
+  "checks": {
+    "storeTests": 0,
+    "parityTests": 0,
+    "buildAll": 0,
+    "candidateBeforeParity": 1,
+    "candidateAfterParity": 1
+  },
+  "artifacts": [
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1e-read-amplification/RESULT.md",
+      "sha256": "ee11ae94ceba261f808567b4d6d0ce0b6e1f60ed0d9d633607c6f3d396115d48"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1e-read-amplification/attempt-timing.log",
+      "sha256": "d79850a893a1d3e50705ba14691ad23f9baad06d07946c7b169e6860cdada82f"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1e-read-amplification/build.log",
+      "sha256": "b1b90586a590ab8990566ee6f72c0d74af9a8c9165798e37a8905fcf571f8747"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1e-read-amplification/candidate-after-parity.log",
+      "sha256": "69705a126b3cf7e1cfebf1d9c5c36d53acaa54437c802d2539c3d3af8df12a85"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1e-read-amplification/candidate-before-parity.log",
+      "sha256": "eda856bc5817667270a94e298067c7c457aff69baee0061742f485269f064177"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1e-read-amplification/parity-tests.log",
+      "sha256": "71b51c7ddb8fc37d21a002e85541b1eb1b3cc056d4c303751cf096e8cfbc0370"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1e-read-amplification/profile.log",
+      "sha256": "dacd100c760fb3018f01948a8315468300f6ae889875c372d206b5a7dbede55f"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1e-read-amplification/snapshot-tests.log",
+      "sha256": "87d881b2008abd57eb9e74e24668fa639012f60ce8e014f424027d12d0065a76"
+    }
+  ]
+}

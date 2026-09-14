@@ -1,0 +1,7 @@
+{
+  "utc": "2026-09-13T23:46:30.149762+00:00",
+  "path": "tests/core/task-attempt-custody-posix-adapter.test.ts",
+  "before": "c78e7a3f2d056eb6b7bc95bee693f33bcd9914a58eaffce415792d4c3d1b6327",
+  "after": "c78e7a3f2d056eb6b7bc95bee693f33bcd9914a58eaffce415792d4c3d1b6327",
+  "unchanged": true
+}

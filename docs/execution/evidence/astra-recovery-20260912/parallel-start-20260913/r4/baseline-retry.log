@@ -1,0 +1,42 @@
+
+ RUN  v3.2.7 /tmp/deckent-r4-757-repair
+
+ ❯ tests/orchestra/scheduler-effects-cascade.test.ts (16 tests | 1 failed | 15 skipped) 34ms
+   ↓ executeSchedulerDecision — CascadeSkip effect > persists a cascadeSkipped NO_GO result, flips task status, persists task json, and reports the id
+   ↓ executeSchedulerDecision — CascadeSkip effect > is a no-op (logged, no throw) when the CascadeSkip taskId is not in taskMap
+   ↓ executeSchedulerDecision — CascadeSkip effect > writes the .result.tmp file strictly before persisting task-<id>.json (persist-before-commit order)
+   ↓ executeSchedulerDecision — CascadeSkip effect > does NOT flip task status or persist task json when the .result write fails (legacy-bug fix)
+   ↓ executeSchedulerDecision — CascadeSkip effect > is idempotent on replay — a second identical effect does not rewrite the result or re-count the id
+   ↓ executeSchedulerDecision — CascadeSkip effect > finishes an interrupted commit (result already on disk, task still PENDING) without rewriting the result
+   ↓ executeSchedulerDecision — WriteCheckpoint effect > invokes the injected writeCheckpoint dep with the effect reason
+   ↓ executeSchedulerDecision — WriteCheckpoint effect > is a no-op when writeCheckpoint is omitted (documented default for un-wired callers)
+   ↓ executeSchedulerDecision — WriteCheckpoint effect > swallows a throwing writeCheckpoint dep and still processes the rest of the tick
+   ↓ executeSchedulerDecision — SpawnTask/KillWorker regression (must stay unchanged) > spawns a SpawnTask effect through the mock backend and persists task-<id>.json as EXECUTING
+   ↓ executeSchedulerDecision — SpawnTask/KillWorker regression (must stay unchanged) > settles a deterministic attribution admission failure once instead of retrying forever
+   ↓ executeSchedulerDecision — SpawnTask/KillWorker regression (must stay unchanged) > keeps an unclassified spawn exception retryable and does not forge a settlement
+   ↓ executeSchedulerDecision — SpawnTask/KillWorker regression (must stay unchanged) > retains an admitted backend failure without retry or IPC fallback
+   × executeSchedulerDecision — SpawnTask/KillWorker regression (must stay unchanged) > bounds unknown host retries with durable backoff and terminal HOLD 33ms
+     → expected "spy" to be called 3 times, but got 1 times
+   ↓ executeSchedulerDecision — SpawnTask/KillWorker regression (must stay unchanged) > kills a worker via the injected killWorker dep for a KillWorker effect
+   ↓ executeSchedulerDecision — SpawnTask/KillWorker regression (must stay unchanged) > runs SpawnTask, KillWorker, CascadeSkip, and WriteCheckpoint in the same tick without cross-interference
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/orchestra/scheduler-effects-cascade.test.ts > executeSchedulerDecision — SpawnTask/KillWorker regression (must stay unchanged) > bounds unknown host retries with durable backoff and terminal HOLD
+AssertionError: expected "spy" to be called 3 times, but got 1 times
+ ❯ tests/orchestra/scheduler-effects-cascade.test.ts:459:27
+    457|     const terminal = await executeSchedulerDecision(decision, baseDeps…
+    458| 
+    459|     expect(backend.spawn).toHaveBeenCalledTimes(3);
+       |                           ^
+    460|     expect(task.status).toBe(TaskStatus.PAUSED);
+    461|     expect(terminal.spawnSkips).toEqual(expect.arrayContaining([
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 15 skipped (16)
+   Start at  18:13:45
+   Duration  3.10s (transform 2.12s, setup 17ms, collect 2.84s, tests 34ms, environment 0ms, prepare 36ms)
+

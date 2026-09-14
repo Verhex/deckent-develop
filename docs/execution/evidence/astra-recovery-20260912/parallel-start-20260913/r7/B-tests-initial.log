@@ -1,0 +1,80 @@
+
+ RUN  v3.2.7 /tmp/deckent-r4-757-repair
+
+ ✓ tests/orchestra/exact-docker-observation.test.ts (18 tests) 8ms
+ ✓ tests/orchestra/spawn-backend-docker-mounts.test.ts (92 tests) 518ms
+ ❯ tests/orchestra/execution-effect-docker-lifecycle.test.ts (45 tests | 1 failed) 18565ms
+   ✓ execution effect Docker lifecycle authority > preserves raw Docker daemon CreatedAt nanos and offsets as volume identity 6ms
+   ✓ execution effect Docker lifecycle authority > requires durable ALLOCATING reread before any adapter effect and rehydrates a fresh token 35ms
+   ✓ execution effect Docker lifecycle authority > projects sensitive paths out without reading or returning their names 2ms
+   ✓ execution effect Docker lifecycle authority > admits public design token assets but keeps credential-shaped token JSON fail-closed 1ms
+   ✓ execution effect Docker lifecycle authority > round-trips host-screened exclusions through allocation without exposing their paths 5ms
+   ✓ execution effect Docker lifecycle authority > denies an explicit sensitive write scope before any lifecycle adapter effect 2ms
+   ✓ execution effect Docker lifecycle authority > binds image-owned read-only dependencies outside the workspace effect manifest 1ms
+   ✓ execution effect Docker lifecycle authority > performs exact absence, labeled create, inspect, population, seal and no-change release 50ms
+   ✓ execution effect Docker lifecycle authority > keeps empty filesWrite as a mandatory read-only policy and rejects null policy input 7ms
+   ✓ execution effect Docker lifecycle authority > returns typed unsupported before any adapter call on Darwin and Windows 1ms
+   ✓ execution effect Docker lifecycle authority > maps admitted WSL execution to the explicit wsl2-linux snapshot authority 5ms
+   ✓ execution effect Docker lifecycle authority > does not create over a pre-existing exact volume 2ms
+   ✓ execution effect Docker lifecycle authority > rejects mutable or foreign daemon image identity before volume inspection 3ms
+   ✓ execution effect Docker lifecycle authority > fails closed before workspace creation when dependency-volume authority is unavailable 2ms
+   ✓ execution effect Docker lifecycle authority > rejects post-create identity drift before trusted population 3ms
+   ✓ execution effect Docker lifecycle authority > requires an exact baseline revalidation before provider start 7ms
+   ✓ execution effect Docker lifecycle authority > accepts the same logical baseline reopened in a fresh Linux mount namespace 10ms
+   ✓ execution effect Docker lifecycle authority > accepts final captures of the same volume from fresh Linux mount namespaces 18ms
+   ✓ execution effect Docker lifecycle authority > requires zero foreign volume attachments before provider authorization 5ms
+   ✓ execution effect Docker lifecycle authority > requires stopped-provider detachment and two identical final captures 21ms
+   ✓ execution effect Docker lifecycle authority > rejects proxy capture results and post-call adapter uncertainty 5ms
+   ✓ execution effect Docker lifecycle authority > preserves the final capture boundary without projecting raw exceptions (ExecutionEffectDockerCaptureAdapterErrorV1: EXECUTION_EFFECT_DOCKER_CAPTURE_ADAPTER_HOLD) 10ms
+   × execution effect Docker lifecycle authority > preserves the final capture boundary without projecting raw exceptions (ExecutionEffectDockerCaptureAdapterErrorV1: EXECUTION_EFFECT_DOCKER_CAPTURE_ADAPTER_HOLD) 16ms
+     → expected '{"state":"HOLD","code":"ADAPTER_UNAVA…' not to match /FOREIGN_SECRET|private\…/custody|stderr
+   ✓ execution effect Docker lifecycle authority > preserves the final capture boundary without projecting raw exceptions (Error: FOREIGN_SECRET /private/custody/provider.stderr) 10ms
+   ✓ execution effect Docker lifecycle authority > captures stopped-provider hidden effects and quarantines the whole attempt 13ms
+   ✓ execution effect Docker lifecycle authority > allows a declared changed effect and requires COMMITTED rather than no-change 32ms
+   ✓ execution effect Docker lifecycle authority > rejects foreign stop authority before final capture 17ms
+   ✓ execution effect Docker lifecycle authority > refuses deletion/absence evidence before a canonical committed landing receipt 48ms
+   ✓ execution effect Docker lifecycle authority > closes release from intent-bound reconciled absence after a delete receipt crash gap 21ms
+   ✓ execution effect Docker lifecycle authority > recovers provider-container compensation from durable Store authority  8365ms
+   ✓ execution effect Docker lifecycle authority > durable release projection crash recovery > replays the same projection after a crash before landing publication  5537ms
+   ✓ execution effect Docker lifecycle authority > cannot release when dependency-volume deletion or absence evidence is missing 20ms
+   ✓ execution effect Docker lifecycle authority > rejects accessor adapter methods before any lifecycle effect 3ms
+   ✓ execution effect Docker lifecycle authority > ADAPTER_UNAVAILABLE failure diagnostics > redacts Bearer tokens without requiring sk-ant in the same message 0ms
+   ✓ execution effect Docker lifecycle authority > ADAPTER_UNAVAILABLE failure diagnostics > redacts sk-ant keys without requiring Bearer in the same message 0ms
+   ✓ execution effect Docker lifecycle authority > ADAPTER_UNAVAILABLE failure diagnostics > strips control characters from adapter failure messages 0ms
+   ✓ execution effect Docker lifecycle authority > ADAPTER_UNAVAILABLE failure diagnostics > truncates multibyte adapter failure messages without splitting code units 0ms
+   ✓ execution effect Docker lifecycle authority > ADAPTER_UNAVAILABLE failure diagnostics > truncates long single-byte adapter failure messages to 512 bytes 0ms
+   ✓ execution effect Docker lifecycle authority > ADAPTER_UNAVAILABLE failure diagnostics > preserves string error codes on adapter failures when present 0ms
+   ✓ execution effect Docker lifecycle authority > ADAPTER_UNAVAILABLE failure diagnostics > serializes debugLog adapter failures with stage before message 0ms
+   ✓ execution effect Docker lifecycle authority > ADAPTER_UNAVAILABLE failure diagnostics > keeps evidenceDigest stable when only adapter failure message differs 3ms
+   ✓ execution effect Docker lifecycle authority > ADAPTER_UNAVAILABLE failure diagnostics > surfaces prepare-call adapter failures with redacted bounded detail 2ms
+   ✓ execution effect Docker lifecycle authority > ADAPTER_UNAVAILABLE failure diagnostics > surfaces provider-start revalidation adapter failures with redacted bounded detail 4ms
+   ✓ execution effect Docker lifecycle authority > ADAPTER_UNAVAILABLE failure diagnostics > surfaces rehydrate-allocation adapter failures when allocation methods are missing 3ms
+   ✓ execution effect Docker lifecycle authority > does not accept forged or reused opaque lifecycle sessions 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/orchestra/execution-effect-docker-lifecycle.test.ts > execution effect Docker lifecycle authority > preserves the final capture boundary without projecting raw exceptions (ExecutionEffectDockerCaptureAdapterErrorV1: EXECUTION_EFFECT_DOCKER_CAPTURE_ADAPTER_HOLD)
+AssertionError: expected '{"state":"HOLD","code":"ADAPTER_UNAVA…' not to match /FOREIGN_SECRET|private\…/custody|stderr
+
+- Expected: 
+/FOREIGN_SECRET|private\/custody|stderr/u
+
++ Received: 
+"{\"state\":\"HOLD\",\"code\":\"ADAPTER_UNAVAILABLE\",\"evidenceDigest\":\"sha256:2a45a7164aa7479401932aa9070a57bc34bd3ee20811fbe953880d71f3e4f665\",\"containmentDecision\":null,\"diagnostic\":{\"schemaVersion\":1,\"stage\":\"FIRST_CAPTURE\",\"adapterStage\":\"HELPER_RUN\",\"command\":{\"reason\":\"timeout\",\"exitCode\":null,\"signaled\":false,\"timeoutMs\":60000,\"elapsedMs\":60001,\"stdoutBytes\":0,\"stderrBytes\":0}}}"
+
+ ❯ tests/orchestra/execution-effect-docker-lifecycle.test.ts:1161:40
+    1159|       diagnostic: { schemaVersion: 1, stage: 'FIRST_CAPTURE', adapterS…
+    1160|     });
+    1161|     expect(JSON.stringify(result)).not.toMatch(/FOREIGN_SECRET|private…
+       |                                        ^
+    1162|     if (error instanceof ExecutionEffectDockerCaptureAdapterErrorV1 &&…
+    1163|       expect(result).toMatchObject({ diagnostic: { command: error.comm…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 154 passed (155)
+   Start at  22:17:18
+   Duration  21.28s (transform 3.91s, setup 67ms, collect 6.00s, tests 19.09s, environment 0ms, prepare 166ms)
+

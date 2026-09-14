@@ -7,6 +7,37 @@ const bounds = { maxEntries: 100, maxBytes: 10_000, maxDurationMs: 1000 };
 const fail = (reason: string): never => { throw new Error(reason); };
 
 describe('bounded custody read operation', () => {
+  it('releases payloads without forgetting native fences or accepting changed re-reads', () => {
+    let content = 'a'.repeat(1000);
+    const view = new CustodyReadSnapshot({ ...bounds, maxBytes: 1800 }, fail);
+    const read = vi.fn(() => content);
+    view.observe('file:a', read, x => x.slice(0, 1), x => x.length, x => x);
+    view.releaseCachedValues();
+    view.memo('next-attempt', () => ({ value: 'b'.repeat(1000) }));
+    content = 'c'.repeat(1000);
+    expect(() => view.verify()).toThrow('changed');
+    expect(read).toHaveBeenCalledTimes(2);
+    const second = new CustodyReadSnapshot(bounds, fail);
+    second.observe('file:a', () => content, x => x, x => x.length, x => x);
+    second.releaseCachedValues();
+    content = 'd';
+    expect(() => second.observe('file:a', () => content, x => x, x => x.length, x => x)).toThrow('changed');
+  });
+
+  it('keeps evicted absence and discovery fences and permits an unchanged re-read', () => {
+    const view = new CustodyReadSnapshot(bounds, fail);
+    let absent: string | null = null;
+    const reads: string[] = [];
+    view.observe('file:a', () => { reads.push('file'); return absent; }, JSON.stringify, () => 4, x => x);
+    view.observe('scan:root', () => { reads.push('scan'); return 'a'; }, x => x, () => 1, x => x);
+    view.releaseCachedValues();
+    expect(view.observe('file:a', () => absent, JSON.stringify, () => 4, x => x)).toBeNull();
+    reads.length = 0;
+    view.verify();
+    expect(reads).toEqual(['file', 'scan']);
+    absent = 'new';
+    expect(() => view.verify()).toThrow('changed');
+  });
   it('detects an expired monotonic deadline even if wall time does not advance', () => {
     const clock = vi.spyOn(performance, 'now').mockReturnValue(0);
     const view = new CustodyReadSnapshot(bounds, fail);

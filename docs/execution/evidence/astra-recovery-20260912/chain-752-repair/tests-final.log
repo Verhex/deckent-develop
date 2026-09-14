@@ -1,0 +1,24 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/orchestra/spawn-backend-docker-mounts.test.ts (92 tests) 440ms
+ ✓ tests/orchestra/exact-accepted-result-terminal-authority.test.ts (7 tests) 10ms
+ ✓ tests/scripts/clean-active-execution-guard.test.ts (69 tests) 12121ms
+   ✓ clean active-execution admission > inspects more than two thousand canonical execution rows without an arbitrary authority limit  485ms
+   ✓ clean active-execution admission > commits clean v2 migration before returning quarantined admission HOLD  377ms
+   ✓ clean active-execution admission > rolls back clean v2 migration atomically when a later row is malformed  351ms
+   ✓ clean active-execution admission > serializes both cross-process orderings: execution-first HOLDs clean, clean-first blocks execution  307ms
+   ✓ clean active-execution admission > rejects rehashed NOT_DISPATCHED cause, evidence, or timestamp mismatches  418ms
+   ✓ clean active-execution admission > binds legacy attestation to exact current task bytes and createdAt  456ms
+   ✓ clean active-execution admission > holds tampered, semantically non-terminal, and multiple matching receipts  494ms
+   ✓ clean active-execution admission > holds when a settled view has any additional matching receipt authority  322ms
+   ✓ clean active-execution admission > rejects rehashed receipt unknown keys, non-canonical strings, and fallback overflow  1140ms
+   ✓ clean active-execution admission > accepts semantically valid variants across the full InvocationEvent union  331ms
+   ✓ clean active-execution admission > rejects rehashed semantic forgeries for every InvocationEvent member  1007ms
+ ✓ tests/orchestra/worker-identity-hostbound.test.ts (2 tests) 8ms
+
+ Test Files  4 passed (4)
+      Tests  170 passed (170)
+   Start at  13:00:24
+   Duration  15.00s (transform 3.59s, setup 35ms, collect 5.81s, tests 12.58s, environment 0ms, prepare 130ms)
+

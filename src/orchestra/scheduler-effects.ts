@@ -36,7 +36,7 @@ import { join, dirname } from 'node:path';
 import type { Task, ResolvedConfig, TaskResult } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
 import { normalizeTaskResultShape, serializeTaskResultForDisk } from '../core/task-result-schema.js';
-import { canonicalTaskResultJson } from '../core/task-result-write-authority.js';
+import { canonicalJson } from '../core/audit-writer.js';
 import {
   isHostPreDispatchReasonCode,
   resolveHostPreDispatchFailureDisposition,
@@ -765,8 +765,12 @@ export function createExactNormalDockerExecutionRegistry(
     let sameAcceptedResult = false;
     if (current.state === 'current') {
       try {
-        sameAcceptedResult = canonicalTaskResultJson(current.result)
-          === canonicalTaskResultJson(entry.accepted.result);
+        // Match the backend's comparison of verified V2 custody JSON. Its
+        // accepted reader seals null-prototype records; the terminal parser
+        // returns ordinary records. Neither that representation difference nor
+        // valid multiline narrative changes the immutable result's content.
+        sameAcceptedResult = canonicalJson(current.result)
+          === canonicalJson(entry.accepted.result);
       } catch {
         sameAcceptedResult = false;
       }
@@ -3032,6 +3036,14 @@ export async function executeSchedulerDecision(
     } catch (e) {
       debugLog('executeSchedulerDecision:spawn', e);
       deps.assignedTaskIds.delete(effect.taskId);
+      if (deps.exactDockerRegistry?.isExactTask(effect.taskId)) {
+        // An admitted generation is not a transient pre-dispatch failure.
+        // Retain its owning backend and original failure for reconciliation;
+        // never advance to IPC polling or manufacture a zero-work retry.
+        const reason = e instanceof Error ? e.message : String(e);
+        deps.exactDockerRegistry.registerHold(effect.taskId, reason);
+        throw new DeckentError('DECKENT_E077', `EXACT_DISPATCH_HOLD:${effect.taskId}:${reason}`);
+      }
       const failure = classifySchedulerSpawnFailure(e);
       if (failure.kind === 'deterministic-admission') {
         const settledAdmission = settleNonRetryableSpawnAdmission(deps.projectRoot, task, failure);

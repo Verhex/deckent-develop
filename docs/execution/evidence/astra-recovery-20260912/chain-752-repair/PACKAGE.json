@@ -1,0 +1,32 @@
+{
+  "at": "2026-09-13T10:00:08.208208+00:00",
+  "parentMaster": [
+    "3178",
+    "120"
+  ],
+  "recoveryId": "R1-752-CHAIN-20260913",
+  "authority": "owner-live continue repair until dogfood surface proof",
+  "scope": [
+    "canonical terminal authority equality",
+    "verified Docker provider-start heartbeat identity binding",
+    "clean RunFlow narrative parity",
+    "recovery of dead sprint752 via existing commands",
+    "V2 multiline accepted-result equality in scheduler terminal reread"
+  ],
+  "negativeScope": [
+    "auth mutation",
+    "manual runtime writes",
+    "guard bypass",
+    "new do run before start closure"
+  ],
+  "proof": [
+    "key-order regression red then green",
+    "PID1 embedded renderer and authorization ordering",
+    "clean narrative regression",
+    "real recovery dry-run",
+    "build gate",
+    "real start after closure"
+  ],
+  "retry": "one canary after changed evidence; do not repeat unchanged failure",
+  "updatedAt": "2026-09-13T10:15:03.415597+00:00"
+}

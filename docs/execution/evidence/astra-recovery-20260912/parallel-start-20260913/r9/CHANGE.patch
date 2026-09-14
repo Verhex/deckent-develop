@@ -1,0 +1,610 @@
+--- a/src/core/run-status-read-model.ts
++++ b/src/core/run-status-read-model.ts
+@@ -47,6 +47,7 @@
+ export type RunStatusReadModelHoldReason =
+   | 'authority-conflict'
+   | 'malformed-task-artifact'
++  | 'exact-result-authority-hold'
+   | 'unresolved-provider-observation';
+ 
+ export interface RunStatusReadModelHold {
+@@ -193,7 +194,11 @@
+   }
+   return Object.freeze({
+     ...projected.projection,
+-    fixRetry: projectFixRetry(projected.projection.lineages, maxFixRetries),
++    // A queued task or an authority HOLD is not an admitted FIX. Only the
++    // current NO_GO attempt can project an outstanding evaluation retry.
++    fixRetry: projectFixRetry(projected.projection.lineages.filter(lineage =>
++      tasksById.get(lineage.attemptIds.at(-1)!)?.status === TaskStatus.NO_GO,
++    ), maxFixRetries),
+   });
+ }
+ 
+@@ -411,6 +416,19 @@
+   return canonicalJson(model.authority) === canonicalJson(authority);
+ }
+ 
++/** IO ingress fence; pure renderers receive only an already-fenced model. */
++export function runStatusReadModelMatchesCurrentGeneration(
++  projectRoot: string,
++  model: CanonicalRunStatusReadModel,
++  authority: CanonicalRunStatus,
++): boolean {
++  if (!runStatusReadModelMatchesAuthority(model, authority)) return false;
++  const generation = readRunGeneration(projectRoot, authority);
++  // A live generation without an identity cannot authenticate persisted counts.
++  if (authority.active && generation === null) return false;
++  return model.runGeneration === generation;
++}
++
+ export type RunStatusReadiness =
+   | { readonly state: 'READY'; readonly model: CanonicalRunStatusReadModel }
+   | {
+@@ -482,12 +500,55 @@
+   }
+ }
+ 
++/** Coordinator-owned state after commit, never raw worker result claims. */
++export interface CoordinatorRunStatusSnapshot {
++  readonly sprintId: string;
++  readonly runGeneration: string;
++  readonly tasks: readonly Task[];
++  readonly heldTaskIds: readonly string[];
++}
++
++function coordinatorTasks(
++  snapshot: CoordinatorRunStatusSnapshot,
++  authority: CanonicalRunStatus,
++  runGeneration: string | null,
++): { tasks: readonly Task[]; holds: RunStatusReadModelHold[] } {
++  const ids = new Set(snapshot.tasks.map(task => task.id));
++  if (
++    !authority.active || authority.coordinator !== 'alive'
++    || snapshot.sprintId !== authority.sprintId
++    || !runGeneration || snapshot.runGeneration !== runGeneration
++    || ids.size !== snapshot.tasks.length
++    || snapshot.tasks.some(task => !task.id || task.sprintId !== snapshot.sprintId
++      || !Object.values(TaskStatus).includes(task.status))
++    || snapshot.heldTaskIds.some(id => !ids.has(id))
++  ) throw new RunStatusReadModelError('INVALID_MODEL', 'Coordinator status snapshot authority mismatch');
++  const held = new Set(snapshot.heldTaskIds);
++  return {
++    tasks: snapshot.tasks.map(task => held.has(task.id)
++      ? { ...task, status: TaskStatus.PAUSED }
++      : task),
++    holds: [...held].sort().map(taskId => ({
++      reasonCode: 'exact-result-authority-hold',
++      evidenceRef: `coordinator:${snapshot.runGeneration}:task:${taskId}`,
++      detail: 'EXACT_RESULT_AUTHORITY_HOLD',
++    })),
++  };
++}
++
+ export function publishCanonicalRunStatusReadModel(
+   projectRoot: string,
+-  options: { readonly publishedAt?: string; readonly authority?: CanonicalRunStatus } = {},
++  options: {
++    readonly publishedAt?: string;
++    readonly authority?: CanonicalRunStatus;
++    readonly coordinatorSnapshot?: CoordinatorRunStatusSnapshot;
++  } = {},
+ ): CanonicalRunStatusReadModel {
+   const authority = options.authority ?? readCanonicalRunStatus(projectRoot);
+-  const loaded = loadCanonicalRunTasks(projectRoot, authority);
++  const runGeneration = readRunGeneration(projectRoot, authority);
++  const loaded = options.coordinatorSnapshot
++    ? coordinatorTasks(options.coordinatorSnapshot, authority, runGeneration)
++    : loadCanonicalRunTasks(projectRoot, authority);
+   const currentTaskIds = new Set(loaded.tasks.map(task => task.id));
+   const currentAttemptIdsByTaskId = new Map<string, ReadonlySet<string>>();
+   for (const task of loaded.tasks) {
+@@ -519,7 +580,7 @@
+     ...(exactTerminalProgress ? { logicalProgress: exactTerminalProgress } : {}),
+     providerConcurrency,
+     terminalPublication,
+-    runGeneration: readRunGeneration(projectRoot, authority),
++    runGeneration,
+     holds: [
+       ...loaded.holds,
+       ...projectionHolds(
+@@ -542,6 +603,10 @@
+   acquirePublicationLock(lockPath);
+   let temporary: string | null = null;
+   try {
++    if (options.coordinatorSnapshot
++      && readRunGeneration(projectRoot, authority) !== runGeneration) {
++      throw new RunStatusReadModelError('CAS_CONFLICT', 'Coordinator generation changed before publication');
++    }
+     const current = readCanonicalRunStatusReadModel(projectRoot);
+     const candidate = current?.revision === previous?.revision
+       ? model
+--- a/src/orchestra/sprint-controller.ts
++++ b/src/orchestra/sprint-controller.ts
+@@ -1301,6 +1301,7 @@
+     attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
+     providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+     onResultCommitted?: (result: TaskResult) => void;
++    onTaskAuthorityHold?: (taskId: string) => void;
+     evaluateCollectedResult?: (
+       task: Task,
+       result: TaskResult,
+@@ -2945,6 +2946,24 @@
+    * Later heartbeat writes remain best-effort and are torn down by the existing
+    * controller finally block.
+    */
++  const collectorAuthorityHeldTaskIds = new Set<string>();
++  const publishCoordinatorProgress = (activeSprint: Sprint) => {
++    const writer = coordinatorPidRecord;
++    if (!writer) return;
++    const heldTaskIds = activeSprint.tasks.filter(task =>
++      collectorAuthorityHeldTaskIds.has(task.id)
++      || (exactDockerRegistry?.isExactTask(task.id)
++        && exactDockerRegistry.readTaskResultAuthority(task.id).state === 'authority-hold'),
++    ).map(task => task.id);
++    return publishCanonicalRunStatusReadModel(projectRoot, {
++      coordinatorSnapshot: {
++        sprintId: activeSprint.id,
++        runGeneration: `lease:${writer.leaseId}`,
++        tasks: activeSprint.tasks,
++        heldTaskIds,
++      },
++    });
++  };
+   const activateCoordinatorSnapshotWriter = async (activeSprint: Sprint): Promise<void> => {
+     const authority = coordinatorPidRecord;
+     if (!authority) {
+@@ -2975,7 +2994,7 @@
+         // The coordinator heartbeat is also the canonical persisted read-model
+         // producer. Status surfaces consume this generation/revision instead of
+         // racing task, dashboard and provider-observation files independently.
+-        publishCanonicalRunStatusReadModel(projectRoot);
++        publishCoordinatorProgress(activeSprint);
+       } catch (error) {
+         if (strict) throw error;
+         debugLog('runSprint:writeStateSnapshot', error);
+@@ -3516,7 +3535,14 @@
+           evaluateCollectedResult: evaluateAndConsumeCollectedAttempt,
+           // Preserve committed progress even when a later authority HOLD rejects
+           // waitForResults instead of returning its local result array.
+-          onResultCommitted: result => { results.push(result); },
++          onResultCommitted: result => {
++            results.push(result);
++            publishCoordinatorProgress(sprint);
++          },
++          onTaskAuthorityHold: taskId => {
++            collectorAuthorityHeldTaskIds.add(taskId);
++            publishCoordinatorProgress(sprint);
++          },
+           ...(exactDockerRegistry ? { exactDockerRegistry } : {}),
+           ...(exactTaskProjectionAdmission ? { exactTaskProjectionAdmission } : {}),
+         },
+@@ -3548,7 +3574,10 @@
+         // Keep unresolved runtime authority visible; no automatic kill or false
+         // terminal receipt is authorized by a result failure.
+         (sprint as Sprint & { executeAborted?: string }).executeAborted = err.message;
+-        safeDashboardUpdate(projectRoot, sprint, err.message);
++        let projected: ReturnType<typeof publishCoordinatorProgress>;
++        try { projected = publishCoordinatorProgress(sprint); }
++        catch (projectionError) { debugLog('runSprint:authorityHoldProjection', projectionError); }
++        safeDashboardUpdate(projectRoot, sprint, err.message, projected?.logicalProgress);
+         throw err;
+       }
+       // EXECUTE-ERROR-SURFACE (born-453, sprint-351 live case — sibling of the
+--- a/src/orchestra/result-collector.ts
++++ b/src/orchestra/result-collector.ts
+@@ -1354,6 +1354,7 @@
+      */
+     /** Progress projection only; emitted after the existing collection commit boundary. */
+     onResultCommitted?: (result: TaskResult) => void;
++    onTaskAuthorityHold?: (taskId: string) => void;
+     evaluateCollectedResult?: (
+       task: Task,
+       result: TaskResult,
+@@ -1400,6 +1401,12 @@
+   const taskMap = new Map(sprint.tasks.map(t => [t.id, t]));
+   const collected = new Set<string>();
+   const authorityFailedTaskIds = new Set<string>();
++  const recordTaskAuthorityHold = (taskId: string): void => {
++    if (authorityFailedTaskIds.has(taskId)) return;
++    authorityFailedTaskIds.add(taskId);
++    try { spawnOpts?.onTaskAuthorityHold?.(taskId); }
++    catch (error) { debugLog('waitForResults:authorityHoldProgress', error); }
++  };
+   const remainingQueue: Task[] = queue ? [...queue] : [];
+   const deferRepairableDependencyFailures =
+     config !== undefined
+@@ -1632,16 +1639,12 @@
+         }
+       };
+       await revalidate();
+-      const previousStatus = taskRef.status;
++      // Do not expose an optimistic DONE to the coordinator heartbeat while
++      // final authority revalidation is still awaiting IO.
++      await revalidate();
+       taskRef.status = evaluated.terminalDecisionAuthority.evaluationReceipt.verdict === 'NO_GO'
+         ? TaskStatus.NO_GO
+         : TaskStatus.DONE;
+-      try {
+-        await revalidate();
+-      } catch (error) {
+-        taskRef.status = previousStatus;
+-        throw error;
+-      }
+       return;
+     }
+     if (spawnOpts?.evaluateCollectedResult) {
+@@ -1660,7 +1663,7 @@
+   const syncCollectedResult = async (...args: Parameters<typeof syncTaskStatusFromResult>): Promise<void> => {
+     try { await syncTaskStatusFromResult(...args); }
+     catch (error) {
+-      if (error instanceof DeckentError && error.code === 'DECKENT_E077') authorityFailedTaskIds.add(args[0]);
++      if (error instanceof DeckentError && error.code === 'DECKENT_E077') recordTaskAuthorityHold(args[0]);
+       throw error;
+     }
+   };
+@@ -1676,7 +1679,7 @@
+       try { authority = readResultAuthority(taskId); }
+       catch (error) {
+         if (!(error instanceof DeckentError) || error.code !== 'DECKENT_E077') throw error;
+-        authorityFailedTaskIds.add(taskId);
++        recordTaskAuthorityHold(taskId);
+         authorityFailure ??= error;
+         continue;
+       }
+@@ -1696,7 +1699,7 @@
+       }
+       if (authority.state === 'not-dispatched') {
+         if (authority.attemptCount !== 0) {
+-          authorityFailedTaskIds.add(taskId);
++          recordTaskAuthorityHold(taskId);
+           throw createExecutionAuthorityError(
+             `Task ${taskId} not-dispatched authority attempted to mint execution`,
+           );
+@@ -1709,7 +1712,7 @@
+       try { collectorRead = readCollectorResult(authority, taskId); }
+       catch (error) {
+         if (!(error instanceof DeckentError) || error.code !== 'DECKENT_E077') throw error;
+-        authorityFailedTaskIds.add(taskId);
++        recordTaskAuthorityHold(taskId);
+         authorityFailure ??= error;
+         continue;
+       }
+@@ -3126,7 +3129,7 @@
+       }
+     } catch (error) {
+       if (!(error instanceof DeckentError) || error.code !== 'DECKENT_E077') throw error;
+-      authorityFailedTaskIds.add(taskId);
++      recordTaskAuthorityHold(taskId);
+       finalAuthorityFailure ??= error;
+     }
+   }
+--- a/src/cli/commands/status.ts
++++ b/src/cli/commands/status.ts
+@@ -39,7 +39,7 @@
+   loadCanonicalRunTasks,
+   projectCanonicalRunLogicalProgress,
+   resolveRunStatusReadiness,
+-  runStatusReadModelMatchesAuthority,
++  runStatusReadModelMatchesCurrentGeneration,
+   type CanonicalRunStatusReadModel,
+ } from '../../core/run-status-read-model.js';
+ import { DEFAULT_HEARTBEAT_TIMEOUT_MS, loadConfig } from '../../core/config.js';
+@@ -314,7 +314,7 @@
+ ): CanonicalRunStatusReadModel | null {
+   try {
+     const model = readCanonicalRunStatusReadModel(root);
+-    return model && runStatusReadModelMatchesAuthority(model, authority) ? model : null;
++    return model && runStatusReadModelMatchesCurrentGeneration(root, model, authority) ? model : null;
+   } catch {
+     return null;
+   }
+@@ -870,6 +870,7 @@
+     finalizeCommand: authority.finalizeCommand,
+     terminalPublication: readModel?.terminalPublication ?? null,
+     providerConcurrency: readModel?.providerConcurrency ?? [],
++    ...(readModel ? { progress: readModel.logicalProgress } : {}),
+   };
+ }
+ 
+@@ -979,7 +980,8 @@
+       progress,
+     }, livenessOptions);
+   return {
+-    dashboard,
++    // Worker process liveness must not overwrite logical task activity.
++    dashboard: canonicalProgress ? { ...dashboard, progress } : dashboard,
+     metadata: {
+       schemaVersion: 1,
+       lifecycleAuthority: 'run-status-authority-v1',
+@@ -1106,7 +1108,7 @@
+   }
+ 
+   const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
+-  const logicalProgress = tasks.length > 0 ? readModel?.logicalProgress ?? null : null;
++  const logicalProgress = readModel?.logicalProgress ?? null;
+   const projection = projectDashboardThroughRunAuthority(
+     state,
+     tasks,
+@@ -1130,6 +1132,7 @@
+     : { ...projectedState, taskSettlements };
+   return {
+     ...snapshot,
++    progress: readModel?.logicalProgress ?? (hasNoDurableRunIdentity(authority) ? snapshot.progress : null),
+     active: authority.active,
+     lifecycle: authority.lifecycle,
+     resumable: authority.resumable,
+--- a/src/mcp/tools/status.ts
++++ b/src/mcp/tools/status.ts
+@@ -17,12 +17,13 @@
+ import { projectTerminalPublicationStatus as projectSharedTerminalPublicationStatus } from '../../core/sprint-terminal-publication-status.js';
+ import {
+   readCanonicalRunStatusReadModel,
+-  runStatusReadModelMatchesAuthority,
++  runStatusReadModelMatchesCurrentGeneration,
+   type CanonicalRunStatusReadModel,
+   type RunStatusReadiness,
+ } from '../../core/run-status-read-model.js';
+ import * as runStatusReadModelAuthority from '../../core/run-status-read-model.js';
+ import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
++import { getMessage, getLanguage } from '../../cli/helpers/messages.js';
+ 
+ /**
+  * Read the last N events from the event stream JSONL file.
+@@ -343,7 +344,7 @@
+ ): CanonicalRunStatusReadModel | null {
+   try {
+     const model = readCanonicalRunStatusReadModel(root);
+-    return model && runStatusReadModelMatchesAuthority(model, authority) ? model : null;
++    return model && runStatusReadModelMatchesCurrentGeneration(root, model, authority) ? model : null;
+   } catch {
+     return null;
+   }
+@@ -458,7 +459,9 @@
+         }
+         const noSprintData = {
+           active: authority.active,
+-          message: 'No active run.',
++          message: authority.active
++            ? getMessage('status.sprint_active', getLanguage(), { sprintId: authority.sprintId ?? '' })
++            : getMessage('status.no_sprint', getLanguage()),
+           sprintId: authority.sprintId ?? canonicalSprintId,
+           job: latestJob,
+           lifecycle: authority.lifecycle,
+@@ -467,6 +470,7 @@
+           recoveryCommand: authority.recoveryCommand,
+           finalizeCommand: authority.finalizeCommand,
+           authority,
++          progress: readModel?.logicalProgress ?? null,
+           terminalPublication: readModel?.terminalPublication ?? null,
+           providerConcurrency,
+           statusReadModel: statusReadModelSurface(readModel),
+@@ -475,7 +479,7 @@
+         if (json) {
+           return { content: [{ type: 'text' as const, text: JSON.stringify(noSprintData) }] };
+         }
+-        const summary = formatStatusResponse(noSprintData);
++        const summary = formatStatusResponse({ ...noSprintData, progress: noSprintData.progress ?? undefined });
+         return {
+           content: [{
+             type: 'text' as const,
+@@ -511,7 +515,7 @@
+ 
+       // Dashboard file is valid — extract fields for display
+       const state = dashResult.state as unknown as Record<string, unknown>;
+-      const progress = state['progress'] as { done?: number; total?: number } | undefined;
++      const progress = readModel?.logicalProgress;
+       const done = progress?.done ?? 0;
+       const total = progress?.total ?? 0;
+       const agents = state['agents'] as unknown[] | undefined;
+@@ -557,9 +561,7 @@
+       const noGoCount = logicalTaskLineages.filter(
+         lineage => lineage.resolvedTask.status === TaskStatus.NO_GO,
+       ).length;
+-      const logicalProgress = logicalTaskLineages.length > 0
+-        ? readModel?.logicalProgress
+-        : undefined;
++      const logicalProgress = readModel?.logicalProgress ?? null;
+ 
+       const verboseFields = verbose ? {
+         phase: state['phase'],
+@@ -570,7 +572,7 @@
+ 
+       const rawData = {
+         ...state,
+-        ...(logicalProgress ? { progress: logicalProgress } : {}),
++        progress: logicalProgress,
+         // Override sprint.id with canonical source-of-truth value so dashboard
+         // and MCP always report the same sprint, even when .dashboard is stale.
+         sprint: sprint ? { ...sprint, id: resolvedSprintId } : { id: resolvedSprintId },
+--- a/src/api/status-reconcile.ts
++++ b/src/api/status-reconcile.ts
+@@ -22,7 +22,7 @@
+ import {
+   readCanonicalRunStatusReadModel,
+   resolveRunStatusReadiness,
+-  runStatusReadModelMatchesAuthority,
++  runStatusReadModelMatchesCurrentGeneration,
+   type CanonicalRunStatusReadModel,
+ } from '../core/run-status-read-model.js';
+ import { readCanonicalRunStatus } from '../core/run-status-authority.js';
+@@ -139,7 +139,7 @@
+   let model: CanonicalRunStatusReadModel | null = null;
+   try {
+     const candidate = readCanonicalRunStatusReadModel(projectRoot);
+-    if (candidate && runStatusReadModelMatchesAuthority(candidate, authority)) model = candidate;
++    if (candidate && runStatusReadModelMatchesCurrentGeneration(projectRoot, candidate, authority)) model = candidate;
+   } catch { /* An unreadable model is treated as unavailable by readiness. */ }
+   const readiness = resolveRunStatusReadiness(authority, model);
+   if (model) {
+--- a/src/cli/helpers/run-state-feed.ts
++++ b/src/cli/helpers/run-state-feed.ts
+@@ -32,6 +32,7 @@
+ import {
+   readCanonicalRunStatusReadModel,
+   runStatusReadModelMatchesAuthority,
++  runStatusReadModelMatchesCurrentGeneration,
+   type CanonicalRunStatusReadModel,
+ } from '../../core/run-status-read-model.js';
+ import {
+@@ -539,7 +540,7 @@
+   if (
+     runStatusReadModel
+     && runStatusAuthority
+-    && !runStatusReadModelMatchesAuthority(runStatusReadModel, runStatusAuthority)
++    && !runStatusReadModelMatchesCurrentGeneration(options.projectRoot, runStatusReadModel, runStatusAuthority)
+   ) {
+     runStatusReadModel = null;
+     runStatusReadModelStale = true;
+--- a/tests/core/run-status-read-model.test.ts
++++ b/tests/core/run-status-read-model.test.ts
+@@ -11,6 +11,8 @@
+   buildCanonicalRunStatusReadModel,
+   publishCanonicalRunStatusReadModel,
+   readCanonicalRunStatusReadModel,
++  runStatusReadModelMatchesCurrentGeneration,
++  projectCanonicalRunLogicalProgress,
+ } from '../../src/core/run-status-read-model.js';
+ import type { CanonicalRunStatus } from '../../src/core/run-status-authority.js';
+ import { TaskStatus, type Task } from '../../src/core/types.js';
+@@ -235,3 +237,74 @@
+     }
+   });
+ });
++
++
++describe('coordinator snapshot custody', () => {
++  function fixture() {
++    const root = mkdtempSync(join(tmpdir(), 'deckent-coordinator-progress-'));
++    mkdirSync(join(root, '.deckent', 'pids'), { recursive: true });
++    const pidPath = join(root, '.deckent', 'pids', 'sprint-900.pid');
++    writeFileSync(pidPath, JSON.stringify({ leaseId: 'current' }));
++    const live = authority({
++      lifecycle: 'ACTIVE', active: true, sprintId: 'sprint-900', coordinator: 'alive',
++    });
++    const tasks = Array.from({ length: 8 }, (_, index) => task(`900-${index + 1}`));
++    tasks[0]!.status = TaskStatus.EXECUTING;
++    tasks[1]!.status = TaskStatus.DONE;
++    tasks[2]!.status = TaskStatus.EXECUTING;
++    return { root, pidPath, live, tasks, snapshot: {
++      sprintId: 'sprint-900', runGeneration: 'lease:current', tasks, heldTaskIds: ['900-1'],
++    } };
++  }
++
++  it('publishes all eight planned tasks and committed progress despite stale materialized files', () => {
++    const { root, live, tasks, snapshot } = fixture();
++    try {
++      mkdirSync(join(root, '.tasks'));
++      for (const t of tasks.slice(0, 3)) writeFileSync(
++        join(root, '.tasks', `task-${t.id}.json`), JSON.stringify({ ...t, status: TaskStatus.EXECUTING }),
++      );
++      const model = publishCanonicalRunStatusReadModel(root, { authority: live, coordinatorSnapshot: snapshot });
++      expect(model.logicalProgress).toMatchObject({ total: 8, done: 1, active: 1, blocked: 6, fixRetry: [] });
++      expect(model.holds).toContainEqual(expect.objectContaining({
++        reasonCode: 'exact-result-authority-hold', evidenceRef: 'coordinator:lease:current:task:900-1',
++      }));
++      expect(tasks[0]!.status).toBe(TaskStatus.EXECUTING);
++      expect(runStatusReadModelMatchesCurrentGeneration(root, model, live)).toBe(true);
++      expect(readCanonicalRunStatusReadModel(root)?.modelDigest).toBe(model.modelDigest);
++    } finally { rmSync(root, { recursive: true, force: true }); }
++  });
++
++  it.each(['lease', 'sprint', 'task', 'duplicate', 'hold'])('rejects foreign snapshot %s without replacing persisted progress', kind => {
++    const { root, live, snapshot } = fixture();
++    try {
++      const first = publishCanonicalRunStatusReadModel(root, { authority: live, coordinatorSnapshot: snapshot });
++      const invalid = { ...snapshot, tasks: [...snapshot.tasks] };
++      if (kind === 'lease') invalid.runGeneration = 'lease:old';
++      if (kind === 'sprint') invalid.sprintId = 'sprint-901';
++      if (kind === 'task') invalid.tasks[0] = { ...invalid.tasks[0]!, sprintId: 'sprint-901' };
++      if (kind === 'duplicate') invalid.tasks.push(invalid.tasks[0]!);
++      if (kind === 'hold') invalid.heldTaskIds = ['foreign'];
++      expect(() => publishCanonicalRunStatusReadModel(root, { authority: live, coordinatorSnapshot: invalid })).toThrow(/authority mismatch/u);
++      expect(readCanonicalRunStatusReadModel(root)?.modelDigest).toBe(first.modelDigest);
++    } finally { rmSync(root, { recursive: true, force: true }); }
++  });
++
++  it('rejects an old lease with identical lifecycle and sprint identity; missing live identity also fails closed', () => {
++    const { root, pidPath, live, snapshot } = fixture();
++    try {
++      const model = publishCanonicalRunStatusReadModel(root, { authority: live, coordinatorSnapshot: snapshot });
++      writeFileSync(pidPath, JSON.stringify({ leaseId: 'successor' }));
++      expect(runStatusReadModelMatchesCurrentGeneration(root, model, live)).toBe(false);
++      writeFileSync(pidPath, '{}');
++      expect(runStatusReadModelMatchesCurrentGeneration(root, model, live)).toBe(false);
++    } finally { rmSync(root, { recursive: true, force: true }); }
++  });
++
++  it('only the current NO_GO lineage projects retry pending, never a queued or held FIX', () => {
++    const tasks = [task('a', { status: TaskStatus.NO_GO }), task('b'), task('c', { status: TaskStatus.PAUSED })];
++    expect(projectCanonicalRunLogicalProgress(tasks).fixRetry.map(row => row.logicalTaskId)).toEqual(['a']);
++    tasks.push(task('a-fix', { isPriorityFix: true, fixForTaskId: 'a', status: TaskStatus.PAUSED }));
++    expect(projectCanonicalRunLogicalProgress(tasks).fixRetry).toEqual([]);
++  });
++});
+--- a/src/orchestra/sprint-lifecycle.ts
++++ b/src/orchestra/sprint-lifecycle.ts
+@@ -58,7 +58,7 @@
+ import { pruneExpiredNervousPending } from '../core/pending-approvals.js';
+ import { isExecutionLockAuthorityArtifactName } from '../core/file-lock.js';
+ import { clearProviderExecutionHolds } from '../core/provider-execution-hold.js';
+-import { publishCanonicalRunStatusReadModel } from '../core/run-status-read-model.js';
++import { publishCanonicalRunStatusReadModel, projectCanonicalRunLogicalProgress, type CanonicalRunLogicalProgress } from '../core/run-status-read-model.js';
+ 
+ // ─── Spawn backend abstraction ───────────────────────────────────
+ import type { SpawnBackend } from './spawn-backend.js';
+@@ -362,12 +362,13 @@
+   projectRoot: string,
+   sprint: Sprint,
+   errorMessage: string,
++  progress?: CanonicalRunLogicalProgress,
+ ): void {
+   try {
+     updateDashboard(projectRoot, {
+       sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
+       agents: [],
+-      progress: { done: 0, active: 0, blocked: 0, total: sprint.tasks.length },
++      progress: progress ?? projectCanonicalRunLogicalProgress(sprint.tasks),
+       alerts: [{ level: AlertLevel.WARNING, message: errorMessage, timestamp: new Date().toISOString() }],
+       updatedAt: new Date().toISOString(),
+     });
+--- a/tests/orchestra/result-collector-settlement-authority.test.ts
++++ b/tests/orchestra/result-collector-settlement-authority.test.ts
+@@ -486,7 +486,10 @@
+ 
+     for (const invalid of [hugeFlat, oversizedHold, cyclicCurrent, getterCurrent]) {
+       let revalidationCount = 0;
++      const visibleStatuses: TaskStatus[] = [];
++      const heldIds: string[] = [];
+       await expect(waitForResults(root, sprint, 250, [], {
++        onTaskAuthorityHold: id => { heldIds.push(id); },
+         ipcExecutionMode: 'normal-docker',
+         resolveExactAttemptIpcAuthority: () => ({
+           state: 'absent',
+@@ -498,6 +501,7 @@
+           authority: valid,
+         }),
+         revalidateExactAcceptedResultTerminalAuthority: async () => {
++          visibleStatuses.push(task.status);
+           revalidationCount += 1;
+           return revalidationCount === 1
+             ? { state: 'current' as const, terminalAuthority: valid }
+@@ -505,6 +509,8 @@
+         },
+       })).rejects.toThrow(/terminal revalidation HOLD/u);
+       expect(revalidationCount).toBeGreaterThanOrEqual(2);
++      expect(visibleStatuses.every(status => status === TaskStatus.EXECUTING)).toBe(true);
++      expect(heldIds).toEqual([task.id]);
+       expect(task.status).toBe(TaskStatus.EXECUTING);
+     }
+     expect(getterCalls).toBe(0);
+--- a/tests/cli/status-terminal-publication-race.test.ts
++++ b/tests/cli/status-terminal-publication-race.test.ts
+@@ -55,6 +55,7 @@
+       }),
+       writeJson(join(deckent, 'pids', `${SPRINT_ID}.pid`), {
+         pid: process.pid,
++        leaseId: 'terminal-race-fixture',
+         sprintId: SPRINT_ID,
+         startedAt: NOW,
+       }),

@@ -1,0 +1,31 @@
+{
+  "utc": "2026-09-13T23:49:55.118731+00:00",
+  "files": {
+    "build-isolated.log": "1c27b8f10eb5635ff5066d1081c73b6deac319d02d22677c0a3dd7435536b889",
+    "first-snapshot-probe.mjs": "8ad79a2604dadfe9b76e590737211f86253504ec3c71a4648db48547ab7290db",
+    "SCOPE.json": "0872d2b2a8d2049d62d82977d1567e53be7709b1466897131fe3c165682d6501",
+    "CHANGE.patch": "4dc54d3898c6b9600c4016055b0b464d2f8436e3da2bdafe39cee06e04fb41be",
+    "after-isolated.log": "08af0563333cd77ab09faeabf3b00d9149e314bf38a45165655b25805f67f1d5",
+    "RESULT.md": "800505a94f410f683f132078b8a188b37bc9d29cdb61a208522590f40a4e6049",
+    "before.log": "5ca5ad31e753bb9af04ff752e1912f4016a185173d4504110dad0f083845639e",
+    "build-main.log": "5af99e7adcfb2ba64dab466e7e4cc7e215279a28831925b7126b894be45e6f21",
+    "after-main.log": "7a221ebf96fc12446b64b84723550a48914b0522177be44d1ebb578d8ca1e513",
+    "tsc.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "LANDING.json": "32b1dc8c8e7d51607381cea97536db03ee0f4ff95bd66f9cfa11d4a155357c0b",
+    "tests.log": "473cb427964c65782b0bbb5ccd51e7f9829e066c066e2a6488c9909cf831c2ab",
+    "dogfood/EXIT.json": "804fc12eb254370dbbdd70d5e0bf01a37f629202ac91634cf0243ba0b0969176",
+    "dogfood/sprint-759-checkpoint.json": "e8f52d11fc3085d0510bbaf240ab29a49d799266b80ac39f5f6ec007d2760fcb",
+    "dogfood/sprint-759.jsonl": "a7a6ab9173c37b0fb6e39e5ffb67bab09754217fe2ab2b14b1b8c114123e2951",
+    "dogfood/worker-file-verification.json": "12054534900c0808abe3370b44c272a08e246e7be79877ed745a8c5fe81c4a3c",
+    "dogfood/sprint-759.snapshot.json": "c16ce62a46e5efecc7828fb6130e4c2e78900a3a1c7c7574103357495600c755",
+    "dogfood/projection-observations.jsonl": "c923894f27e04bd64ca8a6c79aa6646f47d89b5aa61bd2f68a2ec1c007a8fcfb",
+    "dogfood/sprint-759.json": "0fa5689826ce01a0dccd5c72427c7ccd34ed71d3d989d03251c625ff94e4268e",
+    "dogfood/brain-diagnostics.md": "f85186002b7559019e46e3541c3e8e9ad784b2e031b30624d682c568e2edad0b",
+    "dogfood/flow-events-summary.json": "dfb041c506b86de2224dcd3b7510acfa23b589de4ecc0bc04c07316bdf082c13",
+    "dogfood/start.log": "b81cea204d8d22f1eedcbdb22e25e1ce9aa6dbad9488c02924410d0018fa137e",
+    "dogfood/status-after.json": "ae3a3c233e925b8458487a7184f892b106284535ddde88b992ef8c6829b5b81f",
+    "dogfood/resources.jsonl": "e096e14aca46eaee561a42de42759a449b3a9f28ef1ba4fbb0d031681e6958a3",
+    "baseline/src/core/run-status-read-model.ts": "72586a2aaa2c9681189c1b1155d629f9aba99c08724b30c42878ff094401ab62",
+    "baseline/tests/core/run-status-read-model.test.ts": "44d06e68d7a4976802d0019ba82350ebdb3d8255ab14a9a5912c66e5772fa1e8"
+  }
+}

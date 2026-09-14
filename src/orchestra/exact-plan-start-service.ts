@@ -5,6 +5,7 @@
 // and the compatibility handle atomically only from runSprint's admission
 // hook. No function in this module plans or mutates an approved Sprint.
 
+import { formatSpawnBackendRecoveryDiagnostic } from './spawn-backend-recovery-diagnostic.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -1643,7 +1644,8 @@ export function createCanonicalExactSprintExecutor(
           const settlement = {
             state: 'FAILED',
             code: admitted ? 'EXACT_RUNTIME_FAILED_AFTER_ADMISSION' : 'EXACT_RUNTIME_FAILED_BEFORE_ADMISSION',
-            detail: error instanceof Error ? error.message : String(error),
+            detail: formatSpawnBackendRecoveryDiagnostic(error)
+              ?? (error instanceof Error ? error.message : String(error)),
             settledAt: now().toISOString(),
           } as const;
           let terminal: StartAttemptRecord;

@@ -1300,6 +1300,8 @@ export async function waitForResults(
     spawnBackend?: SpawnBackend;
     attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
     providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+    onResultCommitted?: (result: TaskResult) => void;
+    onTaskAuthorityHold?: (taskId: string) => void;
     evaluateCollectedResult?: (
       task: Task,
       result: TaskResult,
@@ -2944,6 +2946,24 @@ export async function runSprint(
    * Later heartbeat writes remain best-effort and are torn down by the existing
    * controller finally block.
    */
+  const collectorAuthorityHeldTaskIds = new Set<string>();
+  const publishCoordinatorProgress = (activeSprint: Sprint) => {
+    const writer = coordinatorPidRecord;
+    if (!writer) return;
+    const heldTaskIds = activeSprint.tasks.filter(task =>
+      collectorAuthorityHeldTaskIds.has(task.id)
+      || (exactDockerRegistry?.isExactTask(task.id)
+        && exactDockerRegistry.readTaskResultAuthority(task.id).state === 'authority-hold'),
+    ).map(task => task.id);
+    return publishCanonicalRunStatusReadModel(projectRoot, {
+      coordinatorSnapshot: {
+        sprintId: activeSprint.id,
+        runGeneration: `lease:${writer.leaseId}`,
+        tasks: activeSprint.tasks,
+        heldTaskIds,
+      },
+    });
+  };
   const activateCoordinatorSnapshotWriter = async (activeSprint: Sprint): Promise<void> => {
     const authority = coordinatorPidRecord;
     if (!authority) {
@@ -2974,7 +2994,7 @@ export async function runSprint(
         // The coordinator heartbeat is also the canonical persisted read-model
         // producer. Status surfaces consume this generation/revision instead of
         // racing task, dashboard and provider-observation files independently.
-        publishCanonicalRunStatusReadModel(projectRoot);
+        publishCoordinatorProgress(activeSprint);
       } catch (error) {
         if (strict) throw error;
         debugLog('runSprint:writeStateSnapshot', error);
@@ -3513,6 +3533,16 @@ export async function runSprint(
           attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
           providerAuthority: opts?.providerAuthority,
           evaluateCollectedResult: evaluateAndConsumeCollectedAttempt,
+          // Preserve committed progress even when a later authority HOLD rejects
+          // waitForResults instead of returning its local result array.
+          onResultCommitted: result => {
+            results.push(result);
+            publishCoordinatorProgress(sprint);
+          },
+          onTaskAuthorityHold: taskId => {
+            collectorAuthorityHeldTaskIds.add(taskId);
+            publishCoordinatorProgress(sprint);
+          },
           ...(exactDockerRegistry ? { exactDockerRegistry } : {}),
           ...(exactTaskProjectionAdmission ? { exactTaskProjectionAdmission } : {}),
         },
@@ -3536,6 +3566,18 @@ export async function runSprint(
               createHistoricalForeignTaskPredicate(projectRoot, sprint.id),
           },
         );
+        throw err;
+      }
+      if (err instanceof DeckentError && err.code === 'DECKENT_E077') {
+        // The collector has drained already-owned completions within its budget.
+        // Do not turn an authority failure into recovery/continuation/FIX dispatch.
+        // Keep unresolved runtime authority visible; no automatic kill or false
+        // terminal receipt is authorized by a result failure.
+        (sprint as Sprint & { executeAborted?: string }).executeAborted = err.message;
+        let projected: ReturnType<typeof publishCoordinatorProgress>;
+        try { projected = publishCoordinatorProgress(sprint); }
+        catch (projectionError) { debugLog('runSprint:authorityHoldProjection', projectionError); }
+        safeDashboardUpdate(projectRoot, sprint, err.message, projected?.logicalProgress);
         throw err;
       }
       // EXECUTE-ERROR-SURFACE (born-453, sprint-351 live case — sibling of the

@@ -1,0 +1,71 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/orchestra/exact-accepted-result-terminal-authority.test.ts (7 tests) 11ms
+ ❯ tests/orchestra/scheduler-effects.test.ts (21 tests | 1 failed) 43ms
+   × scheduler effects repair disposition gate > returns typed no-mint without resolving a prompt or dispatching 15ms
+     → promise rejected "ProviderError: No providers registered an… { providerName: '…' }" instead of resolving
+   ✓ exact registry historical unsettleable retirement > removes the entry so no consumer can read it back as an authority hold 3ms
+   ✓ exact registry containment holds from foreign terminal history > skips a foreign terminal task whose daemon container is absent 3ms
+   ✓ exact registry containment holds from foreign terminal history > throws byte-identically for a hold on the current run task 2ms
+   ✓ exact registry containment holds from foreign terminal history > throws when the owning run of the held task cannot be proven 1ms
+   ✓ exact registry containment holds from foreign terminal history > throws when the owning run is listed but not durably terminal 1ms
+   ✓ exact registry containment holds from foreign terminal history > throws for a hold on a later sprint than the run being reconciled 2ms
+   ✓ exact registry containment holds from foreign terminal history > throws when the daemon container state is present 2ms
+   ✓ exact registry containment holds from foreign terminal history > throws when the daemon container state is unknown 2ms
+   ✓ exact registry containment holds from foreign terminal history > throws when the daemon container state is unobserved 1ms
+   ✓ exact registry containment holds from foreign terminal history > throws when no predicate is injected (legacy call sites unchanged) 1ms
+   ✓ exact registry containment holds from foreign terminal history > never skips in resume mode 2ms
+   ✓ exact registry containment holds from foreign terminal history > keeps the throw when the backend still inventories a live worker 1ms
+   ✓ historical foreign task predicate ordinal boundary > admits only an earlier sprint than the current run 0ms
+   ✓ historical foreign task predicate ordinal boundary > treats a zero-padded current sprint id as the same sprint 0ms
+   ✓ historical foreign task predicate ordinal boundary > fails closed on an unprovable current run or task origin 0ms
+   ✓ historical foreign task predicate ordinal boundary > still requires a durably terminal owning run 0ms
+   ✓ exact registry containment sweep over archived attempts > completes containment when the archived current-run attempt inventories absent 2ms
+   ✓ exact registry containment sweep over archived attempts > still throws EXACT_CONTAINMENT_INCOMPLETE when the archived attempt inventories unknown 1ms
+   ✓ exact registry containment sweep over archived attempts > never retires an archived attempt whose container is present, even from an earlier run 1ms
+   ✓ exact registry containment sweep over archived attempts > never retires an archived attempt whose container state is unknown 2ms
+[scheduler-effects] task 700-005-fix: routing-lineage-missing: original task does-not-exist (fix target for 700-005-fix) could not be read at /tmp/sched3-inherit-4e840a30/.tasks/task-does-not-exist.json — spawn blocked
+[scheduler-effects] task 700-006-fix: routing-lineage-missing: original task 700-006 JSON is corrupt: Expected property name or '}' in JSON at position 2 (line 1 column 3) — spawn blocked
+stdout | tests/orchestra/scheduler-spawn-executor.test.ts > waitForResults — queue-completion trigger (processQueue) delegates to executeSpawnTask > spawns the queued fix-task with inherited routing fields and persists task-<id>.json (behavior a + b, live wiring)
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/scheduler-spawn-executor.test.ts > waitForResults — queue-completion trigger (processQueue) delegates to executeSpawnTask > propagates one provider-authority HOLD instead of retrying a queued task
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/scheduler-spawn-executor.test.ts > waitForResults — dep-ready trigger (dispatchReadyTasks) delegates to executeSpawnTask > spawns a dependency-ready fix-task with inherited routing fields and persists task-<id>.json (behavior a + b, live wiring)
+[deckent] scheduler engine: legacy
+
+ ✓ tests/orchestra/scheduler-spawn-executor.test.ts (33 tests) 2158ms
+   ✓ executeSpawnTask — exact normal-Docker publication order > preserves and freshly revalidates a current terminal across accepted recovery ownership transfer  1034ms
+   ✓ waitForResults — queue-completion trigger (processQueue) delegates to executeSpawnTask > spawns the queued fix-task with inherited routing fields and persists task-<id>.json (behavior a + b, live wiring)  304ms
+   ✓ waitForResults — dep-ready trigger (dispatchReadyTasks) delegates to executeSpawnTask > spawns a dependency-ready fix-task with inherited routing fields and persists task-<id>.json (behavior a + b, live wiring)  303ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/orchestra/scheduler-effects.test.ts > scheduler effects repair disposition gate > returns typed no-mint without resolving a prompt or dispatching
+AssertionError: promise rejected "ProviderError: No providers registered an… { providerName: '…' }" instead of resolving
+ ❯ tests/orchestra/scheduler-effects.test.ts:35:7
+     33|       projectRoot: root, sprintFallbackId: 's', config: undefined,
+     34|       resolveAgentPrompt, resolveSkillPrompts: async () => [], buildWr…
+     35|     })).resolves.toMatchObject({ kind: 'no-mint', taskId: 'root-fix', …
+       |       ^
+     36|     expect(resolveAgentPrompt).not.toHaveBeenCalled();
+     37|   });
+
+Caused by: ProviderError: No providers registered and model 'undefined' is unrecognized — cannot resolve provider
+ ❯ resolveTaskProvider src/orchestra/sprint-utils.ts:266:13
+ ❯ preDispatchExecutionIdentity src/orchestra/scheduler-effects.ts:1720:56
+ ❯ executeSpawnTask src/orchestra/scheduler-effects.ts:1853:10
+ ❯ tests/orchestra/scheduler-effects.test.ts:32:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { providerName: 'unknown' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 60 passed (61)
+   Start at  13:12:01
+   Duration  5.49s (transform 3.29s, setup 36ms, collect 6.70s, tests 2.21s, environment 0ms, prepare 91ms)
+

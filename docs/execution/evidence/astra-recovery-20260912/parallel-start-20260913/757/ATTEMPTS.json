@@ -1,0 +1,450 @@
+[
+  {
+    "task": "757-001",
+    "attempts": [
+      {
+        "attempt": "a08bfb0d-1265-8de8-8c43-7f5dadd0b45c",
+        "generation": "1",
+        "chain": [
+          {
+            "admissionReceiptDigest": "sha256:57c431bd7dbf64fc4e2b4a0d8852da0ca595110d83c31ba05415d85000ab581e",
+            "artifactKey": "effect-landing-d9ec8c1636d081e3bc31db4a788b3731",
+            "artifactReceiptDigest": "sha256:976b25027274e1f5570e19567fa0d159b62d40d65a358c39f1608a1772adc854",
+            "identity": {
+              "attemptId": "a08bfb0d-1265-8de8-8c43-7f5dadd0b45c",
+              "backend": "docker",
+              "generation": 1,
+              "projectId": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+              "projectRootSha256": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+              "schemaVersion": 2,
+              "taskId": "757-001"
+            },
+            "kind": "task-attempt-custody-chain",
+            "occurredAt": "2026-09-13T14:55:29.876Z",
+            "predecessorDigest": "sha256:57c431bd7dbf64fc4e2b4a0d8852da0ca595110d83c31ba05415d85000ab581e",
+            "receiptDigest": "sha256:80ff285db84d977fba15a3c6bb9b654c59400a5a0ca46afe72b629afc5026ee5",
+            "schemaVersion": 2,
+            "stage": "effect-landing"
+          },
+          {
+            "admissionReceiptDigest": "sha256:57c431bd7dbf64fc4e2b4a0d8852da0ca595110d83c31ba05415d85000ab581e",
+            "artifactKey": "accepted-a08bfb0d-1265-8de8-8c43-7f5dadd0b45c",
+            "artifactReceiptDigest": "sha256:4b0d238d44b04ccf99f6866ece148e46b828a8b16efcba0bee125dea94beb245",
+            "identity": {
+              "attemptId": "a08bfb0d-1265-8de8-8c43-7f5dadd0b45c",
+              "backend": "docker",
+              "generation": 1,
+              "projectId": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+              "projectRootSha256": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+              "schemaVersion": 2,
+              "taskId": "757-001"
+            },
+            "kind": "task-attempt-custody-chain",
+            "occurredAt": "2026-09-13T14:55:29.876Z",
+            "predecessorDigest": "sha256:80ff285db84d977fba15a3c6bb9b654c59400a5a0ca46afe72b629afc5026ee5",
+            "receiptDigest": "sha256:fea6fdabd3e89b27d52c8c227e0c3b2552c15c4b5806a116c440c40e3dd73a22",
+            "schemaVersion": 2,
+            "stage": "accepted-result"
+          }
+        ],
+        "observations": {
+          "provider-start": {
+            "admissionRefDigest": "sha256:49010edbe2ace2e6931e06fea758051b207804f7ff88edc117653cd1d7070f3f",
+            "authorityLabelsDigest": "sha256:32b9fe5cb07adc748409c9358bd9ef5f04e6b66b0f5d52fb91871a916f672206",
+            "containerId": "46c3932311b7da47b1babec37a7acb6c183b2709c4889714c54ad6b1a5c4d96f",
+            "dispatchReceiptDigest": "sha256:354e78d08a2db88ccf380cfec4e1ab6e37859bcf3ebcc9e89074165f5b4ed0e4",
+            "executionCommitNonceSha256": "sha256:7520352fedaae6ad3ec3fcdae8caceeb7c015168a0b3f17b0336db8407cd3337",
+            "kind": "exact-docker-provider-start",
+            "observedAt": "2026-09-13T14:38:57.642Z",
+            "pid1StartAckDigest": "sha256:3ad5896ad73937016d03f1f8a4b3a5a7e717ed10abf969ac1292c6fab86ad1b1",
+            "projectionFence": "sha256:9ccdd3c57d95f352b26e2e86c5ade7e5cebc23ff9dd77e45e701208b85b32b0d",
+            "providerExecutionAttemptId": "6b5e45bf-5c0c-8960-824a-33e14618eaf4",
+            "providerExecutionAttemptIdentityDigest": "sha256:daf1c4dcfba1ff250a05937799e228a59a12a8b79049a5f04663dcee791e0e63",
+            "providerInvocationDigest": "sha256:bb8e437f3196f7cc97f2d9223eff01c942d5ee99686084a326cbc39dea7a73e8",
+            "providerStartNonceSha256": "sha256:21981e57ca8e2c22ab23203d62c8e879da27f998dc16124c5712eb2f45aed195",
+            "providerState": "NOT_STARTED",
+            "releaseReceiptDigest": "sha256:a20a1b68f997bfec52fa73a7f90a2f92326f0d0757f905af44061033bb62786f",
+            "releaseReceiptRef": "sha256:26d0bdaf47523d38005c032cbb70c226883397482c95cc24e9653d3976f6f9bd",
+            "schemaVersion": 2,
+            "startAuthorizationDigest": "sha256:f71a264a5379444f2093c3a08cd0f3ca5d217b27c147b240ae11f18935e236d9",
+            "state": "START_AUTHORIZATION_ACCEPTED",
+            "taskSnapshotSha256": "sha256:1b996cb8813134098c8cbce774eb29505b22bbff81653000d95e5c5ab1700560"
+          },
+          "provider-exit": {
+            "admissionRefDigest": "sha256:49010edbe2ace2e6931e06fea758051b207804f7ff88edc117653cd1d7070f3f",
+            "containerId": "46c3932311b7da47b1babec37a7acb6c183b2709c4889714c54ad6b1a5c4d96f",
+            "dockerWaitProcessExitCode": 0,
+            "dockerWaitSignal": null,
+            "exitCode": 0,
+            "kind": "exact-docker-provider-exit",
+            "observedAt": "2026-09-13T14:49:07.084Z",
+            "schemaVersion": 2,
+            "stderrSha256": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdoutSha256": "sha256:9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+            "waitEvidenceDigest": "sha256:460f7c34e45e766871bdabc0e4ccfb17a29749b9f459f50203f15a60932905e2"
+          }
+        },
+        "evaluation": null,
+        "dispatch": {
+          "state": "RELEASED",
+          "reasonCode": null,
+          "receiptDigest": "sha256:354e78d08a2db88ccf380cfec4e1ab6e37859bcf3ebcc9e89074165f5b4ed0e4",
+          "recordedAt": "2026-09-13T14:38:56.674Z"
+        }
+      }
+    ]
+  },
+  {
+    "task": "757-002",
+    "attempts": [
+      {
+        "attempt": "3105d914-71e9-8c2a-86c8-564461dda6bc",
+        "generation": "1",
+        "chain": [
+          {
+            "admissionReceiptDigest": "sha256:328bfbc989ffd682b4619201eab5ec589c2ee7296de2e65291acd61a825b555d",
+            "artifactKey": "effect-landing-3b7a9b57540c0b329ee808ce0ad30d76",
+            "artifactReceiptDigest": "sha256:438070343ffa4f8127b5bc4b31c864cebc4543b11148cef14ca0573e606998c6",
+            "identity": {
+              "attemptId": "3105d914-71e9-8c2a-86c8-564461dda6bc",
+              "backend": "docker",
+              "generation": 1,
+              "projectId": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+              "projectRootSha256": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+              "schemaVersion": 2,
+              "taskId": "757-002"
+            },
+            "kind": "task-attempt-custody-chain",
+            "occurredAt": "2026-09-13T14:44:33.669Z",
+            "predecessorDigest": "sha256:328bfbc989ffd682b4619201eab5ec589c2ee7296de2e65291acd61a825b555d",
+            "receiptDigest": "sha256:e28e727d9bfbac67f76f4300c32a928d952e9b0a897ec908ded5f1e247389701",
+            "schemaVersion": 2,
+            "stage": "effect-landing"
+          },
+          {
+            "admissionReceiptDigest": "sha256:328bfbc989ffd682b4619201eab5ec589c2ee7296de2e65291acd61a825b555d",
+            "artifactKey": "accepted-3105d914-71e9-8c2a-86c8-564461dda6bc",
+            "artifactReceiptDigest": "sha256:751288628c38dce877f10a5b2f10e6a34d8bebd1b81ca326f6c92c666368242c",
+            "identity": {
+              "attemptId": "3105d914-71e9-8c2a-86c8-564461dda6bc",
+              "backend": "docker",
+              "generation": 1,
+              "projectId": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+              "projectRootSha256": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+              "schemaVersion": 2,
+              "taskId": "757-002"
+            },
+            "kind": "task-attempt-custody-chain",
+            "occurredAt": "2026-09-13T14:44:33.669Z",
+            "predecessorDigest": "sha256:e28e727d9bfbac67f76f4300c32a928d952e9b0a897ec908ded5f1e247389701",
+            "receiptDigest": "sha256:d5567707fb33a51eeb4fc83ec22d6aa666eda95e7edd73426b4d9cb40585b431",
+            "schemaVersion": 2,
+            "stage": "accepted-result"
+          },
+          {
+            "admissionReceiptDigest": "sha256:328bfbc989ffd682b4619201eab5ec589c2ee7296de2e65291acd61a825b555d",
+            "artifactKey": "terminal-3ad3e810d5f6cae5c9b53a69b2b22875865d78a74acef14fc2c51593112cb3e3",
+            "artifactReceiptDigest": "sha256:0047a1e8d6098964cb646fa69912a4cd257a4d887a34689713341e3de1838b22",
+            "identity": {
+              "attemptId": "3105d914-71e9-8c2a-86c8-564461dda6bc",
+              "backend": "docker",
+              "generation": 1,
+              "projectId": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+              "projectRootSha256": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+              "schemaVersion": 2,
+              "taskId": "757-002"
+            },
+            "kind": "task-attempt-custody-chain",
+            "occurredAt": "2026-09-13T14:46:03.238Z",
+            "predecessorDigest": "sha256:d5567707fb33a51eeb4fc83ec22d6aa666eda95e7edd73426b4d9cb40585b431",
+            "receiptDigest": "sha256:0f3315639b97671cf671ce2a786811eafb998d5053233372cf814e88a4e4acf0",
+            "schemaVersion": 2,
+            "stage": "evaluation"
+          },
+          {
+            "admissionReceiptDigest": "sha256:328bfbc989ffd682b4619201eab5ec589c2ee7296de2e65291acd61a825b555d",
+            "artifactKey": "terminal-3ad3e810d5f6cae5c9b53a69b2b22875865d78a74acef14fc2c51593112cb3e3",
+            "artifactReceiptDigest": "sha256:744a674cb1d1f4d49886d3f370cefaf8a688bff7c76d0c601094d63027ed8dad",
+            "identity": {
+              "attemptId": "3105d914-71e9-8c2a-86c8-564461dda6bc",
+              "backend": "docker",
+              "generation": 1,
+              "projectId": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+              "projectRootSha256": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+              "schemaVersion": 2,
+              "taskId": "757-002"
+            },
+            "kind": "task-attempt-custody-chain",
+            "occurredAt": "2026-09-13T14:46:09.727Z",
+            "predecessorDigest": "sha256:0f3315639b97671cf671ce2a786811eafb998d5053233372cf814e88a4e4acf0",
+            "receiptDigest": "sha256:5aa16d7250869de80ea495d27cfd7b120144ed6282097d04f66712b394f1d841",
+            "schemaVersion": 2,
+            "stage": "finalizer"
+          },
+          {
+            "admissionReceiptDigest": "sha256:328bfbc989ffd682b4619201eab5ec589c2ee7296de2e65291acd61a825b555d",
+            "artifactKey": "terminal-3ad3e810d5f6cae5c9b53a69b2b22875865d78a74acef14fc2c51593112cb3e3",
+            "artifactReceiptDigest": "sha256:4418018097fbcb3657229e5cce793cc6d84e95be404de8d1b00c0e3e06f97014",
+            "identity": {
+              "attemptId": "3105d914-71e9-8c2a-86c8-564461dda6bc",
+              "backend": "docker",
+              "generation": 1,
+              "projectId": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+              "projectRootSha256": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+              "schemaVersion": 2,
+              "taskId": "757-002"
+            },
+            "kind": "task-attempt-custody-chain",
+            "occurredAt": "2026-09-13T14:46:16.567Z",
+            "predecessorDigest": "sha256:5aa16d7250869de80ea495d27cfd7b120144ed6282097d04f66712b394f1d841",
+            "receiptDigest": "sha256:356b8a058bb76cb7d883f4eb935075df6f5d8c178834969b93be91c308184a7c",
+            "schemaVersion": 2,
+            "stage": "settlement"
+          },
+          {
+            "admissionReceiptDigest": "sha256:328bfbc989ffd682b4619201eab5ec589c2ee7296de2e65291acd61a825b555d",
+            "artifactKey": "terminal-3ad3e810d5f6cae5c9b53a69b2b22875865d78a74acef14fc2c51593112cb3e3",
+            "artifactReceiptDigest": "sha256:3014e5d180098c3cb947a421b0ac953a81f25923d3a781c1827ff64c798c41db",
+            "identity": {
+              "attemptId": "3105d914-71e9-8c2a-86c8-564461dda6bc",
+              "backend": "docker",
+              "generation": 1,
+              "projectId": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+              "projectRootSha256": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+              "schemaVersion": 2,
+              "taskId": "757-002"
+            },
+            "kind": "task-attempt-custody-chain",
+            "occurredAt": "2026-09-13T14:46:34.640Z",
+            "predecessorDigest": "sha256:356b8a058bb76cb7d883f4eb935075df6f5d8c178834969b93be91c308184a7c",
+            "receiptDigest": "sha256:613317fdd3e6f3a2eec23b5a24b264bcfcf4c6a070386ccf37ff3e0284844ad8",
+            "schemaVersion": 2,
+            "stage": "archive"
+          }
+        ],
+        "observations": {
+          "provider-start": {
+            "admissionRefDigest": "sha256:25bccd1978d910badd59ab5b04cdf321e49e27fce955731e0f87d835d04ab1b2",
+            "authorityLabelsDigest": "sha256:cf11b26c2eedcc525e97838187de305db7f01a343852a992fbd20c654ccd8ca9",
+            "containerId": "566e115a98d7dbae99427daabc3911e12138b44f8e835fce4d35d12c020caa7a",
+            "dispatchReceiptDigest": "sha256:c6e128ce868cfcba2d880d19e669e565ae27ffcaf1b26361f99da0a5c95b4b51",
+            "executionCommitNonceSha256": "sha256:300ae12668a4a93b14513983f304f47f803f7944c3bc9d43ca0480ce96da39df",
+            "kind": "exact-docker-provider-start",
+            "observedAt": "2026-09-13T14:39:57.355Z",
+            "pid1StartAckDigest": "sha256:7aa8866327eeff97aa343c2880f9c99b1bba4798bfc2fc727e177a8c0901b095",
+            "projectionFence": "sha256:cf87e43c704579ed0193e6439a9d61579c1d81e9392d2e0913d396d263672588",
+            "providerExecutionAttemptId": "45442905-2d01-8018-89db-416ab3d19510",
+            "providerExecutionAttemptIdentityDigest": "sha256:eb1580d6bda8fa2d25eb7bd159563f6bd0a55267fa6b70f32134756cca83c14e",
+            "providerInvocationDigest": "sha256:e7b32192a1e2acc3fc862c92575d2af2735a276fa0fcdd47dc57b6b67c9eacd2",
+            "providerStartNonceSha256": "sha256:d32fcd763d92b305df0309ed051b8e9817153712e215869476ca76ce19e9e19f",
+            "providerState": "NOT_STARTED",
+            "releaseReceiptDigest": "sha256:6d28505b93f68b8c89f66a8b4c6a7fff7277faebd5213f28c9847f582178d922",
+            "releaseReceiptRef": "sha256:60008db4f1700dd1a144e9239ccc2a23bfaf947d4c4d4b6d579d0cf6e381376e",
+            "schemaVersion": 2,
+            "startAuthorizationDigest": "sha256:ae4f0db361dde5e8beb7de6335e3b28ded82dba5ea8ce213359be2c8c942be2e",
+            "state": "START_AUTHORIZATION_ACCEPTED",
+            "taskSnapshotSha256": "sha256:c70f12f72ae1227df8ef24bfdd1b4c0bcff73f5c7160b9f5487b2e031a61a5dc"
+          },
+          "provider-exit": {
+            "admissionRefDigest": "sha256:25bccd1978d910badd59ab5b04cdf321e49e27fce955731e0f87d835d04ab1b2",
+            "containerId": "566e115a98d7dbae99427daabc3911e12138b44f8e835fce4d35d12c020caa7a",
+            "dockerWaitProcessExitCode": 0,
+            "dockerWaitSignal": null,
+            "exitCode": 0,
+            "kind": "exact-docker-provider-exit",
+            "observedAt": "2026-09-13T14:42:41.182Z",
+            "schemaVersion": 2,
+            "stderrSha256": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdoutSha256": "sha256:9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+            "waitEvidenceDigest": "sha256:3f0189936bd053793cd04fe19c38d7cca49dc3b721c304a125fc38a517e0522f"
+          }
+        },
+        "evaluation": {
+          "evaluatedAt": "2026-09-13T14:46:03.238Z",
+          "acceptanceDecision": {
+            "confirmationReceiptDigest": null,
+            "enforced": false,
+            "outcome": {
+              "action": "ROUTE",
+              "adapter": "llm",
+              "kind": "documentation",
+              "source": "default",
+              "verdict": "UNDECIDABLE"
+            },
+            "postRubricCause": null,
+            "routeClaim": null,
+            "settlement": {
+              "acceptanceDisposition": "pending",
+              "debtDisposition": "active",
+              "reasonCode": "CONFIRMATION_MISSING",
+              "receiptDisposition": "NONE",
+              "sourceVerdict": "UNDECIDABLE"
+            }
+          },
+          "evaluationSnapshot": {
+            "contractSummary": {
+              "decided": 0,
+              "total": 7,
+              "undecidableItems": [
+                {
+                  "itemId": "criterion-go-53b982b4014fbd7f1a019de3804b303bb72320d9d7a427f2214b34fec802ab21",
+                  "statement": "Target file(s) written to disk with the required content"
+                },
+                {
+                  "itemId": "criterion-no-go-13185f4517c1a533857ac706f309d5fcf4849467279ce94de3af5a8b18647f11",
+                  "statement": "Target file(s) missing or empty"
+                },
+                {
+                  "itemId": "criterion-go-8e905eb228e6d976792e6ed70c5c3d50ce927097777b205ab0fcf5549dc9b2da",
+                  "statement": "The declared report contains independently inspected source references and hashes."
+                },
+                {
+                  "itemId": "criterion-go-d975e23c94014a7e0c0ff070e3f1687b310125013ea7b444c746169e37f21ccb",
+                  "statement": "Observations and hypotheses are explicitly separated."
+                },
+                {
+                  "itemId": "criterion-go-2819260f2320ffa9634166a22859cd3a9a860bb6f18248ecff6e93e951f627ae",
+                  "statement": "The proposed next repair has exact file scope and preserves canonical authority."
+                },
+                {
+                  "itemId": "criterion-go-f5f3e37581af704261a1c10ab63bbd9b059349b2f4aa24644f70f23bd4e44f19",
+                  "statement": "Only the declared report changes and no product closure is claimed."
+                },
+                {
+                  "itemId": "criterion-no-go-ee5778099700bac4bcf913f675434722f0fddc6613b6da63ed2fc281144a9b8d",
+                  "statement": "Fabricated execution or measurements, source mutation, missing report, or unbounded history scan."
+                }
+              ]
+            },
+            "decision": "DONE",
+            "retryCount": 0,
+            "rubricScores": [
+              {
+                "criterion": "correctness",
+                "passed": true,
+                "reason": "verification task \u2014 tests passed, existing work confirmed",
+                "score": 100
+              },
+              {
+                "criterion": "test_coverage",
+                "passed": true,
+                "reason": "verification task \u2014 no new code to cover",
+                "score": 100
+              },
+              {
+                "criterion": "scope_compliance",
+                "passed": true,
+                "reason": "verification task \u2014 no files changed (expected)",
+                "score": 100
+              },
+              {
+                "criterion": "documentation",
+                "passed": true,
+                "reason": "verification task \u2014 notes provided",
+                "score": 100
+              },
+              {
+                "criterion": "goNogo:criterion-go-53b982b4014fbd7f1a019de3804b303bb72320d9d7a427f2214b34fec802ab21",
+                "passed": true,
+                "reason": "go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): Target file(s) written to disk with the required content",
+                "score": 50
+              },
+              {
+                "criterion": "goNogo:criterion-no-go-13185f4517c1a533857ac706f309d5fcf4849467279ce94de3af5a8b18647f11",
+                "passed": true,
+                "reason": "no-go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): Target file(s) missing or empty",
+                "score": 50
+              },
+              {
+                "criterion": "goNogo:criterion-go-8e905eb228e6d976792e6ed70c5c3d50ce927097777b205ab0fcf5549dc9b2da",
+                "passed": true,
+                "reason": "go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): The declared report contains independently inspected source references and hashes.",
+                "score": 50
+              },
+              {
+                "criterion": "goNogo:criterion-go-d975e23c94014a7e0c0ff070e3f1687b310125013ea7b444c746169e37f21ccb",
+                "passed": true,
+                "reason": "go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): Observations and hypotheses are explicitly separated.",
+                "score": 50
+              },
+              {
+                "criterion": "goNogo:criterion-go-2819260f2320ffa9634166a22859cd3a9a860bb6f18248ecff6e93e951f627ae",
+                "passed": true,
+                "reason": "go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): The proposed next repair has exact file scope and preserves canonical authority.",
+                "score": 50
+              },
+              {
+                "criterion": "goNogo:criterion-go-f5f3e37581af704261a1c10ab63bbd9b059349b2f4aa24644f70f23bd4e44f19",
+                "passed": true,
+                "reason": "go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): Only the declared report changes and no product closure is claimed.",
+                "score": 50
+              },
+              {
+                "criterion": "goNogo:criterion-no-go-ee5778099700bac4bcf913f675434722f0fddc6613b6da63ed2fc281144a9b8d",
+                "passed": true,
+                "reason": "no-go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): Fabricated execution or measurements, source mutation, missing report, or unbounded history scan.",
+                "score": 50
+              }
+            ],
+            "totalScore": 100
+          }
+        },
+        "dispatch": {
+          "state": "RELEASED",
+          "reasonCode": null,
+          "receiptDigest": "sha256:c6e128ce868cfcba2d880d19e669e565ae27ffcaf1b26361f99da0a5c95b4b51",
+          "recordedAt": "2026-09-13T14:39:56.400Z"
+        }
+      }
+    ]
+  },
+  {
+    "task": "757-003",
+    "attempts": [
+      {
+        "attempt": "c7030198-e27e-8a15-8cd5-427cc3278277",
+        "generation": "1",
+        "chain": [],
+        "observations": {
+          "reconciliation": {
+            "admissionRefDigest": "sha256:dba064e9510baa8689f55fb05a90b99f45c9abff1a8d0b07e5934093b640afe2",
+            "backendProbeEvidenceDigest": "sha256:3dda8c7bdf05a0df19a5f8c5fd1355b9b75d79431c571bb29e5b3f6537062a96",
+            "containerId": null,
+            "containerState": "ABSENT",
+            "containmentEvidenceDigest": "sha256:1a455c61c70b84e3829784f8ebe3102a5be8631f01d03fb5ec2d77cd9205c0c3",
+            "imageDigest": null,
+            "kind": "exact-docker-reconciliation",
+            "mountReceiptDigest": null,
+            "observedAt": "2026-09-13T14:50:03.271Z",
+            "providerInvocationDigest": null,
+            "reasonCode": "MOUNT_RECONCILIATION_REQUIRED",
+            "releaseNonceDigest": null,
+            "releaseState": "NOT_ATTEMPTED",
+            "schemaVersion": 2
+          }
+        },
+        "evaluation": null
+      }
+    ]
+  },
+  {
+    "task": "757-004",
+    "attempts": []
+  },
+  {
+    "task": "757-005",
+    "attempts": []
+  },
+  {
+    "task": "757-006",
+    "attempts": []
+  },
+  {
+    "task": "757-007",
+    "attempts": []
+  },
+  {
+    "task": "757-008",
+    "attempts": []
+  }
+]

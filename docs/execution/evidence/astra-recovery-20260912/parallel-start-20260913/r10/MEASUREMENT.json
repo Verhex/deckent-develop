@@ -1,0 +1,294 @@
+{
+  "candidate-before": {
+    "measurement": {
+      "at": "2026-09-13T21:54:18.764Z",
+      "elapsedMs": 10030.826034000002,
+      "cpu": {
+        "user": 8512068,
+        "system": 1367590
+      },
+      "memory": {
+        "rss": 437575680,
+        "heapTotal": 194752512,
+        "heapUsed": 107020584,
+        "external": 15319711,
+        "arrayBuffers": 8194292
+      },
+      "maxRssKiB": 433396,
+      "result": {
+        "state": "hold",
+        "name": "TaskAttemptCustodyHold",
+        "code": "DISPATCH_DISCOVERY_DEADLINE_EXCEEDED",
+        "message": "TASK_ATTEMPT_CUSTODY_HOLD:DISPATCH_DISCOVERY_DEADLINE_EXCEEDED"
+      }
+    },
+    "topSelfSampledSeconds": [
+      {
+        "function": "captured",
+        "source": "index.mjs",
+        "line": 3311,
+        "sampledSeconds": 4.830484
+      },
+      {
+        "function": "(garbage collector)",
+        "source": "",
+        "line": 0,
+        "sampledSeconds": 0.425317
+      },
+      {
+        "function": "",
+        "source": "",
+        "line": 0,
+        "sampledSeconds": 0.264938
+      },
+      {
+        "function": "ownData",
+        "source": "index.mjs",
+        "line": 574,
+        "sampledSeconds": 0.263606
+      },
+      {
+        "function": "sortedOwnStringKeys",
+        "source": "index.mjs",
+        "line": 549,
+        "sampledSeconds": 0.237213
+      },
+      {
+        "function": "inspectNativeCustodyHandle",
+        "source": "index.mjs",
+        "line": 2407,
+        "sampledSeconds": 0.20187
+      },
+      {
+        "function": "isCanonicalCustodyDecimal",
+        "source": "index.mjs",
+        "line": 2196,
+        "sampledSeconds": 0.136287
+      },
+      {
+        "function": "",
+        "source": "index.mjs",
+        "line": 564,
+        "sampledSeconds": 0.134839
+      },
+      {
+        "function": "canonicalJson",
+        "source": "execution-effect-containment.js",
+        "line": 29,
+        "sampledSeconds": 0.128087
+      },
+      {
+        "function": "canonicalJson",
+        "source": "execution-effect-docker-lifecycle.js",
+        "line": 33,
+        "sampledSeconds": 0.124264
+      },
+      {
+        "function": "(program)",
+        "source": "",
+        "line": 0,
+        "sampledSeconds": 0.12203
+      },
+      {
+        "function": "isCustodyIdentityTransport",
+        "source": "index.mjs",
+        "line": 2239,
+        "sampledSeconds": 0.120326
+      },
+      {
+        "function": "serializeCanonicalJson",
+        "source": "task-attempt-custody-store.js",
+        "line": 620,
+        "sampledSeconds": 0.113577
+      },
+      {
+        "function": "hasExactFrozenDataShape",
+        "source": "exec-authority-native.js",
+        "line": 492,
+        "sampledSeconds": 0.096749
+      },
+      {
+        "function": "hasExactFrozenDataShape",
+        "source": "index.mjs",
+        "line": 556,
+        "sampledSeconds": 0.094443
+      },
+      {
+        "function": "portableEffectPathFailure",
+        "source": "execution-write-scope-policy.js",
+        "line": 124,
+        "sampledSeconds": 0.093867
+      },
+      {
+        "function": "validateManifest",
+        "source": "execution-effect-containment.js",
+        "line": 189,
+        "sampledSeconds": 0.093154
+      },
+      {
+        "function": "frozenSortedStringArray",
+        "source": "index.mjs",
+        "line": 797,
+        "sampledSeconds": 0.087221
+      },
+      {
+        "function": "canonicalJson",
+        "source": "execution-effect-persistence-contract.js",
+        "line": 10,
+        "sampledSeconds": 0.083944
+      },
+      {
+        "function": "isWindowsReservedName",
+        "source": "execution-write-scope-policy.js",
+        "line": 112,
+        "sampledSeconds": 0.082994
+      }
+    ]
+  },
+  "candidate-after": {
+    "measurement": {
+      "at": "2026-09-13T22:03:29.810Z",
+      "elapsedMs": 10029.452378,
+      "cpu": {
+        "user": 8890406,
+        "system": 1516257
+      },
+      "memory": {
+        "rss": 454750208,
+        "heapTotal": 192466944,
+        "heapUsed": 86461504,
+        "external": 19750913,
+        "arrayBuffers": 12606794
+      },
+      "maxRssKiB": 451288,
+      "result": {
+        "state": "hold",
+        "name": "TaskAttemptCustodyHold",
+        "code": "DISPATCH_DISCOVERY_DEADLINE_EXCEEDED",
+        "message": "TASK_ATTEMPT_CUSTODY_HOLD:DISPATCH_DISCOVERY_DEADLINE_EXCEEDED"
+      }
+    },
+    "topSelfSampledSeconds": [
+      {
+        "function": "captured",
+        "source": "index.mjs",
+        "line": 3311,
+        "sampledSeconds": 4.453953
+      },
+      {
+        "function": "(garbage collector)",
+        "source": "",
+        "line": 0,
+        "sampledSeconds": 0.581672
+      },
+      {
+        "function": "",
+        "source": "",
+        "line": 0,
+        "sampledSeconds": 0.314635
+      },
+      {
+        "function": "ownData",
+        "source": "index.mjs",
+        "line": 574,
+        "sampledSeconds": 0.312829
+      },
+      {
+        "function": "sortedOwnStringKeys",
+        "source": "index.mjs",
+        "line": 549,
+        "sampledSeconds": 0.250681
+      },
+      {
+        "function": "inspectNativeCustodyHandle",
+        "source": "index.mjs",
+        "line": 2407,
+        "sampledSeconds": 0.205806
+      },
+      {
+        "function": "",
+        "source": "index.mjs",
+        "line": 564,
+        "sampledSeconds": 0.144785
+      },
+      {
+        "function": "isCanonicalCustodyDecimal",
+        "source": "index.mjs",
+        "line": 2196,
+        "sampledSeconds": 0.136098
+      },
+      {
+        "function": "serializeCanonicalJson",
+        "source": "task-attempt-custody-store.js",
+        "line": 620,
+        "sampledSeconds": 0.134749
+      },
+      {
+        "function": "(program)",
+        "source": "",
+        "line": 0,
+        "sampledSeconds": 0.132935
+      },
+      {
+        "function": "isCustodyIdentityTransport",
+        "source": "index.mjs",
+        "line": 2239,
+        "sampledSeconds": 0.114479
+      },
+      {
+        "function": "validateManifest",
+        "source": "execution-effect-containment.js",
+        "line": 189,
+        "sampledSeconds": 0.113332
+      },
+      {
+        "function": "canonicalJson",
+        "source": "execution-effect-containment.js",
+        "line": 29,
+        "sampledSeconds": 0.111
+      },
+      {
+        "function": "exactRecord",
+        "source": "execution-effect-containment.js",
+        "line": 55,
+        "sampledSeconds": 0.107551
+      },
+      {
+        "function": "canonicalJson",
+        "source": "execution-effect-docker-lifecycle.js",
+        "line": 33,
+        "sampledSeconds": 0.106232
+      },
+      {
+        "function": "canonicalJson",
+        "source": "execution-effect-persistence-contract.js",
+        "line": 10,
+        "sampledSeconds": 0.10459
+      },
+      {
+        "function": "isWindowsReservedName",
+        "source": "execution-write-scope-policy.js",
+        "line": 112,
+        "sampledSeconds": 0.102484
+      },
+      {
+        "function": "portableEffectPathFailure",
+        "source": "execution-write-scope-policy.js",
+        "line": 124,
+        "sampledSeconds": 0.096671
+      },
+      {
+        "function": "frozenSortedStringArray",
+        "source": "index.mjs",
+        "line": 797,
+        "sampledSeconds": 0.094961
+      },
+      {
+        "function": "ownData",
+        "source": "exec-authority-native.js",
+        "line": 481,
+        "sampledSeconds": 0.089282
+      }
+    ]
+  }
+}

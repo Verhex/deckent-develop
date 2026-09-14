@@ -91,6 +91,7 @@ describe('exact committed-unsettled Docker recovery', () => {
     });
     const semanticRead = vi.fn(() => evidence);
     const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
       readRejectedResultDispatch: vi.fn(() => null),
       readStartedFailedDispatch: vi.fn(() => null),
       readDispatchAuthority: vi.fn(() => ({
@@ -129,7 +130,7 @@ describe('exact committed-unsettled Docker recovery', () => {
     )).toThrow('EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED');
   });
 
-  it('leaves an unmarked RELEASED admission on the ordinary reconciliation path', () => {
+  it.each([true, false])('shares startup archive proof with planning (archived=%s)', archived => {
     const identity = {
       projectId: 'project-721', taskId: '721-001',
       attemptId: 'attempt-721', generation: 1,
@@ -141,6 +142,7 @@ describe('exact committed-unsettled Docker recovery', () => {
       refDigest: digest('8'),
     };
     const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
       readRejectedResultDispatch: vi.fn(() => null),
       readStartedFailedDispatch: vi.fn(() => null),
       readDispatchAuthority: vi.fn(() => ({
@@ -154,6 +156,7 @@ describe('exact committed-unsettled Docker recovery', () => {
     const internals = backend as unknown as {
       reconstructExactDockerRecoveryScope: ReturnType<typeof vi.fn>;
       exactCommittedUnsettledSemanticAdapter: ReturnType<typeof vi.fn>;
+      readExactArchivedAttemptDisposition: ReturnType<typeof vi.fn>;
     };
     internals.reconstructExactDockerRecoveryScope = vi.fn(() => ({
       store, policy: {}, identity, admissionRef,
@@ -161,11 +164,14 @@ describe('exact committed-unsettled Docker recovery', () => {
     internals.exactCommittedUnsettledSemanticAdapter = vi.fn(() => {
       throw new Error('semantic proof must not run without a retained marker');
     });
+    internals.readExactArchivedAttemptDisposition = vi.fn(() => archived);
 
     expect(backend.inspectAdmissionResolvedForPlanning(
       store as never, {} as never,
       { state: 'admitted', ref: admissionRef, admission: {} } as never,
-    )).toBe(false);
+    )).toBe(archived);
+    expect(internals.readExactArchivedAttemptDisposition).toHaveBeenCalledTimes(1);
+    if (archived) expect(store.readDispatchObservationByClass).not.toHaveBeenCalled();
     expect(internals.exactCommittedUnsettledSemanticAdapter).not.toHaveBeenCalled();
   });
 

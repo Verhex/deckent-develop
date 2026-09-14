@@ -1,0 +1,40 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ❯ tests/orchestra/exact-accepted-result-terminal-authority.test.ts (7 tests | 1 failed) 13ms
+   ✓ exact accepted-result terminal authority parser > accepts the single fully bound accepted/evaluation/finalizer authority 2ms
+   × exact accepted-result terminal authority parser > accepts identical authority after canonical disk key ordering 8ms
+     → expected false to be true // Object.is equality
+   ✓ exact accepted-result terminal authority parser > rejects a sibling attempt and a changed artifact digest 0ms
+   ✓ exact accepted-result terminal authority parser > rejects stale or sibling terminal rereads before dependency data can be consumed 1ms
+   ✓ exact accepted-result terminal authority parser > rejects a foreign terminal-decision schema or kind even when receipts match 1ms
+   ✓ exact accepted-result terminal authority parser > rejects getters, proxies and cyclic authority values without invoking them 0ms
+   ✓ exact accepted-result terminal authority parser > rejects oversized strings before accepting a structurally similar envelope 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/orchestra/exact-accepted-result-terminal-authority.test.ts > exact accepted-result terminal authority parser > accepts identical authority after canonical disk key ordering
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/orchestra/exact-accepted-result-terminal-authority.test.ts:123:70
+    121|           .map(([key, child]) => [key, reorder(child)])) : value;
+    122|     const disk = reorder(authority) as typeof authority;
+    123|     expect(isExactAcceptedResultTerminalAuthorityV2(disk, accepted)).t…
+       |                                                                      ^
+    124|     expect(isCurrentExactAcceptedTaskTerminalAuthorityRead(accepted.id…
+    125|       state: 'current', terminalAuthority: disk,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 passed (7)
+   Start at  12:52:25
+   Duration  2.75s (transform 1.20s, setup 14ms, collect 1.55s, tests 13ms, environment 0ms, prepare 37ms)
+

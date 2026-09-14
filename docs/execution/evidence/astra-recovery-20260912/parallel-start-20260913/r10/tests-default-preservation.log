@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /tmp/deckent-r4-757-repair
+
+ ✓ tests/core/task-attempt-custody-store.test.ts (179 tests | 176 skipped) 130ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed | 176 skipped (179)
+   Start at  01:00:07
+   Duration  4.43s (transform 2.17s, setup 19ms, collect 2.87s, tests 130ms, environment 0ms, prepare 38ms)
+

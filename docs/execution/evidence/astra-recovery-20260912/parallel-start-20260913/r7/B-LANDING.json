@@ -1,0 +1,24 @@
+{
+  "at": "2026-09-13T19:20:51.588123+00:00",
+  "files": {
+    "src/orchestra/exact-docker-workspace-command.ts": "2f24b2bb8f3e9fbe0c7a25f6501339c4b8f6297ae2250335af06c0918bc78643",
+    "src/orchestra/execution-effect-docker-lifecycle.ts": "f08d9bc3f93c0e0ff90fe6bd0eaa74e33e13c437ff5b6d090112b22f9e5014d6",
+    "src/orchestra/spawn-backend-docker.ts": "1ce0f87dc48898dc859fae42ccbca0dd5b21819e6515ad576a5f9e50fcfbac69",
+    "src/orchestra/result-collector.ts": "1f2bd4f2d2bf36afb8d64b49e4b3a2d490cb551f2fcaf82db460fbca9ef55183",
+    "tests/orchestra/exact-docker-observation.test.ts": "89bccdd576dcc152647ef8e87153ddb37ce9f0d7abb15aba46776ac49a6ee70e",
+    "tests/orchestra/execution-effect-docker-lifecycle.test.ts": "2fa659e6edc9c1c92de887ee33f079963cbc8169d95f298536f63bdb3c7e963b",
+    "tests/orchestra/spawn-backend-docker-mounts.test.ts": "18417ce18f979809ff0f04fc1b37c38f408c1e0a067136146f6b502aedd10c1f",
+    "src/orchestra/exact-docker-command-diagnostic.ts": "badf7b8d2cc9d7602f7fd1ebea4217e81850a8143b5c27923fcf44be4acb0a5d",
+    "tests/orchestra/result-collector-settlement-authority.test.ts": "5ed72ffaedcdac8be2d477f21e389382fe5c582c7f1870cea741341316bafde5"
+  },
+  "tests": 168,
+  "testsExit": 0,
+  "tscExit": 0,
+  "isolatedBuildExit": 0,
+  "realCommandProbeExit": 0,
+  "mainBuildAllExit": 0,
+  "diffCheckExit": 0,
+  "finalRunnerTestsExit": 0,
+  "observedAt": "2026-09-13T19:22:16.681454+00:00",
+  "productClosure": "HOLD; original758helperfailure remains undiagnosed; no newrun"
+}

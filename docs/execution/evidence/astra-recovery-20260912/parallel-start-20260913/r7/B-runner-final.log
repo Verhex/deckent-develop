@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /tmp/deckent-r4-757-repair
+
+ ✓ tests/orchestra/exact-docker-observation.test.ts (18 tests) 9ms
+
+ Test Files  1 passed (1)
+      Tests  18 passed (18)
+   Start at  22:19:44
+   Duration  1.42s (transform 84ms, setup 22ms, collect 51ms, tests 9ms, environment 0ms, prepare 39ms)
+

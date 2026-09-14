@@ -1,0 +1,25 @@
+{
+  "id": "R6-POST-RECOVERY-SEAM-LIVE-PROOF",
+  "observedAt": "2026-09-13T17:15:45.078894+00:00",
+  "outcome": "MASTER3178 / parent120",
+  "authority": "epoch7; owner continued approved dogfood recovery",
+  "newEvidence": [
+    "R4 full inspect false timeout reproduced and repaired after758",
+    "R5 canonical typed hold propagation built"
+  ],
+  "budget": {
+    "startAttempts": 1,
+    "unchangedFailureRetry": false
+  },
+  "command": "node dist/cli/entry.js start --auto-approve",
+  "scope": "existing eight analysis tasks, canonical startup reconciliation only; no manual state cleanup",
+  "negativeScope": [
+    "auth",
+    "mode",
+    "source edits during run",
+    "commit/push",
+    "15/30 scale"
+  ],
+  "directivesSha256": "0b0a5df07186e22e9905a58d175d7c55bebd1fc07e61f0d0367f84b4ee4b1ad2",
+  "returnBoundary": "actual admission, provider, collector and durable settlement; HOLD remains failure"
+}

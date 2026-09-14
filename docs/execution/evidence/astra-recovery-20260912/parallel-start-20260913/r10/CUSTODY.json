@@ -1,0 +1,33 @@
+{
+  "at": "2026-09-13T22:05:24.509323+00:00",
+  "state": "ISOLATED_CANDIDATE_HOLD_NOT_LANDED",
+  "worktree": "/tmp/deckent-r4-757-repair",
+  "hashes": {
+    "src/core/task-attempt-custody-store.ts": {
+      "main": "a0ac403cd35cb7293a59864cee86bee3b701a31cd1d1c475b8e12ca2401cc0b8",
+      "candidate": "3b6b79f202313225f768dc7ef34fd3fb43759f4f2d7993d95c20264d6ed34308"
+    },
+    "src/core/custody-read-snapshot.ts": {
+      "main": "7f9dd99d90407802747c3c8e4f194fb2401ae13a828405b49fa10f9472706942",
+      "candidate": "05710305970d0ee8a034b506f8af7d8e7462eb55c279d4c3c064d69f7ee206c8"
+    },
+    "tests/core/task-attempt-custody-store.test.ts": {
+      "main": "499a007bdf7bc1d69f5805bdc4c00c4fe289a304c6e3aff8cf6593bb88d0bf80",
+      "candidate": "bbe3f65e134ad13d923a5f3db472583b512d5ec7a77fb5bd3ce8f0ccabdf1068"
+    },
+    "tests/core/custody-read-snapshot.test.ts": {
+      "main": "f57b45363964a4667ee3024d393d970b64406154a229a5036ae181a33a74d603",
+      "candidate": "1a6565c5145a92a767cdb7777470ee773ee2985645cf5a8a26f9d407b0ccba0c"
+    }
+  },
+  "checks": {
+    "tests-initial": 1,
+    "tests-final-186": 0,
+    "default-preservation-3": 0,
+    "probe-parity-10": 0,
+    "isolated-build-final": 0,
+    "candidate-before": 1,
+    "candidate-after": 1
+  },
+  "protected": "main source hashes equal baseline; no candidate default enablement"
+}

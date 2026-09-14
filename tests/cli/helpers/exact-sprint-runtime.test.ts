@@ -109,7 +109,12 @@ describe('createLiveExactSprintExecutor', () => {
       options?.onExecutionAdmitted?.(approvedSnapshot(root).sprint);
       return { ...approvedSnapshot(root).sprint, status: SprintStatus.COMPLETE };
     });
-    const executor = createLiveExactSprintExecutor({});
+    const onSprintResult = vi.fn();
+    const executor = createLiveExactSprintExecutor({
+      executionOptions: { autoApprove: true, timeoutMs: 12345,
+        acknowledgeScopePaths: true, acknowledgePromptGate: true, sandboxMode: true },
+      onSprintResult,
+    });
     const input = {
       projectRoot: root,
       config: {} as never,
@@ -137,6 +142,16 @@ describe('createLiveExactSprintExecutor', () => {
     });
     expect(getRunFlowCoordinator(root).getFlow('flow-live').state).toBe('COMPLETED');
     expect(runSprint).toHaveBeenCalledTimes(1);
+    expect(runSprint).toHaveBeenCalledWith(root, expect.anything(), expect.objectContaining({
+      autoApprove: true, timeoutMs: 12345, acknowledgeScopePaths: true,
+      acknowledgePromptGate: true, sandboxMode: true,
+      preplannedSprint: expect.objectContaining({ id: snapshot.sprint.id }),
+      exactPlanAuthority: expect.objectContaining({ planDigest: snapshot.planDigest }),
+      onExactPlanMaterialize: expect.any(Function),
+      onExecutionAdmitted: expect.any(Function),
+    }));
+    expect(onSprintResult).toHaveBeenCalledTimes(1);
+    expect(onSprintResult).toHaveBeenCalledWith(expect.objectContaining({ status: SprintStatus.COMPLETE }));
   });
 
   it('denies a caller whose causation does not bind the approved plan lineage', async () => {

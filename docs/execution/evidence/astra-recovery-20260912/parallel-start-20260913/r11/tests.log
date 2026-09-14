@@ -1,0 +1,11 @@
+
+ RUN  v3.2.7 /tmp/deckent-r4-757-repair
+
+ ✓ tests/core/task-attempt-custody-win32-adapter.test.ts (3 tests) 17ms
+ ✓ tests/core/task-attempt-custody-posix-adapter.test.ts (54 tests) 747ms
+
+ Test Files  2 passed (2)
+      Tests  57 passed (57)
+   Start at  01:26:30
+   Duration  2.64s (transform 473ms, setup 39ms, collect 805ms, tests 764ms, environment 0ms, prepare 107ms)
+

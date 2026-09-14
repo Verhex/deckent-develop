@@ -1,0 +1,26 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/core/custody-read-snapshot.test.ts (6 tests) 6ms
+ ✓ tests/core/task-attempt-custody-store.test.ts (176 tests) 27154ms
+   ✓ TaskAttemptCustodyStore V2 kernel > settles the bounded final IPC sequence without exposing or publishing sequence max plus one  10805ms
+   ✓ TaskAttemptCustodyStore V2 kernel > builds an exact accepted-result to archive predecessor chain  1109ms
+   ✓ TaskAttemptCustodyStore V2 kernel > reads each predecessor once at the late validation boundary without an exponential traversal  1102ms
+   ✓ TaskAttemptCustodyStore V2 kernel > holds when current artifact IO changes the predecessor receipt by corrupt before late validation  1004ms
+   ✓ TaskAttemptCustodyStore V2 kernel > holds when current artifact IO changes the predecessor receipt by delete before late validation  1009ms
+   ✓ TaskAttemptCustodyStore V2 kernel > holds when current artifact IO changes the predecessor artifact by corrupt before late validation  1002ms
+   ✓ TaskAttemptCustodyStore V2 kernel > holds when current artifact IO changes the predecessor artifact by delete before late validation  1007ms
+   ✓ TaskAttemptCustodyStore V2 kernel > does not reuse predecessor authority across top-level reads after tampering  1091ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects a stage artifact captured before its predecessor chain event  388ms
+   ✓ TaskAttemptCustodyStore V2 kernel > detects a missing earlier chain stage when a later durable stage exists  473ms
+   ✓ TaskAttemptCustodyStore V2 kernel > settles RELEASED only from exact mount outcome and durable gated release evidence  395ms
+   ✓ TaskAttemptCustodyStore V2 kernel > retains committed-journal release-pending truth with complete immutable inventory  461ms
+   ✓ TaskAttemptCustodyStore V2 kernel > requires an exactly empty chain and exact structural evidence refs  392ms
+   ✓ TaskAttemptCustodyStore V2 kernel > rejects stale/sibling authority, provider-observation substitution and disposition conflicts  474ms
+   ✓ TaskAttemptCustodyStore V2 kernel > retains committed-journal release-pending truth with complete immutable inventory  440ms
+
+ Test Files  2 passed (2)
+      Tests  182 passed (182)
+   Start at  01:18:22
+   Duration  31.55s (transform 2.10s, setup 38ms, collect 2.80s, tests 27.16s, environment 0ms, prepare 94ms)
+

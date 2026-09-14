@@ -1,0 +1,26 @@
+{
+  "sprintId": "sprint-759",
+  "checkpointNumber": 5,
+  "timestamp": "2026-09-13T23:40:34.256Z",
+  "sprintStartedAt": "2026-09-13T23:33:44.975Z",
+  "completedTasks": [],
+  "pendingTasks": [
+    "759-001"
+  ],
+  "activeWorkers": [],
+  "brainPhase": "FIX",
+  "eventStreamOffset": 4,
+  "executionMode": "standard",
+  "skipCleanup": false,
+  "schemaVersion": 2,
+  "taskStates": [
+    {
+      "id": "759-001",
+      "status": "PENDING"
+    }
+  ],
+  "remainingQueue": [
+    "759-001"
+  ],
+  "lastDecisionSeq": 0
+}

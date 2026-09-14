@@ -10,7 +10,7 @@ import { RECENT_WORKS_DIR, DECKENT_DIR } from './constants.js';
 import { debugLog } from './utils.js';
 // Rotation is a sibling module and does not import back into this one, so the
 // direct edge is safe; a lazy require would only hide the dependency.
-import { resolveRotationMaxBytes, shouldRotate, rotateMetricsFile } from './observability-rotation.js';
+import { resolveRotationMaxBytes, rotateMetricsFile } from './observability-rotation.js';
 import { ErrorRegistry } from './errors.js';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -74,11 +74,12 @@ let _sprintId: string | null = null;
 // without limit.
 //
 // Checks are scheduled from observed metric-file bytes rather than a local
-// threshold. `shouldRotate` remains the sole policy resolver; this writer only
-// decides when the next policy query is worthwhile. That gives geometric
-// checks as a file grows without duplicating the configured ceiling here.
+// threshold. `resolveRotationMaxBytes` remains the policy authority; this
+// writer only decides when the next policy query is worthwhile.
 let _bytesUntilRotationCheck = 0;
 let _rotationRetryBytes = 0;
+let _resolvedRotationMaxBytes: number | null = null;
+let _rotationInProgress = false;
 let _perSprintFile = false;
 
 /**
@@ -100,6 +101,8 @@ export function initObservability(
   _perSprintFile = opts?.perSprintFile ?? false;
   _bytesUntilRotationCheck = 0;
   _rotationRetryBytes = 0;
+  _resolvedRotationMaxBytes = null;
+  _rotationInProgress = false;
 }
 
 /**
@@ -111,6 +114,8 @@ export function resetObservability(): void {
   _perSprintFile = false;
   _bytesUntilRotationCheck = 0;
   _rotationRetryBytes = 0;
+  _resolvedRotationMaxBytes = null;
+  _rotationInProgress = false;
 }
 
 /**
@@ -484,7 +489,7 @@ function injectSprintId<T extends ObservabilityEntry>(entry: T): T {
  * written — so the record lands in the fresh file and the ceiling actually
  * bounds `.deckent/metrics.jsonl`.
  *
- *  - The ceiling itself is never named here. `shouldRotate` resolves it from
+ *  - The ceiling itself is never named here. The rotation module resolves it from
  *    effective configuration (`observability.rotation.maxSizeMB`, via
  *    `readConfiguredRotationConfig`), so this path carries no literal.
  *  - A rotation failure never loses the metric and never reaches the caller —
@@ -493,6 +498,11 @@ function injectSprintId<T extends ObservabilityEntry>(entry: T): T {
  *    same session. It never latches the size trigger off permanently.
  */
 function rotateBeforeAppend(projectRoot: string, upcomingBytes: number): void {
+  // Rotation and its retention/config authorities may emit telemetry. Those
+  // records still append normally, but must not recursively start another
+  // threshold check while the current check owns rotation.
+  if (_rotationInProgress) return;
+
   if (_bytesUntilRotationCheck > upcomingBytes) {
     _bytesUntilRotationCheck -= upcomingBytes;
     return;
@@ -502,15 +512,25 @@ function rotateBeforeAppend(projectRoot: string, upcomingBytes: number): void {
     const metricsPath = getMetricsPath(projectRoot);
     const sizeBeforeAppend = existsSync(metricsPath) ? statSync(metricsPath).size : 0;
     const maxBytes = resolveRotationMaxBytes(projectRoot);
-    const rotate = shouldRotate(projectRoot);
+    _resolvedRotationMaxBytes = maxBytes;
+    const rotate = sizeBeforeAppend + upcomingBytes > maxBytes;
     // The archive is per-sprint; without a bound sprint there is no canonical
     // destination, so rotation stays with finalize rather than inventing one.
     const sprintId = _sprintId;
     if (rotate && sprintId) {
-      const result = rotateMetricsFile(projectRoot, sprintId);
+      _rotationInProgress = true;
+      let result: ReturnType<typeof rotateMetricsFile>;
+      try {
+        result = rotateMetricsFile(projectRoot, sprintId);
+      } finally {
+        _rotationInProgress = false;
+      }
       if (result.rotated) {
         // The current append creates the first bytes of the fresh hot file.
-        _bytesUntilRotationCheck = upcomingBytes;
+        // Schedule from the same resolved ceiling instead of checking again on
+        // the next append; the latter accidentally made every post-rotation
+        // append perform filesystem/config work.
+        _bytesUntilRotationCheck = Math.max(maxBytes - upcomingBytes, upcomingBytes);
         _rotationRetryBytes = 0;
         return;
       }
@@ -525,7 +545,10 @@ function rotateBeforeAppend(projectRoot: string, upcomingBytes: number): void {
     // Retry from the same session after an observed-byte backoff. Doubling the
     // prior backoff prevents a persistent failure from turning into per-append
     // filesystem work, while any successful policy query resets it above.
-    _rotationRetryBytes = Math.max(_rotationRetryBytes * 2, upcomingBytes);
+    const nextRetryBytes = Math.max(_rotationRetryBytes * 2, upcomingBytes);
+    _rotationRetryBytes = _resolvedRotationMaxBytes === null
+      ? nextRetryBytes
+      : Math.min(nextRetryBytes, _resolvedRotationMaxBytes);
     _bytesUntilRotationCheck = _rotationRetryBytes;
     debugLog('observability:size-trigger', error);
   }

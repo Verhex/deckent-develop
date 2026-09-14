@@ -351,6 +351,18 @@ const BASE_MESSAGES: MessageMap = {
     en: 'Run {flowId} has already ended: {state}. Inspect its result with `deckent status`.',
     tr: 'Run {flowId} sonlandı: {state}. Sonucunu `deckent status` ile inceleyin.',
   },
+  'recover.retain_released_unaccepted_option': {
+    en: 'Preserve one released but unaccepted effect attempt; do not accept its result, archive, or resume.',
+    tr: 'Kaynakları bırakılmış fakat etkisi kabul edilmemiş tek attempt kaydını koru; sonucu kabul etme, arşivleme veya devam ettirme.',
+  },
+  'recover.retain_released_unaccepted_confirm': {
+    en: 'Preserve released, unaccepted attempt {dispatchRequestId}. This does not make the task successful.',
+    tr: 'Kaynakları bırakılmış, kabul edilmemiş {dispatchRequestId} attempt kaydını koru. Bu işlem görevi başarılı yapmaz.',
+  },
+  'recover.released_unaccepted_result': {
+    en: 'Released, unaccepted effect: {state} · dispatch {dispatchRequestId} · evidence {evidenceDigest}. Result remains unaccepted.',
+    tr: 'Kaynakları bırakılmış, kabul edilmemiş etki: {state} · dispatch {dispatchRequestId} · kanıt {evidenceDigest}. Sonuç kabul edilmemiş olarak kalır.',
+  },
   'recover.close_rejected_result_option': {
     en: 'Close one schema-rejected result after verified provider exit and effect release; preserve all evidence.',
     tr: 'Provider çıkışı ve etki bırakımı doğrulandıktan sonra bir şema-reddedilmiş sonucu kapat; tüm kanıtları koru.',

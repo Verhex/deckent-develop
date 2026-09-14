@@ -1,3 +1,4 @@
+import { parseExactDockerCommandDiagnostic, type ExactDockerCommandDiagnosticV1 } from './exact-docker-command-diagnostic.js';
 import { createHash } from 'node:crypto';
 import { types as nodeTypes } from 'node:util';
 
@@ -1755,6 +1756,8 @@ export interface ExecutionEffectDockerLifecycleAdapterFailureV1 {
   readonly message: string;
   readonly code?: string;
   readonly stage: string;
+  readonly adapterStage?: ExecutionEffectDockerCaptureAdapterStageV1;
+  readonly command?: ExactDockerCommandDiagnosticV1;
 }
 
 export interface ExecutionEffectDockerLifecycleHoldV1 {
@@ -1778,9 +1781,11 @@ export type ExecutionEffectDockerCaptureAdapterStageV1 =
 
 /** Only trusted adapter boundaries construct this error; raw errors never project. */
 export class ExecutionEffectDockerCaptureAdapterErrorV1 extends Error {
-  constructor(readonly stage: ExecutionEffectDockerCaptureAdapterStageV1) {
+  readonly commandDiagnostic: ExactDockerCommandDiagnosticV1 | null;
+  constructor(readonly stage: ExecutionEffectDockerCaptureAdapterStageV1, commandDiagnostic?: ExactDockerCommandDiagnosticV1) {
     super('EXECUTION_EFFECT_DOCKER_CAPTURE_ADAPTER_HOLD');
     this.name = 'ExecutionEffectDockerCaptureAdapterErrorV1';
+    this.commandDiagnostic = parseExactDockerCommandDiagnostic(commandDiagnostic);
   }
 }
 
@@ -1793,6 +1798,7 @@ export interface ExecutionEffectDockerFinalDiagnosticV1 {
   readonly schemaVersion: 1;
   readonly stage: (typeof EXECUTION_EFFECT_DOCKER_FINAL_STAGES)[number];
   readonly adapterStage: ExecutionEffectDockerCaptureAdapterStageV1 | null;
+  readonly command?: ExactDockerCommandDiagnosticV1;
 }
 
 function hold(
@@ -1844,6 +1850,10 @@ function projectAdapterFailureDetail(
     message,
     ...(code ? { code } : {}),
     stage,
+    ...(error instanceof ExecutionEffectDockerCaptureAdapterErrorV1 ? {
+      adapterStage: error.stage,
+      ...(error.commandDiagnostic ? { command: error.commandDiagnostic } : {}),
+    } : {}),
   });
 }
 
@@ -1852,6 +1862,8 @@ function formatAdapterFailureForDebugLog(
 ): string {
   const ordered = {
     stage: failure.stage,
+    ...(failure.adapterStage ? { adapterStage: failure.adapterStage } : {}),
+    ...(failure.command ? { command: failure.command } : {}),
     ...(failure.code ? { code: failure.code } : {}),
     errorName: failure.errorName,
     message: failure.message,
@@ -3522,9 +3534,10 @@ export async function captureExecutionEffectDockerFinalV1(
     evidence: unknown,
     containmentDecision: ExecutionEffectContainmentDecision | null = null,
     adapterStage: ExecutionEffectDockerCaptureAdapterStageV1 | null = null,
+    command: ExactDockerCommandDiagnosticV1 | null = null,
   ): ExecutionEffectDockerLifecycleHoldV1 => Object.freeze({
     ...hold(code, evidence, containmentDecision),
-    diagnostic: Object.freeze({ schemaVersion: 1 as const, stage, adapterStage }),
+    diagnostic: Object.freeze({ schemaVersion: 1 as const, stage, adapterStage, ...(command ? { command } : {}) }),
   });
   if (provider === null || typeof provider !== 'object' || nodeTypes.isProxy(provider)) {
     return finalHold('SESSION_INVALID', { stage: 'final' });
@@ -3762,7 +3775,8 @@ export async function captureExecutionEffectDockerFinalV1(
     return finalHold('ADAPTER_UNAVAILABLE', {
       stage: 'final-quiescence-call', authorityDigest: attachmentAuthorityDigest,
     }, null, error instanceof ExecutionEffectDockerCaptureAdapterErrorV1
-      ? error.stage : null);
+      ? error.stage : null, error instanceof ExecutionEffectDockerCaptureAdapterErrorV1
+      ? parseExactDockerCommandDiagnostic(error.commandDiagnostic) : null);
   }
 }
 

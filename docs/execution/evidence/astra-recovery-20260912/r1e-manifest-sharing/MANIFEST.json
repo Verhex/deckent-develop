@@ -1,0 +1,40 @@
+{
+  "observedAt": "2026-09-12T22:49:40.042355+00:00",
+  "status": "LOCAL_VERIFIED_LATENCY_HOLD",
+  "exits": {
+    "tests": 0,
+    "tsc": 0,
+    "build": 0,
+    "native": 1
+  },
+  "artifacts": [
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1e-manifest-sharing/build.log",
+      "sha256": "5e66e28a253ea55f59962adb352ad94290bd1e40ef7b401219fbf21dccc65379"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1e-manifest-sharing/native.log",
+      "sha256": "89dc35a5a03ee4714294955f7569fdddef1fa5d9131514b803e04183d4f04bed"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1e-manifest-sharing/RESULT.md",
+      "sha256": "9f6f9bdd301505230a74e69ad64574b83905ffe75cf66501aa3738928db4151e"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1e-manifest-sharing/tsc.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1e-manifest-sharing/tests.log",
+      "sha256": "a0f9e806b1ed9e8fc930be709c61121e0667ceab1abef8799a16733ffedf6d32"
+    },
+    {
+      "path": "src/core/execution-effect-containment.ts",
+      "sha256": "40bca8d1cdb15a8ed8c0678691becb93ffd8a05df3e7f07a3c618bb256e3f4ac"
+    },
+    {
+      "path": "src/orchestra/execution-effect-store-adapter.ts",
+      "sha256": "10540ce26089fb9c7ac3f8ac2a3e4ed4d5abd1b0dc5ca721df7fd1e0eb430577"
+    }
+  ]
+}

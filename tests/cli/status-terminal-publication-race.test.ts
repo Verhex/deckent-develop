@@ -55,6 +55,7 @@ describe('status terminal publication archive-window race', () => {
       }),
       writeJson(join(deckent, 'pids', `${SPRINT_ID}.pid`), {
         pid: process.pid,
+        leaseId: 'terminal-race-fixture',
         sprintId: SPRINT_ID,
         startedAt: NOW,
       }),

@@ -1,0 +1,372 @@
+{
+  "observedAt": "2026-09-13T13:49:27.554531+00:00",
+  "flowId": "7efd5f6f-5321-491a-b6ba-2f1f3695bddd",
+  "planDigest": "6d5d2aad13f488da0c43e9d1ca1068fc27a4a99e13ae7aed81a647393de8bc0e",
+  "topology": {
+    "schemaVersion": 1,
+    "configuredMaxWorkers": 2,
+    "effectiveConcurrency": 1,
+    "taskSlots": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "collisions": [
+      {
+        "path": "docs/execution/evidence/astra-canary-20260912/REPORT.md",
+        "key": "docs/execution/evidence/astra-canary-20260912/report.md",
+        "writerSlots": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "declared": false
+      }
+    ],
+    "authoredEdges": [],
+    "syntheticEdges": [
+      {
+        "from": 1,
+        "to": 2,
+        "source": "collision",
+        "paths": [
+          "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+        ]
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "source": "collision",
+        "paths": [
+          "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+        ]
+      },
+      {
+        "from": 3,
+        "to": 4,
+        "source": "collision",
+        "paths": [
+          "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+        ]
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "source": "collision",
+        "paths": [
+          "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+        ]
+      },
+      {
+        "from": 5,
+        "to": 6,
+        "source": "collision",
+        "paths": [
+          "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+        ]
+      },
+      {
+        "from": 6,
+        "to": 7,
+        "source": "collision",
+        "paths": [
+          "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+        ]
+      },
+      {
+        "from": 7,
+        "to": 8,
+        "source": "collision",
+        "paths": [
+          "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+        ]
+      }
+    ],
+    "effectiveEdges": [
+      {
+        "from": 1,
+        "to": 2,
+        "source": "collision",
+        "paths": [
+          "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+        ]
+      },
+      {
+        "from": 2,
+        "to": 3,
+        "source": "collision",
+        "paths": [
+          "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+        ]
+      },
+      {
+        "from": 3,
+        "to": 4,
+        "source": "collision",
+        "paths": [
+          "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+        ]
+      },
+      {
+        "from": 4,
+        "to": 5,
+        "source": "collision",
+        "paths": [
+          "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+        ]
+      },
+      {
+        "from": 5,
+        "to": 6,
+        "source": "collision",
+        "paths": [
+          "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+        ]
+      },
+      {
+        "from": 6,
+        "to": 7,
+        "source": "collision",
+        "paths": [
+          "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+        ]
+      },
+      {
+        "from": 7,
+        "to": 8,
+        "source": "collision",
+        "paths": [
+          "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+        ]
+      }
+    ],
+    "waves": [
+      {
+        "wave": 1,
+        "slots": [
+          1
+        ]
+      },
+      {
+        "wave": 2,
+        "slots": [
+          2
+        ]
+      },
+      {
+        "wave": 3,
+        "slots": [
+          3
+        ]
+      },
+      {
+        "wave": 4,
+        "slots": [
+          4
+        ]
+      },
+      {
+        "wave": 5,
+        "slots": [
+          5
+        ]
+      },
+      {
+        "wave": 6,
+        "slots": [
+          6
+        ]
+      },
+      {
+        "wave": 7,
+        "slots": [
+          7
+        ]
+      },
+      {
+        "wave": 8,
+        "slots": [
+          8
+        ]
+      }
+    ],
+    "findings": [
+      {
+        "code": "undeclared-writer-collision",
+        "severity": "block",
+        "slots": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "path": "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+      }
+    ],
+    "verdict": "block"
+  },
+  "actualWrites": [
+    {
+      "id": "756-001",
+      "filesWrite": [
+        "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+      ]
+    },
+    {
+      "id": "756-002",
+      "filesWrite": [
+        "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+      ]
+    },
+    {
+      "id": "756-003",
+      "filesWrite": [
+        "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+      ]
+    },
+    {
+      "id": "756-004",
+      "filesWrite": [
+        "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+      ]
+    },
+    {
+      "id": "756-005",
+      "filesWrite": [
+        "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+      ]
+    },
+    {
+      "id": "756-006",
+      "filesWrite": [
+        "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+      ]
+    },
+    {
+      "id": "756-007",
+      "filesWrite": [
+        "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+      ]
+    },
+    {
+      "id": "756-008",
+      "filesWrite": [
+        "docs/execution/evidence/astra-canary-20260912/REPORT.md"
+      ]
+    }
+  ],
+  "expectedWrites": [
+    {
+      "lane": "history",
+      "modelRequested": "gpt-5.6-sol",
+      "fileWrite": "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/reports/history/REPORT.md",
+      "reads": [
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/core/custody-read-snapshot.ts",
+        "src/orchestra/exact-docker-container-observation.ts",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/R3-RESULT.md",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/755-resource-summary.json"
+      ]
+    },
+    {
+      "lane": "timers",
+      "modelRequested": "gpt-5.6-terra",
+      "fileWrite": "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/reports/timers/REPORT.md",
+      "reads": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/sprint-phases.ts",
+        "src/orchestra/resource-report.ts",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/R3-RESULT.md",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/755-resource-summary.json"
+      ]
+    },
+    {
+      "lane": "scheduler",
+      "modelRequested": "gpt-5.6-sol",
+      "fileWrite": "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/reports/scheduler/REPORT.md",
+      "reads": [
+        "src/orchestra/dependency-scheduler.ts",
+        "src/orchestra/scheduler-driver.ts",
+        "src/orchestra/scheduler-reducer.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/provider-concurrency-runtime-reader.ts",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/R3-RESULT.md",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/755-resource-summary.json"
+      ]
+    },
+    {
+      "lane": "resources",
+      "modelRequested": "gpt-5.6-luna",
+      "fileWrite": "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/reports/resources/REPORT.md",
+      "reads": [
+        "src/orchestra/resource-monitor.ts",
+        "src/orchestra/resource-report.ts",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/R3-RESULT.md",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/755-resource-summary.json"
+      ]
+    },
+    {
+      "lane": "status",
+      "modelRequested": "gpt-5.6-terra",
+      "fileWrite": "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/reports/status/REPORT.md",
+      "reads": [
+        "src/core/run-status-read-model.ts",
+        "src/core/run-status-authority.ts",
+        "src/cli/commands/status.ts",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/R3-RESULT.md",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/755-resource-summary.json"
+      ]
+    },
+    {
+      "lane": "supervision",
+      "modelRequested": "gpt-5.6-sol",
+      "fileWrite": "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/reports/supervision/REPORT.md",
+      "reads": [
+        "src/nervous/bootstrap.ts",
+        "src/orchestra/sprint-controller.ts",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/R3-RESULT.md",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/755-resource-summary.json"
+      ]
+    },
+    {
+      "lane": "events",
+      "modelRequested": "gpt-5.6-terra",
+      "fileWrite": "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/reports/events/REPORT.md",
+      "reads": [
+        "src/api/run-flow-event-stream.ts",
+        "src/api/run-flow-routes.ts",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/R3-RESULT.md",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/755-resource-summary.json"
+      ]
+    },
+    {
+      "lane": "environment",
+      "modelRequested": "gpt-5.6-luna",
+      "fileWrite": "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/reports/environment/REPORT.md",
+      "reads": [
+        "Dockerfile.worker",
+        "assets/Dockerfile.worker",
+        "package.json",
+        "src/orchestra/exact-docker-workspace-command.ts",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/R3-RESULT.md",
+        "docs/execution/evidence/astra-recovery-20260912/chain-752-repair/755-resource-summary.json"
+      ]
+    }
+  ],
+  "exitCode": 1,
+  "workerExecution": "not admitted"
+}

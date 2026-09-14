@@ -4,6 +4,31 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 
+// The command now consumes the shared plan/executor facade. Keep these
+// adapter tests hermetic; the real facade/receipt chain has separate tests.
+vi.mock('../../../src/orchestra/run-flow-plan-service.js', () => ({
+  planRunFlow: vi.fn(async (input) => {
+    const { planSprint } = await import('../../../src/orchestra/brain.js');
+    const sprint = await planSprint(input.projectRoot, input.config,
+      input.source.brainContext, input.recommendation, { dryRun: true });
+    return { sprint, flowId: input.proposal.flowId, revision: 1, planDigest: 'fixture-digest' };
+  }),
+  decideRunFlowPlan: vi.fn(),
+}));
+vi.mock('../../../src/cli/helpers/exact-sprint-runtime.js', () => ({
+  createLiveExactSprintExecutor: vi.fn((input) => ({
+    execute: vi.fn(async (request) => {
+      const { runSprint } = await import('../../../src/orchestra/brain.js');
+      const sprint = await runSprint(request.projectRoot, request.config, {
+        ...input.executionOptions,
+        ...(input.providerAuthority ? { providerAuthority: input.providerAuthority } : {}),
+      });
+      input.onSprintResult?.(sprint);
+      return { status: 'settled', settlement: { state: 'COMPLETED', code: 'SPRINT_COMPLETE' } };
+    }),
+  })),
+}));
+
 // ─── Mocks ───────────────────────────────────────────────────────────
 
 vi.mock('../../../src/core/config.js', () => ({

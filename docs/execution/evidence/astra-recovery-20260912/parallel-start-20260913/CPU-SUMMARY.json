@@ -1,0 +1,200 @@
+{
+  "profiles": [
+    "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171744.118385.9.010.cpuprofile",
+    "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171631.118385.4.005.cpuprofile",
+    "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171653.118385.5.006.cpuprofile",
+    "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171538.118385.1.002.cpuprofile",
+    "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171829.118385.11.012.cpuprofile",
+    "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171711.118385.6.007.cpuprofile",
+    "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.164948.118385.0.001.cpuprofile",
+    "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171716.118385.7.008.cpuprofile",
+    "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171621.118385.3.004.cpuprofile",
+    "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171600.118385.2.003.cpuprofile",
+    "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171807.118385.10.011.cpuprofile",
+    "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171740.118385.8.009.cpuprofile"
+  ],
+  "samplingIntervalUs": 10000,
+  "selfTimeNotWallTime": true,
+  "top": [
+    {
+      "sampledSeconds": 714.542038,
+      "function": "captured",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 3311
+    },
+    {
+      "sampledSeconds": 470.163555,
+      "function": "(idle)",
+      "url": "",
+      "line": 0
+    },
+    {
+      "sampledSeconds": 64.557264,
+      "function": "spawn",
+      "url": "node:internal/child_process",
+      "line": 356
+    },
+    {
+      "sampledSeconds": 62.793733,
+      "function": "(garbage collector)",
+      "url": "",
+      "line": 0
+    },
+    {
+      "sampledSeconds": 42.438071,
+      "function": "ownData",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 574
+    },
+    {
+      "sampledSeconds": 39.482201,
+      "function": "sortedOwnStringKeys",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 549
+    },
+    {
+      "sampledSeconds": 39.114882,
+      "function": "spawnSync",
+      "url": "node:internal/child_process",
+      "line": 1128
+    },
+    {
+      "sampledSeconds": 35.49518,
+      "function": "",
+      "url": "",
+      "line": 0
+    },
+    {
+      "sampledSeconds": 25.474761,
+      "function": "serializeCanonicalJson",
+      "url": "file:///home/alperen/deckent-dev/dist/core/task-attempt-custody-store.js",
+      "line": 620
+    },
+    {
+      "sampledSeconds": 20.917289,
+      "function": "(program)",
+      "url": "",
+      "line": 0
+    },
+    {
+      "sampledSeconds": 19.856253,
+      "function": "isCanonicalCustodyDecimal",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 2196
+    },
+    {
+      "sampledSeconds": 17.433599,
+      "function": "",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 564
+    },
+    {
+      "sampledSeconds": 17.203101,
+      "function": "update",
+      "url": "node:internal/crypto/hash",
+      "line": 134
+    },
+    {
+      "sampledSeconds": 17.155015,
+      "function": "portableEffectPathFailure",
+      "url": "file:///home/alperen/deckent-dev/dist/core/execution-write-scope-policy.js",
+      "line": 124
+    },
+    {
+      "sampledSeconds": 15.799294,
+      "function": "frozenSortedStringArray",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 797
+    },
+    {
+      "sampledSeconds": 15.278235,
+      "function": "isWindowsReservedName",
+      "url": "file:///home/alperen/deckent-dev/dist/core/execution-write-scope-policy.js",
+      "line": 112
+    },
+    {
+      "sampledSeconds": 14.734264,
+      "function": "canonicalJson",
+      "url": "file:///home/alperen/deckent-dev/dist/orchestra/execution-effect-docker-lifecycle.js",
+      "line": 32
+    },
+    {
+      "sampledSeconds": 13.698618,
+      "function": "ownData",
+      "url": "file:///home/alperen/deckent-dev/dist/core/exec-authority-native.js",
+      "line": 481
+    },
+    {
+      "sampledSeconds": 13.004821,
+      "function": "hasExactFrozenDataShape",
+      "url": "file:///home/alperen/deckent-dev/dist/core/exec-authority-native.js",
+      "line": 492
+    },
+    {
+      "sampledSeconds": 12.346234,
+      "function": "isCustodyIdentityTransport",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 2239
+    },
+    {
+      "sampledSeconds": 11.773302,
+      "function": "normalizeJson",
+      "url": "file:///home/alperen/deckent-dev/dist/core/task-attempt-custody-store.js",
+      "line": 487
+    },
+    {
+      "sampledSeconds": 10.772887,
+      "function": "canonicalJson",
+      "url": "file:///home/alperen/deckent-dev/dist/core/execution-effect-containment.js",
+      "line": 29
+    },
+    {
+      "sampledSeconds": 10.409134,
+      "function": "exactRecord",
+      "url": "file:///home/alperen/deckent-dev/dist/core/execution-effect-containment.js",
+      "line": 55
+    },
+    {
+      "sampledSeconds": 9.972615,
+      "function": "hasExactFrozenDataShape",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 556
+    },
+    {
+      "sampledSeconds": 8.822624,
+      "function": "readAdmissionRecord",
+      "url": "file:///home/alperen/deckent-dev/dist/core/task-attempt-custody-store.js",
+      "line": 6528
+    },
+    {
+      "sampledSeconds": 8.749976,
+      "function": "intrinsicArraySort",
+      "url": "file:///home/alperen/deckent-dev/dist/core/task-attempt-custody-store.js",
+      "line": 44
+    },
+    {
+      "sampledSeconds": 8.366,
+      "function": "canonicalJson",
+      "url": "file:///home/alperen/deckent-dev/dist/core/execution-effect-persistence-contract.js",
+      "line": 10
+    },
+    {
+      "sampledSeconds": 8.251806,
+      "function": "validateManifest",
+      "url": "file:///home/alperen/deckent-dev/dist/core/execution-effect-containment.js",
+      "line": 189
+    },
+    {
+      "sampledSeconds": 7.160385,
+      "function": "snapshotExactDataRecord",
+      "url": "file:///home/alperen/deckent-dev/dist/core/task-attempt-custody-store.js",
+      "line": 414
+    },
+    {
+      "sampledSeconds": 6.792871,
+      "function": "listSome",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 83
+    }
+  ]
+}

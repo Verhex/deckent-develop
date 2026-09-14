@@ -73,6 +73,7 @@ function nativeError(code: string): Error {
 class FakeNativeCustody {
   readonly roots = new Map<string, FakeNode>();
   readonly records = new WeakMap<object, FakeHandleRecord>();
+  readonly operationCounts = new Map<string, number>();
   readonly facade: ExecAuthorityNativeCustodyFacade;
   platform: ExecAuthorityNativePlatform = 'linux';
   probeAvailable = true;
@@ -81,6 +82,8 @@ class FakeNativeCustody {
   replaceProjectIdentityAtCall: number | null = null;
   rootSeparationFault: string | null = null;
   closeCalls = 0;
+  openHandleCount = 0;
+  applyPrivateCalls = 0;
   closeFaultAtCall: number | null = null;
   readonly openFileFaults = new Map<string, string>();
   readonly readFaults = new Map<string, string>();
@@ -91,6 +94,7 @@ class FakeNativeCustody {
   constructor() {
     this.facade = {
       invoke: ((operation: string, rawInput: unknown): unknown => {
+        this.countOperation(operation);
         const input = rawInput as Record<string, unknown>;
         switch (operation) {
           case 'open-root': {
@@ -327,6 +331,7 @@ class FakeNativeCustody {
           }
           case 'identity': return this.identity(this.openRecord(input.handle).node);
           case 'apply-private': {
+            this.applyPrivateCalls += 1;
             const node = this.openRecord(input.handle).node;
             node.mode = node.kind === 'DIRECTORY' ? '0700' : '0600';
             return this.evidence('APPLY_PRIVATE');
@@ -354,12 +359,14 @@ class FakeNativeCustody {
         });
       },
       closeHandle: handle => {
+        this.countOperation('close-handle');
         this.closeCalls += 1;
         if (this.closeFaultAtCall === this.closeCalls) {
           throw nativeError('E_EXEC_AUTH_NATIVE_CLOSE_UNCONFIRMED');
         }
         const record = this.openRecord(handle);
         record.state = 'CONSUMED';
+        this.openHandleCount -= 1;
       },
     };
   }
@@ -418,6 +425,24 @@ class FakeNativeCustody {
     parent.children.set(name, this.node('DIRECTORY', parent, name, 0, '0700'));
   }
 
+  setModeAbsolute(path: string, mode: FakeNode['mode']): void {
+    const rootEntry = [...this.roots.entries()]
+      .filter(([root]) => path === root || path.startsWith(`${root}/`))
+      .sort(([left], [right]) => right.length - left.length)[0];
+    if (rootEntry === undefined) throw new Error(`unknown fake path ${path}`);
+    const [rootPath, root] = rootEntry;
+    const components = path === rootPath ? [] : path.slice(rootPath.length + 1).split('/');
+    this.findNode(root, components).mode = mode;
+  }
+
+  operationCount(operation: string): number {
+    return this.operationCounts.get(operation) ?? 0;
+  }
+
+  resetOperationCounts(): void {
+    this.operationCounts.clear();
+  }
+
   identityAtAbsolute(path: string): ExecAuthorityNativeIdentity {
     const rootEntry = [...this.roots.entries()]
       .filter(([root]) => path === root || path.startsWith(`${root}/`))
@@ -448,6 +473,10 @@ class FakeNativeCustody {
       current = next;
     }
     return current;
+  }
+
+  private countOperation(operation: string): void {
+    this.operationCounts.set(operation, this.operationCount(operation) + 1);
   }
 
   private findAbsolute(path: string): FakeNode | undefined {
@@ -498,6 +527,7 @@ class FakeNativeCustody {
   private handle(node: FakeNode): ExecAuthorityNativeCustodyHandle {
     const handle = Object.freeze(Object.create(null)) as ExecAuthorityNativeCustodyHandle;
     this.records.set(handle, { node, state: 'OPEN', reconciliation: null });
+    this.openHandleCount += 1;
     return handle;
   }
 
@@ -1096,6 +1126,120 @@ describe('POSIX task-attempt custody adapter — typed native facade', () => {
     fake = new FakeNativeCustody();
     fake.seedRoot('/workspace');
     nativeState.current = fake.available();
+  });
+
+  it('reads files, directories and scans without privacy writes; writer traversal still applies privacy', () => {
+    const adapter = createTaskAttemptCustodyPosixAdapter();
+    const store = openStore(adapter);
+    const directory = taskAttemptCustodyRelativePath('nested/parent');
+    const beforeWrite = fake.applyPrivateCalls;
+    adapter.ensurePrivateDirectory(store.root, directory);
+    expect(fake.applyPrivateCalls).toBeGreaterThan(beforeWrite);
+    fake.writeAbsolute('/workspace/custody/nested/parent/proof.bin', Buffer.from('read-only'));
+    const beforeReads = fake.applyPrivateCalls;
+    const input = { root: store.root, relativePath: taskAttemptCustodyRelativePath('nested/parent/proof.bin'),
+      policy: { minBytes: 1, maxBytes: 32, requireSingleLink: true as const } };
+    const first = adapter.readFirstWriter(input)!;
+    expect(Buffer.from(first.bytes).toString()).toBe('read-only');
+    expect(adapter.readVerified({ root: store.root, proof: first.proof, policy: input.policy })).toEqual(first);
+    expect(adapter.readPrivateDirectory(store.root, directory)).not.toBeNull();
+    expect(adapter.scanPrivateDirectoryBounded!({ root: store.root, relativeDirectory: directory,
+      maxEntries: 10, maxNameBytes: 100, deadlineUnixMs: Date.now() + 1000 }).names).toEqual(['proof.bin']);
+    expect(fake.applyPrivateCalls).toBe(beforeReads);
+  });
+
+  it('measures current repeated-read traversal amplification by directory depth without weakening fences', () => {
+    const adapter = createTaskAttemptCustodyPosixAdapter();
+    const store = openStore(adapter);
+    const shallowDirectory = taskAttemptCustodyRelativePath('shallow');
+    const deepDirectory = taskAttemptCustodyRelativePath('deep/one/two/three');
+    adapter.ensurePrivateDirectory(store.root, shallowDirectory);
+    adapter.ensurePrivateDirectory(store.root, deepDirectory);
+    fake.writeAbsolute('/workspace/custody/shallow/value.bin', Buffer.from('shallow'));
+    fake.writeAbsolute('/workspace/custody/deep/one/two/three/value.bin', Buffer.from('deep'));
+    const limit = { minBytes: 1, maxBytes: 32, requireSingleLink: true as const };
+
+    const measureTwoReads = (relativePath: string) => {
+      fake.resetOperationCounts();
+      const first = adapter.readFirstWriter({
+        root: store.root,
+        relativePath: taskAttemptCustodyRelativePath(relativePath),
+        policy: limit,
+      });
+      if (first === null) throw new Error(`seeded fixture missing: ${relativePath}`);
+      expect(adapter.readVerified({ root: store.root, proof: first.proof, policy: limit }))
+        .toEqual(first);
+      return Object.freeze({
+        openRoot: fake.operationCount('open-root'),
+        openDirectoryAt: fake.operationCount('open-directory-at'),
+        directoryIdentity: fake.operationCount('identity'),
+        openFileAt: fake.operationCount('open-file-at'),
+        readBounded: fake.operationCount('read-bounded'),
+        closeHandle: fake.operationCount('close-handle'),
+        total: [...fake.operationCounts.values()].reduce((sum, count) => sum + count, 0),
+      });
+    };
+
+    const shallow = measureTwoReads('shallow/value.bin');
+    expect(shallow).toEqual({
+      openRoot: 2,
+      openDirectoryAt: 2,
+      directoryIdentity: 2,
+      openFileAt: 2,
+      readBounded: 2,
+      closeHandle: 6,
+      total: 16,
+    });
+    expect(fake.openHandleCount).toBe(0);
+
+    const deep = measureTwoReads('deep/one/two/three/value.bin');
+    expect(deep).toEqual({
+      openRoot: 2,
+      openDirectoryAt: 8,
+      directoryIdentity: 2,
+      openFileAt: 2,
+      readBounded: 2,
+      closeHandle: 12,
+      total: 28,
+    });
+    expect(deep.openDirectoryAt - shallow.openDirectoryAt).toBe(6);
+    expect(deep.closeHandle - shallow.closeHandle).toBe(6);
+    expect(fake.applyPrivateCalls).toBeGreaterThan(0);
+    expect(fake.operationCount('apply-private')).toBe(0);
+    expect(fake.openHandleCount).toBe(0);
+
+    adapter.ensurePrivateDirectory(store.root, taskAttemptCustodyRelativePath('unsafe/parent'));
+    fake.writeAbsolute('/workspace/custody/unsafe/parent/value.bin', Buffer.from('unsafe'));
+    fake.setModeAbsolute('/workspace/custody/unsafe', '0600');
+    fake.resetOperationCounts();
+    expectHold(() => adapter.readFirstWriter({
+      root: store.root,
+      relativePath: taskAttemptCustodyRelativePath('unsafe/parent/value.bin'),
+      policy: limit,
+    }), 'PRIVACY_UNVERIFIED');
+    expect(fake.operationCount('read-bounded')).toBe(0);
+    expect(fake.openHandleCount).toBe(0);
+
+    fake.writeAbsolute('/workspace/custody/shallow/replaced.bin', Buffer.from('before'));
+    fake.readFaults.set('replaced.bin', 'E_EXEC_AUTH_NATIVE_IDENTITY_CHANGED');
+    fake.resetOperationCounts();
+    expectHold(() => adapter.readFirstWriter({
+      root: store.root,
+      relativePath: taskAttemptCustodyRelativePath('shallow/replaced.bin'),
+      policy: limit,
+    }), 'ARTIFACT_CHANGED');
+    expect(fake.operationCount('read-bounded')).toBe(1);
+    expect(fake.openHandleCount).toBe(0);
+
+    console.info(`native-read-amplification ${JSON.stringify({ shallow, deep })}`);
+  });
+
+  it('does not create or chmod a missing directory on a read', () => {
+    const adapter = createTaskAttemptCustodyPosixAdapter();
+    const store = openStore(adapter);
+    const before = fake.applyPrivateCalls;
+    expect(adapter.readPrivateDirectory(store.root, taskAttemptCustodyRelativePath('absent/parent'))).toBeNull();
+    expect(fake.applyPrivateCalls).toBe(before);
   });
 
   it('shares one domain-separated semantic Docker label digest across custody boundaries', () => {

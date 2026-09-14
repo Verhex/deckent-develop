@@ -1,6 +1,6 @@
 import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootstrap.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
-import { SprintStatus } from '../../core/types.js';
+import { SprintStatus, type Sprint } from '../../core/types.js';
 import {
   createCanonicalExactSprintExecutor,
   type CanonicalExactSprintExecutor,
@@ -8,12 +8,17 @@ import {
 } from '../../orchestra/exact-plan-start-service.js';
 import { captureGitBase } from '../../orchestra/run-diff-service.js';
 import { getRunFlowCoordinator } from '../../orchestra/run-flow-coordinator-registry.js';
-import { runSprint as runSprintLifecycle } from '../../orchestra/sprint-controller.js';
+import { runSprint as runSprintLifecycle, type RunSprintOptions } from '../../orchestra/sprint-controller.js';
 
 export interface LiveExactSprintExecutorInput {
   readonly providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
   readonly approvalAuthority?: ReturnType<typeof bootstrapApprovalAuthority>;
   readonly verifyStartAuthorization?: ExactStartAuthorizationVerifier;
+  /** Surface options cannot override the digest-bound execution authority. */
+  readonly executionOptions?: Pick<RunSprintOptions,
+    'autoApprove' | 'acknowledgeScopePaths' | 'acknowledgePromptGate'
+    | 'sandboxMode' | 'timeoutMs' | 'spawnBackend' | 'connector'>;
+  readonly onSprintResult?: (sprint: Sprint) => void;
 }
 
 /**
@@ -32,6 +37,7 @@ export function createLiveExactSprintExecutor(
         context.projectRoot,
         { ...context.config, deckent_style: 'sprint' },
         {
+          ...input.executionOptions,
           preplannedSprint: context.sprint,
           exactPlanAuthority: {
             ...context.exactRef,
@@ -57,6 +63,7 @@ export function createLiveExactSprintExecutor(
             : {}),
         },
       );
+      input.onSprintResult?.(sprint);
       return sprint.status === SprintStatus.COMPLETE
         ? { terminalState: 'COMPLETED', reasonCode: 'SPRINT_COMPLETE' }
         : sprint.status === SprintStatus.ABORTED

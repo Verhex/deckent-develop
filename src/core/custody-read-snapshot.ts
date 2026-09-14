@@ -11,6 +11,7 @@ export interface CustodyReadSnapshotStatistics {
   readonly observationHits: number;
   readonly semanticHits: number;
   readonly retainedBytes: number;
+  readonly peakRetainedBytes: number;
   readonly durationMs: number;
 }
 
@@ -19,11 +20,15 @@ export interface CustodyReadSnapshotStatistics {
  * Callers must supply validated, owned values and stable fingerprints. */
 export class CustodyReadSnapshot {
   private readonly started = performance.now();
-  private readonly observations = new Map<string, { value: unknown; check: () => void }>();
+  private readonly observations = new Map<string, {
+    value: unknown; cached: boolean; valueBytes: number; expected: string; check: () => void;
+  }>();
   private readonly semantic = new Map<string, unknown>();
   private retainedBytes = 0;
+  private peakRetainedBytes = 0;
   private observationHits = 0;
   private semanticHits = 0;
+  private semanticBytes = 0;
   private invalidReason: 'changed' | 'budget' | 'deadline' | 'mutation' | null = null;
   private readonly owners = new WeakMap<object, number>();
   private nextOwnerId = 0;
@@ -50,27 +55,53 @@ export class CustodyReadSnapshot {
 
   denyMutation(): never { return this.fail('mutation'); }
 
-  private retain(bytes: number): void {
+  /** Release payload ownership at a consumer boundary, retaining every original
+   * observation fence. Re-reading an evicted value must still match that fence.
+   * This measures cache ownership, not process RSS or values held by callers. */
+  releaseCachedValues(): void {
+    this.assertCurrent();
+    for (const observation of this.observations.values()) {
+      if (!observation.cached) continue;
+      observation.value = undefined;
+      observation.cached = false;
+      this.retainedBytes -= observation.valueBytes;
+    }
+    this.semantic.clear();
+    this.retainedBytes -= this.semanticBytes;
+    this.semanticBytes = 0;
+  }
+
+  private retain(bytes: number, newEntry = true): void {
     this.assertCurrent();
     if (!Number.isSafeInteger(bytes) || bytes < 0
-      || this.observations.size + this.semantic.size >= this.bounds.maxEntries
+      || (newEntry && this.observations.size + this.semantic.size >= this.bounds.maxEntries)
       || this.retainedBytes + bytes > this.bounds.maxBytes) this.fail('budget');
     this.retainedBytes += bytes;
+    this.peakRetainedBytes = Math.max(this.peakRetainedBytes, this.retainedBytes);
   }
 
   observe<T>(key: string, read: () => T, fingerprint: (value: T) => string,
     size: (value: T) => number, copy: (value: T) => T): T {
     this.assertCurrent();
     const existing = this.observations.get(key);
-    if (existing) {
+    if (existing?.cached) {
       this.observationHits++;
       return copy(existing.value as T);
     }
     let value: T;
     try { value = read(); } catch (error) { this.invalidReason ??= 'changed'; throw error; }
     const expected = fingerprint(value);
-    this.retain(size(value) + Buffer.byteLength(key) + Buffer.byteLength(expected));
-    this.observations.set(key, { value, check: () => {
+    const valueBytes = size(value);
+    if (existing) {
+      if (expected !== existing.expected) this.fail('changed');
+      this.retain(valueBytes, false);
+      existing.value = value;
+      existing.cached = true;
+      existing.valueBytes = valueBytes;
+      return copy(value);
+    }
+    this.retain(valueBytes + Buffer.byteLength(key) + Buffer.byteLength(expected));
+    this.observations.set(key, { value, cached: true, valueBytes, expected, check: () => {
       this.assertCurrent();
       if (fingerprint(read()) !== expected) this.fail('changed');
     } });
@@ -98,7 +129,9 @@ export class CustodyReadSnapshot {
     freeze(value);
     const bytes = JSON.stringify(value);
     if (bytes === undefined) this.fail('mutation');
-    this.retain(Buffer.byteLength(bytes) + Buffer.byteLength(key));
+    const retained = Buffer.byteLength(bytes) + Buffer.byteLength(key);
+    this.retain(retained);
+    this.semanticBytes += retained;
     this.semantic.set(key, value);
     return value;
   }
@@ -125,6 +158,7 @@ export class CustodyReadSnapshot {
     this.assertCurrent();
     return Object.freeze({ observations: this.observations.size,
       observationHits: this.observationHits, semanticHits: this.semanticHits,
-      retainedBytes: this.retainedBytes, durationMs: performance.now() - this.started });
+      retainedBytes: this.retainedBytes, peakRetainedBytes: this.peakRetainedBytes,
+      durationMs: performance.now() - this.started });
   }
 }

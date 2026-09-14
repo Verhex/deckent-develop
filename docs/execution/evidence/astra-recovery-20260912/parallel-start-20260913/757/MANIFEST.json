@@ -1,0 +1,56 @@
+{
+  "observedAt": "2026-09-13T15:05:32.713994+00:00",
+  "files": {
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/757-001-01-effect-landing.json": "7d10f92e7e268094ce16c353e972511784374383511e205230ed33a71bbb7b6b",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/757-001-02-accepted-result.json": "98f968ebc5d5d5e6a73f04c98fec54e2f5f0b598212c345c89477f8fa83c4089",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/757-001-provider-exit.json": "46b54b2f596a5f0b4e872cdd1dd128c99b8d3d2def562aa3c95f84bf9b73f4b5",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/757-001-provider-start.json": "64ce9f02ff5e3e9885fb27312ec1cccbea27691d3d073c0ab53c7650495a37ca",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/757-002-01-effect-landing.json": "4b109827999521f00733d60826349d420d785ae62468f4ec8089fccab578b1e6",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/757-002-02-accepted-result.json": "66d50c14b58694812baea335ecf9c2a2eb3f48e25a402fd6e29587ffdd16e545",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/757-002-03-evaluation.json": "4332625225b4c40199ecae1bf9430d042b631a00f132982f0836e472cc3a926a",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/757-002-04-finalizer.json": "97e1498909b99f4add90f015980a91f9611e88eba4a060d676c19d677e91616b",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/757-002-05-settlement.json": "a6a7bc3d6c67e552349c089a38aea9d96adb46f8552e22db9045e071426e169b",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/757-002-06-archive.json": "79fbfe319039c5f3c56635df3ae65c9bd4eba6c5cbe7cf542af74781f54bcc18",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/757-002-provider-exit.json": "33d674e501d1ab871bb283780845173eda5410bd496aab9fc651f56ad63c531b",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/757-002-provider-start.json": "0d14251c8412113b05154e789b495dac47a7775ee1cd9ca265d11cac5b169829",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/757-003-reconciliation.json": "a9b0b5eafc8e4227258f76d27e2df750f4a26a32e79a8497c32d3de9551f18b3",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/ATTEMPTS.json": "26aa50e95d8778d64be016567ee4126d2dc3a10489a3f107d696f5b33a22a08a",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/CPU-SUMMARY.json": "b03b00430ee606ef63d2629b45af3c8c9ba917080d3fcd4a58ad50b3b90df88e",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/RESOURCE-SUMMARY.json": "77d81ea3d692f8302c36c7a38f7bd17781f7b8fb59451d8412db136ade7b9374",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/RESULT.md": "3e26b98c267cff011944fa195a921f24b751053725cdae95588358428204cf7d",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/errors-at-exit.md": "9b711e12e32de34a087a17283ea074549bf64708d03d243207e80f364547b3d6",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/first-wave-observation.json": "ab3b325184da5e65b2e23c797dcb46d7e2767b0c29edbf54f5910165018b061d",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/interim-findings.json": "c67d3f39208b2cb4d32b05f2dc5503f496fb713b0ff50a494b4371a440b39391",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/resources.jsonl": "6be8c1df30d91f38195d8bb9607a09347df4362e27cf3c691c4e20bac439317e",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/start.log": "fc0c6c6b1a4ace2f45acd798eaecae990abae2a777ad9f864893f7ad0b6575af",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/status-at-exit.json": "c16ddaa7d3ed550d9f0a0a33cc7acb455e956fca4be9ffaf08bf05b201ca94fa",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/volume-inspect-deadline-probe.json": "28f087b9c6d6d7cc728469ab5cee113cfdb65149237d63ae4bd9f24d910601ae"
+  },
+  "sourceRefs": {
+    "src/orchestra/exact-docker-workspace-command.ts": "c15c92c2c5fdc26ee6499ca5d45aa106a74513da38797c534140c95a472571b7",
+    "src/orchestra/spawn-backend-docker.ts": "bfeabbc4f7fd35559dc49c1ff6a4736465909a3ab1ecc9ee141cfec5b842ee48",
+    "src/orchestra/execution-effect-docker-lifecycle.ts": "e0be2c0c85f8b72fb886ca8ec9e5cd5faf74ec2af24f625c21c1e042d80a2fde",
+    "src/orchestra/scheduler-effects.ts": "c774b0f21a874e239f9cea4e179091cbee41cef17daf0c0bd7052d7b8a17a084",
+    "src/orchestra/result-collector.ts": "13e21fbb68fc2be2ba9147b8241bdc0a60724806243a55494caff1c46f1c04d3"
+  },
+  "reportFiles": {
+    "docs/execution/evidence/parallel-start-20260913/parallel-status-analysis-20260913.md": "34c9bd20c4f910661db4234c5801475b939116eba409c6963f831170485069e8",
+    "docs/execution/evidence/parallel-start-20260913/parallel-resources-analysis-20260913.md": "694b3e28b46046066248818137df0e5aa789c892463ad461045ea2bc26f25427",
+    "docs/execution/evidence/parallel-start-20260913/parallel-scheduler-analysis-20260913.md": "478047e37e50d72d45c481ee3c585f7c8d35f0dd47800b8acdfd949215cf7509",
+    "docs/execution/evidence/parallel-start-20260913/parallel-history-analysis-20260913.md": "0d29f5978389f2b4fe75218f8f66e4ff8e15d793581ef5f50a78d8685ca10ba6",
+    "docs/execution/evidence/parallel-start-20260913/parallel-environment-analysis-20260913.md": "c94c088c42e84570cc7f9ea17ec8862116be4cac0d2ff46b56e2e463e128d906",
+    "docs/execution/evidence/parallel-start-20260913/parallel-supervision-analysis-20260913.md": "91a39d39f6e243c51196e236e93ca17b302b555e97609547f7e76b46b1e4636a",
+    "docs/execution/evidence/parallel-start-20260913/parallel-timers-analysis-20260913.md": "1b6e2ff450ad1d0ae66c06d8df98d791ec0edfc28eca47c1e718b82de08f2200",
+    "docs/execution/evidence/parallel-start-20260913/parallel-events-analysis-20260913.md": "e57fcc0ea3ac8ca9ce7e2ea45c08a6e36e8223a2f9ed97ec8cea26ecf6a4b15e"
+  },
+  "checks": {
+    "readonlyDockerDeadlineProbeExit": 0,
+    "timerReportSourceHashes": "5/5 MATCH",
+    "gitDiffCheckExit": 0,
+    "cliExit": 1,
+    "tests": "not run; no product source change",
+    "build": "not run",
+    "processProbeExit": 1,
+    "processProbeInterpretation": "PID171674 absent"
+  }
+}

@@ -1,0 +1,1 @@
+{"state":"ready","missingClis":[],"missingCaCerts":false,"missingRuntimeAuthority":false,"missingDependencyAuthority":false,"suggestedBuildCmd":"docker build -f Dockerfile.worker --build-arg INSTALL_CODEX=true -t deckent-worker:r1-20260912 ."}

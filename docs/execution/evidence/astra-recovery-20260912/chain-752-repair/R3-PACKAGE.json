@@ -1,0 +1,27 @@
+{
+  "recoveryId": "R3-754-OBSERVATION-DEADLINE-20260913",
+  "parentOutcome": "MASTER3178 / STATE-RETENTION-001",
+  "ownerAuthority": "live instruction repair actual dogfood blockers and return through canonical start",
+  "health": "DEGRADED",
+  "observedAt": "2026-09-13T11:29:20.678769+00:00",
+  "evidence": [
+    "754 archive/evaluation DONE; outer CONTAIN_HOLD, own container unknown",
+    "real docker inspect ~130ms absent; same production runner under six real archive reads returns timeout/error after14s"
+  ],
+  "scope": [
+    "extract unchanged bounded command runner into standalone module",
+    "isolate read-only Docker container observation deadline/output in worker-thread using same bounded runner",
+    "preserve injected runner contracts and all absence/identity gates"
+  ],
+  "negativeScope": [
+    "no mutation/auth/receipt weakening",
+    "no history deletion or fake DONE",
+    "no worker rename",
+    "no general refactor or resource monitor changes"
+  ],
+  "proofBudget": {
+    "realCanaries": 1,
+    "unchangedFailureRetry": false
+  },
+  "returnBoundary": "canonical recovery754 then build and real start; provider-free reproduction only diagnoses mechanism, never outer DONE"
+}

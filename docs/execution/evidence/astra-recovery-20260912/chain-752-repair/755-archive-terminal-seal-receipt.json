@@ -1,0 +1,42 @@
+{
+  "kind": "deckent.sprint-archive-terminal-seal",
+  "version": 1,
+  "sprintId": "sprint-755",
+  "runId": "9034863d-f080-4024-8889-43fa392184d4",
+  "coordinatorGeneration": 1,
+  "terminalOutcome": "COMPLETE",
+  "logicalSettlementDigest": "b529deb56f581e1c51168e6068a3f12a49f8bfa1fb70f889fce0b86f5395f721",
+  "priorAuthorityVersion": 0,
+  "authorityVersion": 1,
+  "terminalReceipt": {
+    "version": 1,
+    "sprintId": "sprint-755",
+    "runId": "9034863d-f080-4024-8889-43fa392184d4",
+    "coordinatorGeneration": 1,
+    "terminalOutcome": "COMPLETE",
+    "logicalSettlementDigest": "b529deb56f581e1c51168e6068a3f12a49f8bfa1fb70f889fce0b86f5395f721",
+    "priorAuthorityVersion": 0,
+    "authorityVersion": 1
+  },
+  "finalEvent": {
+    "sequence": 10,
+    "digest": "c28abdd1c18024d258975b669a4e9423825513cadd07d6e6580cf87d8139db1f"
+  },
+  "canonicalHotJournalPath": ".deckent/recently-works/sprint-755-events.jsonl",
+  "expectedArchivedPreimageSha256": "e83181366cd7674f6614c7e6bf6946bdaea0116555258b4004d26b34814d1402",
+  "hotJournalSha256": "cb943ddef73026e8bee4c16da6f5839e9b35f11f3da0b1d8f25b4a0801b2d8fd",
+  "archivedJournalSha256": "cb943ddef73026e8bee4c16da6f5839e9b35f11f3da0b1d8f25b4a0801b2d8fd",
+  "operatorReason": "deckent outer lifecycle terminal publication: COMPLETE",
+  "operatorReasonSha256": "b67ec38d87b58511fd3458b86dfc1ed19146a651ecc8694eb37dd85fede08b86",
+  "brainAdoptionRequired": true,
+  "terminalEventsProjectionSha256": "73a41fa3b88e6b2a776366f0112e19d922b75cad95383b7a87296dcfd585ee9d",
+  "postSealPolicySha256": "98bd3f37c2ae1f22f9d570ee56c4de733fbf55728a7984f2cf4ed73d5cf9b778",
+  "repairedHistoryPath": "journal-history/sprint-755-events.jsonl.e83181366cd7674f6614c7e6bf6946bdaea0116555258b4004d26b34814d1402",
+  "repairedHistorySha256": "e83181366cd7674f6614c7e6bf6946bdaea0116555258b4004d26b34814d1402",
+  "sequenceCounterValue": 10,
+  "sequenceCounterSha256": "4a44dc15364204a80fe80e9039455cc1608281820fe2b24f1e5233ade6af1dd5",
+  "expectedArchivedSequencePreimageSha256": "2c624232cdd221771294dfbb310aca000a0df6ac8b66b696d90ef06fdefb64a3",
+  "repairedSequenceHistoryPath": "sequence-history/sprint-755-seq.2c624232cdd221771294dfbb310aca000a0df6ac8b66b696d90ef06fdefb64a3",
+  "repairedSequenceHistorySha256": "2c624232cdd221771294dfbb310aca000a0df6ac8b66b696d90ef06fdefb64a3",
+  "originalDisposition": "repaired"
+}

@@ -1,0 +1,90 @@
+
+🛡  Sprint Cost Estimate
+==================================================
+Task count:          1
+Retry multiplier:    1.20x
+Cache hit ratio:     0%
+
+Model distribution:
+  openai/gpt-5.6-sol                 1 task (subscription)
+
+Token Estimate:
+  Uncached input:      3,240
+  Cache read:          0 (90% discount)
+  Cache creation:      0
+  Output:              180,000
+
+Cost Breakdown (USD):
+  openai               $0 (subscription; quota UNKNOWN)
+  ────────────────────────────────────────
+  Realistic:           $0.0000  ← current estimate
+  Optimistic (cache):  $0.0000
+  Worst case (retry):  $0.0000
+
+Subscription impact:
+  openai: UNKNOWN (provider-limit-evidence-not-supplied)
+
+API/USD budget check:
+  Sprint USD budget:   $1000.00 (config: cost_limits.sprint_max_usd)
+  API USD used:        0.0%
+  USD status:          ✅ Within API/USD budget
+
+Warnings:
+  ⚠ openai subscription quota is unknown: no authoritative provider-limit evidence was supplied. USD $0 is not a quota-availability verdict.
+[deckent] scheduler engine: reducer
+● Sprint #760 Complete  26m 24s
+────────────────────────────────────────────────
+
+Results
+  ✓ 1 done  ⚡ 0 debt  ✗ 0 no-go
+
+Evaluation Summary
+  GO (DONE):        1
+  GO_WITH_TECH_DEBT: 0
+  NO_GO:             0
+
+Task Breakdown
+  ID        │Title                   │Status              │Agent         │Duration
+  ──────────┬────────────────────────┬────────────────────┬──────────────┬────────
+  760-001   │760-001                 │DONE                │-             │-       
+
+Changes
+  tests/core/task-attempt-custody-posix-adapter.test.ts | attempt 026261f0-3f46-8443-8feb-f107ce7a9ab4
+
+Tests
+  +1 new │ 1 total │ 0.0% coverage
+
+Agent Performance
+  Agent          Tasks  Done%
+  test-guardian      1   100%
+
+Learnings
+  ⚠ UTC: 2026-09-14T07:18:44.665Z
+Scope/result truth: preparatory test evidence only; test-green is not product DONE and does not close MASTER3178 D performance. R10's real 10s history candidate remained over deadline and R11 only removed read-time fchmod; neither is recharacterized here. No real history scan or live custody access was performed.
+Changed evidence: tests/core/task-attempt-custody-posix-adapter.test.ts:73-85,96-97,361-369,428-444,1151-1235; SHA-256 a9eec57090b1d34f6d9afbac8f17268ec11982d73a668ef7423bcbbe773c3453. FakeNative now counts every invoke and close and tracks live handles.
+Actual verification: VITEST_MAX_FORKS=2 npx vitest run --configLoader runner --no-cache tests/core/task-attempt-custody-posix-adapter.test.ts; exit 0; 1 file, 55/55 tests passed. Executed repeated readFirstWriter + readVerified measurements: one-parent path = open-root 2, open-directory-at 2, identity 2, open-file-at 2, read-bounded 2, close-handle 6, total 16; four-parent path = 2, 8, 2, 2, 2, 12, total 28. The depth delta is +6 parent opens and +6 closes for the same two semantic reads. These are operation counts, not elapsed-time or an invented optimized ceiling.
+Security evidence: repeated reads performed zero apply-private calls; an unsafe 0600 ancestor was rejected as PRIVACY_UNVERIFIED before read-bounded; injected native identity replacement was rejected as ARTIFACT_CHANGED; successful and rejected paths ended with zero open fake handles. Existing fixture security tests all remained green.
+Producer/consumer inspection: TaskAttemptCustodyStore.readFirstWriterSnapshotUncached and readVerifiedSnapshotUncached at src/core/task-attempt-custody-store.ts:13376-13425 call the adapter independently. Adapter readFirstWriter/readVerified at src/core/task-attempt-custody-posix-adapter.ts:1390-1432 funnels each read through openFile; openParentDirectory/openDirectoryComponents at :2388-2491 reopens the bound root and every parent, performs a directory identity reread, then opens/reads/closes the file. Docker consumes repeated verified artifacts at src/orchestra/spawn-backend-docker.ts:12899,14280,14367,14392,14831,14865,14882,15158,15170,15317,15349,15692,15770,15884,15949-15963,17446,20265,20336,20366,20469,20513,20605. Production hashes inspected: adapter f89a7c880fbf464a4c301461d9933b55bcff88e1a15c21797a9a84eee36c63cf; store a0ac403cd35cb7293a59864cee86bee3b701a31cd1d1c475b8e12ca2401cc0b8.
+Precise guarded repair recommendation: in a subsequent production-authorized task, add an operation-local read traversal scope in src/core/task-attempt-custody-posix-adapter.ts and thread its lifecycle only through src/core/task-attempt-custody-store.ts / src/core/custody-read-snapshot.ts for one bounded snapshot operation. Reuse the opened, native-pinned root/parent descriptor chain only for reads sharing the exact rootId and parent path, removing duplicate open-root/open-directory-at/close pairs within that operation; never persist it across operations, await gaps, attempts, generations, projects, tenants, or callbacks. Do not cache proof bytes as a substitute for a semantic reread. Retain OWNER_PRIVATE descriptor-relative open on every traversed component; root identity equality against the bound root; per-component returned identity/type/mode validation; the final directory identity reread; file regular-type/private-mode/single-link checks; read-bounded before/after immutable identity equality; proof equality in readVerified; and fail-closed close handling. The last verified file reread and all mount callback post-use root/project/path revalidation fences must remain. If TypeScript facade lifetime cannot express safe scoped reuse, the only permitted widening is a bounded leased-handle/batch operation across native/exec-authority/index.mjs and native/exec-authority/src/custody_posix.c with identical native identity and terminal-close semantics; no global cache or raw fd exposure.
+Platform/tenant boundary: current executed evidence is a linux-shaped FakeNative POSIX contract only, not real Linux, macOS, or Windows performance proof. A repair must key scope by rootId + projectId + attemptId/generation and the exact parent path, and must never share across caller tenant/project authority; Windows requires its own adapter evidence and macOS/Linux require real native temporary-fixture runs before platform claims.
+Missing host-proof profile: scripts/production-wiring-host-proof-harness.mjs:19-39 and :221-257 registers closure-OS, terminal-native, memory-compact, and metrics profiles but no native-history profile (file SHA-256 26d56698a276bd20d02d4511f235f63b587bd9f12bdeb8858f291b9fab2defd0). Closure must add a new dedicated identity, for example adapterId deckent-native-custody-history-profile-v1, schemaId deckent.host-proof.native-custody-history-profile.v1, and observationGroupId deckent:native-custody-history-profile; it must bind exact built assets, host OS/arch/native ABI, tenant/project corpus digest, command/deadline, before/after operation totals, unchanged semantic result digest, security-fence outcomes, and true exit status. It must run against an isolated authorized corpus and the real native adapter, then demonstrate the owner-approved 10s history budget. It must not reuse closure-os, terminal-native-provider, memory-compact-read-export, or any unrelated profile identity.
+docImpact: none; no product or documentation contract changed.
+
+Next Steps
+  → All tasks complete — ready for next sprint
+Sprint 760 Complete!
+
+Results: 1/1 tasks succeeded
+Time: 26 minutes 24s total
+
+What went well:
+  ✓ No boundary violations
+
+Next steps:
+  → Run `deckent retro` for detailed retrospective
+  → Run `deckent status --debt` to see tech debt
+  → Ready for next sprint
+
+✅ Sprint sprint-760 tamamlandı (26dk 24sn)
+   1/1 task: 1 DONE, 0 TECH_DEBT, 0 NO_GO
+   Agent: test-guardian(1)

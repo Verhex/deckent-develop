@@ -1,0 +1,162 @@
+{
+  "profiles": [
+    {
+      "path": "/tmp/deckent-start757-20260913/CPU.20260913.173015.171674.0.001.cpuprofile",
+      "size": 219248860,
+      "sha256": "4dc66d4601bd3ee13374d530517798738249d86bdf67583f9dff22fc99dab4ed"
+    }
+  ],
+  "topSampledSeconds": [
+    {
+      "function": "captured",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 3311,
+      "seconds": 640.26873
+    },
+    {
+      "function": "(idle)",
+      "url": "",
+      "line": 0,
+      "seconds": 240.693775
+    },
+    {
+      "function": "(garbage collector)",
+      "url": "",
+      "line": 0,
+      "seconds": 64.66248
+    },
+    {
+      "function": "",
+      "url": "",
+      "line": 0,
+      "seconds": 51.080395
+    },
+    {
+      "function": "ownData",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 574,
+      "seconds": 37.435561
+    },
+    {
+      "function": "sortedOwnStringKeys",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 549,
+      "seconds": 36.59533
+    },
+    {
+      "function": "spawnSync",
+      "url": "node:internal/child_process",
+      "line": 1128,
+      "seconds": 32.748085
+    },
+    {
+      "function": "spawn",
+      "url": "node:internal/child_process",
+      "line": 356,
+      "seconds": 28.327748
+    },
+    {
+      "function": "canonicalJson",
+      "url": "file:///home/alperen/deckent-dev/dist/orchestra/execution-effect-docker-lifecycle.js",
+      "line": 32,
+      "seconds": 25.390131
+    },
+    {
+      "function": "serializeCanonicalJson",
+      "url": "file:///home/alperen/deckent-dev/dist/core/task-attempt-custody-store.js",
+      "line": 620,
+      "seconds": 21.862934
+    },
+    {
+      "function": "update",
+      "url": "node:internal/crypto/hash",
+      "line": 134,
+      "seconds": 19.265284
+    },
+    {
+      "function": "portableEffectPathFailure",
+      "url": "file:///home/alperen/deckent-dev/dist/core/execution-write-scope-policy.js",
+      "line": 124,
+      "seconds": 19.050704
+    },
+    {
+      "function": "isWindowsReservedName",
+      "url": "file:///home/alperen/deckent-dev/dist/core/execution-write-scope-policy.js",
+      "line": 112,
+      "seconds": 19.025616
+    },
+    {
+      "function": "(program)",
+      "url": "",
+      "line": 0,
+      "seconds": 18.843449
+    },
+    {
+      "function": "isCanonicalCustodyDecimal",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 2196,
+      "seconds": 18.652955
+    },
+    {
+      "function": "canonicalJson",
+      "url": "file:///home/alperen/deckent-dev/dist/core/execution-effect-containment.js",
+      "line": 29,
+      "seconds": 17.288767
+    },
+    {
+      "function": "",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 564,
+      "seconds": 17.22272
+    },
+    {
+      "function": "exactRecord",
+      "url": "file:///home/alperen/deckent-dev/dist/core/execution-effect-containment.js",
+      "line": 55,
+      "seconds": 15.560582
+    },
+    {
+      "function": "frozenSortedStringArray",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 797,
+      "seconds": 14.898005
+    },
+    {
+      "function": "validateManifest",
+      "url": "file:///home/alperen/deckent-dev/dist/core/execution-effect-containment.js",
+      "line": 189,
+      "seconds": 14.232546
+    },
+    {
+      "function": "ownData",
+      "url": "file:///home/alperen/deckent-dev/dist/core/exec-authority-native.js",
+      "line": 481,
+      "seconds": 13.061322
+    },
+    {
+      "function": "hasExactFrozenDataShape",
+      "url": "file:///home/alperen/deckent-dev/dist/core/exec-authority-native.js",
+      "line": 492,
+      "seconds": 11.619453
+    },
+    {
+      "function": "isCustodyIdentityTransport",
+      "url": "file:///home/alperen/deckent-dev/native/exec-authority/index.mjs",
+      "line": 2239,
+      "seconds": 11.604192
+    },
+    {
+      "function": "normalizeJson",
+      "url": "file:///home/alperen/deckent-dev/dist/core/task-attempt-custody-store.js",
+      "line": 487,
+      "seconds": 10.911989
+    },
+    {
+      "function": "FastBuffer",
+      "url": "node:internal/buffer",
+      "line": 960,
+      "seconds": 10.730957
+    }
+  ],
+  "limits": "Sampled residence including native blocking and idle, not pure CPU attribution; raw profiles retained outside repo."
+}

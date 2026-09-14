@@ -1,0 +1,69 @@
+{
+  "observedAt": "2026-09-13T14:09:09.025493+00:00",
+  "tasks": [
+    {
+      "taskId": "756-001",
+      "attemptId": "56466047-b500-8500-88e8-f336fc6771e0",
+      "state": "NOT_DISPATCHED",
+      "reason": "PRE_MOUNT_ABORTED",
+      "providerStartReceipt": false,
+      "terminalDigest": "sha256:5b2b5bb9240d2bc8d624741ed8929a9822dfd164a027c7ebc4c2bd1c610ee95c"
+    },
+    {
+      "taskId": "756-002",
+      "attemptId": "99432e84-e530-84b6-802c-9d181c7f8fe3",
+      "state": "NOT_DISPATCHED",
+      "reason": "PRE_MOUNT_ABORTED",
+      "providerStartReceipt": false,
+      "terminalDigest": "sha256:76b5c38cc0bfe592fca16876bf4fe47ca10f328a4abfe744f4caa278c463b7f6"
+    },
+    {
+      "taskId": "756-003",
+      "attemptId": "b948d8d7-9f53-81a9-8abc-c6c86dd25aff",
+      "state": "NOT_DISPATCHED",
+      "reason": "PRE_MOUNT_ABORTED",
+      "providerStartReceipt": false,
+      "terminalDigest": "sha256:245a2f0a1fd9f70730fce942df87689d845dcea1001feb7dc5ac7fb2aaad94ef"
+    },
+    {
+      "taskId": "756-004",
+      "attemptId": "85e60095-97c1-8c86-89dd-dda72d842b67",
+      "state": "NOT_DISPATCHED",
+      "reason": "PRE_MOUNT_ABORTED",
+      "providerStartReceipt": false,
+      "terminalDigest": "sha256:68336af2e25638a44089c03ce629521af9e49e37c86e19fb60a0a9e1009270b9"
+    },
+    {
+      "taskId": "756-005",
+      "attemptId": "2f754623-1b28-8388-8b50-873fe53f5bc7",
+      "state": "NOT_DISPATCHED",
+      "reason": "PRE_MOUNT_ABORTED",
+      "providerStartReceipt": false,
+      "terminalDigest": "sha256:da3a0b27f84f174a94ee7bd6af6a4ae7d0d4289f8f9f0649f6fb78e1ee65340b"
+    },
+    {
+      "taskId": "756-006",
+      "attemptId": "695950c5-f689-826c-873d-dc71677b2c79",
+      "state": "NOT_DISPATCHED",
+      "reason": "PRE_MOUNT_ABORTED",
+      "providerStartReceipt": false,
+      "terminalDigest": "sha256:e7d8d918d6e991096dd249e10b91f8a5446b14c6fb0aac2d9ca5890eea3e0c8d"
+    },
+    {
+      "taskId": "756-007",
+      "attemptId": "d7e8ad9b-462d-8f4c-8727-de2516bd2a50",
+      "state": "NOT_DISPATCHED",
+      "reason": "PRE_MOUNT_ABORTED",
+      "providerStartReceipt": false,
+      "terminalDigest": "sha256:fe25695dad6fb18adff3c090650b6dcaeff078ea8989dabb742059905163f1d9"
+    },
+    {
+      "taskId": "756-008",
+      "attemptId": "93cd4d35-86d6-81f5-8cd6-72deca39ff61",
+      "state": "NOT_DISPATCHED",
+      "reason": "PRE_MOUNT_ABORTED",
+      "providerStartReceipt": false,
+      "terminalDigest": "sha256:51dd36056a4a3dddc9fc02d3add0db343cd20d2931513fd1e10b0bfdbe79f901"
+    }
+  ]
+}

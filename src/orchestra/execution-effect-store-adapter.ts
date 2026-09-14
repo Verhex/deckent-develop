@@ -45,6 +45,7 @@ import {
   type TaskAttemptCustodyStore,
   type TaskAttemptCustodyVerifiedEffectLandingV2,
   type TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2,
+  type TaskAttemptCustodyEffectReleasedUnacceptedEvidenceV2,
   type TaskAttemptCustodyPreservedArtifactRefV2,
 } from '../core/task-attempt-custody-store.js';
 import {
@@ -738,13 +739,41 @@ export class ExecutionEffectStoreAdapterV1 {
 
   /** Read-only semantic proof for a committed journal whose resource release
    * and accepted-result stages have not been published. */
-  readCommittedReleasePendingEvidence():
-    TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2 | null {
+  readCommittedReleasePendingEvidence(): TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2 | null {
+    if (this.readLatestReleaseProgress() !== null) return null;
+    return this.#readCommittedJournalEvidence('COMMITTED_JOURNAL_RELEASE_PENDING');
+  }
+
+  /** Negative proof: released resources, committed journal bytes, no acceptance claim.
+   * The strict persistence-bundle reader remains the sole acceptance authority. */
+  readReleasedUnacceptedEvidence(): TaskAttemptCustodyEffectReleasedUnacceptedEvidenceV2 | null {
+    const progress = this.readLatestReleaseProgress();
+    if (!progress || progress.state !== 'RELEASED') return null;
+    const outcomes = this.readReleaseOutcomes();
+    if (outcomes.releasedProgressDigest !== progress.progressDigest) return null;
+    const base = this.#readCommittedJournalEvidence('RELEASED_EFFECT_UNACCEPTED');
+    const artifact = this.#readArtifact('execution-effect-lifecycle-authority',
+      this.#cleanupArtifactKey('RELEASE', 'RELEASED'));
+    if (!base || !artifact) return null;
+    const releaseProgress = Object.freeze({
+      artifactClass: 'execution-effect-lifecycle-authority' as const,
+      artifactKey: artifact.receipt.artifactKey, receiptDigest: artifact.receipt.receiptDigest,
+      contentDigest: artifact.proof.sha256, byteLength: artifact.proof.byteLength,
+    });
+    return Object.freeze({ ...base, releaseProgress,
+      semanticEvidenceDigest: executionEffectPersistenceRawDigest(canonicalTaskAttemptCustodyJson({
+        domain: 'execution-effect-released-unaccepted-semantic-v1', base, releaseProgress,
+        outcomes, progressDigest: progress.progressDigest,
+      }, this.#policy.jsonBounds)),
+    });
+  }
+
+  #readCommittedJournalEvidence<P extends 'COMMITTED_JOURNAL_RELEASE_PENDING' | 'RELEASED_EFFECT_UNACCEPTED'>(phase: P):
+    (Omit<TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2, 'phase'> & { readonly phase: P }) | null {
     const anchor = this.#readLandingRecoveryAnchor();
     const ready = this.#readLifecyclePublication('READY_FOR_LANDING');
     const committedRef = anchor?.resumeContext.committed?.journal ?? null;
-    if (!anchor || !ready || !committedRef
-      || this.readLatestReleaseProgress() !== null) return null;
+    if (!anchor || !ready || !committedRef) return null;
     const anchorArtifact = this.#readArtifact(
       'execution-effect-lifecycle-authority', this.#landingRecoveryAnchorKey(),
     );
@@ -956,7 +985,7 @@ export class ExecutionEffectStoreAdapterV1 {
       artifactClass, artifactKey, receiptDigest, contentDigest, byteLength,
     });
     const evidenceWithoutDigest = Object.freeze({
-      phase: 'COMMITTED_JOURNAL_RELEASE_PENDING' as const,
+      phase,
       landingRecoveryAnchor: preserved('execution-effect-lifecycle-authority',
         anchorArtifact.receipt.artifactKey, anchorArtifact.receipt.receiptDigest,
         anchorArtifact.proof.sha256, anchorArtifact.proof.byteLength),
@@ -2283,6 +2312,14 @@ export class ExecutionEffectStoreAdapterV1 {
     return Object.freeze(source);
   }
 
+  #readImmutableManifest(ref: ExecutionEffectStoreImmutableArtifactRefV1): ExecutionEffectManifest | null {
+    return this.#readSnapshotFact('immutable-manifest', JSON.stringify(ref), () => {
+      const artifact = this.#readImmutableArtifact('execution-effect-manifest', ref);
+      if (!artifact) return null;
+      return parseExecutionEffectManifest(JSON.parse(Buffer.from(artifact.bytes).toString('utf8')));
+    });
+  }
+
   #readArtifact(
     artifactClass: Exclude<HostArtifactClass, 'task-admission-snapshot'>,
     artifactKey: string,
@@ -2592,27 +2629,17 @@ export class ExecutionEffectStoreAdapterV1 {
     const workspaceArtifact = workspaceRef ? this.#readImmutableArtifact(
       'execution-workspace-snapshot', workspaceRef,
     ) : null;
-    const baselineArtifact = baselineRef
-      ? this.#readImmutableArtifact('execution-effect-manifest', baselineRef) : null;
-    const finalArtifact = finalRef
-      ? this.#readImmutableArtifact('execution-effect-manifest', finalRef) : null;
     let workspaceValue: unknown;
-    let baselineValue: unknown;
-    let finalValue: unknown = null;
     try {
       workspaceValue = workspaceArtifact
         ? JSON.parse(Buffer.from(workspaceArtifact.bytes).toString('utf8')) : null;
-      baselineValue = baselineArtifact
-        ? JSON.parse(Buffer.from(baselineArtifact.bytes).toString('utf8')) : null;
-      finalValue = finalArtifact
-        ? JSON.parse(Buffer.from(finalArtifact.bytes).toString('utf8')) : null;
     } catch {
       throw new TypeError('Execution effect lifecycle referenced artifact is invalid');
     }
     const workspace = state === 'ALLOCATING' ? null
       : parseExecutionEffectWorkspaceSnapshotSealV1(workspaceValue);
-    const baseline = state === 'ALLOCATING' ? null : parseExecutionEffectManifest(baselineValue);
-    const final = finalRef ? parseExecutionEffectManifest(finalValue) : null;
+    const baseline = state === 'ALLOCATING' || !baselineRef ? null : this.#readImmutableManifest(baselineRef);
+    const final = finalRef ? this.#readImmutableManifest(finalRef) : null;
     const projection = { ...(durableBody.semanticProjection as Record<string, unknown>) };
     const baselineDigest = projection.baselineManifestDigest;
     if (state !== 'ALLOCATING') {

@@ -1,0 +1,20 @@
+{
+  "at": "2026-09-13T22:30:51.385277+00:00",
+  "sha256": {
+    "build-isolated.log": "1c27b8f10eb5635ff5066d1081c73b6deac319d02d22677c0a3dd7435536b889",
+    "native-before.log": "d721515740f5bb04dcaf2ddd624ad0dc217a9018ce33cc62f456bb80c0e39fea",
+    "SCOPE.json": "ee0756668cfc2e2b02fea0a826fc2f9c40188c63ae6ef140b338b408747231a6",
+    "CHANGE.patch": "547d17626e4aa315a3aae59f711f952b78b54499fb72022be582afdff1e00c0a",
+    "758-status-after.json": "0fb9ac66a7d675d9c64a1beafab2b969c8848e09a910b209f3f351b6671bbe6b",
+    "RESULT.md": "d5355a51c35a9d650ce4ce77ee18dc9d06ef5aa6f63486e4e53b63720130dd10",
+    "native-read-probe.mjs": "b0bc3a42c9c4f7ff29b7adc5f3ac66422179145f7a792234b80019d5a1bc1b1c",
+    "build-main.log": "77754708494fb57fcac7198fe39a8a68f107949cb2af0298b5660e0c34c75c34",
+    "native-after.log": "bcb434f64fa02b42dc81fe8b2cae77c029f9e6699005d78bc5b3f09788e241a8",
+    "tsc.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "LANDING.json": "2d55503ba7aa8ebf8fdd38dbc52a7ca46d94645fddf38a8e79dcfa417cf74cd3",
+    "tests.log": "aa91750e28d1d26cc68fb541b24910b19410568fe4a169ee334e58ab40ed2702",
+    "native-main.log": "32c3e8e27dbef50f988bfbfbc96188bb9c8f700f6507bd0a1fbd19d4d9248457",
+    "baseline/src/core/task-attempt-custody-posix-adapter.ts": "843f56193a3da0c96a53ac5343fd30d0e2a9a42e9df7a40f980f2ea33515bd33",
+    "baseline/tests/core/task-attempt-custody-posix-adapter.test.ts": "b8d065d3ed12a8554aca1593e51a5548e601dd0bd09b67085f5c39f45bdc05b8"
+  }
+}

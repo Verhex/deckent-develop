@@ -1,0 +1,90 @@
+
+🛡  Sprint Cost Estimate
+==================================================
+Task count:          8
+Retry multiplier:    1.20x
+Cache hit ratio:     0%
+
+Model distribution:
+  openai/gpt-5.6-sol                 3 task (subscription)
+  openai/gpt-5.6-terra               3 task (subscription)
+  openai/gpt-5.6-luna                2 task (subscription)
+
+Token Estimate:
+  Uncached input:      25,920
+  Cache read:          0 (90% discount)
+  Cache creation:      0
+  Output:              240,000
+
+Cost Breakdown (USD):
+  openai               $0 (subscription; quota UNKNOWN)
+  ────────────────────────────────────────
+  Realistic:           $0.0000  ← current estimate
+  Optimistic (cache):  $0.0000
+  Worst case (retry):  $0.0000
+
+Subscription impact:
+  openai: UNKNOWN (provider-limit-evidence-not-supplied)
+
+API/USD budget check:
+  Sprint USD budget:   $1000.00 (config: cost_limits.sprint_max_usd)
+  API USD used:        0.0%
+  USD status:          ✅ Within API/USD budget
+
+Warnings:
+  ⚠ openai subscription quota is unknown: no authoritative provider-limit evidence was supplied. USD $0 is not a quota-availability verdict.
+[deckent] scheduler engine: reducer
+[deckent] scheduler engine: reducer
+● Sprint #756 Complete  22m 50s
+────────────────────────────────────────────────
+
+Results
+  ✓ 0 done  ⚡ 0 debt  ✗ 8 no-go
+
+Evaluation Summary
+  GO (DONE):        0
+  GO_WITH_TECH_DEBT: 0
+  NO_GO:             8
+
+Task Breakdown
+  ID        │Title                   │Status              │Agent         │Duration
+  ──────────┬────────────────────────┬────────────────────┬──────────────┬────────
+  756-001   │756-001                 │NO_GO               │-             │-       
+  756-002   │756-002                 │NO_GO               │-             │-       
+  756-003   │756-003                 │NO_GO               │-             │-       
+  756-004   │756-004                 │NO_GO               │-             │-       
+  756-005   │756-005                 │NO_GO               │-             │-       
+  756-006   │756-006                 │NO_GO               │-             │-       
+  756-007   │756-007                 │NO_GO               │-             │-       
+  756-008   │756-008                 │NO_GO               │-             │-       
+
+Changes
+  No file changes recorded
+
+Tests
+  +0 new │ 8 total │ 0.0% coverage
+
+Agent Performance
+  No agent data available
+
+Learnings
+  No learnings recorded
+
+Next Steps
+  → Fix 8 NO_GO task(s): 756-001, 756-002, 756-003, 756-004, 756-005, 756-006, 756-007, 756-008
+Sprint 756 Complete!
+
+Results: 0/8 tasks succeeded, 8 need attention
+Time: 22 minutes 51s total
+
+What went well:
+  ✓ No boundary violations
+
+Next steps:
+  → Run `deckent retro` for detailed retrospective
+  → Run `deckent status --debt` to see tech debt
+  → Ready for next sprint
+
+✅ Sprint sprint-756 tamamlandı (22dk 51sn)
+   0/8 task: 0 DONE, 0 TECH_DEBT, 8 NO_GO
+   Agent: doc-writer(8)

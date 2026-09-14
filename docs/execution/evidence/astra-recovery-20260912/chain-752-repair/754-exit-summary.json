@@ -1,0 +1,42 @@
+{
+  "observedAt": "2026-09-13T11:21:25.020941+00:00",
+  "surface": "start",
+  "sprint": 754,
+  "exit": {
+    "observedAt": "2026-09-13T11:19:50.713127+00:00",
+    "kind": "exit",
+    "pid": 1051853,
+    "exitCode": 1,
+    "elapsedSeconds": 1698.1944259540178
+  },
+  "reason": "EXACT_RUNTIME_FAILED_AFTER_ADMISSION:EXACT_LIFECYCLE_CONTAIN_HOLD",
+  "hostSampledHwmKiB": 7584884,
+  "lastHostSample": {
+    "observedAt": "2026-09-13T11:19:47.593434+00:00",
+    "kind": "coordinator",
+    "pid": 1051853,
+    "elapsedSeconds": 1695.074737965013,
+    "userCpuSeconds": 1332.7,
+    "systemCpuSeconds": 183.59,
+    "status": {
+      "VmHWM": "7584884 kB",
+      "VmRSS": "7558892 kB",
+      "VmSwap": "0 kB",
+      "Threads": "11"
+    },
+    "io": {
+      "rchar": 15025628046,
+      "wchar": 36775469,
+      "syscr": 1293480,
+      "syscw": 37992,
+      "read_bytes": 10924032,
+      "write_bytes": 92327936,
+      "cancelled_write_bytes": 64114688
+    }
+  },
+  "newRunAuthorizedByThisObservation": false,
+  "files": {
+    "754-start.log": "c6aaa92071d6d9fa75889b7d2dd4bd292083464ac9242526568097e3d5c179f0",
+    "754-resources.jsonl": "f679cc5c6ee02fd898988b4236020c01aa9104ff79402d28081c75399eed712a"
+  }
+}

@@ -1135,6 +1135,8 @@ describe('execution effect Docker lifecycle authority', () => {
 
   it.each([
     [new ExecutionEffectDockerCaptureAdapterErrorV1('HELPER_RUN'), 'HELPER_RUN'],
+    [new ExecutionEffectDockerCaptureAdapterErrorV1('HELPER_RUN', { reason: 'timeout', exitCode: null, signaled: false,
+      timeoutMs: 60000, elapsedMs: 60001, stdoutBytes: 0, stderrBytes: 0 }), 'HELPER_RUN'],
     [new Error('FOREIGN_SECRET /private/custody/provider.stderr'), null],
   ] as const)('preserves the final capture boundary without projecting raw exceptions (%s)', async (error, adapterStage) => {
     const workspacePlan = plan();
@@ -1156,7 +1158,10 @@ describe('execution effect Docker lifecycle authority', () => {
       state: 'HOLD', code: 'ADAPTER_UNAVAILABLE',
       diagnostic: { schemaVersion: 1, stage: 'FIRST_CAPTURE', adapterStage },
     });
-    expect(JSON.stringify(result)).not.toMatch(/FOREIGN_SECRET|private\/custody|stderr/u);
+    expect(JSON.stringify(result)).not.toMatch(/FOREIGN_SECRET|private\/custody|provider\.stderr/u);
+    if (error instanceof ExecutionEffectDockerCaptureAdapterErrorV1 && error.commandDiagnostic) {
+      expect(result).toMatchObject({ diagnostic: { command: error.commandDiagnostic } });
+    }
     expect(fake.calls).not.toContain('capture:FINAL_QUIESCENCE_SECOND');
   });
 
@@ -1754,3 +1759,13 @@ describe('execution effect Docker lifecycle authority', () => {
     )).toMatchObject({ state: 'HOLD', code: 'SESSION_INVALID' });
   });
 });
+
+ it('preserves typed capture stage and bounded command details through prepare failure projection', () => {
+   const diagnostic = { reason: 'timeout' as const, exitCode: null, signaled: false,
+     timeoutMs: 60000, elapsedMs: 60001, stdoutBytes: 0, stderrBytes: 0 };
+   const failure = _adapterFailureDiagnosticsInternals.projectAdapterFailureDetail(
+     new ExecutionEffectDockerCaptureAdapterErrorV1('HELPER_RUN', diagnostic), 'prepare-call');
+   expect(failure).toMatchObject({stage: 'prepare-call', adapterStage: 'HELPER_RUN', command: diagnostic});
+   expect(JSON.parse(_adapterFailureDiagnosticsInternals.formatAdapterFailureForDebugLog(failure)))
+     .toMatchObject({adapterStage: 'HELPER_RUN', command: diagnostic});
+ });

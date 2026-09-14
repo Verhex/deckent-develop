@@ -1,0 +1,11 @@
+
+ RUN  v3.2.7 /tmp/deckent-r4-757-repair
+
+ ✓ tests/orchestra/exact-docker-observation.test.ts (18 tests) 8ms
+ ✓ tests/orchestra/spawn-backend-docker-mounts.test.ts (92 tests) 484ms
+
+ Test Files  2 passed (2)
+      Tests  110 passed (110)
+   Start at  18:37:40
+   Duration  6.60s (transform 3.44s, setup 25ms, collect 4.89s, tests 492ms, environment 0ms, prepare 76ms)
+

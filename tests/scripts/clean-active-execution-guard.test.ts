@@ -3303,6 +3303,19 @@ describe('clean active-execution admission', () => {
     expect(report.reasons).toEqual([]);
   });
 
+  it('accepts a valid terminal flow with multiline narrative intent and final newline', () => {
+    const root = fixtureRoot();
+    const opening = runFlowApprovalOpening('multiline-intent');
+    (opening[0]!.proposal as Record<string, unknown>).intentSummary = '# DIRECTIVES\n\nDo the admitted work.\n';
+    writeRunFlowEvents(root, 'multiline-intent', [
+      ...opening,
+      { type: 'APPROVAL_REJECTED', revision: 1, reason: 'operator-declined' },
+    ]);
+    const report = inspectActiveExecutions(root, { processProbe: () => 'dead' });
+    expect(report.decision).toBe('ALLOW');
+    expect(report.reasons).toEqual([]);
+  });
+
   it('reconciles mixed historical jobs, dead RunFlow pids, and terminal mission claims without false HOLDs', () => {
     const root = fixtureRoot();
     writeJson(join(root, '.deckent', 'runtime', 'jobs', 'sprint-777.json'), {

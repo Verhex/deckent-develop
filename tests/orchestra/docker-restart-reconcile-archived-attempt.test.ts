@@ -126,6 +126,8 @@ function recoveryHarness(
       }],
       heldAdmissions: [],
     })),
+    readEffectReleasedUnacceptedDispatch: vi.fn((): unknown => null),
+    readRejectedResultDispatch: vi.fn((): unknown => null),
     readEffectCommittedReleasePendingDispatch: vi.fn((): unknown => null),
     readStartedFailedDispatch: vi.fn((): unknown => null),
     readDispatchAuthority: vi.fn(() => ({ state: 'terminal' as const, authority })),

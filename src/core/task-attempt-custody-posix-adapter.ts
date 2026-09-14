@@ -2403,7 +2403,12 @@ class PosixTaskAttemptCustodyAdapter extends PosixTaskAttemptCustodyAdapterCore 
           this.closeNativeHandle(binding.custody, previous.handle, 'create-directory');
         }
       }
-      binding.custody.invoke('apply-private', { handle: current.handle });
+      // OPEN_EXISTING is a read: native open already requires OWNER_PRIVATE.
+      // Reapplying permissions would mutate ctime and clear durability evidence.
+      // Writer traversal retains its explicit privacy application below.
+      if (disposition === 'OPEN_OR_CREATE') {
+        binding.custody.invoke('apply-private', { handle: current.handle });
+      }
       const identity = binding.custody.invoke('identity', { handle: current.handle });
       if (
         identity.objectType !== 'DIRECTORY'

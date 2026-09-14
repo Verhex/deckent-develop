@@ -1,0 +1,13 @@
+{
+  "sprintId": "sprint-759",
+  "pid": 660276,
+  "startToken": "s4303842",
+  "leaseId": "0a570798-3cff-4c1c-bd41-f5543a44cea6",
+  "startedAt": "2026-09-13T23:22:20.964Z",
+  "currentWave": 0,
+  "taskStatuses": {
+    "759-001": "PENDING"
+  },
+  "metricsJsonlSize": 13,
+  "lastHeartbeat": "2026-09-13T23:22:38.055Z"
+}

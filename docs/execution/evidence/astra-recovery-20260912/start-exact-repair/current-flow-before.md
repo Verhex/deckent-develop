@@ -1,0 +1,1016 @@
+> Güncel checkpoint 2026-09-12T18:16:20.712484+00:00 — Astra epoch7, R0B: canonical status düzeldi;
+> 748/749/750 inactive, archive hashleri korunmuş. Performans adayı HOLD ve
+> varsayılan OFF; üretim direct reader'da.325 test + final dar1 + tsc/build exit0,
+> source/build MATCH. Default native health READY/exit0 fakat205s. R0/DOGFOOD DEGRADED;751 başlamadı; commit/push yok.
+> Sonraki sınır: verified içerik/manifest ortak saklama ve native5s/memory gate.
+> Önce `docs/execution/evidence/astra-recovery-20260912/r0b/RESULT.md` oku.
+> Aşağıdaki eski checkpoint'ler tarihsel kanıttır.
+
+> Güncel checkpoint2026-09-12T17:05:54Z — Astra epoch7:748 negatif attempt
+> `REJECTED_RESULT_CLOSED`;748/749/750 dört task artifaktı canonical archive'da,
+> hashler korunmuş, active=false iki yeni süreçten doğrulandı. R0 outerHOLD:
+> planning-health201s, legacy Dashboard/lock projection çelişkileri ve formal
+> XVerify.751 başlamadı. Yeni oturum önce
+> `docs/execution/evidence/astra-recovery-20260912/r0/RESULT.md` ve
+> `docs/execution/active/DOGFOOD-RESTORATION-2026-09-12.md` okusun.
+> Aşağıdaki eski checkpoint'ler tarihsel kanıttır; yeniden execution yetkisi üretmez.
+
+# Geçici iş imleci
+
+> **İKİ LANE VAR.** Aşağıdaki 7099-Terminal bölümü **Cursor'ın** lane'idir — dokunulmadı.
+> Bu üstteki bölüm, owner'ın 2026-09-12 kararı ve epoch-7 COMMITTED receipt
+> zinciriyle tek yürütücüsü **gpt-6-astra** olan **dogfood-canlıya-alma** lane'idir. SSOT: [MASTER](../docs/MASTER-PLAN.md).
+> Bu dosya authority, admission veya settlement receipt DEĞİLDİR.
+
+## LANE: DOGFOOD CANLI (2026-09-12)
+
+
+Güncelleme 2026-09-12T15:05:14.604790+00:00: terminal Cursor owner-pause/toparlama;219 zaten
+tüketildi,220 açık. Ana iş DEGRADED/HOLD. Core build185PASS önceki kanıt; yeni
+Opus gerçek XVerify UNCLEAR/HOLD, durable settlement+receipt doğrulandı.
+İki fresh-process readonly discovery748 exact exit0/0; tam cold recovery değil.
+Planning health15:03:42Z yalnız748-001 için STARTED_ATTEMPT_RECONCILIATION_REQUIRED
+HOLD. Sonraki: Astra engine planning-readiness ↔ historical rejection authority
+uyumu; ardından CLI canonical preflight/exit ve tek gerçek continuation. CLI-only
+düzeltme tüm ingresses için yeterli değil. Force/autoarchive yok. Main mixed dirty,
+commit/push yok; ayrıntı durum-raporu.md ve post-opus-analysis.md.
+
+> **DEVİR TAMAMLANDI — COMMITTED, epoch 7 (2026-09-12).** Yürütücü: `gpt-6-astra`.
+> Aktif `handoffId: ah-2026-09-12-opus-astra-dogfood-v3`.
+> Canonical authority: `docs/execution/handoffs/ah-2026-09-12-opus-astra-dogfood-v3/0003-committed.json`.
+> Receipt digest'i yalnız receipt'te tutulur. Opus bu scope'ta mutation'ı durdurdu;
+> yalnız gözlem/handoff desteği verir. Önceki v1/v2 adaylar ABORTED; receipt'leri korunur.
+> Alıcı zinciri ve devredilen 32 dosyayı yeniden doğruladı: drift 0. Bu pointer değişikliği
+> COMMITTED sonrasında alıcı tarafından yapıldı; immutable receipt manifest'i değiştirilmedi.
+> Devir ürün DONE/XVerify değildir. İlk iş BULGU-M: 747 settlement yolunun analizi;
+> Sonraki owner-live A kararı kalıcı recovery kapsamını onayladı; predicate değişikliği
+> ancak kanıtlanmış aynı kapsamın contract incelemesiyle değerlendirilir.
+> Sonraki BUG-F gerçek worker kanıtıdır. Güncel build STALE/HOLD ve Cursor lane'indeki
+> raporlanmış typecheck hatası ayrı build gate'inde takip edilir. C/D kapsamı devredilmedi.
+
+Güncel owner kararı (2026-09-12, Astra teslim sonrası): Brain `codex/gpt-6-astra`,
+varsayılan worker `codex/gpt-5.6-sol`; Terra/Luna iş türü ve runtime admission'a göre.
+Yerel config uygulandı; max_workers2 korunuyor. Aşağıdaki Sonnet tercihi tarihsel Opus
+koşularının talimatıdır; yeni model kararı onu supersede eder. Başlangıç planı ve Dockerfile
+incelemesi: `durum-raporu.md` EK-5. Mevcut main henüz clean/landed olarak raporlanmaz.
+
+Owner talimatı: *"küçük maddelerle start/do çalıştıra çalıştıra bulduğun bugları doğru
+çözümlerle gidererek ilerle, dogfooding'i doğru şekilde canlıya al, workerlar hep sonnet."*
+
+### Kök-neden zinciri (bu gece ÖLÇÜLDÜ, tahmin değil)
+
+`deckent start` → `EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD:746-001:hold:production-wiring-host-proof-process-failed`
+
+Zinciri sonuna kadar sürdüm; iki ayrı defekt çıktı:
+
+**BUG-A — tipli reason çöpe gidiyor (motor, genel, herkesi etkiler).**
+`scripts/production-wiring-host-proof-harness.mjs:581`
+```js
+if (result.state !== 'observed') return 1;   // reasonCode DISCARD
+```
+Harness kesin bir `reasonCode` üretiyor (ölçüldü: `host-proof-request-invalid`), sonra atıp
+çıplak `1` dönüyor — stdout ve stderr **tamamen boş**. Konteynerde birebir yeniden ürettim
+(`--network none --read-only --user 65534:65534`, RC=1, 0 bayt çıktı).
+Runner (`production-wiring-host-proof-runner.ts:787`) bunu generic
+`host-proof-process-failed`'e çeviriyor.
+`sprint-controller.ts:1548` `isDecidedExactSettlementHold` ise `production-wiring-*`
+ailesinde yalnız `-invalid`/`-changed` son ekini "kesinleşmiş" sayıyor ⇒ emeklilik reddediliyor
+⇒ **her sonraki `deckent start` kalıcı bloke.**
+
+Kritik gözlem: reason korunsaydı `production-wiring-host-proof-request-invalid` olacaktı,
+`-invalid` ile biter, predicate **TRUE** döner, 746-001 kendiliğinden emekli olurdu.
+**Predicate zaten bunu bekliyor — harness beklenen şeyi yaymıyor.** Tasarım doğru, yayım eksik.
+
+**BUG-B — metrics-retention profili harness'a kaydedilmemiş (benim önceki eksik wiring'im).**
+Harness `PROFILES` tablosunda 6 adapter var (`closure-os`, 3× terminal-health,
+`terminal-native-provider`, `memory-compact-read-export`); `deckent-metrics-retention-v1` **yok**.
+Kimlik tuple'ını `src/core/production-wiring-host-proof.ts`'e eklemişim (planner kabul ediyor)
+ama **çalıştıran** profili harness'a eklememişim ⇒ `parseRequest` profil bulamıyor ⇒ request-invalid.
+
+### Sıra (küçük maddeler, her biri wire+landing doğrulamalı)
+
+| # | İş | Durum |
+|---|---|---|
+| 1 | **BUG-A**: harness typed reason'ı stderr'e bounded machine-code olarak yayınlasın | ✅ BİTTİ |
+| 2 | **BUG-A**: runner stderr'den reason'ı sıkı-doğrulamayla okusun, yoksa mevcut generic'e düşsün | ✅ BİTTİ |
+| 3 | **BUG-B**: `deckent-metrics-retention-v1` profilini harness PROFILES'a kaydet | ✅ BİTTİ |
+| 4 | build:all + scoped test + gerçek konteyner koşusu | ✅ build exit0 · 20/20 test |
+| 5 | `deckent start` → BUG-A yayılımı kanıtlandı (hata mesajı tipli hâle geldi) | ✅ BİTTİ |
+| 5b | DIRECTIVES asset digest'lerini tazele (harness değişti) | ✅ host rc=0 · konteyner rc=0 `observed` |
+| 5c | **BUG-C**: `clearPid` kanıtı teardown'da siliyordu | ✅ BİTTİ |
+| 5d | **BUG-D**: mühürlü arşiv makbuzu okunmuyordu | ✅ BİTTİ |
+| 5e | koşum-4: `deckent start` → blok AŞILDI, yeni kapı: `EXACT_DOCKER_TASK_PROJECTION_ADMISSION_REQUIRED` | ✅ BİTTİ |
+| 6 | **BUG-E**: planner'ın bellek profili hiç yoktu → 200 satırlık paylaşılan varsayılan | ✅ BİTTİ |
+| 7 | **BULGU-E**: düz `deckent start` exact-Docker custody ile yapısal olarak uyumsuz | AÇIK — owner kararı |
+| 8 | koşum-5: `deckent do` → **PLAN BAŞARILI** (628 sn, exit=0) | ✅ BİTTİ |
+| 9 | koşum-6: onay + başlat → worker koştu, **effect landed**, sonra `missing-worker-evidence` | ✅ ölçüldü |
+| 10 | **BUG-F**: worker'dan hiç istenmeyen kanıt alanı settlement'ta zorunlu | ✅ BİTTİ |
+| 11 | sprint-747 kalıntısı (`EXECUTING`) → `deckent recover --force` | ✅ ÇÖZÜLDÜ |
+| 12 | build:all (BUG-F'i binary'ye indirmek için) | ✅ exit 0 · 04:17 |
+| 13 | **BUG-G**: `max_tier` tavanı gerçek hâle getirildi + owner talimatı config'e bağlandı | ✅ BİTTİ |
+| 14 | koşum-7b: plan BAŞARILI (774 sn) · worker modeli **sonnet** | ✅ ölçüldü |
+| 15 | koşum-7b onay+başlat → `RUN_FAILED`, worker'a hiç ulaşılmadı | ❌ 747-001 bloğu |
+| 16 | **BULGU-M**: 747 settlement'ı için desteklenen yüzey KALMADI | 🚧 OWNER KARARI |
+| 17 | **BULGU-N**: `isDecidedExactSettlementHold` dar dal (11 koddan 1'i) | AÇIK — uygulanmadı |
+| 6 | Bellek okuma: anlam-koruyan seçim (`BRAIN-MEMORY-LIFECYCLE-001`) → `deckent do` açılır | SIRADA |
+| 7 | Dispatch-öncesi hataların kalıcı yazması (`safeDashboardUpdate` bağlanması) | SIRADA |
+
+### Kanıt — BUG-A/B düzeltme öncesi vs sonrası (ölçüldü)
+
+Aynı istek, aynı konteyner kısıtları:
+
+| | önce | sonra |
+|---|---|---|
+| çıkış kodu | 1 | 1 |
+| stdout | boş | boş (başarı protokolü korundu) |
+| stderr | **boş** | `{"kind":"deckent-production-wiring-host-proof-failure-v1","reasonCode":"host-proof-verifier-asset-invalid"}` |
+| harness iç sonucu | `host-proof-request-invalid` (profil yok) | `host-proof-verifier-asset-invalid` (profil çözüldü, digest bayat) |
+| runner'ın bildireceği | `production-wiring-host-proof-process-failed` | `production-wiring-host-proof-verifier-asset-invalid` |
+| `isDecidedExactSettlementHold` | **false** → kalıcı blok | **true** → emeklilik mümkün |
+
+Dosyalar: `scripts/production-wiring-host-proof-harness.mjs` (FAILURE_KIND + typed stderr yayımı,
+metrics-retention profili + gözlemci çağrısı) · `src/orchestra/production-wiring-host-proof-runner.ts`
+(`parseHarnessFailureReason`, overflow önceliği korunur) ·
+`tests/orchestra/production-wiring-host-proof-failure-reason.test.ts` (13 test).
+Sözlük bilerek `isDecidedExactSettlementHold` ile AYNI tutuldu — daha sıkı olsaydı
+predicate'in kabul edeceği bir kodu kanal reddedip bloğu geri açardı.
+
+### BUG-C ve BUG-D — kalıcı bloğun gerçek iki halkası
+
+BUG-A/B'den sonra hata `...verifier-asset-invalid`'e döndü ama **hâlâ HOLD**. `-invalid` ile bitip
+`production-wiring-` ile başladığı için "decided" olmalıydı ⇒ 9 `retirable` koşulundan başka biri
+düşüyordu. Tek tek ölçtüm: **koşul 9**, `readOwningRun('sprint-746') === 'terminal'` → `unknown`.
+
+**BUG-C — `clearPid` teardown'da kanıtı siliyordu.**
+`readRunFlowTerminalClosureForSprint` (`core/run-jobs-read.ts:146`) önce
+`readSprintProcessIdentity` ister, o da `.deckent/pids/<id>.snapshot.json`'a dayanır.
+Ölçüm: snapshot'lar **sprint-730'da duruyor** — 731+ hiçbirinde yok.
+`clearPid` 14 çağrı yerinden **13'ü** snapshot'ı siliyordu (yalnız benim önceki düzeltmem koruyordu).
+`.pid` = canlılık iddiası (teardown'da silinmeli); snapshot = **kanıt**, koşu bittikten SONRA
+okunuyor. Teardown'ın kanıt silmesi defektti.
+→ `ClearSprintPidOptions.preserveSnapshot` → **`dropSnapshot`** (varsayılan: KORU).
+Silme yalnız settlement yetkisinde: `sprint-finalizer.ts persistFinalSprintState` ve
+checkpoint supersession. Güvenlik kanıtı: `detectOrphan` önce `.pid` varlığına bakıyor
+(`sprint-pid-manager.ts:481`) ⇒ korunan snapshot sahte yetim üretemez.
+
+**BUG-D — mühürlü arşiv makbuzu hiç okunmuyordu.**
+Sprint-746'nın arşivinde zaten **digest-bağlı mühür** vardı:
+`terminal-seal-receipt.json` → `kind: deckent.sprint-archive-terminal-seal`,
+`terminalOutcome: "ABORTED"`, `logicalSettlementDigest: 9cbb6814…`.
+`readOwningRunTerminalDisposition` bunu hiç sormuyor; yalnız PID'e bağlı closure yoluna düşüyordu.
+→ `readArchivedSprintTerminalOutcome()` (`core/sprint-archive.ts`) eklendi; mevcut
+`sealStructurallyValid` doğrulaması isimlendirilmiş fonksiyona çıkarıldı (kopya yok) ve
+controller'ın archive dalı önce mühre bakıyor. Deny-only guard hâlâ üstte kalır.
+
+**Bu kanıt uydurmak DEĞİL** — zaten var olan, kendi içinde tutarlı, digest-bağlı kaydı okumak.
+Ölçüm sonrası: `sprint-746: terminal` · `sprint-744: terminal` · `sprint-737: terminal`.
+Karantinaya gerek kalmadı.
+
+Testler: `tests/orchestra/archived-sprint-terminal-disposition.test.ts` (11) ·
+`sprint-pid-manager.test.ts` (varsayılan tersine çevrildi, +1 test) · toplam 111/111 + 11 yeşil.
+`decay-config-wire.test.ts`'teki 2 kırık **önceden vardı** (stash ile doğrulandı, bana ait değil).
+
+### BUG-E — planner'ın bellek profili hiç yoktu
+
+Gecelik raporda "bellek sözleşmesi kırık, zorunlu kayıt için kırpma yolu yok" demiştim.
+Doğru ölçümle tablo değişti: `DEFAULT_MEMORY_READ_PROFILES` **yalnız `worker`** için profil
+tanımlıyordu (`{maxBytes:131072, maxLines:512}`) ve resolver o tek tüketiciyi hardcode ediyordu.
+Planner profilsiz kalıp **paylaşılan 200 satırlık varsayılana** düşüyordu.
+
+Ölçüm (gerçek per-consumer limitlerle):
+
+| tüketici | bütçe | prompt'un kendi BINDING 3 ADR'si |
+|---|---|---|
+| worker | 512 satır / 128KB | **AVAILABLE** — hiç kırık değilmiş |
+| planner | 200 satır / 32KB | **HOLD** `REQUIRED_ENTRY_OVERSIZE` suçlu=`adr-d-002` |
+
+Yani sözleşme sağlamdı; **eksik olan profildi.** Gecelik "worker da kırık" satırım yanlıştı
+(her iki tüketiciye de paylaşılan varsayılanı uygulamıştım).
+
+Eşik taraması (planner, gerçek korpus):
+
+| satır → | 512 | 768 | 1024 | 1536 | 2048 |
+|---|---|---|---|---|---|
+| 0 ADR | OK | OK | OK | OK | OK |
+| prompt BINDING 3 | HOLD | OK | OK | OK | OK |
+| en büyük 3 ADR | HOLD | HOLD | OK | OK | OK |
+| en büyük 5 ADR | HOLD | HOLD | HOLD | OK | OK |
+| en büyük 8 ADR | HOLD | HOLD | HOLD | HOLD | OK |
+
+Bayt tarafı bağlayıcı: 1536 satırda 256KB **yetmiyor**, 384KB yetiyor. Sebep: bütçe **tam
+canonical record** baytını sayıyor, prompt'a giden içerikten ~3× büyük (118KB içerik → 384KB kayıt).
+
+→ `planner: { maxBytes: 393_216, maxLines: 1_536 }` eklendi ve resolver genelleştirildi
+(artık profil tanımlayan her tüketiciye uygulanıyor, yalnız `worker`'a değil).
+Değer keyfi değil: 5 en büyük ADR + identity + son retro + kritikler sığsın diye ölçüldü;
+bir alt kademe (256KB) ölçülerek yetmediği gösterildi. Tavan hedef değil — fazlası ertelenir,
+sığmayan zorunlu küme hâlâ tipli HOLD.
+Owner override'ı korunuyor: authored `memory_read` > default, named `memory_read_profiles` > shared.
+Test: `tests/core/memory-read-planner-profile.test.ts` (10 yeşil).
+
+Kritik kayıt düzeltmesi: gecelik "0 kritik kayıt" ölçümüm yanlış tenant seçimiyle alınmıştı;
+doğrusu **1** (bir `debt`, 8 satır). Sonuç değişmiyor ama 512'de neden
+`CRITICAL_CONTEXT_UNAVAILABLE` geldiğini açıklıyor: zorunlu küme 505 satır, kritik 8 satırla
+510 bütçesini 3 satır aşıyor.
+
+### BULGU-E (owner kararı gerek) — düz `deckent start` exact-Docker ile uyumsuz
+
+Koşum-4: blok aşıldı, fakat `Sprint failed at phase PLAN:
+EXACT_DOCKER_TASK_PROJECTION_ADMISSION_REQUIRED` (265 sn sonra).
+
+Kök neden: `start.ts`'te **iki** `runSprint` çağrısı var.
+- `:723` exact yol — `exactPlanAuthority` + `onExactPlanMaterialize` + `onExecutionAdmitted` taşır.
+  **Ama yalnız `--flow-id --revision --plan-digest` üçlüsü birlikte verilirse** çalışır (`:514`).
+- `:1379` legacy yol — bunların hiçbirini taşımaz. Düz `deckent start` buraya düşer.
+
+`spawn_backend: "docker"` olduğu için `defaultBackendUsesExactDockerCustody = true`
+(`sprint-controller.ts:2634`) ⇒ legacy yol PLAN'da koşulsuz ölür.
+**Düz `deckent start` bu config'le asla başarılı olamaz** ve bunu 4+ dakika sonra keşfeder.
+`sprint-runner-entry.ts:613` (detached runner) de aynı eksikliği taşır.
+
+İki dürüst seçenek (owner kararı):
+1. **Hızlı ve dürüst red:** legacy dal, backend exact custody istiyorsa admission anında tipli
+   hata versin ve desteklenen yolu adıyla söylesin — 265 sn kör bekleme biter.
+2. **`deckent start` kendi RunFlow önerisini kursun** (propose→approve→start), yani exact yolu
+   kendi kendine alsın. Gerçek "dogfood canlı" cevabı bu, ama onay yüzeyine dokunur.
+
+Şimdilik desteklenen exact yol `deckent do` ile ilerliyorum (koşum-5).
+
+### KOŞUM 6 — dogfood gerçekten çalıştı, sonra tek alanda takıldı
+
+| saat | olay |
+|---|---|
+| 03:33:31 | plan hazır, **exit=0**, 628 sn — 1 görev, 7 go + 4 no-go, GATE GEÇTİ |
+| 03:34:19 | APPROVAL_GRANTED + START_REQUESTED |
+| 03:38:45 | **RUN_STARTED** |
+| 03:39:46 | worker gönderimi kabul — *"Exact provider release 1 için kanıtlandı"* |
+| **03:51:36** | **effect landing** — 4 dosya çalışma ağacına indi |
+| 03:58:23 | `RUN_FAILED` · `hold:production-wiring-missing-worker-evidence` |
+
+**Worker'ın ürettiği iş gerçek ve kaliteli.** `tests/core/observability-rotation-tenant.test.ts`
+(345 satır, YENİ): hermetik (tmpdir, spawn yok), canonical modülü çağırıyor, fixture-local
+yeniden uygulama yok, başlıkta kusuru doğru tarif ediyor (tek global arşiv popülasyonu üzerinden
+ceiling = veri kaybı yolu). Ayrıca `observability.ts`, `observability-rotation.ts`,
+`config-types.ts` değişti.
+
+**Canlı doğrulanan düzeltmelerim:** `.deckent/pids/sprint-747.snapshot.json` VAR (BUG-C —
+731'den beri hiçbirinde yoktu) · `sprint-747: terminal` ölçüldü, **blok yeniden oluşmadı**
+(BUG-C/D) · planner 628 sn'de tam plan üretti (BUG-E) · host-proof host+konteynerde `observed`
+(BUG-A/B).
+
+**Kendi okuma hatam:** bir ara "worker öldü, 14 dk hiçbir şey yok" dedim — yanlıştı. Worker
+konteynerde koşmuş, çıktısını üretmiş, custody zinciri effect'i indirmişti; konteyner ve süreç
+yoktu çünkü **iş bitmişti**. Yokluğu ölüm sandım.
+
+### BUG-F — settlement, worker'dan hiç istenmeyen alanı zorunlu tutuyor
+
+`settleProductionWiringResultEvidence` (`core/task-result-settlement.ts:499`) `.result` içinde
+`productionWiringEvidence` yoksa `missing-worker-evidence` HOLD veriyor.
+Ama worker'a verilen sonuç sözleşmesi (`prompt-god-template.ts:2827`) şunları istiyor:
+`taskId, workerId, promptCompilePlanId, filesChanged, linesAdded, linesRemoved, testsPassed,
+testVerification, criteriaEvidence, coverage, selfAssessment, techDebtCriterionIds, notes`.
+**Bu alan listede YOK.** Şema da `.optional()`. Wiring bloğu zinciri gösteriyor ve hata hâlinde
+`UNWIRED:` notu istiyor — ama kanıt nesnesini hiç istemiyor.
+
+⇒ **Kusursuz bir worker bile bu kapıyı geçemez.** Her üretim-mutasyon görevi HOLD'a düşer.
+BUG-B ile aynı sınıf: kimlik kayıtlı, çalıştıran taraf bağlanmamış.
+
+Düzeltme, aynı dosyadaki **kanıtlanmış deseni** izliyor (satır 1967, `runPolicyEvidence`):
+*"Result contract (mandatory): echo this exact digest … missing = typed HOLD."*
+`productionWiringResultContract(boundDigest)` eklendi, zinciri render eden **her iki dala** da
+bağlandı (kapalı zincir + çözülmemiş zincir).
+
+İki tasarım kararı:
+- **Backtick kullanılmadı.** Bloktaki her backtick'li parça bir sözleşme kimliğidir; bir talimat
+  kimlik sanılmamalı. (Mevcut test bu değişmezi tarıyor — testi değiştirmek yerine metni uyarladım.)
+- **"complete" durumu bilerek sunulmuyor.** Worker kendi düzenlemesini gözler; zincirin bağlı
+  olduğu sonucuna yalnız host kendi bağımsız gözleminden varabilir. Worker'a completeness
+  iddia ettirmek, öz-raporu üretim-wiring verdict'ine çevirirdi.
+
+Regresyon dürüstlüğü: değişikliğim mevcut bir V2 testini kırdı (`not.toContain('evidenceRefs')`).
+Testi **zayıflatmadım**; iddiayı gerçek niyetine göre **daha kesin** yaptım — render edilen
+biçimleri (`refs:` ve `[state/basis]` niteleyicisi) yasaklıyor, artık meşru olarak geçen alan
+adını değil. Test: `production-wiring-worker-result-contract.test.ts` (10) · mevcut suite 15/15.
+
+### BULGU-H/I/J/K (koşum 6'dan, düzeltilmedi — owner kararı)
+
+- **H — model owner talimatına uymadı.** "Workerlar hep sonnet" dedin; planner `claude-opus-5`
+  seçti. `modes.performance.default_model = claude-sonnet-5` ama planner'ın per-task `model`
+  alanı onu eziyor. Zorlayıcı mekanizma gerekiyor.
+- **I — kalıcı konteyner kaydı `runSpawn` yolunda tetiklenmiyor.** `.deckent/runtime/containers/`
+  BOŞ; konteyner kaldırıldıktan sonra teşhis imkânsız.
+- **J — read-model donuyor.** `publishedAt: 00:40:14`, effect landing 00:51'de; 16 dk bayat.
+- **K — `deckent runs <id> --diff` izole etmiyor.** "run'ın gerçek ayak izi" diyor ama taban
+  commit'e göre TÜM ağacı gösteriyor (57 dosya, Cursor'ın işi dahil).
+
+### sprint-747 settlement — "deadlock" DEĞİLDİ, yanlış yüzeyi denemişim
+
+Üç yüzey HOLD verdi (`clean`→`E_CLEAN_TASK_ACTIVE:747-001:EXECUTING`,
+`cleanup`→`terminal-receipt-required`, `recover --dry-run`→"0 arşivlenecek"), ben de
+"hiçbir desteklenen komut sprint katmanını settle edemiyor" diye yazacaktım. **Yanlış.**
+
+Denemediğim şey `--dry-run` olmayan koşumdu. `deckent recover sprint-747 --force` (04:09→04:14,
+exit 0) işi yaptı:
+
+```
+Denetim kapısı:  GATE_FAILURE            ← koşu gerçekten başarısızdı, dürüst sınıflama
+Görev dosyaları: 0 arşivlendi, 2 korundu ← .deckent/archive/sprints/sprint-747/tasks/preserved/
+Sürdürme checkpoint'i: preserved (sha256:fb9825d1…)
+```
+
+Sonuç: `.deckent/sprint-state.json` **kaldırıldı**, `.tasks/` boşaldı,
+`preservation-marker.json` `reason: "non-terminal"` yazdı — yani motor "bu koşu terminal
+değildi, kanıtı saklıyorum" dedi. Doğru davranış; uydurma makbuz üretmedi.
+
+`--dry-run`'ın "0 arşivlenecek" demesi ile `--force`'un 2 dosya koruması çelişkili **değil**:
+dry-run yalnız *arşivlenecekleri* sayıyor, *korunacakları* saymıyor. Yine de operatöre yanlış
+"yapacak bir şey yok" izlenimi veriyor.
+
+> **BULGU-L (owner kararı, kozmetik değil).** `recover --dry-run` önizlemesi `--force`'un
+> gerçekte yapacağı işi eksik gösteriyor: korunacak dosya sayısını ve sprint-state kaldırmayı
+> saymıyor. Operatör "yapacak bir şey yok" sanıp başka yollar aramaya başlıyor — bu gece
+> bana tam olarak bunu yaptırdı.
+
+Ayrıca sınandı ve **negatif**: `deckent runs --close-stale` → "Bayat koşu yok". Bu süpürge
+run-flow katmanını sahipleniyor, sprint katmanını değil; 838e9216 zaten `RUN_FAILED`. Yani
+sprint-katmanı settlement'ının sahibi `recover`/`resume`, `runs` değil.
+
+### BUG-C canlı kanıt (crash yolu)
+
+`.deckent/pids/sprint-747.snapshot.json` — 03:55, **sprint-730'dan (9 Eylül) beri ilk yeni
+snapshot**. `.pid` temizlendi, kanıt kaldı. Tasarım tam da bu.
+Dürüst sınır: bu yalnız **çöküş** yolunu kanıtlıyor. Temiz finalize yolunda
+`persistFinalSprintState` bilerek `dropSnapshot: true` geçiyor, yani o yol henüz koşuda
+kanıtlanmadı.
+
+### BUG-G — `max_tier` belgelenmiş bir tavan ama hiçbir yerde uygulanmıyor
+
+BULGU-H'nin ("workerlar hep sonnet" talimatı eziliyor) kök-nedenini sürdüm. Ölçüm:
+
+| ölçüm | değer |
+|---|---|
+| aktif mod | `performance` |
+| `modes.performance.default_model` | `claude-sonnet-5` |
+| task 747-001 gerçek `model` | **`claude-opus-5`** |
+| `claude-sonnet-5` tier | `standard` |
+| `claude-opus-5` tier | `premium` |
+
+Zinciri okudum (`src/orchestra/model-selector.ts:254 resolveTaskModel`):
+
+- **Katman 0** `forceModel` (DIRECTIVES `- Model:`) → her şeyi atlar.
+- **Katman 4** `inferTierFromScore(title, description, scope)` → sezgisel skor tier üretir;
+  core/runtime kapsamlı karmaşık task `premium` veriyor ⇒ opus.
+- **Katman 2** yalnız docs/test-only kapsamı `standard`'a kırpıyor.
+- **Katman 1** yalnız `economic`/`pro_plan` modunda `premium`'u kırpıyor.
+
+`performance` modunda **hiçbir tavan yok**. Oysa `ModelStrategy.max_tier`
+(`src/core/mode-presets.ts:22`) birebir şöyle belgelenmiş:
+
+```ts
+/** Maximum allowed tier (tasks cannot exceed this) */
+max_tier: ModelTier;
+```
+
+Tüm repoda `max_tier`'ın **tek** tüketicisi var: `model-selector.ts:38`, ve o da yalnız
+`resolveConfiguredStrongerDefault` içinde bir *yükseltme* kapısı — tavan olarak değil.
+Yani `default_model` bir tercih, `worker_tier` yalnız kurulum-zamanı, `max_tier` ise
+**ölü sözleşme**.
+
+Bu, bu gece düzelttiğim A/B/C/D/E/F ile aynı sınıf: *beyan edilmiş sözleşme, uygulayıcısı yok.*
+Doğru çözüm literal "sonnet" zorlaması değil (Kanun 10 ihlali olurdu) —
+`max_tier`'ı `resolveTaskModel` yolunda gerçek tavana çevirmek ve owner'ın knob'unu canlı hâle
+getirmek. Brain etkilenmez: Brain modeli `brain_model`/`brain_tier`'dan çözülüyor,
+`resolveTaskModel`'den geçmiyor.
+
+### BUG-G ÇÖZÜLDÜ — "workerlar hep sonnet" artık config-resolved
+
+Kök-nedeni **ölçtüm** (önce yanlış katmanı suçlayacaktım):
+
+- `recommendation.modelConstraint` 10 çağrı yerinin **hepsinde `null`** — üreticisi yok.
+  Yani planner'ın LLM'i model dayatmıyor; yol `resolveTaskModel`'e düşüyor.
+- Gerçek task 747-001 ile `calculateModelScore` = **4** (eşik `>= 4` → `premium`).
+  Kısaltılmış metinle 1 çıkıyor; premium'u üreten şey **9 dosyalık yazma kapsamı + 2 dizin**.
+- `resolveTaskModel(gerçek task)` → `claude-opus-5`, task dosyasındakiyle **birebir**.
+
+Asimetri: `resolveTaskModel` içinde "Layer 1b: declared minimum tier" var (`min_tier`),
+tavanın karşılığı **yok**. `PlanModeConfig` `min_tier?` taşıyor, `max_tier` alanı bile yok.
+`ModelStrategy.max_tier` ise "tasks cannot exceed this" diye belgeli ama tek okuyucusu
+bir *yükseltme* kapısı.
+
+Düzeltme (literal "sonnet" zorlaması DEĞİL — Kanun 10):
+- `src/core/config-types.ts` → `PlanModeConfig.max_tier?: ModelTier` (min_tier'ın aynadaki eşi)
+- `src/orchestra/model-selector.ts` → "Layer 1c" tavan clamp'i; otorite sırası
+  mode config → mode-preset strategy → tavan yok (bugünkü davranış bit-bit korunur)
+- Tavan tabandan düşükse `E_MODEL_TIER_BOUNDS_CONTRADICTORY` ile **yüksek sesle** hata:
+  iki sessiz çözüm de owner'ın yazmadığı bir politikayı yürürlüğe koyardı
+- `deckent config set modes.performance.max_tier standard` (proje-yerel; **shipped preset'e
+  dokunulmadı**, diğer kullanıcıların yönlendirmesi değişmez)
+
+Kanıt:
+
+| ölçüm | önce | sonra |
+|---|---|---|
+| `resolveTaskModel(747-001)` | `claude-opus-5` | **`claude-sonnet-5`** |
+| `activeModeConfig.max_tier` | (alan yok) | `standard` |
+| scoped test | — | 41/41 yeşil (8'i yeni) |
+
+Brain etkilenmiyor — **doğrulandı**: `sprint-planner.ts:707` `brain_model`'i `forceModel`
+argümanı olarak geçiyor, Katman 0 erken dönüyor. Tavan yalnız oto-seçilen worker modelini
+bağlar; açık `- Model:` pin'i hâlâ üstün (test #8 bunu sabitliyor).
+
+Regresyon dürüstlüğü: `planner-override-precedence` + `brain-planning-precedence` 9 test
+kırmızı — ama **benim değişikliğim olmadan da 9 kırmızı** (dosyaları HEAD'e alıp ölçtüm).
+Hepsi `E_PRODUCTION_WIRING_REQUIRED`, tier ile ilgisiz; önceden var olan borç.
+
+### Koşum-7 konusu — neden STATE-RETENTION-001 DEĞİL
+
+747'nin worker'ı efektini çalışma ağacına indirdi ve **hâlâ commit edilmedi**
+(`observability.ts`, `observability-rotation.ts`, `config-types.ts` = +595 satır, artı yeni
+tenant testi). Aynı outcome'u tekrar koşarsam worker işi yapılmış bulur, yeni efekt inmez ve
+koşu kanıt yerine *no-effect admission*'da düşer — BUG-F hakkında hiçbir şey öğrenemem.
+
+Profil kısıtı da dar: kayıtlı 7 host-proof profilinden 4'ü terminal-* (Cursor'ın lane'i),
+1'i closure-os (owner-gated), 1'i metrics-retention (efekt inmiş durumda). Geriye
+**`deckent-memory-compact-read-export-v1`** kalıyor — ve o zaten iş tablomun 6. maddesi.
+Koşum öncesi ikisini de doğruladım: `scripts/memory-compact-host-proof-observer.mjs` var
+(8024 bayt) ve adapter harness `PROFILES`'ında kayıtlı ⇒ BUG-B sınıfına düşmeyecek.
+
+### KOŞUM-7 — plan ve model kanıtlandı, koşu 747 bloğuna çarptı
+
+**7a** (04:29): `INVOCATION_RECEIPT_PRE_DISPATCH_WRITE_FAILED` @182 sn.
+**7b** (04:37, aynı hedef): plan **BAŞARILI**, 774 sn, GATE GEÇTİ, öneri `6de757f8`.
+Yani 7a **tekrarlamadı** — geçici, **kök-nedeni teşhis edilmedi**. Düzeltmem onu çözmedi.
+
+Sahibin talimatı canlı planda tuttu:
+
+| | koşum-6 (747) | koşum-7b |
+|---|---|---|
+| worker `model` | `claude-opus-5` | **`claude-sonnet-5`** |
+| Brain `requestedModel` | `claude-opus-5` | `claude-opus-5` (değişmedi) |
+| `effort` | high | high (korundu) |
+
+Onay+başlat → 5 dakika sonra `RUN_FAILED`, **`RUN_STARTED` hiç gelmedi**:
+
+```
+run crashed before completion:
+EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD:747-001:hold:production-wiring-missing-worker-evidence
+```
+
+Worker'a hiç ulaşılmadı ⇒ `.result` yok ⇒ **BUG-F hâlâ uçtan uca kanıtsız.**
+
+### BULGU-M (OWNER KARARI — bloke edici) — 747 settlement'ı için desteklenen yüzey kalmadı
+
+Bu sabahki hatamı tekrarlamamak için bu kez **hepsini gerçek koşumla** denedim ve
+ön-koşullarını kaynaktan okudum:
+
+| yüzey | koşum | sonuç |
+|---|---|---|
+| `recover sprint-747 --force` | gerçek | non-terminal korundu · **`sprint-state.json` kaldırıldı** |
+| `resume sprint-747` | **gerçek** | `Resume HOLD: … eşleşen kalıcı run durumunu gerektirir` |
+| `recover --resume --dry-run` | dry | `canonical, sürdürülebilir PAUSED/ORPHANED authority bulunamadı` |
+| `recover --restore-tasks` | kaynak | yalnız `.tasks/` geri yükler; snapshot sprint-state İÇERMEZ |
+| `cleanup --sprint sprint-747` | dry | `terminal-receipt-required` |
+| `runs --close-stale` | gerçek | "bayat koşu yok" (run-flow katmanı, sprint değil) |
+| yeni `deckent do` | gerçek | `RUN_FAILED` — 747-001 |
+
+**Kilidin mekaniği (kaynak-kanıtlı, tahmin değil):**
+
+1. `resume.ts:348` gerçek uzlaştırma yolu `!dryRun && !hasInvalidSettlement` ile açılıyor —
+   747-001 `pending-settlement`, yani bu kapı **geçiyor**.
+2. Hemen sonraki kapı `readSprintState(projectRoot)?.sprintId === checkpoint.sprintId`.
+   `recover --force` o dosyayı sildiği için `null` ⇒ `settlement_state_required`.
+3. `recover --resume` de kurtarmıyor: `sprint-controller.ts:2783` `restoreSprintFromCheckpoint`'i
+   `readSprintState()`'in döndürdüğü `prevSprintId`'ye bağlıyor — aynı silinmiş dosya.
+4. `--restore-tasks` de kurtarmıyor: `task-restoration.ts:43 createPreArchiveSnapshot`
+   yalnız `.tasks/` dosyalarını alıyor.
+
+**Doğru çerçeve** (bunu "recover dosyayı siliyor" diye yazmak yanıltıcı olurdu):
+`recover --force` ve `resume` **sıralı yüzeyler ama sıralama hiçbir yerde beyan edilmemiş.**
+recover başarıyla bitip *"sprint-747 run'ı yeniden başlatmaya ready"* diyor — oysa resume'un
+ön-koşulunu kaldırmış durumda. `recover --resume`'un aynı komutta bulunması, sıralamanın
+komut içinde çözülmesinin amaçlandığını gösteriyor; operatöre bırakılması tasarım değil.
+
+**Yapmadığım şey:** `.deckent/sprint-state.json`'ı elle yazmak. Uydurma bir kalıcı run durumu
+üretmek tam olarak motorun engellemek için var olduğu şey; kilidi açardı ama settlement
+otoritesini sahtelerdi.
+
+### BULGU-N (uygulanmadı) — `isDecidedExactSettlementHold` dalı aile için fazla dar
+
+`sprint-controller.ts:1549`: `production-wiring-*` ailesinde yalnız `-invalid`/`-changed`
+"kesinleşmiş" sayılıyor. Ama `task-result-settlement.ts:420-431`'in yaydığı 11 kodun **yalnız
+1'i** (`host-effect-authority-invalid`) bu filtreden geçiyor; `-changed` ise bu aile için
+tamamen ölü dal. Predicate'in kendi yorumu nedeni ele veriyor: dal
+*"the `production-wiring-*` **verifier-asset** family"* için yazılmış, ama sonuç-settlement
+ailesini de yönetiyor.
+
+Bitmiş bir denemede bu kodların hepsi **değişmez artefaktlar hakkındaki kararlardır**
+(sonuç dosyası ve digest-bağlı plan sözleşmesi); sonraki bir başlatmada farklı çıkamazlar.
+
+**Bilerek UYGULAMADIM.** İki nedenle: (a) ölçtüm — sprint-747'nin arşiv terminal mührü `null`,
+yani koşul 9 (`owning run terminal`) yine düşerdi ve genişletme bu vakayı **çözmezdi**;
+(b) bu bir güvenlik predicate'i ve ikinci bir outcome — 747 düzgün settle olunca soru
+hipotetik hâle gelir. Kanıt tablosu kayıtlı, karar owner'ın.
+
+### Süreç dersi (kendime)
+
+Koşum sırasında proje köküne **yazma**: exact Docker dependency-population helper'ı ~33 sn
+pencerede kökün byte-aynı kalmasını şart koşuyor. Koşum-6 sırasında notları scratchpad'e aldım.
+
+### Sınırlar (kendime hatırlatma)
+
+- stdout **başarı protokolüdür** — bozulmaz. Teşhis yalnız stderr'e, bounded machine-code olarak.
+- Runner stderr'e **güvenmez**: exact `kind`, sıkı regex, uzunluk tavanı; aksi halde generic'e düşer.
+- `isDecidedExactSettlementHold`'u GEVŞETMEK yasak — daha önce önerip geri aldım; predicate doğru.
+- Worker modeli sonnet: `modes.performance.default_model = claude-sonnet-5` (doğrulandı).
+- Karantina son çare; önce gerçek düzeltme. Silme YOK, her zaman sha256 manifestli yedek.
+
+---
+
+# (Cursor lane) Geçici iş imleci — 7099 Terminal
+
+Güncelleme: 2026-09-09T10:50Z. SSOT: [MASTER](../docs/MASTER-PLAN.md).
+Bu dosya authority, admission veya settlement receipt değildir.
+Silinme tetiği: onaylı sıra tüketilip kalıcı kanıtlar SSOT/evidence'a işlendiğinde.
+
+## Güncel gerçek
+
+2026-09-09 final Native dilimi: catalog/checkpoint3df2f1138, statusUXe7adcc04f,
+kanıt27af4125a committed. Main91catalog+141status tests; actual38help+8checkpoint
+PASS. Finalbuild:all source/native pins unchanged. ActualWSL80x24 /status aç/kaydır/
+Esc/yeniden aç/Esc/exit0, sıfır clear2J/3J; digest f4403f9e5544bb25e361cb297bf6c5eac5fd21aeb875f7192bb28198d8f20a0a.
+Bot153705 canonicalstart/status+host doğrulandı; eski8959/14358 normalstop kanıtlı.
+Owner limit nedeniyle bu dilim sonrası Fable handoff istendi ve TAMAMLANDI: canonical
+chain ah-2026-09-09-astra-fable-7099 PREPARED→VERIFIED→COMMITTED, epoch 5, son receipt
+docs/execution/handoffs/ah-2026-09-09-astra-fable-7099/0003-committed.json
+receiptDigest sha256:7e6f41d8947d121cb346365db307808a532421a4d40c0d5bb1925916d451d54f
+(07:43Z). Aktif yürütücü claude-code-cli/claude/claude-fable-5-1 supervisor; Astra
+source/run/approval/SSOT mutation STOP. Snapshot proof/handoff-snapshot.json a5d0f689….
+Kalan exact sıra durum-raporu.md; 7099VERIFY, fakeDONE yok. Aşağıdaki ara kayıtlar
+tarihseldir; yeni state iddiası için üstteki finalproof kullanılır.
+
+Owner 2026-09-09 devam kararı: 7099 Native Terminal kapanışı öncelikli; önceki
+duraklama sona erdi. User manuel Native/bashing approval denemesinde bariz iyileşme
+bildirdi; bug ayrıntısı soruldu, rapor tek başına DONE sayılmıyor.
+Root gerçek main TTY: chat-2026-09-09T06-23-20-507Z-496k9d, configured
+local-llm/Qwen3.8-27B-Q4_K_M; HAZIR yanıtı, ardından deckent_read_file ile
+package.json name/version yanıtı gözlendi; /exit clean0. Source/entry/build pins
+prepost eşit. Transcript digest e133689f9c78f0e9957b8a080defc7918812aba747171708899bcd9a48c71a8a;
+kalıcı dosya .deckent/recovery-snapshots/7099-catalog-YLr6iwUC/proof/native-local-main-20260909.typescript.
+Bu Native conversation/tool gözlemidir, dogfood multiworker settlement veya7099DONE değil.
+Yeni owner UX kararı: sürekli sprint/status/error paneli varsayılan gizli,
+/status ile istek üzerine açılır; aktif turn/tool ve session identity korunur.
+Sol ayrı persistent 7099-status-1DleJjO4/checkout içinde bounded App/test lane'inde.
+Katalog/checkpoint adayı: 91/91 root test, build:all0 source-stable, HOST actual
+help38/38 +checkpoint8/8PASS. Sandbox empty-help failure ve helper hash/interpolation
+kusurları ayrı kayıtlı, eski FAIL sonuçları değiştirilmedi. Exact12path main'e
+aktarılmış; main targeted test sürüyor, main build/commit henüz yok. Sourcefan-in
+diğer dirty dosyalara dokunmadı. Bot canonical inspect hostta absent; buna rağmen
+iki bot process önceki host ps'de canlıydı, reconciled/running tek-owner iddiası yok.
+
+### Önceki ara snapshot (tarihsel)
+
+Main `1c2df4047` origin/main'e push edildi; önceki DNS hatası yetkili host
+denemesinde aşıldı. 7099 VERIFY, DONE veya handoff gerçekleşmedi.
+Oturum/ortam geçişinde eski /tmp adayları hostta da kayboldu. Aşağıdaki /tmp
+yolları tarihsel referanstır; kalan kalıcı arşivler ayrıca doğrulanmadan güncel
+kanıt sayılmaz. Git worktree metadata korunuyor; prune/gc/cleanup yapılmadı.
+Katalog/checkpoint tekrar üretimi kalıcı ignored alanda:
+`.deckent/recovery-snapshots/7099-catalog-YLr6iwUC/checkout` (base1c2df4047).
+Sol katalog/generator 6path freeze; eksik help i18n key root tarafından eklendi.
+Terra checkpoint readonly listeleme karşıörneklerini tamamlıyor. Root yeni
+birleşik test/build/gerçek CLI kanıtı sonrası tek fan-in writer; eski85/44PASS
+bu aday için kullanılmıyor. Candidate henüz main'e alınmadı.
+09:07TR düzeltmesi: sandbox NOT_RUNNING gözlemi host gerçeğini temsil etmiyor.
+Host ps PID8959 ve PID14358 için aynı repo binary'sinden bot listen doğruladı;
+çift canlı süreç var, tek-daemon sahipliği/Telegram sağlığı doğrulanmadı.
+PID926501 aşağıda yalnız tarihsel kayıttır. Kill/cleanup/restart yapılmadı.
+Owner push sonrası durup analiz istedi: uygulama ve iki alt ajan freeze edildi.
+Yeni run/build/fan-in yok; değerlendirme durum-raporu.md'de. Goal active kalır,
+objective veya MASTER değiştirilmedi. Docker'da yalnız local-llm container canlı.
+Fable1059 tüketildi/1060 yanıtlandı: Goal purpose/termination consumer bağı hâlâ
+BLOCKS_CURRENT_DONE. XVerify unattended zinciri Goal yetkisi yerine kullanılamaz.
+Yeni paket/audit açılmadı. MCP checkpoint karar yolu authority parity bulgusu
+aşağıda korunuyor; outer middleware henüz doğrulanmadı.
+
+## Önceki doğrulamalar — tarihsel kayıt
+
+Output paketi 815db82aa ile MAIN'de: 36 source/test + EN/TR CLI docs, exact38file.
+CLI watch output / legacy output, API iki route ve Dashboard üç consumer aynı
+read-only custody projection'ına bağlı. Principal yalnız id/tenantId; opaque read
+capability write authority üretmez; pre/post custody + filtered Docker identity.
+Observer kapatma worker/task settlement değildir; raw kaynak korunur, görünüm
+redacted tam satırlar ve açık omission bildirimi taşır. Explicit attempt selection.
+Main163/163 targeted +87/87 Dashboard +archive-debt targeted PASS; fullbuild:all
+exit0 ve kaynak pre/post aynı. Aday36dosya ile main byte-equality doğrulandı.
+GERÇEK MAIN CLI: 724-001 canonical/legacy2/2PASS, sealed18609byte kaynak digest'i ve
+receipt eşleşti, sanitized tail/NDJSON ve clean exit0. Yeni dispatch/live proof değil.
+Kanıt /tmp/deckent-7099-output-read-rK8QBKxH/actual-output-main-sealed-c6pYhQ;
+kalıcı arşiv /home/alperen/deckent-recovery-20260904/terminal-7099-output-main-hEzd4a,
+130checksumPASS, manifest58836f786211. İlk cross-checkout binary-root HOLD korunuyor;
+override yapılmadı, kendi checkout'unda build/okuma ile geçti. Bot817258stop→926501
+start/statusrunning. MCP reconnect NOT_VERIFIED. Build inherited dirty source içerir.
+Output kanıt özeti1c2df4047 ile ayrıca commitli; inherited706capsule satırı unstaged
+korundu. Main cachedorigin31ahead. Push araçta process başlamadan approval-required/Never
+reddedildi; aynı denemeyi tekrarlama/bypass yok. MASTER7099 VERIFY değişmedi.
+Sıradaki: eski CLI metadata/generator adayını güncel main'le exact delta uzlaştır;
+checkpoint list parity, global source diagnostics; ardından Goal transport/admission
+ve bağımlı çoklu görev→sonraki Goal→durable settlement. Yeni geniş audit/paket yok.
+Canlı Docker observation, macOS/Windows-native ve tam7099 closure hâlâ açık.
+
+Aktif disjoint Codex lanes: /tmp/deckent-7099-catalog-join-AyWfLG6g/checkout,
+sourcebase815db82aa (main'in sonraki commit'i yalnız docs). Sol6path katalog/generator;
+Terra checkpoint list/approvals readonlyadapter +3test +messages tekkey. Her ikisi
+çalışıyor; root tek fan-in writer. Main bot926501 çalışır; candidate dist yok,
+binary override/build yapılmadı. Baseline64source violation, selected37/44PASS;
+ZERO guard checkpoint list dependency bitmeden red kalır, whitelist/hardcode yok.
+Root MASTER check590rows/501active/projections in-sync; Closure7event gatePASS,
+ledger/DONE mutation yok. Fable/Cursor yeni incoming yok, yeniASSIGN yok.
+Root prepared proof: catalog-join-AyWfLG6g/prove-checkpoint-list-v1.mjs (syntax PASS,
+UNRUN until joined build): actual CLI all/pending/TR/strict-unscoped/partial/disabled,
+fixture source bytes pre/post pinned; gerçek live approval/settlement iddiası yok.
+7099-L3 BLOCKS_CURRENT_DONE finding: src/mcp/tools/checkpoint.ts:78 registered tool
+approve/reject doğrudan updateCheckpointStatus→writeFileSync çağırıyor (aynıdosya56).
+src/mcp/tools/index.ts:94 production registration. CLI authenticated approvals
+executor'ıyla authority parity kanıtı yok; list lane'ine eklenmedi, henüz fix yok.
+
+Son landing422dffda7: checkpoint approve/reject iki argümanla aynı authenticated
+approvals executor'a bağlandı; origin/tenant kontrolleri mutation öncesi. Dil local,
+invalid input güvenli; raw checkpoint write yok. Exact5file, main39/39test6file,
+ayrı Luna reviewPASS (XVerify değil). Fullbuild11957exit0/pre-post source aynı;
+gerçek CLI help4/4 +negative5/5PASS. Human-auth/provider/settlement proof değildir.
+Kanıt /tmp/deckent-7099-checkpoint-route-zDUAffyx; actual-checkpoint-help-3xLeE4,
+actual-checkpoint-negative-RoVW7Z. Bot784946stop→817258start/statusrunning.
+Main cachedorigin'den29ahead; push yok; inherited dirty source build'e dahildi.
+Metadata adayında registered legacy child normal arg/option doğrulamasına alındı;
+4seçiliPASS/41skip+tsc0. Birleşik source diagnostics: 3→1gerçek hata (output --logs),
+261actual/7mappedhelp. Kanıt cli-contract-fix-rHc68nq7/checkpoint-joined-source-diagnostics.json.
+Metadata/generator main'e alınmadı. Checkpoint list parity ve tam7099 açık.
+Kalıcı checkpoint kanıtı: terminal-7099-checkpoint-main-Wk7bJDjZ (repo dışı recovery
+dizini); 38checksum rootPASS, manifest83654618b52d, SUMSae5971d75b38.
+Output root cause: watch/API worker-logs eski `.tasks`/container yollarını okuyor;
+verified pristine-provider-stream yalnız RELEASED+PROVIDER_EXIT sonrası yayınlanıyor
+(custody-store:11130; spawn-backend-docker:18965). Terminal artifact'ı canlı stream
+gibi sunmak yanlış olur. Exact task→attempt okuma + ayrı live stream bağı kapanmalı;
+7099 içinde BLOCKS_CURRENT_DONE, yeni MASTER paketi açılmadı.
+
+Önceki landing43696cfa9: approvals run mevcut XVerify/LLM composition'a bağlandı,
+legacy confirmations run aynı consumer'ı kullanır. Provider authority taşınır,
+tenant filtresi çağrıdan önce; tüm ifadeler, receipt/settlement/separation korunur.
+Main5suite34/34PASS, tsc0; source7file. Root test locale izolasyonu ekledi.
+Main build53700exit0, source before/after856d3c2a0e265359c9b9bf5a6433aad1df69202a687522be4ae84602ccd2c152/1419;
+inherited dirty source dahil, temizHEADbuild değildir. Bot730260 canonical stop,
+yeniden784946start/statusrunning. Actual MAIN help EN/TR4/4PASS (e12c4899e7c9),
+empty inbox canonicalEN/legacyTR2/2PASS (8e72e70d6234); provider/settlement proof değil.
+Arşiv: /home/alperen/deckent-recovery-20260904/terminal-7099-approval-run-main-crCuU4MS;
+manifest a86c85a70524, SUMS309057590dba; önceki başarısız kanıtlar korundu.
+Main HEAD43696cfa9, yerel origin/main kaydından28commit ileride. Push yok;
+MASTER hâlâ VERIFY. Diğer üç CLI davranışı ve Goal transport/admission açık.
+
+Child-help2file809745720 ile main'de. Main17/17test, build-v3 session52017exit0,
+source pre/post sabit200d4a071cb5bf0097ab3991b215a4f835e9b16ceb75563c2677b719e253568b/1418.
+Actual-proof-v2 session72380exit0:6/6PASS, EN/TR child-help+access footer ve2topalias.
+Proof SHA cb380893713854c5834185a4c9c59415528b5beb0cee05e6138961aceef8caf0.
+Bot canonical stop721067→start730260/statusrunning. Önceki TS buildFAIL ve actual
+4PASS/2FAIL korundu; sonucun üzerine PASS yazılmadı. Bir eski negatif wall-clock
+duration performans kanıtı sayılmadı. WholeCLI/7099 veya platform closure değildir.
+
+- Tek ACTIVE outcome 7099; MASTER VERIFY. DOGFOOD ON / HEALTH DEGRADED.
+  Owner-approved bounded ADR-D-007 elle yürütme; mode değişmedi.
+- Önceki main HEAD809745720; o noktada origin/main yerel kaydından27commit ilerideydi.
+  Fresh full-access context'te push denendi fakat process yaratılmadan tool policy
+  approval-required/Never reddetti. Tek deneme; bypass/kör retry yapılmaz.
+  Root tek main entegratörü; ilgisiz dirty değişiklikler, DB/task/receipt korunuyor.
+- Goal consumer persistence: 5d792f038,30exactfiles, main212/212test + tsc0.
+  Author effect/checkpoint accepted receipt'ten önce atomik kalıcılaşır; replay
+  yeni provider çağrısı istemez; cancellation/terminal sonuç yeniden açılmaz.
+  Gerçek compiled iki-DB replay + terminal3case supportive PASS, canlı provider değil.
+- Fable sync async v5: dfb4697e7,9exactfiles; main179/179test + tsc0.
+  Candidate9actualCLI PASS; owned process group/lifetime deadline counterexamples
+  v5 ile kapandı. Bağımsız root/Terra review ve committed byte/hash eşleşmesi PASS.
+- Main fullbuild58073 exit0, pre/post kaynak eşit. sourceTree
+  f8890c64d9578990f0446ff3bbf980fcb1adfa3a3366e60b59cb7af1211df70c /1417;
+  nativeef06f44…/7. Bot canonical stop405459→ALLOW→build:all→start593010;
+  CLI bot status running doğrulandı. Eski MCP host reconnect NOT_VERIFIED.
+  Build yalnız üretilmiş19çıktıyı yeniden yarattı; retained state temizlenmedi.
+- Yeni joined fullbuild58769exit0 iki dilimi içerir, pre/post kaynak eşit;
+  /tmp/deckent-7099-joined-refresh-oIlcXEZV. Botstop593010→start650161/statusrunning.
+  Cursor16 dosya f5bed84c0, main10/10test+önceki tsc0+current CLI28/28PASS;
+  exact manifest /tmp/deckent-cursor-source-fanin-zJwfeW/source-freeze-v1.json.
+  Goalbackend4 dosya275a000f9, main26/26test+compiled-v2PASS. Compiled-v1 injected
+  provider fixture hatası korunuyor, gerçek provider çağrısı/settlement değildir.
+- Readonly MASTER gate PASS:590row/501active; closure7event chain PASS.
+  Bu sayı ölçümdür; MASTER/ledger mutation veya ürün DONE değildir.
+
+## Sıradaki exact iş
+
+0. **ACİL (owner 2026-09-09, MASTER 7105 TERMINAL-CONTEXT-CONTINUITY-001):** native terminal
+   tur içi bağlam taşması: loop estimateTokens ile adapter measureProviderRequest ayrı otorite;
+   overflow retry yalnız epochAdvancedThisTurn; 16 KB tool-result önizlemesi pencereden bağımsız.
+   Uygulama Astra izole worktree (communication.md ENTRY 1084 İŞ C), review/landing Fable.
+0a. LANDED (owner onayı 09:42Z): caa404984 fix(mcp) checkpoint read-only typed refusal (Cursor L3);
+   27c9f9fd3 feat(custody) Lane D T1+T2 goal subject/ledger v3/settlement namespace (Astra; UNWIRED,
+   T5–T7 bağlı). Push yok; main origin'den 4 ileride.
+0a1. LANDED 10:22Z (owner onayı): 72ca31c42 E077 paketi; b0b1626e0 governance docs; 87baca2e8 MASTER 7105
+   context continuity (Astra İŞ C, Opus review GO, gerçek Qwen 24-tool kanıtı); c56565f89 T3 purpose-bound
+   admission (Cursor); bfe8fd4c9 T4 non-reservable artifact (Cursor). Main origin'den 9 ileride, push yok.
+0a3. Canary run-4 (sprint-730, 09:54Z): worker dispatch KABUL, custody zinciri 01→06 tam (728 reader
+   sınıfı geçildi), effect landed; evaluation NO_GO (assessment-parity, worker öz-değerlendirme tutarsız,
+   ürün doğru); FIX fazı EXACT_LIFECYCLE_CONTAIN_HOLD ile crash → yeni sınıf: contain reconcile custody
+   store'u diskten tarayıp tarihsel 728-001'i hold'a çeviriyor. DÜZELTME (ajan kanıtı): barikat
+   sprint-controller.ts:4063 koşulsuz FIX-öncesi contain reconcile; EXECUTE admission hold yok, redispatch
+   hiç olmadı (ikinci defekt yok). Fix lane deckent-lane-contain-hold (Astra A3 doğrulaması bekleniyor).
+   sprint-730 kalıntısı recover ile arşivlendi. Build c842a396 (7105 dahil) bot 584802.
+0a5. 11:02Z durum: contain-hold A3 düzeltmesi hazır (predicate yalnız DAHA ÖNCEKİ ordinal;
+   E077 retirement yolu candidate varken `<`, candidate yokken önceki davranış; +6 test, fan-in 37/37;
+   6 pre-existing kırık ayrık) → Astra sınırlı re-verify (ENTRY 1128). Populate-race parser düzeltmesi
+   (tam-satır sentinel, 24/24) → Astra A2 re-verify sürüyor. Cursor L5 ACCEPTED + alan-sırası rötuşu;
+   7105-b REVISE (ENTRY 57): battery suite 2 kırık, 'reference-expansion' reason emitter'sız (sil),
+   no-progress CADENCE değil (undefined). Kuru-prova: populate+contain patch'leri main ef54d66f7 üstüne
+   çakışmasız uygulandı (scratch worktree), birleşik tsc/vitest koşuyor. Astra İŞ D uygulamada.
+   Sıra: CONFIRMED×2 + Cursor READY×2 → fan-in → gate'ler → owner commit gate → bot stop → build:all →
+   bot start → canary run-5 (hedef: FIX turu tamamlanır, DONE settlement). Ana ağaç run sırasında sessiz.
+0a6. 11:20Z: engine lane'leri fan-in DOĞRULANDI ve main'de STAGED (13 dosya; commit owner gate).
+   Kuru-prova iki regresyon yakaladı, düzeltildi: (1) mounts :3249 yeni daemon probe'u hermetik
+   runner'sız 10 s timeout → test-only enjeksiyon (96/96); (2) sprint-lifecycle/spawn-failure-authority
+   `reconcileExactLifecycle(mode, undefined)` çağrı-şekli → options yokken tek argüman (125/125).
+   Birleşik ağaç: tsc0; 95 dosya 1762 test → 25 kırık = 24 main-baseline pre-existing (sprint-controller 12,
+   docker-restart-reconcile 5, spawn-throw-lifecycle 5, cascade 1, scheduler-effects 1) + constants.test
+   (committed HEAD'de kırık; main'deki uncommitted 4-satır silme düzeltiyor — owner bulgusu). Ortam:
+   planning-preflight gitignored native prebuilds KOPYASI ister (symlink reddedilir). Gate'ler: i18n,
+   config-writers, no-model-literal temiz; cli-mcp-parity main'de de kırmızı (pre-existing; description-catalog
+   key drift — owner bulgusu). Astra A2/A3 CONFIRMED (ENTRY 1129). 7106 (Astra) READY_FOR_REVIEW, bağımsız
+   review ajanı sürüyor. Cursor ENTRY 57 (L5 rötuş + 7105-b REVISE) bekleniyor.
+0a7. 11:19Z LANDED (owner onayı): 99d94a929 populate-race + contain-hold. Bot 692938, build:all exit0.
+   Canary run-5 (sprint-731, flow fd218d1c, 11:25Z): dispatch KABUL, worker etkisi landed (CANARY-NOTE run-5),
+   custody 01→06-archive 11:35:32Z tam, evaluation decision DONE (bir kriter UNDECIDABLE/CONFIRMATION_MISSING
+   → FIX), FIX-öncesi contain reconcile: 728-001 DOĞRU emekli edildi (ERRORS.md 11:46:32Z daemon absent —
+   run-4 sınıfı KAPANDI); 11:46:33Z RUN_FAILED EXACT_CONTAINMENT_INCOMPLETE = YENİ sınıf: arşiv-atlama dalı
+   (spawn-backend-docker.ts:19505, E077 #1) absence kaydetmiyor, tamamlık kontrolü (scheduler-effects.ts:1265)
+   bu run'ın settle+arşiv olmuş 731-001'ini 'unknown' görüyor. Düzeltme lane'i deckent-lane-archived-absence
+   (contain modunda daemon probe: absent→absence; present/unknown→typed hold). Kalıntı: run-status ACTIVE/FIX,
+   coordinator yok → run-6 öncesi recover. 7106 (Astra) REVISE (default .15 küçük pencereyi kapatıyor; 560-006
+   proof silinmiş). 7105-b (Cursor) GO + 3 rötuş; L5 ACCEPTED; ikisi run-6 öncesi landing kuyruğunda.
+0a8. 12:40Z OWNER PIVOT — terminal program (MASTER 7107 şemsiye; 7108/7109/7111/7112/7113): owner iki
+   oturumda 30 dk / ~25 onay / 0 cevap bildirdi ("kabul edilemez teslimat; claude code / codex / cursor gibi
+   akıcı"). Kök nedenler kanıtla: RC1 Qwen thinking + 4096 tavanı (4×4096 üretim, RESPONSE_MISSING),
+   RC2 bayt/token tavan karışımı (checkpoint 4/9/13/19), RC3 fetch failed cause gizli, RC4 checkpoint
+   sonrası iş kaybı (DECKENT_E005, boş findings), RC5 bash salt-okunur onay, RC6 büyük referans stratejisi.
+   Doküman docs/execution/active/TERMINAL-FLUENCY-PROGRAM-001.md. Lane'ler: 7108 (ajan), 7109 (Cursor
+   ENTRY 64), 7111 (ajan), 7112 (ajan, worktree deckent-lane-7110), 7106 revize (Astra READY, review
+   ajanı). Landing #2 e7b32aaf8 (A4+L5+7105-b) main'de; run-6 terminal programından SONRA.
+0a9. 15:09Z: LANDED f65502eb3 (7106) → 0eda3ee0f (7108) → d07c3b4db (7109); build:all OK, bot 1035283 yeni
+   dist (7106+7108+7109). sprint-731 kalıntısı recover ile arşivlendi. Owner canlı test bekleniyor (131k+32k,
+   standart+full-auto, MASTER-PLAN senaryosu). Açık: 7108-b (Astra post-landing REVISE: /props deadline/abort,
+   retry re-admission, cause-zinciri abort önceliği, kalıcı TLS/DNS retry) ajanda; 7111 READY→d07c3b4db rebase
+   (bridge çakışması) ajanda; 7112 revizyon READY→d07c3b4db rebase (4 çakışma) ajanda; 7113 tasarım GO
+   (flag-gated, default OFF → kabul sonrası ON), Astra dilim A uygulamaya başlıyor; Cursor beklemede (dilim D).
+   Claude limitleri: alt ajanlar 14:50Z reset sonrası sürdürüldü; review'lar ana oturumda yapılıyor.
+0a10. 15:3xZ LANDED (owner toplu onayı): 0fd94b77e 7108-b (probe deadline/abort, retry re-admission, abort-first
+   transport, signal forwarding) → b6f8f4549 7112 rev4 (host tool-trail, content-ref reader UTF-8 sınır-güvenli,
+   host-stamped checkpoint, replay guard, pencere-paylı açılış) → f3d3e2ceb 7111 rev2 (salt-okunur shell
+   sınıflandırıcı argv-metni/realpath/case, read_file outline-aralık-arama, gruplu onay). Üçlü ağaç: tsc0,
+   2083/2092 (bilinen 9), 64k core-16 9386/9830. Build:all + bot restart koşuyor → owner canlı test (tam 7107
+   bataryası). Astra A5c/A6b/A7b post-landing; 7113 dilim A (Astra) base f3d3e2ceb; Cursor 7113-D bekliyor.
+   Bilinen 9 pre-existing kırık: qwen-incident 2, snapshot-compact 1, shell-risk 2, picker 1, string-free 2,
+   app-picker-mutex 1 (owner admission bekleyen ayrı temizlik işi).
+0a4. MASTER 7106 TERMINAL-PREAMBLE-BUDGET-001 (owner-admitted 10:31Z, P0): "Selam" turu ~48k/131k preamble;
+   Astra İŞ D (ölçüm → progressive tool şeması, contentRef referans metin, config-resolved pay, /context).
+0a2. Canary run-3 (sprint-729, 09:03Z) worker gönderimi kabul edilmedi: kök neden = exact Docker
+   dependency-population helper'ı (spawn-backend-docker.ts:2857-3108) ~33 s pencerede canlı proje
+   kökünün byte-aynı kalmasını şart koşuyor (envanter untracked dahil), o pencerede main ağacına yazan
+   ajan vardı → exit 78 → HELPER_RUN → lifecycle.ts:3161 catch yutuyor → ADAPTER_UNAVAILABLE/PRE_MOUNT_ABORTED.
+   Image/native/subscription temiz (rebuild gerekmez; 04 Eylül image'ı commit'li Dockerfile'dan
+   yeniden üretilemez — hijyen bulgusu). Fix: typed ordinal + bounded config-resolved retry
+   (izole worktree deckent-lane-populate-race) + lifecycle typed yakalama (Cursor ENTRY 47).
+   sprint-729 kalıntısı: sprint-state FIX/FIXING; recover dry-run task residue force-archive gösteriyor.
+0b. E077 makine-brick paketi (ADR-D-007, Fable epoch-5): (1) arşivlenmiş attempt cold-start atlama
+   (Astra CONFIRMED, canary run-2 724-001 geçti); (2) yabancı settle-edilemeyen attempt registry
+   emekliliği (uygulandı, doğrulama Astra'da); ardından build + canary run-3 (asıl hedef: exact
+   Docker accepted-result reader kanıtı). Bulgu: replay sözleşmesi versiyonsuz; emeklilik yalnız debugLog.
+0c. Fan-in kuyruğu (Fable; commit owner gate): MCP checkpoint paritesi (Cursor; main'e uygulandı,
+   152/152 + parity + i18n PASS); Lane D T1+T2 (Astra, 62/62 + tsc0, review sırada); hermeticity
+   gate main'de önceden kırmızı (harness:412) → owner bulgusu.
+
+
+Tamamlanan dar uygulamanın geçmişi: Sol, `/tmp/deckent-7099-approval-run-QBsITiyx/checkout`
+base809745720 üzerinde eksik `approvals run` consumer'ını mevcut XVerify +
+acceptance-confirmation composition'a bağlıyor. Index aynı runtime.providerAuthority
+nesnesini geçirecek; yeni authority/policy yok. Root aynı adayda yalnız katalog
+satırlarını yazar (`approvals run` + legacy run: process/apply/owner).
+Scoped test → bağımsız review → gerçek compiled proof; main'e henüz alınmadı.
+Main baseline session47554: acceptance-service suite0/8PASS, exit1;
+`/tmp/deckent-7099-approval-run-QBsITiyx/baseline-acceptance-tests.json` korunuyor.
+Eski test fixture'ı canonical approvals kaydını kurmadığı için bu sayı sekiz ayrı
+production hatası değildir. Aday testler gerçek approvals+legacy kayıtlarına taşınıyor.
+Root `prove-run-help.mjs` hazırladı, syntaxcheckPASS; actual çalışma UNRUN.
+İnceleme: configured-tenant dışı istek provider'dan önce elenir, tüm statements
+taşınır, missing lifecycle için yeni policy default'u türetilmez. Source/test
+İlk freeze: Sol5suite34testPASS bildirdi. Root private canonical build session2998
+exit2: yeni runner'da var olmayan provider-authority-runtime.js type import'u,
+TS2307. Native Linux build geçti; compiled ürün kanıtı yok. Doğru mevcut modül
+provider-authority-composition.js; exact import düzeltmesi ve tsc + aynı hedefli
+testlerin durable JSON doğrulaması Sol'a verildi. Main/source/bot değişmedi.
+Checkpoint önerisi düzeltildi: iki argüman korunur, canonical kimlik
+`checkpoint-${sprintId}-${phase}`; tek argümanlı alias eşdeğer değildir.
+Output araştırması: exact Docker terminal yakalama `pristine-provider-stream`
+üretir (spawn-backend-docker.ts); store.readVerifiedArtifact mevcut. Host-only
+`.tasks/*.log` veya eski output snapshot'ını okumak exact private output kapanışı
+değildir. Mevcut verified reader'ın operator adapterına bağlanması araştırılacak;
+ham custody dosyası okuma/konum tahmini yapılmadı.
+
+Son tamamlanan dilim: child `--help` gerçek canonical alt komutun tam yardımını
+ve erişim açıklamalarını gösterir; public Commander output config normal/hata
+yolunda geri yüklenir. Normal action forwarding/config/authority değişmedi.
+Metadata/verifier/generator adayının kalanları hâlâ HOLD; `output` ve eksik
+confirmations run için sahte eşdeğer veya katalog silme yok. Alt ajan yazımı bitti.
+
+Metadata devamı tekrar aktif, aynı private writer: typeof-path union daraltması;
+index.ts'de açıkça kayıtlı HIDDEN help [topic] için exact katalog+EN/TR arg binding.
+Scope yalnız hidden-help registration metadata + messages topic key kadar genişledi;
+action handler değişmez. İki silinmiş checkpoint approve/reject satırı da restore
+edilecek; önceki9diagnostic mevcut tam envanter sayılmaz. Virtual help yapısı gerçek
+production resolver ile kontrol edilir, action/settlement veya tree-presence diye
+sunulmaz. Kalan eksik hedefler/prefixler red kalır; generated manual edit yok.
+
+V3 metadata teslim edildi (main dışında): tsc0, seçili3testPASS/41skip; baseline
+path kaybı yok. Hidden help ve type narrowing düzeldi,6mapped-help ayrı ölçülüyor.
+Kalan4 gerçek eksik: output/watch --logs; approvals run/approve/reject hedefleri.
+freeze-help-contract-v3 SHA1368582d8b113a57532b806eb6801cf10eb3d37c96314bd09cf5c1df21e49b3c.
+Root yalnız bu4legacy yol için mevcut canonical servis/yetki sınırı planını kısa
+bağlamlı Sol'a okutturuyor; action implementation veya yeni authority izni verilmedi.
+
+Root review 19:46Z: CLI adayındaki `confirmations run` satırının silinmesi,
+explicit `help` komutunu da gizleyebilen genel filtre ve yalnız hedef varlığıyla
+legacy yolu verified sayma REVISE edildi. Main'e alınmadı. `output→watch --logs`
+mevcut ama watch'ta --logs yok; bare watch tmux açar, eşdeğer değildir. Generator
+HOLD korunacak; katalogdan silme veya gate bypass ile yeşil üretilmeyecek.
+CLI freeze-hold-v2 kaynak pinleri root MATCH; targeted53/59PASS,6FAIL. Dokuz
+diagnostic kaldı: help katalog, output prefix, confirmations run hedef ve6virtual
+child erişilebilirliği. Generated docs yazılmadı; aday main dışında HOLD.
+Windows tek-help proof v1 UNRUN; v2 düzeltildi ve root session49484 exit1 ile
+gerçek Windows Node v24.15.0 altında çalıştırıldı. Child55128 hiçbir çıktı vermeden
+20s deadline'a ulaştı; native-owned handle SIGKILL ve close kanıtlandı. Kaynak/build
+pinleri sabit, semantic FAIL; timeout kök nedeni henüz saptanmadı. Aynı run tekrar yok.
+Readonly source ayrımı: worktree authority `--help` için hash kontrolünden önce
+dönüyor; bu fonksiyonun hash yolu sebep değil. Entry/index statik importları help
+öncesinde yükleniyor. UNC import maliyeti/native dependency uyumu hipotez, ölçülmüş
+kök neden değil; Windows sonucu unsupported-platform kapanışı sayılmıyor.
+Bu iki lane host subagent işidir; gerçek Deckent worker/settlement sayılmaz.
+
+1. Autonomous canlı invocation admission hazırlığı. Fresh effective config:
+   enabled=true/engine=v2, tenant main; parent codex/claude subscription/docker
+   selectorlarında runtimeFingerprint ve executionProfileRef yok; project selector[].
+   Goal purpose budgetları yok; final_only_usage yalnız worker.
+   Mevcut invoker bu girdilerle provider'dan önce HOLD olur. Kör yeni run yok.
+   Readonly ayrım: budgetlar validated config set yüzeyinde owner-policy değeridir;
+   limits init profileRef'i kullanıcıdan alıyor/runtimeFingerprint:null yazıyor,
+   gerçek adapter-profile discovery bağlantısı yok. Percent subscription admission
+   yalnız XVerify'a özgü; Goal için numeric capacity uydurulamaz. Ek source bulgusu:
+   Goal transport createPlannerSpawn ile host subprocess; seçilmiş Docker backend
+   kimliğinin actual transport ile bağı henüz yok. Aynı7099 recovery wiring kapsamı;
+   fake ref/receipt/auth veya gate bypass yok.
+2. Backend identity guard private dfb4697e7 checkout'ta startup_review yazarı:
+   /tmp/deckent-goal-backend-binding-K1TYMP/checkout, exact2production+3test scope.
+   Docker-selected→host fallback pre-dispatch HOLD; input/result/replay backend bağı.
+   Şema/config/approval değişikliği yok; Goal termination ve purpose-specific
+   subscription admission genişletmesi henüz owner-admitted değil. Foundation
+   outerDONE değil; fullclosure successorlarına dependency-bound. Fable1056 görüşü
+   tüketildi,1058 gereksiz per-invocation manuelgate genellemesini reddeder; mevcut
+   policy-resolved unattended çalışma korunacak. Source/profile üreticisi zatenVAR,
+   eksik Goal consumer bağlantısıdır; tekrar icat yok.
+3. Admission karşılanınca canonical create-goal→bounded autonomous start→gerçek
+   governed approval→bağımlı sprintler→sonraki goal turu→acceptance→restart/no-replay.
+   Private fixture DAG canlı authority değildir; approved proof contract:
+   /tmp/deckent-7099-planner-receipt-LfteLX/autonomous-v2-cli-proof-contract-v1.md
+   (historical blockers source ile giderildi, yeni config bulguları yukarıda).
+4. Cursor v4 actual537case:487PASS/6FAIL/44HOLD, exit1/no drift. Source16landed;
+   runner test-only proof/tmp bağımlılığı kaldırıldı,22main testPASS; runner/test
+   ve yalnız ownregistry entry babae7b2f ile main'de.
+   Kalan6FAIL model arg required/optional ve task settle enum/catalog sapması;
+   HOLD13live-unmanifested+9virtual path, iki dil. Aynı matrix tekrar yok.
+   Narrow2arg candidate4testsPASS fakat generator --write/check global
+   E_CLI_DOC_CONTRACT_DRIFT ileexit1; generated3docs değişmedi, main fan-in yapılmadı.
+   Terra aynı /tmp/deckent-7099-cli-contract-fix-rHc68nq7/checkout'ta ortak
+   producer→contract→verifier→generator uzlaştırmasını yürütüyor. Exact expanded
+   metadata/help write scope capsule'da; commandactions/config/authority READONLY.
+   Currentbase intelligence zatencontracted; eskief6inventory kör uygulanmaz.
+   Negatif canonical+forwarding testleri ve generatorGREEN sonrası root actualproof.
+5. Güncel main/build tabanından sonraki disjoint atamalar; host MCP refresh ayrı doğrulanır.
+6. Windows-native tek EN root --help gerçek denemesi FAIL (yukarıda); izole env,
+   main currentbuild, native-owned directchild deadline/close kanıtları korundu.
+   Eski Nv2Sjp/fd3 helperları UNRUN ve kullanılmıyor. --version-json UNRUN: mevcut
+   version-info.ts tmux/claude sürümünü execSync ile sorguluyor, no-shell/no-provider
+   bu proof sınırına uymuyor. Help kanıtı version/PTY/fullWindows DONE sayılmaz.
+
+## Provider durumu
+
+- Fable v5 MAIN'e alındı, source/proof FROZEN. ENTRY1055 aynı7099 Goal wiring
+  producer/Docker transport/non-reservable authority sınırı için tek bounded
+  readonly ikinci görüş; yeni audit/implementation paketi değil.
+- Cursor ENTRY33 uyarınca yazmıyor. Terra dört runner eksiğini ve gerçek Commander
+  wrapped argument regression'ını kapattı; focused32/32PASS. v4 freeze-v3.json
+  SHA248a4313…, runner271cc8a4…; root actualmatrix session69366 terminalexit1.
+  V3 492PASS/19HOLD tarihsel, yeniden PASS yazılmaz. Production16 dosya main
+  f5bed84c0; root28 actualPASS. Runner/test+registry babae7b2f, main22/22PASS.
+- Goal backend aday freeze-v2.json SHA06141ffe…, targeted26/26PASS+tsc0;
+  real-ledger capability HOLD öncesi receipt/reservation yok, aynı kimlik retry
+  bir kez çalışır. Bağımsız source review GO ve maincompiled-v2PASS;275a000f9landed.
+  Docker producer/consumer ve authority genişletmeleri hâlâ açık.
+- Codex alt ajanları yalnız exact bağımsız arşiv/readiness işlerinde; bu host
+  delegation Deckent gerçek worker dispatch veya XVerify settlement değildir.
+
+## Goal için gerekli ürün kararı — henüz uygulanmadı
+
+Mevcut full-access/commit/build izninden ayrı kalan iki authority genişletmesi:
+(1) Task ID uydurmadan Goal/mission/purpose/round/invocation/attempt kimliğine bağlı
+Docker custody/termination/result sözleşmesi; eski task receipt'leri ve DB uyumluluğu
+korunur. Mevcut task-only binding açıkça reservation.taskId:null girdisini reddediyor.
+(2) Abonelik sayısal rezervasyon kotası bildirmediğinde Goal authoring/acceptance için
+purpose-bound açık admission politikası; XVerify flag'i ödünç alınmaz, yüzdeden kota
+uydurulmaz. Öneri: mevcut Brain/Auditor rol bütçelerini üst sınır olarak miras almak,
+provider/tenant kapasitesiyle kesiştirmek; yeni fiyat/kredi/limitsiz çağrı yetkisi yok.
+Unattended çalışma yalnız zaten kabul edilmiş scope içinde; policy istemedikçe her
+turda yeni manuel onay kapısı yaratılmaz. Default-off ürün enablement'ı ve bu repo
+için canonical config seçimi owner kararı gerektirir. Bu not admission/receipt değil.
+Karar alınmadan bu iki policy/schema genişlemesi uygulanmaz; katalog lane'i bağımsızdır.
+
+## Kalıcı kanıtlar
+
+Arşiv kökü: /home/alperen/deckent-recovery-20260904
+- Child-help main: terminal-7099-child-help-main-6mniPgNr;
+  MANIFEST-v2 SHA320f5fb938e9143ca80552d78c4d93d5a8da045f8f916008079a2db9a173b925,
+  SUMS-v2 SHA1499ed721cc39d5cd244efb354d69d649f3f8d13bb192c2fe6527bb74dea5f17;
+  root96checksumPASS. Committed2blob, main17test/build-v3/actual6PASS ve eskiFAIL
+  kayıtları. İlkmanifestin recordHash diye yanlış adlandırdığı1418 değeri v2'de
+  sourceTreeFileCount olarak düzeltildi; önceki manifest/checksum korunuyor.
+- CLI/Windows HOLD: terminal-7099-cli-windows-hold-B8dxbEIx,
+  manifest8aa5f272e8d66ae51c12a3803b8f4b031f6da15443048140014e03e5801d990f;
+  35checksum rootPASS. Windows gerçek timeout/close ve CLI53/59FAIL/HOLD kayıtları;
+  success/settlement değildir. Büyük matris veya fixture tekrar kopyalanmadı.
+- Help harness main: terminal-7099-help-harness-main-pasqsGO1,
+  manifestf97d35d92d15256a874eefd39f08e625956b4c1e29c307db93203353b1817c8b,
+  13checksum rootPASS; committed3files ve main22test, büyükmatrix tekrar kopyalanmadı.
+- Joined main: terminal-7099-joined-main-LHCvmuYm,
+  manifestc5caf71da1c692ca417782aab0ae8b7a55710d584ac9d57927bf6e0ad0c82a4a,
+ 1664checksum rootPASS; source20 exactcommitted blobs eşleşir; Cursorv4FAIL/HOLD
+  korunur, mainbuild/currentCLI28/Goalcompiledv2 supportive kanıtları dahildir.
+- Goal backend candidate: terminal-7099-goal-backend-candidate-tW1NDc97,
+  manifestd237b6492883e782d157e36a8b63138a88ca2d4be09f42d605decbc33aa73ba4.
+- Goal main: terminal-7099-goal-main-integration-bt5wNm,
+  manifest26502712bbdcea94a28ebde68447d18a68fbc9a349422d89c11d53d2a83a1177,36checksumPASS.
+- Goal candidate: terminal-7099-goal-consumer-candidate-yDHPWx,45checksumPASS.
+- Sync main: terminal-7104-sync-main-lOyYT6,
+  manifest1323901f51ee10d17d51a6838624133edea60559141f41e5b14ced8c06e9dec7,13checksumPASS.
+  Candidate v5-AI3ckq yalnız hash-bound reference, tekrar1983dosya kopyalanmadı.
+- Debt main837e61636: terminal-7099-debt-holds-main-j5K9K2,102test/48checksumPASS.
+- Main build: terminal-7099-main-refresh-RyZPti,
+  manifeste9679dcc4b0542183f96a94c90e032f0762b2397d02fd0eacad95f0a02c1d49a,
+  6checksum rootPASS; start/result/output+runner/buildidentity korunuyor.
+- Önceki bu imleç: current-flow-checkpoint-l368qT/current-flow-before-compact.md,
+  SHA b5b053bc542fc037789866d9b7202dcfaecf038b836e07d339edc52f72856bb5.
+  Geçmiş silinmedi; tarihsel kaynak/runtime kanıtları canonical capsule'da da duruyor.
+
+## Korunan kapsam
+
+Gerçek bağımlı çoklu worker→otomatik sonraki goal→durable settlement AÇIK.
+S1/S2/S3 foundations landed; L1–L6 ve linked7085/7086/7088/7089 closure açık.
+Linux kanıtları Windows-native/macOS/SSH/tmux eksiklerini kapatmaz.
+7099 sonrası7103→7101→7104→7102(önce ADR amendment)→4034.
+9002 DONE korunur;9001 graph/vector ve birleşik yüzey audit'i bu programa eklenmez.
+Yeni kanıt olmadan tekrar audit/test/build yok; sınırlı kapasite fan-in/realproof'a ayrılır.
+
+## Durum deltası 0a11 (2026-09-09, ~20:30Z)
+- Landed: d4046bdcb (7109-b exact measurement, wire-parity; canlı 364==364) · f2dbb0db3 (7114 anlatım sözleşmesi + ara teslim + kesme-koruma + araç satırı). Fan-in b4de8a1df üzerinde 39 dosya 455/455, tsc 0, lint-i18n/zero-hardcode 0.
+- Astra A7d post-landing CONFIRMED (7111-b, 285/285); 7111-c gerekmedi. Astra 7113 B uygulamada, gerçek ölçüm proof'u bu build sonrası.
+- Cursor ENTRY 75: 7109-b düzeltme notu + sıradaki iş = 7107 kabul bataryası koşucusu (scripts/terminal-acceptance-battery.mjs). Cevap bekleniyor.
+- Build: build:all f2dbb0db3 üzerinde yeşil; bot yeniden başlatıldı. Eski MCP server süreçleri (dist cache) host adapter restart'ına kadar eski kodu koşturur.
+- Sıradaki: owner gerçek Qwen kabul testi (7107 §3): ilk anlatım ≤10 s, ilk ara teslim ≤90 s/≤12 çağrı, sahte checkpoint 0, /context "ölçüm: kesin". "terminal-bağlam-hatırla" kararı: araştırma §4 = pencereyi büyütme (65536 + rope-scale 2.0 önerisi), owner kararı bekliyor.
+
+
+Koordinasyon 2026-09-12T13:59:55.206547+00:00: Cursor217 doğrulandı, CHECKPOINT (READY değil).
+start215/216 henüz uygulanmadı; ENTRY218 CLI engel teslimini mevcut REPL paste
+owner retest'inden ayırıp önceliklendirdi. Kanıt detayları durum-raporu.md.
+
+
+2026-09-12T14:53:39.615776+00:00: Owner Opus5 XVerify yetkisiyle tek gerçek operasyon tamamlandı;
+verdict UNCLEAR/HOLD, durable receipt19f69925… MATCH, terminal settlement CLOSED.
+Unavailable değil; ürün closure hâlâ HOLD. Kaynak/cold-restart/CLI eksikleri
+durum-raporu.md ve docs/execution/evidence/astra-recovery-20260912/ altında.
+Cursor219 CHECKPOINT/pause korunuyor, toparlama220 açık; yeni ASSIGN yok.
+
+
+## Owner start/do canary sonrası — 2026-09-12, Astra epoch7
+
+Önceki no751 / henüz-canary-yok kayıtları bu owner-authorized deneme için tarihsel kaldı. Pre-canary commit3eaa44da5. Start:416748ms/exit1/EXACT_DOCKER_TASK_PROJECTION_ADMISSION_REQUIRED. Do: gerçek Flow963bbc69-bfff-4b5f-b5ac-6ba130853feb →751-001 worker→main etkisi→RUN_FAILED. Worker NO_GO; EFFECT_RELEASE_HOLD / ARTIFACT_REPLAY_MISMATCH, recovery REHYDRATE_AUTHORITY_MISMATCH. Son durumda coordinator/worker yok, effect settlement HOLD; task/checkpoint/native custody korunuyor.
+
+Aktif outcome MASTER120 / recovery; yeni implementation başlamadı. İlk sonraki bounded iş751 release/rehydration artifact farkını bulup exact settlement'ı kapatmak; yeni sprint/cleanup/force-finalize ile atlanmaz. Worker candidate3dosya +24/-16; baseline70/71, candidate69/71, tsc0. Checkpoint koruma, ACCEPT değil. Dist candidate öncesine ait. [Kalıcı canary kanıtı](../docs/execution/evidence/astra-canary-20260912/REPORT.md).
+
+
+## 2026-09-12 — R1 planlandı, execution başlamadı
+
+Epoch7 / MASTER120 / RECOVERY-DO-DOGFOOD-001. Owner “önce plan, başla deyince uygula” talimatı bağlayıcı. [R1 planı](../docs/execution/active/RECOVERY-DO-DOGFOOD-001-R1-PLAN.md): 751 effect release/negative settlement → archive/.tasks cleanup → dependency+verification → start ortak admission → latency/status → gerçek retention dogfood. 19:31:50Z: 751 dead/ABORTED, terminalReceipt yok, task EXECUTING; 20 task-artifact korunuyor. Plan dokümanı yeni run veya cleanup yetkisi değildir. Sonraki eylem, owner “başla” sonrası fresh identity kontrolü ve exact mismatch analizi.
+
+
+## 2026-09-12 — R1-A source repair; terminal closure HOLD
+
+Owner start alındı. [Kanıt](../docs/execution/evidence/astra-recovery-20260912/r1/RESULT.md): wall-clock rollback journal sırasını bozmuş; coordinator causal-time + Docker shared clock source düzeltmesi yerel doğrulandı. Eski751 malformed journal immutable kalıyor; negative effect disposition yok, build clean gate task751 ve XVerify pending receipt nedeniyle HOLD. `.tasks` silinmedi. R1-A kapanış contract’ı tamamlanmadan B/C/D/E/F veya yeni sprint yok. Cursor221 tüketildi/arşivlendi,222 ACK; REPL pause, start215/216 R1-D proof kapsamına alındı.

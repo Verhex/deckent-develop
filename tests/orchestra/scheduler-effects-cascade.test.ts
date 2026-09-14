@@ -76,6 +76,7 @@ import type { Task } from '../../src/core/types.js';
 import type { SpawnBackend, SpawnBackendOptions } from '../../src/orchestra/spawn-backend.js';
 import {
   executeSchedulerDecision,
+  createExactNormalDockerExecutionRegistry,
 } from '../../src/orchestra/scheduler-effects.js';
 import type { SchedulerDecisionExecutionDeps } from '../../src/orchestra/scheduler-effects.js';
 import type { SchedulerDecision, SchedulerEffect } from '../../src/orchestra/scheduler-reducer.js';
@@ -406,6 +407,32 @@ describe('executeSchedulerDecision — SpawnTask/KillWorker regression (must sta
     const persisted = JSON.parse(readFileSync(join(root, '.tasks', `task-${task.id}.json`), 'utf-8'));
     expect(persisted.schedulerSpawnAttempts).toBe(1);
     expect(persisted.retryAfter).toBeGreaterThan(Date.now());
+  });
+
+  it('retains an admitted backend failure without retry or IPC fallback', async () => {
+    const task = makeTask('800-EXACT-FAIL');
+    const registry = createExactNormalDockerExecutionRegistry(root);
+    const backend = makeMockBackend();
+    backend.spawn = vi.fn(() => {
+      // Authority has crossed into the backend before the transport fails.
+      registry.registerHold(task.id, 'MOUNT_RECONCILIATION_REQUIRED', backend);
+      throw new Error('TASK_ATTEMPT_CUSTODY_HOLD:DISPATCH_TRANSITION_INVALID');
+    });
+    const deps = baseDeps(root, new Map([[task.id, task]]), { backend, exactDockerRegistry: registry });
+    await expect(executeSchedulerDecision(makeDecision([
+      { kind: 'SpawnTask', taskId: task.id, reason: 'queue-drain' },
+    ]), deps)).rejects.toMatchObject({
+      code: 'DECKENT_E077',
+      message: `EXACT_DISPATCH_HOLD:${task.id}:TASK_ATTEMPT_CUSTODY_HOLD:DISPATCH_TRANSITION_INVALID`,
+    });
+    expect(registry.resolveLifecycleOwner(task.id)).toBe(backend);
+    expect(registry.readTaskResultAuthority(task.id)).toMatchObject({
+      state: 'authority-hold', holdReason: 'TASK_ATTEMPT_CUSTODY_HOLD:DISPATCH_TRANSITION_INVALID',
+    });
+    expect(deps.assignedTaskIds.has(task.id)).toBe(false);
+    expect((task as Task & { retryAfter?: number }).retryAfter).toBeUndefined();
+    expect(existsSync(join(root, '.tasks', `task-${task.id}.result`))).toBe(false);
+    expect(backend.spawn).toHaveBeenCalledTimes(1);
   });
 
   it('bounds unknown host retries with durable backoff and terminal HOLD', async () => {

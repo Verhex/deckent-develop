@@ -1,3 +1,4 @@
+import { canonicalJson } from '../core/audit-writer.js';
 import { types as nodeTypes } from 'node:util';
 
 import type {
@@ -269,7 +270,7 @@ function isExactAcceptedAuthorityMetadata(
     && acceptedRef.schemaVersion === 2
     && acceptedRef.kind === 'task-accepted-result-v2-ref'
     && isExactCustodyIdentity(acceptedRef.identity)
-    && JSON.stringify(acceptedRef.identity) === JSON.stringify(accepted.identity)
+    && canonicalJson(acceptedRef.identity) === canonicalJson(accepted.identity)
     && typeof acceptedRef.artifactKey === 'string'
     && acceptedRef.artifactKey.length > 0
     && isSha256Digest(acceptedRef.artifactReceiptDigest)
@@ -321,7 +322,7 @@ function isExactTerminalAuthorityMetadata(
     && settlementRef.schemaVersion === 2
     && settlementRef.kind === 'task-result-settlement-v2-ref'
     && isExactCustodyIdentity(settlementRef.identity)
-    && JSON.stringify(settlementRef.identity) === JSON.stringify(terminal.identity)
+    && canonicalJson(settlementRef.identity) === canonicalJson(terminal.identity)
     && typeof settlementRef.artifactKey === 'string'
     && settlementRef.artifactKey.length > 0
     && isSha256Digest(settlementRef.artifactReceiptDigest)
@@ -359,7 +360,7 @@ export function isExactAcceptedResultTerminalAuthorityV2(
   return candidate.schemaVersion === 2
     && candidate.kind === 'exact-accepted-result-terminal-authority-v2'
     && isExactAcceptedAuthorityMetadata(candidate.acceptedAuthority)
-    && JSON.stringify(candidate.acceptedAuthority) === JSON.stringify(expected)
+    && canonicalJson(candidate.acceptedAuthority) === canonicalJson(expected)
     && isExactTerminalAuthorityMetadata(terminal)
     && decision !== undefined
     && decision !== null
@@ -388,13 +389,13 @@ export function isExactAcceptedResultTerminalAuthorityV2(
       'chainDigest',
     ])
     && isExactCustodyIdentity(decision.identity)
-    && JSON.stringify(terminal.identity) === JSON.stringify(expected.identity)
+    && canonicalJson(terminal.identity) === canonicalJson(expected.identity)
     && terminal.admissionReceiptDigest === expected.admissionReceiptDigest
     && terminal.acceptedResultChainDigest === expected.acceptedResultChainDigest
     && terminal.resultDigest === expected.resultDigest
     && isSha256Digest(terminal.settlementDigest)
-    && JSON.stringify(terminal.settlementRef.identity) === JSON.stringify(expected.identity)
-    && JSON.stringify(decision.identity) === JSON.stringify(expected.identity)
+    && canonicalJson(terminal.settlementRef.identity) === canonicalJson(expected.identity)
+    && canonicalJson(decision.identity) === canonicalJson(expected.identity)
     && (
       decision.evaluationReceipt.verdict === 'DONE'
       || decision.evaluationReceipt.verdict === 'GO_WITH_TECH_DEBT'

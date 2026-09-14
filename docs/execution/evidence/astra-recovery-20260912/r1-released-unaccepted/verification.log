@@ -1,0 +1,18 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/cli/commands/recover.test.ts (9 tests) 14ms
+ ✓ tests/orchestra/sprint-recovery-operation.test.ts (22 tests) 102ms
+ ✓ tests/orchestra/exact-committed-unsettled-recovery.test.ts (4 tests) 4844ms
+   ✓ exact committed-unsettled Docker recovery > publishes and idempotently rereads the real committed-anchor Store disposition  4837ms
+ ✓ tests/orchestra/exact-released-unaccepted-recovery.test.ts (3 tests) 10422ms
+   ✓ released unaccepted effect preservation > preserves all bytes, survives restart and replays without acceptance  4144ms
+   ✓ released unaccepted effect preservation > refuses wrong sprint authority and a timestamp older than release  3229ms
+   ✓ released unaccepted effect preservation > refuses replaced release evidence instead of accepting a digest assertion  3049ms
+ ✓ tests/orchestra/released-unaccepted-host-boundary.test.ts (5 tests) 9ms
+
+ Test Files  5 passed (5)
+      Tests  43 passed (43)
+   Start at  00:17:15
+   Duration  13.63s (transform 4.07s, setup 66ms, collect 8.83s, tests 15.39s, environment 1ms, prepare 183ms)
+

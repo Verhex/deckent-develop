@@ -1,0 +1,13 @@
+
+ RUN  v3.2.7 /tmp/deckent-r4-757-repair
+
+ ✓ tests/orchestra/exact-docker-observation.test.ts (25 tests) 9ms
+ ✓ tests/orchestra/execution-effect-docker-lifecycle.test.ts (46 tests) 16344ms
+   ✓ execution effect Docker lifecycle authority > recovers provider-container compensation from durable Store authority  7144ms
+   ✓ execution effect Docker lifecycle authority > durable release projection crash recovery > replays the same projection after a crash before landing publication  4883ms
+
+ Test Files  2 passed (2)
+      Tests  71 passed (71)
+   Start at  10:01:34
+   Duration  18.54s (transform 742ms, setup 39ms, collect 923ms, tests 16.35s, environment 0ms, prepare 97ms)
+

@@ -1,0 +1,32 @@
+{
+  "at": "2026-09-13T21:40:54.971772+00:00",
+  "kind": "CAS-scoped-uncommitted-main",
+  "files": {
+    "src/core/run-status-read-model.ts": "72586a2aaa2c9681189c1b1155d629f9aba99c08724b30c42878ff094401ab62",
+    "src/orchestra/sprint-controller.ts": "82b1a6537e6e9d4d0310a864a6b38d769a01dd88144ff0f339fa8e5b9e758b1c",
+    "src/orchestra/result-collector.ts": "3b105473ef9ab406589763479a2970d7e7a1626c999f960835ed4a3401128488",
+    "src/cli/commands/status.ts": "ff8a8fb418f5dddacfe0b9974bfe16761e24e0f601ff25257fcdb0fd11002111",
+    "src/mcp/tools/status.ts": "91ba2ecc1ea65234f69023756d8b5f16a2529bd0911720011c4a443ebb29e7de",
+    "src/api/status-reconcile.ts": "2e0803ff9429c8f0e39290dbf99e87fd64e2744b8490ff3191ae0ae63fe957c4",
+    "src/cli/helpers/run-state-feed.ts": "02cf772136d12f5a8014057d20758c3412d03f04578db994fc2d58ba36681b76",
+    "tests/core/run-status-read-model.test.ts": "44d06e68d7a4976802d0019ba82350ebdb3d8255ab14a9a5912c66e5772fa1e8",
+    "src/orchestra/sprint-lifecycle.ts": "5c6999767c00fccdbfea573d2d10e99aa75e5ed467ab0057bacfa47247be7df1",
+    "tests/orchestra/result-collector-settlement-authority.test.ts": "a03f83525bb0a580098196d18482c0f2bc205ad4d88ec7710c3de4d4b8223e6b",
+    "tests/cli/status-terminal-publication-race.test.ts": "554ee3d4817ea64ca819e8b22a12de804846bb73fe9ab438c02510e02456331a"
+  },
+  "checks": {
+    "tests-final-sequential": 0,
+    "isolated-build-final": 0,
+    "compiled-ingress-probe": 0,
+    "main-build-all": 0,
+    "diff-check": 0,
+    "tsc-final": 0,
+    "compiled-main-ingress-probe": 0
+  },
+  "priorFailures": [
+    "tests-build parallel caused hermetic dist drift; final sequence isolated",
+    "compiled probe exposed absent dashboard progress and worker/task count conflation; corrected",
+    "MCP null progress formatter type error corrected",
+    "old archive fixture lacked lease; identity added"
+  ]
+}

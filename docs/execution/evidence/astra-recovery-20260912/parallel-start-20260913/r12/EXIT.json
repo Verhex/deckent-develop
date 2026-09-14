@@ -1,0 +1,10 @@
+{
+  "exitCode": 1,
+  "utc": "2026-09-13T23:14:50.263501+00:00",
+  "elapsedSeconds": 15.059315755002899,
+  "childUsage": {
+    "maxRSSKiB": 336196,
+    "userSeconds": 3.616952,
+    "systemSeconds": 1.734687
+  }
+}

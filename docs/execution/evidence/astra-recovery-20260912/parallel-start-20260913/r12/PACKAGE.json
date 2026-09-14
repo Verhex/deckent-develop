@@ -1,0 +1,24 @@
+{
+  "observedAt": "2026-09-13T23:14:19.304Z",
+  "outcome": "MASTER3178 / parent120",
+  "scope": [
+    "tests/core/task-attempt-custody-posix-adapter.test.ts",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r12/WORKER-RESULT.md"
+  ],
+  "readScope": [
+    "src/core/task-attempt-custody-posix-adapter.ts",
+    "src/core/task-attempt-custody-store.ts",
+    "src/core/custody-read-snapshot.ts",
+    "src/orchestra/spawn-backend-docker.ts",
+    "native/exec-authority/index.mjs",
+    "native/exec-authority/src/custody_posix.c",
+    "scripts/production-wiring-host-proof-harness.mjs",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r11/RESULT.md",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r10/RESULT.md"
+  ],
+  "kind": "dogfood-preparatory-test-and-evidence",
+  "runtimeRepairHold": "native-history host-proof adapter unavailable",
+  "attemptBudget": 1,
+  "command": "node dist/cli/entry.js start --auto-approve",
+  "directivesSha256": "72a6f22375790ab56ca23c81fdf9f1db9407501bd77143895d41a4a0f4ba37e1"
+}

@@ -1,0 +1,78 @@
+{
+  "at": "2026-09-13T10:14:00.835799+00:00",
+  "rawSha256": "bc32d4ef928b7e5ef6256794479ae148466fa56f65d3a42e2d50efd3968022f6",
+  "exitCode": 0,
+  "reports": [
+    {
+      "sprintId": "sprint-752",
+      "dryRun": false,
+      "identity": {
+        "executionId": "sprint-752",
+        "generation": 2,
+        "taskId": "sprint-752",
+        "attemptId": "sprint-752:recovery:2",
+        "fenceToken": "sha256:439887bbd69a59160214ae4fc90ee6ff131fda583e90913573bdbd27f1c2c254"
+      },
+      "auditGate": "GATE_FAILURE",
+      "orphanIpcDirs": 0,
+      "staleLocksCleaned": 0,
+      "staleSpawnLocksCleaned": 0,
+      "taskFilesArchived": 0,
+      "taskFilesPreserved": 2,
+      "exactCustodyReservations": {
+        "pendingBeforeAdmission": 0,
+        "heldAdmissionGraphs": 0,
+        "unresolvedBeforeRecovery": 0,
+        "admittedFromStagedSnapshot": 0,
+        "retiredBeforeAdmission": 0,
+        "quarantinedHistoricalAdmissions": 0,
+        "receiptDigest": "sha256:990e7d1bdc963ba423aa93cecd8b96b947c47a02c58415cf72a68d33c5c79c37"
+      },
+      "artifactPolicy": {
+        "policyVersion": 1,
+        "archiveManifests": [
+          {
+            "manifestVersion": 1,
+            "policyVersion": 1,
+            "operation": "force-archive",
+            "source": "/home/alperen/deckent-dev/.tasks/task-752-001.json",
+            "destination": "/home/alperen/deckent-dev/.deckent/archive/sprints/sprint-752/tasks/preserved/task-752-001.json",
+            "digest": "sha256:57e9ee3d7f2bd20d0c8ff58293a65767a23b7d07196fdb0b65d53d8acb10467d",
+            "artifactClass": "task-residue",
+            "owner": {
+              "taskId": "sprint-752",
+              "attemptId": "sprint-752:recovery:2",
+              "fence": "sha256:439887bbd69a59160214ae4fc90ee6ff131fda583e90913573bdbd27f1c2c254"
+            },
+            "successor": null,
+            "restoreSemantics": "restore-to-source-if-owner-current",
+            "requestedBy": "sprint-recovery-operation"
+          },
+          {
+            "manifestVersion": 1,
+            "policyVersion": 1,
+            "operation": "force-archive",
+            "source": "/home/alperen/deckent-dev/.tasks/task-752-001.skill-delivery.json",
+            "destination": "/home/alperen/deckent-dev/.deckent/archive/sprints/sprint-752/tasks/preserved/task-752-001.skill-delivery.json",
+            "digest": "sha256:ac9e5b5e2edd3e035ac2cd108045eb09dbd6a7bc187eb2f0a6e37fc90f4be6d6",
+            "artifactClass": "task-residue",
+            "owner": {
+              "taskId": "sprint-752",
+              "attemptId": "sprint-752:recovery:2",
+              "fence": "sha256:439887bbd69a59160214ae4fc90ee6ff131fda583e90913573bdbd27f1c2c254"
+            },
+            "successor": null,
+            "restoreSemantics": "restore-to-source-if-owner-current",
+            "requestedBy": "sprint-recovery-operation"
+          }
+        ],
+        "checkpoint": {
+          "disposition": "preserved",
+          "digest": "sha256:8f8d0d2872953362bb0ef15697e6577d71f2d976a85015feeaf5be3b509c46bb",
+          "reason": "CHECKPOINT_SUPERSESSION_REQUIRED"
+        }
+      },
+      "remediation": null
+    }
+  ]
+}

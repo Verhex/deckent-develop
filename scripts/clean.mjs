@@ -3316,7 +3316,11 @@ function validRunFlowProposal(value, flowId) {
     && RUN_FLOW_REQUEST_ORIGINS.has(value.origin)
     && Number.isSafeInteger(value.revision)
     && value.revision >= 1
-    && boundedIdentity(value.intentSummary, 100_000);
+    // Intent is narrative text, not an identifier. The canonical producer
+    // accepts multiline DIRECTIVES including their final newline.
+    && typeof value.intentSummary === 'string'
+    && value.intentSummary.trim().length > 0
+    && value.intentSummary.length <= 100_000;
 }
 
 function validRunFlowPreview(value, flowId) {

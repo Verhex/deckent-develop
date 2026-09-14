@@ -1,0 +1,45 @@
+{
+  "recoveryId": "R1-START-EXACT-20260913",
+  "parentMaster": [
+    "3178 RECOVERY-DO-DOGFOOD-001",
+    "120 STATE-RETENTION-001"
+  ],
+  "ownerAuthority": "live start-first sequential surface repair authorization",
+  "observedAt": "2026-09-12T23:48:40.772095+00:00",
+  "health": "DEGRADED",
+  "base": "c9a81dc6b9bd77cd90bf09aa6998a94a2d482b0a",
+  "writeScope": [
+    "src/cli/commands/start.ts",
+    "src/cli/helpers/exact-sprint-runtime.ts",
+    "tests/cli/commands/start.test.ts",
+    "tests/cli/helpers/exact-sprint-runtime.test.ts"
+  ],
+  "exclusions": [
+    "auth/runtime raw mutation",
+    "receipt rewrite",
+    "do and other surface implementation",
+    "Cursor REPL code",
+    "cleanup",
+    "policy bypass"
+  ],
+  "proof": "targeted tests + tsc + build + one canonical start; stop unchanged failure; new failure must be diagnosed before retry",
+  "returnToDogfood": "node dist/cli/entry.js start --auto-approve --timeout 300000",
+  "currentSource": [
+    {
+      "path": "src/cli/commands/start.ts",
+      "sha256": "e63b60c5aa5ae01bffddaa54c5719ae8d49942b61eb03b0890c6b9077fe4dc78"
+    },
+    {
+      "path": "src/cli/helpers/exact-sprint-runtime.ts",
+      "sha256": "989be68798f0f8314de78966360451f4fa68949319f922098e32f1e92b263edb"
+    },
+    {
+      "path": "tests/cli/commands/start.test.ts",
+      "sha256": "f98a03e0f15d040901a3e554f9f850998d50349d16da7d8f7af006a010f2e542"
+    },
+    {
+      "path": "tests/cli/helpers/exact-sprint-runtime.test.ts",
+      "sha256": "a024f319b3a3d4609dfbe0736d6d2ebe05ac0a1db84ec717bb6c85c5cf49471d"
+    }
+  ]
+}

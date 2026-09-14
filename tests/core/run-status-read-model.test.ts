@@ -11,7 +11,10 @@ import {
   buildCanonicalRunStatusReadModel,
   publishCanonicalRunStatusReadModel,
   readCanonicalRunStatusReadModel,
+  runStatusReadModelMatchesCurrentGeneration,
+  projectCanonicalRunLogicalProgress,
 } from '../../src/core/run-status-read-model.js';
+import { writePid } from '../../src/orchestra/sprint-pid-manager.js';
 import type { CanonicalRunStatus } from '../../src/core/run-status-authority.js';
 import { TaskStatus, type Task } from '../../src/core/types.js';
 
@@ -233,5 +236,109 @@ describe('canonical run status read model', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+
+describe('coordinator snapshot custody', () => {
+  function fixture() {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-coordinator-progress-'));
+    mkdirSync(join(root, '.deckent', 'pids'), { recursive: true });
+    const pidPath = join(root, '.deckent', 'pids', 'sprint-900.pid');
+    writeFileSync(pidPath, JSON.stringify({ leaseId: 'current' }));
+    const live = authority({
+      lifecycle: 'ACTIVE', active: true, sprintId: 'sprint-900', coordinator: 'alive',
+    });
+    const tasks = Array.from({ length: 8 }, (_, index) => task(`900-${index + 1}`));
+    tasks[0]!.status = TaskStatus.EXECUTING;
+    tasks[1]!.status = TaskStatus.DONE;
+    tasks[2]!.status = TaskStatus.EXECUTING;
+    return { root, pidPath, live, tasks, snapshot: {
+      sprintId: 'sprint-900', runGeneration: 'lease:current', tasks, heldTaskIds: ['900-1'],
+    } };
+  }
+
+  it('publishes all eight planned tasks and committed progress despite stale materialized files', () => {
+    const { root, live, tasks, snapshot } = fixture();
+    try {
+      mkdirSync(join(root, '.tasks'));
+      for (const t of tasks.slice(0, 3)) writeFileSync(
+        join(root, '.tasks', `task-${t.id}.json`), JSON.stringify({ ...t, status: TaskStatus.EXECUTING }),
+      );
+      const model = publishCanonicalRunStatusReadModel(root, { authority: live, coordinatorSnapshot: snapshot });
+      expect(model.logicalProgress).toMatchObject({ total: 8, done: 1, active: 1, blocked: 6, fixRetry: [] });
+      expect(model.holds).toContainEqual(expect.objectContaining({
+        reasonCode: 'exact-result-authority-hold', evidenceRef: 'coordinator:lease:current:task:900-1',
+      }));
+      expect(tasks[0]!.status).toBe(TaskStatus.EXECUTING);
+      expect(runStatusReadModelMatchesCurrentGeneration(root, model, live)).toBe(true);
+      expect(readCanonicalRunStatusReadModel(root)?.modelDigest).toBe(model.modelDigest);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it.each(['lease', 'sprint', 'task', 'duplicate', 'hold'])('rejects foreign snapshot %s without replacing persisted progress', kind => {
+    const { root, live, snapshot } = fixture();
+    try {
+      const first = publishCanonicalRunStatusReadModel(root, { authority: live, coordinatorSnapshot: snapshot });
+      const invalid = { ...snapshot, tasks: [...snapshot.tasks] };
+      if (kind === 'lease') invalid.runGeneration = 'lease:old';
+      if (kind === 'sprint') invalid.sprintId = 'sprint-901';
+      if (kind === 'task') invalid.tasks[0] = { ...invalid.tasks[0]!, sprintId: 'sprint-901' };
+      if (kind === 'duplicate') invalid.tasks.push(invalid.tasks[0]!);
+      if (kind === 'hold') invalid.heldTaskIds = ['foreign'];
+      expect(() => publishCanonicalRunStatusReadModel(root, { authority: live, coordinatorSnapshot: invalid })).toThrow(/authority mismatch/u);
+      expect(readCanonicalRunStatusReadModel(root)?.modelDigest).toBe(first.modelDigest);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('rejects an old lease with identical lifecycle and sprint identity; missing live identity also fails closed', () => {
+    const { root, pidPath, live, snapshot } = fixture();
+    try {
+      const model = publishCanonicalRunStatusReadModel(root, { authority: live, coordinatorSnapshot: snapshot });
+      writeFileSync(pidPath, JSON.stringify({ leaseId: 'successor' }));
+      expect(runStatusReadModelMatchesCurrentGeneration(root, model, live)).toBe(false);
+      writeFileSync(pidPath, '{}');
+      expect(runStatusReadModelMatchesCurrentGeneration(root, model, live)).toBe(false);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('only the current NO_GO lineage projects retry pending, never a queued or held FIX', () => {
+    const tasks = [task('a', { status: TaskStatus.NO_GO }), task('b'), task('c', { status: TaskStatus.PAUSED })];
+    expect(projectCanonicalRunLogicalProgress(tasks).fixRetry.map(row => row.logicalTaskId)).toEqual(['a']);
+    tasks.push(task('a-fix', { isPriorityFix: true, fixForTaskId: 'a', status: TaskStatus.PAUSED }));
+    expect(projectCanonicalRunLogicalProgress(tasks).fixRetry).toEqual([]);
+  });
+});
+
+
+describe('fresh coordinator publication before task materialization', () => {
+  it.each([false, true])('resolves its live lease without injected authority (historical dashboard=%s)', historical => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-fresh-progress-'));
+    try {
+      if (historical) writeFileSync(join(root, '.dashboard'), JSON.stringify({
+        sprint: { id: 'sprint-899', status: 'ABORTED', phase: 'EXECUTE' },
+      }));
+      const writer = writePid(root, 'sprint-900', new Date().toISOString());
+      const snapshot = { sprintId: writer.sprintId, runGeneration: `lease:${writer.leaseId}`,
+        tasks: [task('900-001')], heldTaskIds: [] };
+      const model = publishCanonicalRunStatusReadModel(root, { coordinatorSnapshot: snapshot });
+      expect(model.authority).toMatchObject({ sprintId: writer.sprintId, active: true, coordinator: 'alive' });
+      expect(model.logicalProgress.total).toBe(1);
+      expect(() => publishCanonicalRunStatusReadModel(root, {
+        coordinatorSnapshot: { ...snapshot, runGeneration: 'lease:foreign' },
+      })).toThrow(/authority mismatch/u);
+      expect(readCanonicalRunStatusReadModel(root)?.modelDigest).toBe(model.modelDigest);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('does not let a snapshot hint override a persisted different active run', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-fresh-progress-conflict-'));
+    try {
+      const writer = writePid(root, 'sprint-900', new Date().toISOString());
+      writeFileSync(join(root, '.deckent', 'sprint-active.json'), JSON.stringify({ sprintId: 'sprint-901' }));
+      expect(() => publishCanonicalRunStatusReadModel(root, { coordinatorSnapshot: {
+        sprintId: writer.sprintId, runGeneration: `lease:${writer.leaseId}`, tasks: [task('900-001')], heldTaskIds: [],
+      } })).toThrow(/authority mismatch/u);
+    } finally { rmSync(root, { recursive: true, force: true }); }
   });
 });

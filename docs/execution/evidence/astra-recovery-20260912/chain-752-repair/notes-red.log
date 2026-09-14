@@ -1,0 +1,353 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ❯ tests/orchestra/scheduler-spawn-executor.test.ts (33 tests | 1 failed | 32 skipped) 992ms
+   ↓ executeSpawnTask — provider-authority ingress > holds before prompt construction or backend dispatch and preserves explicit attendance
+   ↓ executeSpawnTask — provider-authority ingress > binds final-only adapter admission to Docker rather than the ordinary host adapter
+   ↓ executeSpawnTask — provider-authority ingress > preserves the existing executor behavior when provider authority is not configured
+   ↓ executeSpawnTask — resolved host-adapter precedence > routes an adapter provider to its host adapter even when config resolved Docker
+   ↓ executeSpawnTask — resolved host-adapter precedence > keeps an explicit task-level Docker override on the exact route
+   ↓ executeSpawnTask — exact normal-Docker publication order > snapshots every exact non-terminal entry as typed HOLD instead of dropping to legacy
+   ↓ executeSpawnTask — exact normal-Docker publication order > CAS-fences exact terminal replay instead of overwriting attempt authority
+   ↓ executeSpawnTask — exact normal-Docker publication order > routes exact-attempt IPC authority through the owning backend and preserves zero-work truth
+   ↓ executeSpawnTask — exact normal-Docker publication order > rehydrates durable exact NOT_DISPATCHED and scans one project owner across backend instances
+   ↓ executeSpawnTask — exact normal-Docker publication order > folds an out-of-order durable zero-work generation chain to its latest predecessor
+   ↓ executeSpawnTask — exact normal-Docker publication order > holds a recovered generation chain with a missing predecessor generation
+   × executeSpawnTask — exact normal-Docker publication order > preserves and freshly revalidates a current terminal across accepted recovery ownership transfer 991ms
+     → expected { state: 'hold', …(1) } to be { state: 'current', …(6) } // Object.is equality
+   ↓ executeSpawnTask — exact normal-Docker publication order > keeps public task/receipt absent through prepare+dispatch and publishes only after RELEASED
+   ↓ executeSpawnTask — exact normal-Docker publication order > keeps a task-level legacy route readable without treating it as exact pending work
+   ↓ executeSpawnTask — exact normal-Docker publication order > fails closed instead of rendering mismatched or suspicious capture diagnostics
+   ↓ executeSpawnTask — exact normal-Docker publication order > preserves a verified capture diagnostic when a released entry is cold-rehydrated
+   ↓ executeSpawnTask — exact normal-Docker publication order > turns missing exact dependency authority into a durable registry HOLD
+   ↓ executeSpawnTask — canonical write collision admission > holds before prompt construction and backend dispatch for every trigger path
+   ↓ executeSpawnTask — fix-task routing-lineage inheritance > inherits forceModel/provider/modelEffort from the original when the fix-task left them unset (behavior a)
+   ↓ executeSpawnTask — fix-task routing-lineage inheritance > preserves an explicit fix-task override instead of clobbering it with the original value
+   ↓ executeSpawnTask — fix-task routing-lineage inheritance > inherits the backend field; when the inherited value matches config.spawn_backend the injected backend is reused (no real backend-factory spawn)
+   ↓ executeSpawnTask — fix-task routing-lineage inheritance > persists task-<id>.json with status EXECUTING and the inherited fields after a successful spawn (behavior b)
+   ↓ executeSpawnTask — fix-task routing-lineage inheritance > publishes one canonical TASK_ASSIGN event for a dynamically dispatched task
+   ↓ executeSpawnTask — fix-task routing-lineage inheritance > returns routing-lineage-missing and blocks the spawn when the original task file cannot be read
+   ↓ executeSpawnTask — fix-task routing-lineage inheritance > returns routing-lineage-missing when the original task file is corrupt JSON
+   ↓ executeSpawnTask — fix-task routing-lineage inheritance > is a no-op for a non-fix task (no lineage lookup, spawns normally)
+   ↓ executeSpawnTask — fix-task routing-lineage inheritance > preserves final-only Codex containment on dependency-triggered Docker dispatch
+   ↓ executeSpawnTask — fix-task routing-lineage inheritance > blocks a continuation Docker dispatch when the task-stamped grant is missing
+   ↓ executeSpawnTask — fix-task routing-lineage inheritance > blocks queued/respawn dispatch when attended authority is only a raw reference
+   ↓ executeSpawnTask — resolution parity across caller-shaped deps (three-trigger parity) > resolves identical forceModel/provider/modelEffort for the same fix-task fixture whether invoked with local-path-shaped or heavyweight-respawn-shaped deps
+   ↓ waitForResults — queue-completion trigger (processQueue) delegates to executeSpawnTask > spawns the queued fix-task with inherited routing fields and persists task-<id>.json (behavior a + b, live wiring)
+   ↓ waitForResults — queue-completion trigger (processQueue) delegates to executeSpawnTask > propagates one provider-authority HOLD instead of retrying a queued task
+   ↓ waitForResults — dep-ready trigger (dispatchReadyTasks) delegates to executeSpawnTask > spawns a dependency-ready fix-task with inherited routing fields and persists task-<id>.json (behavior a + b, live wiring)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/orchestra/scheduler-spawn-executor.test.ts > executeSpawnTask — exact normal-Docker publication order > preserves and freshly revalidates a current terminal across accepted recovery ownership transfer
+AssertionError: expected { state: 'hold', …(1) } to be { state: 'current', …(6) } // Object.is equality
+
+- Expected
++ Received
+
+  {
+-   "evaluationReceipt": {
+-     "verdict": "DONE",
+-   },
+-   "finalizerReceipt": {
+-     "verdict": "DONE",
+-   },
+-   "projectedResult": {
+-     "taskId": "exact-recovered-terminal",
+-   },
+-   "result": {
+-     "agent": null,
+-     "attempt": 2,
+-     "attemptCustody": {
+-       "admissionReceiptDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+-       "effectLanding": {
+-         "admissionReceiptDigest": "sha256:c5d3d8904599e5c842fb98dcd0042170bfc2b8bd94d72220b3329efae9adfe6d",
+-         "bindingDigest": "sha256:096f6302a287c62ba1ea26e4aa74f9d35a0b01dd31a70d36832f6c78059818a7",
+-         "custodyPolicyDigest": "sha256:668807a93fb8cf94ed9d9272995d2f7f59d9c5aea96da29bed54ef3394046110",
+-         "disposition": "COMMITTED_NO_CHANGE",
+-         "effectDecisionDigest": "sha256:28de9dac6f01f6235a05be3606fd700db70bdc87d1b3a50fd3a69941d5dc66a8",
+-         "effectLandingChainDigest": "sha256:1edfce0c2cfcde67583f0335becba5d6b6b151982f9b6396997db847aac85c2b",
+-         "identity": {
+-           "attemptId": "123e4567-e89b-42d3-a456-426614174000",
+-           "generation": 4,
+-           "projectId": "fixture-project",
+-           "taskId": "fixture-001",
+-         },
+-         "kind": "task-attempt-effect-landing-binding",
+-         "landingArtifactKey": "primary",
+-         "landingArtifactReceiptDigest": "sha256:4f2970878fe9ade70837b689436c5a2e81918f829a3eb226de105bf965cdef10",
+-         "landingReceiptDigest": "sha256:394395311f92930a5c303e101c3f845abcfc88c67a4f6bacb9544065ca72aff7",
+-         "readyLifecycleAuthorityDigest": "sha256:7f470268beda91a3848b2bc4951015791fd1ce2981b64035e88afde33b9f2a5a",
+-         "transactionDigest": "sha256:afbd7951ba2bcb77bbe56f907f6054971361574523b95a1e40e94e541eeaa3e4",
+-         "version": 2,
+-       },
+-       "hostPromotion": {
+-         "assembledV1Digest": "sha256:feeab226b3b885e152cca45c2c69cd8d16de15d8eaf8fde5345c142206e39a55",
+-         "authority": "host-canonical-ingress-assembler",
+-         "kind": "task-result-host-promotion",
+-         "version": 2,
+-       },
+-       "hostWorkAttribution": {
+-         "artifactClass": "host-work-attribution",
+-         "artifactKey": "host-work-123e4567-e89b-42d3-a456-426614174000",
+-         "artifactReceiptDigest": "sha256:7bb319bebc32d1ebd3c1b3d19d96350d0424f211630f619fac55484fe798d977",
+-         "artifactSha256": "sha256:ef9b5c3fed5930b06b40bdf4ee2b063d7b413d2eb90e6e7cb1fcfd711feb4f7c",
+-         "byteLength": 1017,
+-       },
+-       "identity": {
+-         "attemptId": "attempt-recovered-terminal",
+-         "backend": "docker",
+-         "generation": 1,
+-         "projectId": "project-test",
+-         "projectRootSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+-         "schemaVersion": 2,
+-         "taskId": "exact-recovered-terminal",
+-       },
+-       "policyDigest": "sha256:668807a93fb8cf94ed9d9272995d2f7f59d9c5aea96da29bed54ef3394046110",
+-       "sourceResult": {
+-         "artifactClass": "worker-result",
+-         "artifactKey": "primary",
+-         "artifactReceiptDigest": "sha256:4bb11ab13c12cd05429b52d1aa6fd90e619c104260aca36e5e1c8237de63dc6e",
+-         "artifactSha256": "sha256:3c79f73155c1bb98c632188f9cddfbbb9d72ce75667e6168d1d1dceb9f871306",
+-         "byteLength": 202,
+-       },
+-       "version": 2,
+-     },
+-     "auditorValidation": null,
+-     "boundaryViolations": [],
+-     "brainEvaluation": null,
+-     "brainEvaluationReason": null,
+-     "cost": {
+-       "currency": "USD",
+-       "isLocal": true,
+-       "pricingSource": "fixture",
+-       "usd": 0,
+-     },
+-     "criteriaEvidence": [],
+-     "diskVerified": true,
+-     "filesChanged": [
+-       {
+-         "linesAdded": 1,
+-         "linesRemoved": 0,
+-         "path": "src/exact-handoff.ts",
+-         "status": "modified",
+-       },
+-     ],
+-     "fixForTaskId": null,
+-     "goCriteria": [],
+-     "handoffNotes": "use the terminal-bound exact API",
+-     "honestGate": {
+-       "flagged": false,
+-       "violation": null,
+-     },
+-     "isPriorityFix": false,
+-     "model": "fixture-model",
+-     "notes": "Worker observation
+- Second line	with details",
+-     "provider": "fixture-provider",
+-     "rubricScores": null,
+-     "schemaVersion": "2.0",
+-     "selfAssessment": "DONE",
+-     "sharedNotes": [],
+-     "skills": [],
+-     "taskId": "exact-recovered-terminal",
+-     "techDebtCriterionIds": [],
+-     "tests": {
+-       "applicability": "REQUIRED",
+-       "command": null,
+-       "coverage": null,
+-       "failed": 0,
+-       "orchestratorVerified": false,
+-       "outcome": "NOT_EXECUTED",
+-       "passed": 0,
+-       "total": 0,
+-     },
+-     "tokenUsage": {
+-       "cacheCreationTokens": 0,
+-       "cacheReadTokens": 0,
+-       "inputTokens": 10,
+-       "outputTokens": 5,
+-       "source": "provider-adapter",
+-       "totalTokens": 15,
+-     },
+-     "totalLinesAdded": 1,
+-     "totalLinesRemoved": 0,
+-     "totalScore": null,
+-     "tsc": {
+-       "clean": true,
+-       "errors": 0,
+-     },
+-     "workerId": "worker-fixture-001",
+-   },
+-   "state": "current",
+-   "terminalAuthority": {
+-     "acceptedAuthority": {
+-       "acceptedResultChainDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+-       "acceptedResultRef": {
+-         "artifactKey": "primary",
+-         "artifactReceiptDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+-         "identity": {
+-           "attemptId": "attempt-recovered-terminal",
+-           "backend": "docker",
+-           "generation": 1,
+-           "projectId": "project-test",
+-           "projectRootSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+-           "schemaVersion": 2,
+-           "taskId": "exact-recovered-terminal",
+-         },
+-         "kind": "task-accepted-result-v2-ref",
+-         "schemaVersion": 2,
+-       },
+-       "admissionReceiptDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+-       "executionMode": "normal-docker",
+-       "identity": {
+-         "attemptId": "attempt-recovered-terminal",
+-         "backend": "docker",
+-         "generation": 1,
+-         "projectId": "project-test",
+-         "projectRootSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+-         "schemaVersion": 2,
+-         "taskId": "exact-recovered-terminal",
+-       },
+-       "resultDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+-     },
+-     "kind": "exact-accepted-result-terminal-authority-v2",
+-     "schemaVersion": 2,
+-     "terminalDecisionAuthority": {
+-       "evaluationReceipt": {
+-         "artifactReceiptDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+-         "artifactSha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+-         "byteLength": 128,
+-         "chainDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+-         "verdict": "DONE",
+-       },
+-       "finalizerReceipt": {
+-         "artifactReceiptDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+-         "artifactSha256": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+-         "byteLength": 96,
+-         "chainDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+-         "state": "terminal-ready",
+-       },
+-       "identity": {
+-         "attemptId": "attempt-recovered-terminal",
+-         "backend": "docker",
+-         "generation": 1,
+-         "projectId": "project-test",
+-         "projectRootSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+-         "schemaVersion": 2,
+-         "taskId": "exact-recovered-terminal",
+-       },
+-       "kind": "exact-task-terminal-decision-authority-v2",
+-       "schemaVersion": 2,
+-     },
+-     "terminalResultAuthority": {
+-       "acceptedResultChainDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+-       "admissionReceiptDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+-       "evaluationArtifact": {
+-         "artifactReceiptDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+-         "artifactSha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+-         "byteLength": 128,
+-         "chainDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+-       },
+-       "evaluationChainDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+-       "executionMode": "normal-docker",
+-       "finalizerArtifact": {
+-         "artifactReceiptDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+-         "artifactSha256": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+-         "byteLength": 96,
+-         "chainDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+-       },
+-       "finalizerChainDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+-       "identity": {
+-         "attemptId": "attempt-recovered-terminal",
+-         "backend": "docker",
+-         "generation": 1,
+-         "projectId": "project-test",
+-         "projectRootSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+-         "schemaVersion": 2,
+-         "taskId": "exact-recovered-terminal",
+-       },
+-       "resultDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+-       "settlementDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+-       "settlementRef": {
+-         "artifactKey": "settlement",
+-         "artifactReceiptDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+-         "identity": {
+-           "attemptId": "attempt-recovered-terminal",
+-           "backend": "docker",
+-           "generation": 1,
+-           "projectId": "project-test",
+-           "projectRootSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+-           "schemaVersion": 2,
+-           "taskId": "exact-recovered-terminal",
+-         },
+-         "kind": "task-result-settlement-v2-ref",
+-         "schemaVersion": 2,
+-       },
+-     },
+-   },
+-   "terminalResultAuthority": {
+-     "acceptedResultChainDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+-     "admissionReceiptDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+-     "evaluationArtifact": {
+-       "artifactReceiptDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+-       "artifactSha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+-       "byteLength": 128,
+-       "chainDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+-     },
+-     "evaluationChainDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+-     "executionMode": "normal-docker",
+-     "finalizerArtifact": {
+-       "artifactReceiptDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+-       "artifactSha256": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+-       "byteLength": 96,
+-       "chainDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+-     },
+-     "finalizerChainDigest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+-     "identity": {
+-       "attemptId": "attempt-recovered-terminal",
+-       "backend": "docker",
+-       "generation": 1,
+-       "projectId": "project-test",
+-       "projectRootSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+-       "schemaVersion": 2,
+-       "taskId": "exact-recovered-terminal",
+-     },
+-     "resultDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+-     "settlementDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+-     "settlementRef": {
+-       "artifactKey": "settlement",
+-       "artifactReceiptDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+-       "identity": {
+-         "attemptId": "attempt-recovered-terminal",
+-         "backend": "docker",
+-         "generation": 1,
+-         "projectId": "project-test",
+-         "projectRootSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+-         "schemaVersion": 2,
+-         "taskId": "exact-recovered-terminal",
+-       },
+-       "kind": "task-result-settlement-v2-ref",
+-       "schemaVersion": 2,
+-     },
+-   },
++   "reasonCode": "exact-terminal-result-authority-mismatch",
++   "state": "hold",
+  }
+
+ ❯ tests/orchestra/scheduler-spawn-executor.test.ts:844:57
+    842|     }, recovery);
+    843| 
+    844|     expect(registry.readExactTerminalAuthority(taskId)).toBe(reordered…
+       |                                                         ^
+    845|     expect(recovery.readExactDockerAcceptedTaskTerminalAuthority)
+    846|       .toHaveBeenCalledWith(expect.objectContaining({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 32 skipped (33)
+   Start at  13:11:45
+   Duration  4.76s (transform 1.93s, setup 15ms, collect 2.55s, tests 992ms, environment 0ms, prepare 32ms)
+

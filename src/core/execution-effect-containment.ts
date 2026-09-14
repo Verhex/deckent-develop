@@ -404,7 +404,19 @@ type ManifestValidation =
   | Readonly<{ readonly ok: true; readonly manifest: ExecutionEffectManifest }>
   | Readonly<{ readonly ok: false; readonly hold: ExecutionEffectHold }>;
 
+// This registry recognizes only this parser's deeply immutable output objects.
+// It caches content validation, never disk freshness, admission or policy authority.
+// Deserialized values, clones and proxies must pass the complete parser again.
+const validatedManifestObjects = new WeakSet<ExecutionEffectManifest>();
+
 function validateManifest(value: unknown, expectedPhase?: 'baseline' | 'final'): ManifestValidation {
+  if (value !== null && typeof value === 'object'
+    && validatedManifestObjects.has(value as ExecutionEffectManifest)) {
+    const manifest = value as ExecutionEffectManifest;
+    return expectedPhase === undefined || manifest.phase === expectedPhase
+      ? { ok: true, manifest }
+      : { ok: false, hold: { code: 'MANIFEST_PHASE_MISMATCH' } };
+  }
   const record = exactRecord(value, [
     'version', 'phase', 'attempt', 'attemptDigest', 'workspaceIdentity', 'captureAuthority',
     'landingSemantics', 'policy', 'entries', 'digest',
@@ -550,7 +562,9 @@ function validateManifest(value: unknown, expectedPhase?: 'baseline' | 'final'):
   if (sha256('execution-effect-manifest-v1', body) !== record.digest) {
     return { ok: false, hold: { code: 'MANIFEST_DIGEST_MISMATCH' } };
   }
-  return { ok: true, manifest: Object.freeze({ ...body, digest: record.digest as string }) };
+  const manifest = Object.freeze({ ...body, digest: record.digest as string });
+  validatedManifestObjects.add(manifest);
+  return { ok: true, manifest };
 }
 
 export function parseExecutionEffectManifest(value: unknown): ExecutionEffectManifest | null {

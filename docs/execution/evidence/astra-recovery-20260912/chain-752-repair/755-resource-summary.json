@@ -1,0 +1,47 @@
+{
+  "observedAt": "2026-09-13T12:46:53.113484+00:00",
+  "sprintId": "sprint-755",
+  "attemptId": "d71cebfb-3c5b-8b0b-8584-a759418f3e19",
+  "exit": {
+    "observedAt": "2026-09-13T12:41:13.460872+00:00",
+    "kind": "exit",
+    "pid": 38217,
+    "exitCode": 0,
+    "elapsedSeconds": 2216.7537978499995
+  },
+  "hostObservedHwmKiB": 9079120,
+  "hostLastSample": {
+    "observedAt": "2026-09-13T12:41:11.831276+00:00",
+    "kind": "coordinator",
+    "pid": 38217,
+    "elapsedSeconds": 2215.124208829,
+    "userCpuSeconds": 1631.27,
+    "systemCpuSeconds": 238.97,
+    "status": {
+      "VmHWM": "9079120 kB",
+      "VmRSS": "8862296 kB",
+      "VmSwap": "0 kB",
+      "Threads": "11"
+    },
+    "io": {
+      "rchar": 22358490442,
+      "wchar": 53925336,
+      "syscr": 2569429,
+      "syscw": 88185,
+      "read_bytes": 888909824,
+      "write_bytes": 141352960,
+      "cancelled_write_bytes": 100524032
+    }
+  },
+  "worker": {
+    "samples": 24,
+    "firstSampleAt": "2026-09-13T12:12:09.209408+00:00",
+    "lastSampleAt": "2026-09-13T12:14:04.197142+00:00",
+    "sampledMaxMemoryBytes": 592026009.6,
+    "sampledPeakCpuPercent": 174.44,
+    "providerStartAt": "2026-09-13T12:12:10.913Z",
+    "providerExitAt": "2026-09-13T12:14:05.915Z",
+    "providerReceiptIntervalSeconds": 115.002
+  },
+  "limits": "5s Docker samples are not exact worker peak; exited zero-PID rows excluded. Host clock delay remains in total elapsed. Receipt interval is provider-start to observed provider-exit, not pure model compute."
+}

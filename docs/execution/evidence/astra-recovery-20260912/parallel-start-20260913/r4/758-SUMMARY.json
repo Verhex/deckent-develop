@@ -1,0 +1,51 @@
+{
+  "observedAt": "2026-09-13T15:40:26.621882+00:00",
+  "flowId": "99f90f6a-5a30-4215-bda1-334b995a5886",
+  "eventSource": ".deckent/runtime/run-flow-store/99f90f6a-5a30-4215-bda1-334b995a5886.events.jsonl",
+  "eventSourceSha256": "608aa005238610ed53f44d0117ddda2f345cb2b6bdb5c3b6c398fee253652885",
+  "events": [
+    {
+      "timestamp": "2026-09-13T15:25:17.380Z",
+      "type": "PROPOSAL_SUBMITTED",
+      "sequence": 1
+    },
+    {
+      "timestamp": "2026-09-13T15:25:17.380Z",
+      "type": "PREVIEW_STARTED",
+      "sequence": 2
+    },
+    {
+      "timestamp": "2026-09-13T15:25:17.431Z",
+      "type": "PREVIEW_READY",
+      "sequence": 3
+    },
+    {
+      "timestamp": "2026-09-13T15:25:17.484Z",
+      "type": "APPROVAL_GRANTED",
+      "sequence": 4
+    },
+    {
+      "timestamp": "2026-09-13T15:25:17.595Z",
+      "type": "START_REQUESTED",
+      "sequence": 5
+    },
+    {
+      "timestamp": "2026-09-13T15:31:34.013Z",
+      "type": "RUN_FAILED",
+      "error": "DECKENT_E091:spawn-backend-recovery-hold",
+      "sequence": 6
+    }
+  ],
+  "exit": {
+    "observedAt": "2026-09-13T15:31:34.653253+00:00",
+    "kind": "exit",
+    "pid": 227504,
+    "exitCode": 1,
+    "elapsedSeconds": 398.4445845219998
+  },
+  "coordinatorSampledHwmKiB": 4722708,
+  "lastSampleCpuSeconds": 390.88,
+  "runStarted": false,
+  "exactBlockingAttempts": "UNAVAILABLE: top-level failure lost typed holds; 757003 compensation seam defect independently reproduced, not yet proved sole758 blocker",
+  "replayBudgetRemaining": 0
+}

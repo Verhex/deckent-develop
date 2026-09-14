@@ -1,0 +1,41 @@
+{
+  "observedAt": "2026-09-13T12:49:57.676195+00:00",
+  "recoveryId": "R3-754-OBSERVATION-DEADLINE-20260913",
+  "realRun": "sprint-755",
+  "flowId": "9034863d-f080-4024-8889-43fa392184d4",
+  "runExitCode": 0,
+  "runDisposition": "COMPLETE",
+  "taskDisposition": "1/1 DONE",
+  "postWorkerBuildExitCode": 0,
+  "postWorkerMainVerificationExitCode": 0,
+  "canonicalArchiveAndTerminalVerificationExitCode": 0,
+  "masterValidatorExitCode": 0,
+  "formalCrossProviderXVerify": "unavailable/HOLD",
+  "parentOutcomeDisposition": "OPEN",
+  "sourceHashes": {
+    "src/orchestra/spawn-backend-docker.ts": "bfeabbc4f7fd35559dc49c1ff6a4736465909a3ab1ecc9ee141cfec5b842ee48",
+    "src/orchestra/exact-docker-workspace-command.ts": "c15c92c2c5fdc26ee6499ca5d45aa106a74513da38797c534140c95a472571b7",
+    "src/orchestra/exact-docker-container-observation.ts": "2e10d30a4b618661b1a331a0714f539042cb7b33a3a97611669b1d9c780b56e7",
+    "src/orchestra/exact-docker-container-observation-worker.ts": "d47c88f2b7580ec58a5b05b6a1a73ec3a7f6d00063091e3fa8f76c0b9b601d8e",
+    "src/core/observability.ts": "5306b5aa748660b0f7dc09b474e77c40370804e76b1f1db4de9ac3385f6eaad8",
+    "tests/orchestra/docker-restart-reconcile-archived-attempt.test.ts": "66bd207f0536432e76809f932c90b2fdb5cb68f3acbb90d01acdb1bada790a12"
+  },
+  "evidenceHashes": {
+    "R3-PACKAGE.json": "47c73a179e780f891b5431bad1668da9d86fff696c4bf44907c7bd1f32feb75b",
+    "R3-RESULT.md": "2c98d3832022151f816c8f17f5869f969cef8896a09f11f45f7a0349cf8a3415",
+    "R3-LAUNCH-EVIDENCE.json": "cfed7ff90773869b12b8b82b5f94bf521898de3da347f1485d908276f5e8dff1",
+    "754-recovery.json": "d20fb256265058abb0cfcfad4f443667bfaec58ef326797d7116e4122c4bd5d2",
+    "754-inspect-contention-before.log": "e40e66d02c1422276e663dc094ce3cca7da65d7f71658aa418c78561f62c55db",
+    "754-inspect-contention-after.log": "67f62e79111ccb1602510cc3e2e9c0198108322f4147010bb95d688c2e46e52a",
+    "755-start.log": "8daf8b7b023c3268b4a49d59d95bf726e3289c9896ff909350520802a4a6a060",
+    "755-resource-summary.json": "8d2377d01cc10fff338788d670fe439a10fbb2aa2a29786a4defe992b05e2d58",
+    "755-resources.jsonl": "6189df6c069d6eafe589a8cc99ce959beccbe4fd0eccbc5ff2ee40be582afad9",
+    "755-job.json": "5493093db6fd1fe29dcfbbaa3083027f49badc3d139121f75eb5d4c308eba8a4",
+    "755-canonical-status.json": "e0a2fef8a9536949d4e9c73ac49d6f9f83d9b3519ded1e893b6ac8c1b4069e47",
+    "755-archive-verification.json": "0bf46337e21eb15f19cf4197ce94fb3a7eb80cb18543706b41155e775ed653f3",
+    "755-archive-terminal-seal-receipt.json": "0357e91e35a6d8073e91080187e66a717d1d44896907075d66328edadd3dc57b",
+    "755-post-build.log": "ee9629abc0c24d04fd75b4abe6f3978137188d8f56c4aba8e36014b0f34ef5f2",
+    "755-host-worker-verification.log": "2cbb57b83a3453128b730ab22560eab82104e9133fab44bbfa2e3e97242edc4e",
+    "755-errors-at-exit.md": "2514f5d31aab13f26dd9985e6f1dff9d5569689c03343c019ec9c2efe556065f"
+  }
+}

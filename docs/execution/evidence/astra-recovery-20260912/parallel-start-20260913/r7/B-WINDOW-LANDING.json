@@ -1,0 +1,39 @@
+{
+  "at": "2026-09-13T20:35:25.936951+00:00",
+  "scope": [
+    "src/orchestra/spawn-backend-docker.ts",
+    "src/orchestra/exact-docker-container-observation.ts",
+    "src/orchestra/exact-docker-command-transport.ts",
+    "tests/orchestra/exact-docker-observation.test.ts",
+    "tests/orchestra/spawn-backend-docker-mounts.test.ts",
+    "src/orchestra/exact-docker-capture-window-worker.ts"
+  ],
+  "sha256": {
+    "src/orchestra/spawn-backend-docker.ts": "89e48fab39202cd5900d15422069a11e17208a4b42f2a99e124f1ec487bea8b4",
+    "src/orchestra/exact-docker-container-observation.ts": "0e6b8e6cb4426a6d15e83cf296f2e228d3f72f26447db18c4b965f9dfaab95eb",
+    "src/orchestra/exact-docker-command-transport.ts": "e8beecf32d8a03f9334dff4bfe4343c8a8d0c648f354d3c1e90d802998cd6789",
+    "tests/orchestra/exact-docker-observation.test.ts": "a1778b60068577699681b72c1d9fe2b8f1bed844bbbdafd782343cd205dcef21",
+    "tests/orchestra/spawn-backend-docker-mounts.test.ts": "c30da94e6d1a8b5e89790b6faf3523f4a43da5c6b107e61af1ae3215d0e195e4",
+    "src/orchestra/exact-docker-capture-window-worker.ts": "ca9e296058cec32c36cd91c54de68c77f7af14dbd1d39506768587b320dc7fd6"
+  },
+  "activeRunProcesses": [],
+  "targetedTests": {
+    "exit": 0,
+    "passed": 116
+  },
+  "lifecycleTests": {
+    "exit": 0,
+    "passed": 45,
+    "note": "unchanged lifecycle suite from initial pass; failed test in that run was separate stale source anchor"
+  },
+  "tscExit": 0,
+  "isolatedBuildExit": 0,
+  "windowProbeExit": 0,
+  "mainBuild": {
+    "exit": 0,
+    "command": "npm run build:all"
+  },
+  "productClosure": "HOLD; C/D/E remain; historical758 root cannot be certain from old metadata",
+  "completedAt": "2026-09-13T20:37:02.616854+00:00",
+  "diffCheckExit": 0
+}

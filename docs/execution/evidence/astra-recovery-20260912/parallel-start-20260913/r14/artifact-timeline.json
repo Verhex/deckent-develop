@@ -1,0 +1,278 @@
+[
+  {
+    "class": "archive-receipt",
+    "capturedAt": "2026-09-14T07:22:05.100Z",
+    "receiptDigest": "sha256:5118a61d64d64345314680c47d4140ad9135b0e80532bed0adddc6a132d5cf2c",
+    "artifact": "sha256:c6e2cade9b6a8e54b619c2aeb1aa2539216dcc606f6dafaeb2ee9564d0a66944"
+  },
+  {
+    "class": "canonical-accepted-result",
+    "capturedAt": "2026-09-14T07:20:26.003Z",
+    "receiptDigest": "sha256:d75e1b25ac6b8f4ffaf97005285de5e1e0205e8a677c04c3fc8a7d8c4fda58a2",
+    "artifact": "sha256:7ff77664762effbbacc3dcea01dec2824fb07e7f12ce2856c9ab8c3c83daf1de"
+  },
+  {
+    "class": "evaluation-receipt",
+    "capturedAt": "2026-09-14T07:21:39.750Z",
+    "receiptDigest": "sha256:2cf5c11527a392a7a46767d9137db2f4c397ebd3ed5525c44a46e2e481747141",
+    "artifact": "sha256:f6aefd9763f9bb62eca91af41a3e9226dbc1c009d05a25d7912e517744090fe0"
+  },
+  {
+    "class": "execution-effect-landing-journal",
+    "capturedAt": "2026-09-14T07:19:06.921Z",
+    "receiptDigest": "sha256:e2c9c0941bc8b5f6431627db2d33d81c4280643b061207d6cc70f36ead3b3dc3",
+    "artifact": "sha256:4fc1356917fba907d6fae084c5a10e442f4ce571960bbef1ebd9cb0cb32cfdd7"
+  },
+  {
+    "class": "execution-effect-landing-journal",
+    "capturedAt": "2026-09-14T07:19:05.177Z",
+    "receiptDigest": "sha256:f477f96195e72f4a03f0f48b56f8bc245789e7b25b5ebb26557923da2a183bab",
+    "artifact": "sha256:67d9a23f13a2fab9cfc71372037d2a5fa5e15d5cfc975b73770a1f554d7f53c5"
+  },
+  {
+    "class": "execution-effect-landing-journal",
+    "capturedAt": "2026-09-14T07:19:05.938Z",
+    "receiptDigest": "sha256:4bcaa701de96044734991df9790062e56ffdececc170a08e59d4231fb774e7b9",
+    "artifact": "sha256:689d64edf2c8c56d1242a7610c18ee58bf7429f979262d4eba6e060fd28c730d"
+  },
+  {
+    "class": "execution-effect-landing-journal",
+    "capturedAt": "2026-09-14T07:19:06.922Z",
+    "receiptDigest": "sha256:e7fdab43fe424306329b6d802b9c583f83979038845de95fff25ee45646fa810",
+    "artifact": "sha256:6821f8aff8e9b0327c569019c5339c9e609094e1bf1041c96cf90f5eb6aea86d"
+  },
+  {
+    "class": "execution-effect-landing-journal",
+    "capturedAt": "2026-09-14T07:19:04.707Z",
+    "receiptDigest": "sha256:8626faca75736b6c2e89a144cff450a0694a44ea61792c8fbf773f0974c87807",
+    "artifact": "sha256:3524e97f22f8f2c74f451e172eb966904e0d62d75f7958ee4bde6c66485b3f6a"
+  },
+  {
+    "class": "execution-effect-landing-journal",
+    "capturedAt": "2026-09-14T07:19:06.477Z",
+    "receiptDigest": "sha256:4fa89a71c0d3cb230f8999d60d4b9ebb5ba902aa8702c0a0b4ea01d64b9ffe00",
+    "artifact": "sha256:d9d96f3854598c6dbc84b5c44577e8cb208a46d8b122f9ed50b596a17a61273c"
+  },
+  {
+    "class": "execution-effect-landing-receipt",
+    "capturedAt": "2026-09-14T07:20:26.003Z",
+    "receiptDigest": "sha256:d3a93d22631bdea6bdfb53d9cd48b1f8541f7dd841bc8113e8395955b16755d0",
+    "artifact": "sha256:0fc5c3f2e0c94d05df7b1fcb848361a3e7525d9f3ae72b1dab2c1123c20944e3"
+  },
+  {
+    "class": "execution-effect-landing-receipt-evidence",
+    "capturedAt": "2026-09-14T07:19:06.921Z",
+    "receiptDigest": "sha256:670981f798939e20ebe0e7811515dfecf3e454129c2e61fd19d9764becd02143",
+    "artifact": "sha256:ef24feb44f5b33aa4629f548b85ccb2a9841718c630c9ae527cc4d28506f37da"
+  },
+  {
+    "class": "execution-effect-landing-receipt-evidence",
+    "capturedAt": "2026-09-14T07:19:06.921Z",
+    "receiptDigest": "sha256:655518b7a319ed8d888dc7cacb18ec627dc249eb55dfd2ecff858f80e4c1ddf8",
+    "artifact": "sha256:4fc1356917fba907d6fae084c5a10e442f4ce571960bbef1ebd9cb0cb32cfdd7"
+  },
+  {
+    "class": "execution-effect-landing-receipt-evidence",
+    "capturedAt": "2026-09-14T07:19:06.921Z",
+    "receiptDigest": "sha256:ed5c14d5ad62e8dc8dd8e8fdfc234a3dacaf6b8c79e3b0664b8f9568434e066e",
+    "artifact": "sha256:9e92a25e7794f9b5f7a8dc43c04c8e9e1107c50d4431bc59afa55d2c0c793c77"
+  },
+  {
+    "class": "execution-effect-landing-receipt-evidence",
+    "capturedAt": "2026-09-14T07:19:07.378Z",
+    "receiptDigest": "sha256:3f681aca5b1a5154fb39ce9728c63ab6f62ea78858cfd178144e11130134786f",
+    "artifact": "sha256:954b3414037a2f6b3dd137e16148f4b98824ecc82858645cac6f6ec5fb996fbc"
+  },
+  {
+    "class": "execution-effect-landing-receipt-evidence",
+    "capturedAt": "2026-09-14T07:19:06.921Z",
+    "receiptDigest": "sha256:274d6a1e1544aa66ad9c9821e98fc0e7062011b6e2063840e73ac8493b2da829",
+    "artifact": "sha256:51e2da3ae382dc42e76751a628d52f23ddff3e9cecf4855711a2e2747e0dc746"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:19:33.262Z",
+    "receiptDigest": "sha256:14249bb9a621d61630976c9bd5eff6d96451f024c51c70a217296a150fc70dae",
+    "artifact": "sha256:2d3ef9d8dfc067411b1032ca5b571be98a89815b5c1f89f271bf519df1597a3e"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:20:14.729Z",
+    "receiptDigest": "sha256:a586fc1676e6297e49f2c7bbc234ac10c3df87dae36b2b8ffb69a84fcb5cdeac",
+    "artifact": "sha256:da82752199b25dc3537de51371a0828c3c250d158dc626f72ff395870f844415"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:19:06.921Z",
+    "receiptDigest": "sha256:ff02cd9a0d80ef6c2d61324d09b9dfbc0069d9ed59846019da74d876d58eecaf",
+    "artifact": "sha256:a6914dbe412980c1c5ca0772b1aa7e8cd30caf472f99f07e9b2fae0bdfe54fe4"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:19:53.286Z",
+    "receiptDigest": "sha256:e83d565674639cf949b651eb171c30f8eceaaa70188b773be119e64a2edcf92b",
+    "artifact": "sha256:38bc8a1e5b5a2cadae37bfb1862e5d1adc9dda2f0acbbe8a3e03ea7b796b6548"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:19:53.528Z",
+    "receiptDigest": "sha256:6d980e2413821ab99c63220fd307e0bb7dbd62a24aa6ae38f950fe89ea65c21b",
+    "artifact": "sha256:613a20866cc8641d51c5e0d83b994d97141da0df7cc2079e803cf0c83e434837"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:20:14.998Z",
+    "receiptDigest": "sha256:c3a854018c7512e3f65b170c7ab2517fe0ed086d452f7b0a785f782e2b2b92a6",
+    "artifact": "sha256:b7061817ddb9106e4235069abc8ab939c25e1536bc164151e24d87393ddca6e7"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:19:33.533Z",
+    "receiptDigest": "sha256:52e9af7567872c171ec70ebd139b165d96f7a38723229e25130f4b7fe52e9a0b",
+    "artifact": "sha256:1b26f5969ba54a8d695a3c49a65e56a98788c808769ac7ce29a691c8de68a416"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:19:53.528Z",
+    "receiptDigest": "sha256:49fea97087d34842ae0becc4b4ab768741d44ae4c3a4194890591f4ad760032a",
+    "artifact": "sha256:4c2d3ae4203cd08a93f498e733f94cd4150ed95efbf47e1685070f6641523de9"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:20:14.998Z",
+    "receiptDigest": "sha256:7688efda025c854b0a3a46cbfb5f6c6883c31758f9a7b163382b6515c1c6339c",
+    "artifact": "sha256:388b43ca8194b1ccbc1d417279919f5c6a445ce0ea32769b72d6f1e435b03cd7"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:20:03.295Z",
+    "receiptDigest": "sha256:86e03718c30cac19132f8209541754a9716d505393eb3a57ec5ad9f79f59c2c2",
+    "artifact": "sha256:46e4cb60e608f37bb87d2cb19ab3a8ea541e6a0e02977504e613394420107c73"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:19:24.215Z",
+    "receiptDigest": "sha256:a2e902157231ef601e1ce5fc3f3f79cd80a7254464a36e802ee6e9fbed31e0cb",
+    "artifact": "sha256:ac6a550a6b4ef0406368a7871b9958a50baba4bb9d0f69dc66bf64962cf7742b"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:20:26.003Z",
+    "receiptDigest": "sha256:fa51492da50b0c61b248a0c61a94b8962c4aec2010e22680d8fcd34d8268cdf2",
+    "artifact": "sha256:ffc5b826def3e2563c0e1bd2b5f55d63f6aeb80d4a59023fc109251f2dd09503"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:19:43.302Z",
+    "receiptDigest": "sha256:8e4d20960c2f28fa4f9eb5ad8c149f595bfacc10f6a39e299be33888860332f4",
+    "artifact": "sha256:1f55f2d36f4d9d77b15442eca9bef368df9f43c3ebb7d305e2600ac4ac3a4a26"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:19:33.533Z",
+    "receiptDigest": "sha256:fefdff653d5adeb5db9f2d1e5c64c3f95c64de56e803d45706e67e280dcf5be2",
+    "artifact": "sha256:7c42eb9a72c033aefd85fa19e4813dd5482b49f251b9276344f20f73f44a4e45"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:19:06.921Z",
+    "receiptDigest": "sha256:224213619c4fb7e96baf5adfe0826bb5d234e0b5c27b6d6c0a27aa9a4be660fe",
+    "artifact": "sha256:26dc40ea6386445247cbb62fd3f539a2a28f12b78ec967f761c88d57abc74ef1"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:12:55.140Z",
+    "receiptDigest": "sha256:f5545068d6491c66cec8a9109a1188943c894cc3f82b54b2ac2037a43e66f697",
+    "artifact": "sha256:df7439bd2c837dbd7f2f1b7d37dc789388b9f0fa81f96165c3a807cb905dd063"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:13:42.774Z",
+    "receiptDigest": "sha256:78c444bf2b2f48b1535506cba6f917da397518880f0d1b39dbed8ee703856fa0",
+    "artifact": "sha256:1ebdd48636dd55b63367e458febbcfa8af24d524de551cde177dc5df3558e522"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:13:50.199Z",
+    "receiptDigest": "sha256:ba85f5dbf1f96a4889aa70dea52d39172bed40584bc14c1cdbe61c3dac982582",
+    "artifact": "sha256:76905a039ee8fda25cf822375dcf71b9f39f056f4232c787b08dc66aac2142eb"
+  },
+  {
+    "class": "execution-effect-lifecycle-authority",
+    "capturedAt": "2026-09-14T07:18:59.150Z",
+    "receiptDigest": "sha256:894c04cd31a94c2f9310b4e541f8e60e8d7f30a0f0dfa49e3fc8e77574a4ae4d",
+    "artifact": "sha256:09b0d687f74162fdeb58d70fa058097bda5b6f53dc62b9b8b3034d3fccaa0b35"
+  },
+  {
+    "class": "execution-effect-manifest",
+    "capturedAt": "2026-09-14T07:13:42.229Z",
+    "receiptDigest": "sha256:e0fadb2007a9055d0c822abd2fae3382c5448ee66ce547dfac8d477ca183ec4f",
+    "artifact": "sha256:2ab49340a12aa7c38efcbf4d57ad77773895f1969b2650949c26f0ecff5b0e13"
+  },
+  {
+    "class": "execution-effect-manifest",
+    "capturedAt": "2026-09-14T07:18:58.607Z",
+    "receiptDigest": "sha256:d02b035c477573c4b6c4bed3fd880f8a2ff3b0f15a63bee1f6aea060ce53a436",
+    "artifact": "sha256:fd9456a2ef03ae4749a52def9e62ce84a08f9dda51278fe5cc32b532e3c062a6"
+  },
+  {
+    "class": "execution-effect-manifest",
+    "capturedAt": "2026-09-14T07:18:58.607Z",
+    "receiptDigest": "sha256:342348f64c81cee87b2f734aafd133b50724571ed6b109082032b33be2d365be",
+    "artifact": "sha256:fd9456a2ef03ae4749a52def9e62ce84a08f9dda51278fe5cc32b532e3c062a6"
+  },
+  {
+    "class": "execution-effect-staged-content",
+    "capturedAt": "2026-09-14T07:19:04.309Z",
+    "receiptDigest": "sha256:f1fef9c34bdc1180d956590fcdabbe66c9158911cfeb7ede4dc093174b17610c",
+    "artifact": "sha256:a9eec57090b1d34f6d9afbac8f17268ec11982d73a668ef7423bcbbe773c3453"
+  },
+  {
+    "class": "execution-workspace-release",
+    "capturedAt": "2026-09-14T07:20:26.003Z",
+    "receiptDigest": "sha256:c6c8b600605d98a9393487b170a21217863b2385e7bc8f681a76f39ed8fc0961",
+    "artifact": "sha256:b15584268c74193b28c53ccba6bad26df825e64179e5051b994ba8eb6e34a2e0"
+  },
+  {
+    "class": "execution-workspace-snapshot",
+    "capturedAt": "2026-09-14T07:13:42.774Z",
+    "receiptDigest": "sha256:a714821aed837e0c1038bbf8f6ff48f95e0030ef4a5a96e355e2ca31ddcf4322",
+    "artifact": "sha256:896b45dfbda90babd0a5c37da8db7b55f44d0eca121ba2f20489d879239f9748"
+  },
+  {
+    "class": "finalizer-receipt",
+    "capturedAt": "2026-09-14T07:21:44.965Z",
+    "receiptDigest": "sha256:d5b93c6a3410b118b063e83bca04ba6f56cdb4e675c9a1d5e99a30d72971deb6",
+    "artifact": "sha256:f23587a32edde2f89f5bb2c55c06748790636a289a21486037c90555fbdeae61"
+  },
+  {
+    "class": "host-work-attribution",
+    "capturedAt": "2026-09-14T07:18:51.437Z",
+    "receiptDigest": "sha256:3032a44de3c47910eaa24f10982ed7091942d066eb5886eb6dc6dfa023cbd6a2",
+    "artifact": "sha256:145c0006a5cdcb4da2a2054e5f82289a9b0877c11656ff0bd16a2863ec2a5bc1"
+  },
+  {
+    "class": "pristine-provider-stream",
+    "capturedAt": "2026-09-14T07:18:51.437Z",
+    "receiptDigest": "sha256:f27582561a1e8ee072679e0226043238f2554fc3bc274aabf48fdbac383bf3c9",
+    "artifact": "sha256:ba481e65847af73f38dfcd81e89461ad2d88c9b1fe871370e64643efaa76a8f1"
+  },
+  {
+    "class": "settlement-receipt",
+    "capturedAt": "2026-09-14T07:21:50.412Z",
+    "receiptDigest": "sha256:21295393d273ebfe9d55f9b1b3dc3a9a0e05a552db29154b94bfb89bde2e5d93",
+    "artifact": "sha256:ae9b0f51a1a2c6236022ce3ba01af733ff98970cdf68491aa3f9bce7237614ce"
+  },
+  {
+    "class": "worker-landing-proposal",
+    "capturedAt": "2026-09-14T07:18:51.437Z",
+    "receiptDigest": "sha256:31e998305c270fa94fb463a8583e3d012dbc0a5271be63e424c125d9a3141a93",
+    "artifact": "sha256:5d48fa6d93b19053af903eb3c9aafd13a13babd32854dae136a4d3c36352ed3d"
+  },
+  {
+    "class": "worker-result",
+    "capturedAt": "2026-09-14T07:18:51.437Z",
+    "receiptDigest": "sha256:a7d35efbb6c45816d416b5348b5f4ed0f59e5a569f641a71c50bd9bfbc0552ce",
+    "artifact": "sha256:2836af91a997afbf994a44175a3173f596dec51a28ab129ba7e06d6338c038a2"
+  }
+]

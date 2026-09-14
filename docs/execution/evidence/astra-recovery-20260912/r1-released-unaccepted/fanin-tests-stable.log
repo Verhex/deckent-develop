@@ -1,0 +1,13 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/cli/commands/recover.test.ts (9 tests) 13ms
+ ✓ tests/orchestra/sprint-recovery-operation.test.ts (23 tests) 216ms
+ ✓ tests/cli/detached-start-terminal-result.test.ts (6 tests) 5ms
+ ✓ tests/cli/start-environment-orphan-preflight.test.ts (3 tests) 7ms
+
+ Test Files  4 passed (4)
+      Tests  41 passed (41)
+   Start at  00:56:33
+   Duration  5.33s (transform 4.89s, setup 79ms, collect 11.57s, tests 241ms, environment 0ms, prepare 155ms)
+

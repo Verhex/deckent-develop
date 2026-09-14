@@ -1,0 +1,20 @@
+{
+  "recoveryId": "R2-753-TERMINAL-REPRESENTATION-20260913",
+  "parent": "R1-752-CHAIN-20260913",
+  "ownerAuthority": "continue repairing admitted chain until dogfood surfaces proven",
+  "observedAt": "2026-09-13T10:51:33.692604+00:00",
+  "changedEvidence": [
+    "753 actual live backend null-prototype vs terminal ordinary record; deepEqual false/canonicalEqual true",
+    "production-like regression RED then61/61 PASS",
+    "main worker effect71/71 independent host pass",
+    "canonical recovery753 exit0,cleanALLOW,build:all exit0"
+  ],
+  "scope": [
+    "scheduler terminal equality follows backend canonical JSON contract"
+  ],
+  "proofBudget": {
+    "canaries": 1,
+    "repeatUnchangedFailure": false
+  },
+  "next": "single normal start with external read-only CPU/RAM sampling; no do until start proof"
+}

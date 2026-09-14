@@ -123,6 +123,33 @@ function success(manifestValue: ExecutionEffectManifest): ExecutionEffectManifes
   return Object.freeze({ ok: true, manifest: manifestValue });
 }
 
+describe('parser-owned immutable manifest reuse', () => {
+  it('reuses only validated output identity, never an untrusted clone or changed input', () => {
+    const original = manifest('baseline', ['file.txt'], [directory('.'), file('file.txt', 'before')]);
+    expect(parseExecutionEffectManifest(original)).toBe(original);
+    const clone = JSON.parse(JSON.stringify(original));
+    const reparsed = parseExecutionEffectManifest(clone);
+    expect(reparsed).toEqual(original);
+    expect(reparsed).not.toBe(original);
+    clone.entries[1].path = '../escape';
+    expect(parseExecutionEffectManifest(clone)).toBeNull();
+    const assertFrozen = (value: unknown): void => {
+      if (value === null || typeof value !== 'object') return;
+      expect(Object.isFrozen(value)).toBe(true);
+      for (const child of Object.values(value)) assertFrozen(child);
+    };
+    assertFrozen(original);
+    const changed = { ...original, digest: '0'.repeat(64) };
+    expect(parseExecutionEffectManifest(changed)).toBeNull();
+  });
+
+  it('keeps the expected phase gate when a validated object is reused', () => {
+    const baseline = manifest('baseline', [], [directory('.')]);
+    const result = evaluateExecutionEffectContainment({ baseline: success(baseline), final: success(baseline) });
+    expect(result.state).not.toBe('VERIFIED');
+  });
+});
+
 describe('exact Docker read-only .deck mask baseline', () => {
   const note = 'docs/execution/canary/CANARY-NOTE.md';
   const dirs = [directory('.'), directory('docs'), directory('docs/execution'),

@@ -1,0 +1,205 @@
+{
+  "kind": "deckent.sprint-archive-manifest",
+  "schemaVersion": 1,
+  "sprintId": "sprint-755",
+  "terminalOutcome": "COMPLETE",
+  "artifactCount": 18,
+  "totalBytes": 114586,
+  "familyCounts": {
+    "run": 12,
+    "tasks": 2,
+    "evaluations": 0,
+    "metrics": 1,
+    "scheduler": 1,
+    "heartbeat": 0,
+    "docs": 2,
+    "audits": 0,
+    "unknown": 0
+  },
+  "artifacts": [
+    {
+      "path": "docs/brain-sprint.md",
+      "family": "docs",
+      "bytes": 541,
+      "sha256": "32ff0873c407831cce953aac8db6ff216b74f52bc2836ddac3cdc531838adaa7",
+      "sources": [
+        ".brain/sprints/sprint-755.md"
+      ]
+    },
+    {
+      "path": "docs/DIRECTIVES.md",
+      "family": "docs",
+      "bytes": 21032,
+      "sha256": "e2b6c66c5776168f82d264e0886e9b7f0b3666f27f775efd0d1ed27455d7c345",
+      "sources": [
+        "docs/DIRECTIVES.md"
+      ]
+    },
+    {
+      "path": "job.json",
+      "family": "run",
+      "bytes": 13437,
+      "sha256": "5493093db6fd1fe29dcfbbaa3083027f49badc3d139121f75eb5d4c308eba8a4",
+      "sources": [
+        ".deckent/runtime/jobs/sprint-755.json"
+      ]
+    },
+    {
+      "path": "journal-history/sprint-755-events.jsonl.e83181366cd7674f6614c7e6bf6946bdaea0116555258b4004d26b34814d1402",
+      "family": "run",
+      "bytes": 3107,
+      "sha256": "e83181366cd7674f6614c7e6bf6946bdaea0116555258b4004d26b34814d1402",
+      "sources": [
+        "journal-history/sprint-755-events.jsonl.e83181366cd7674f6614c7e6bf6946bdaea0116555258b4004d26b34814d1402"
+      ]
+    },
+    {
+      "path": "metrics/metrics-21fbf79ae5834b92.jsonl.gz",
+      "family": "metrics",
+      "bytes": 1516,
+      "sha256": "21fbf79ae5834b92015112bd55b3ec78139f4a3f338aa910fb35fc7d0fdebcc1",
+      "sources": [
+        "metrics/metrics-21fbf79ae5834b92.jsonl.gz"
+      ]
+    },
+    {
+      "path": "scheduler/sprint-755.jsonl",
+      "family": "scheduler",
+      "bytes": 13041,
+      "sha256": "4cd583ff7892a8414bbc395b86957a66777728f2e1b1253e0fa456c471218c3e",
+      "sources": [
+        ".deckent/runtime/scheduler-shadow/sprint-755.jsonl"
+      ]
+    },
+    {
+      "path": "sequence-history/sprint-755-seq.2c624232cdd221771294dfbb310aca000a0df6ac8b66b696d90ef06fdefb64a3",
+      "family": "run",
+      "bytes": 1,
+      "sha256": "2c624232cdd221771294dfbb310aca000a0df6ac8b66b696d90ef06fdefb64a3",
+      "sources": [
+        "sequence-history/sprint-755-seq.2c624232cdd221771294dfbb310aca000a0df6ac8b66b696d90ef06fdefb64a3"
+      ]
+    },
+    {
+      "path": "sprint-755-events.jsonl",
+      "family": "run",
+      "bytes": 3721,
+      "sha256": "cb943ddef73026e8bee4c16da6f5839e9b35f11f3da0b1d8f25b4a0801b2d8fd",
+      "sources": [
+        ".deckent/recently-works/sprint-755-events.jsonl"
+      ]
+    },
+    {
+      "path": "sprint-755-gate-authority.json",
+      "family": "run",
+      "bytes": 1873,
+      "sha256": "8f1f825460f594e91f8b754138a928ed0d1974e66ea6e3c4cbc66fc490a8c233",
+      "sources": [
+        ".deckent/recently-works/sprint-755-gate-authority.json"
+      ]
+    },
+    {
+      "path": "sprint-755-gate.json",
+      "family": "run",
+      "bytes": 901,
+      "sha256": "f26778ae306b9ce390de9b2b55b78f2c520679b4c988184a848de5b44ebe2661",
+      "sources": [
+        ".deckent/recently-works/sprint-755-gate.json"
+      ]
+    },
+    {
+      "path": "sprint-755-metrics.jsonl",
+      "family": "run",
+      "bytes": 566,
+      "sha256": "47cc581f00079d5c5c6e7608bfae3681f6adbb72629f04fe5fa82375568bc262",
+      "sources": [
+        ".deckent/recently-works/sprint-755-metrics.jsonl"
+      ]
+    },
+    {
+      "path": "sprint-755-pre-archive.sha256",
+      "family": "run",
+      "bytes": 96,
+      "sha256": "0624a9ef077a53ec6f0322d36b151fbcc1841e190a8acae0dec84da199190686",
+      "sources": [
+        ".deckent/recently-works/sprint-755-pre-archive.sha256"
+      ]
+    },
+    {
+      "path": "sprint-755-pre-archive.tar.gz",
+      "family": "run",
+      "bytes": 6843,
+      "sha256": "48c27fd151fe29e642a2923dfdd92152b6b547d005848f0458847878964310a9",
+      "sources": [
+        ".deckent/recently-works/sprint-755-pre-archive.tar.gz"
+      ]
+    },
+    {
+      "path": "sprint-755-seq",
+      "family": "run",
+      "bytes": 2,
+      "sha256": "4a44dc15364204a80fe80e9039455cc1608281820fe2b24f1e5233ade6af1dd5",
+      "sources": [
+        ".deckent/recently-works/sprint-755-seq"
+      ]
+    },
+    {
+      "path": "sprint-755-terminal-receipt.json",
+      "family": "run",
+      "bytes": 4403,
+      "sha256": "6053ba91cd150f03f00598ecbb64a2e0aca5ec2aab7055285fe34797c7b8fb23",
+      "sources": [
+        ".deckent/recently-works/sprint-755-terminal-receipt.json"
+      ]
+    },
+    {
+      "path": "tasks/task-755-001.json",
+      "family": "tasks",
+      "bytes": 40475,
+      "sha256": "397c4caad7735f62b08aecff46bee738a432a7972af355c540bb9f7fa87cf726",
+      "sources": [
+        "tasks/task-755-001.json"
+      ]
+    },
+    {
+      "path": "tasks/task-755-001.skill-delivery.json",
+      "family": "tasks",
+      "bytes": 681,
+      "sha256": "22d5a410d7cdb58b8698ae614f37120c1f34015d4bcf6b86e3af436c91066e45",
+      "sources": [
+        "tasks/task-755-001.skill-delivery.json"
+      ]
+    },
+    {
+      "path": "terminal-seal-receipt.json",
+      "family": "run",
+      "bytes": 2350,
+      "sha256": "0357e91e35a6d8073e91080187e66a717d1d44896907075d66328edadd3dc57b",
+      "sources": [
+        "terminal-seal-receipt.json"
+      ]
+    }
+  ],
+  "conflicts": [],
+  "memoryReferences": [
+    {
+      "id": "mem-sprint-755",
+      "type": "memory",
+      "updatedAt": "2026-09-13 12:38:01",
+      "digest": "2958a68117fba290f697b57af7421af6c61a0b35ab5aec2e551f6bc2b45f719d"
+    },
+    {
+      "id": "retro-sprint-755",
+      "type": "retro",
+      "updatedAt": "2026-09-13 12:38:05",
+      "digest": "208eef2d2789c03fe1ce317d3d4151b007b9f015d0ac15075c3d3ae0680fc1b2"
+    },
+    {
+      "id": "sprint-log-755",
+      "type": "sprint",
+      "updatedAt": "2026-09-13 12:38:01",
+      "digest": "01f976d5d54980cd569bed7a0360c005de789748bd033eabccee555a7c0d491f"
+    }
+  ],
+  "contentDigest": "21e10a56b91d263f0d68321682f2cfffdc3b4bc63f59b687e7ac1a004751c891"
+}

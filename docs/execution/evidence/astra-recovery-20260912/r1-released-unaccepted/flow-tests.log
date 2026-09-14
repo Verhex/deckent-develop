@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/orchestra/sprint-recovery-operation.test.ts (23 tests) 191ms
+
+ Test Files  1 passed (1)
+      Tests  23 passed (23)
+   Start at  00:32:53
+   Duration  5.96s (transform 3.17s, setup 19ms, collect 4.32s, tests 191ms, environment 0ms, prepare 37ms)
+

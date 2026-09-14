@@ -1,0 +1,11 @@
+{
+  "at": "2026-09-13T22:24:42.661597+00:00",
+  "candidateFilesMovedTo": "/tmp/deckent-r10-held-source",
+  "files": {
+    "src/core/task-attempt-custody-store.ts": "3b6b79f202313225f768dc7ef34fd3fb43759f4f2d7993d95c20264d6ed34308",
+    "src/core/custody-read-snapshot.ts": "05710305970d0ee8a034b506f8af7d8e7462eb55c279d4c3c064d69f7ee206c8",
+    "tests/core/task-attempt-custody-store.test.ts": "bbe3f65e134ad13d923a5f3db472583b512d5ec7a77fb5bd3ce8f0ccabdf1068",
+    "tests/core/custody-read-snapshot.test.ts": "1a6565c5145a92a767cdb7777470ee773ee2985645cf5a8a26f9d407b0ccba0c"
+  },
+  "reason": "preserve failed R10 candidate; restore main dependencies before independent R11 build"
+}

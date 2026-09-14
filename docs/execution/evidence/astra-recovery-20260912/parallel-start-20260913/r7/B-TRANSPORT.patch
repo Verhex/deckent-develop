@@ -1,0 +1,208 @@
+--- a/src/orchestra/spawn-backend-docker.ts
++++ b/src/orchestra/spawn-backend-docker.ts
+@@ -1,3 +1,4 @@
++import { resolveExactDockerEffectCaptureRunner } from './exact-docker-command-transport.js';
+ import { parseExactDockerCommandDiagnostic } from './exact-docker-command-diagnostic.js';
+ import { runExactDockerWorkspaceCommand, type ExactDockerWorkspaceCommandResultV1, type ExactDockerWorkspaceCommandRunnerV1 } from './exact-docker-workspace-command.js';
+ import { resolveExactDockerObservationRunner } from './exact-docker-container-observation.js';
+@@ -3620,8 +3621,10 @@
+   }
+   // Injected adapters retain their exact test/platform authority. Only the
+   // production runner's read-only daemon observations need deadline isolation;
+-  // mutating commands continue through the existing execution path.
++  // population and other mutations retain the existing execution path. Final
++  // capture explicitly selects its own isolated command transport below.
+   const run = resolveExactDockerObservationRunner(input.runner);
++  const runFinalCapture = resolveExactDockerEffectCaptureRunner(input.runner);
+   const populationRetryMax = resolveExactDockerPopulationRetryMaxV1(input.populationRetryMax);
+   const wallClockNow = input.nowIso;
+   let lastTimestampMs: number | null = null;
+@@ -3776,7 +3779,10 @@
+         helperSource,
+         encoded,
+       ];
+-      result = await run(Object.freeze({
++      // Lifecycle admission, volume generation and native/image authority above
++      // are unchanged. Only final capture pipe/deadline ownership moves off the
++      // coordinator loop; the thread never reads or writes custody state.
++      result = await (populate ? run : runFinalCapture)(Object.freeze({
+         command: 'docker' as const,
+         args: Object.freeze(args),
+         stdin: populate ? input.inventory.nulDelimitedPaths : Buffer.alloc(0),
+--- a/src/orchestra/exact-docker-container-observation.ts
++++ b/src/orchestra/exact-docker-container-observation.ts
+@@ -1,4 +1,4 @@
+-import { Worker } from 'node:worker_threads';
++import { runIsolatedExactDockerCommandTransport } from './exact-docker-command-transport.js';
+ import { runExactDockerWorkspaceCommand, type ExactDockerWorkspaceCommandInputV1, type ExactDockerWorkspaceCommandResultV1, type ExactDockerWorkspaceCommandRunnerV1 } from './exact-docker-workspace-command.js';
+ 
+ function unavailable(): ExactDockerWorkspaceCommandResultV1 {
+@@ -40,32 +40,7 @@
+   input: ExactDockerWorkspaceCommandInputV1,
+ ): Promise<ExactDockerWorkspaceCommandResultV1> {
+   if (!isExactDockerReadOnlyObservation(input)) return unavailable();
+-  return await new Promise(resolveResult => {
+-    let worker: Worker;
+-    let result: ExactDockerWorkspaceCommandResultV1 | undefined;
+-    try {
+-      worker = new Worker(new URL('./exact-docker-container-observation-worker.js', import.meta.url), {
+-        workerData: input,
+-        // --input-type only applies to the calling eval/stdin script, not a file.
+-        execArgv: process.execArgv.filter(arg => !arg.startsWith('--input-type')),
+-      });
+-    } catch { resolveResult(unavailable()); return; }
+-    worker.once('message', (message: ExactDockerWorkspaceCommandResultV1) => {
+-      if (!message || (message.status !== null && !Number.isSafeInteger(message.status))
+-        || (message.signal !== null && typeof message.signal !== 'string')
+-        || typeof message.error !== 'boolean' || typeof message.overflow !== 'boolean'
+-        || !(message.stdout instanceof Uint8Array) || !(message.stderr instanceof Uint8Array)
+-        || message.stdout.byteLength > input.stdoutCeiling
+-        || message.stderr.byteLength > input.stderrCeiling) {
+-        result = unavailable(); return;
+-      }
+-      result = Object.freeze(message);
+-    });
+-    worker.once('error', () => { result = unavailable(); });
+-    // Only resolve after the observation thread has retired. No detached poller
+-    // or subprocess is deliberately left behind after a successful result.
+-    worker.once('exit', code => resolveResult(code === 0 && result ? result : unavailable()));
+-  });
++  return runIsolatedExactDockerCommandTransport(input);
+ }
+ 
+ /** One production command seam covers allocation, containment and compensation.
+--- a/src/orchestra/exact-docker-command-transport.ts
++++ b/src/orchestra/exact-docker-command-transport.ts
+@@ -0,0 +1,61 @@
++import { Worker } from 'node:worker_threads';
++import { parseExactDockerCommandDiagnostic } from './exact-docker-command-diagnostic.js';
++import { runExactDockerWorkspaceCommand, type ExactDockerWorkspaceCommandInputV1,
++  type ExactDockerWorkspaceCommandResultV1, type ExactDockerWorkspaceCommandRunnerV1,
++} from './exact-docker-workspace-command.js';
++
++function unavailable(): ExactDockerWorkspaceCommandResultV1 {
++  return Object.freeze({ status: null, signal: null, stdout: Buffer.alloc(0),
++    stderr: Buffer.alloc(0), error: true, overflow: false });
++}
++
++/** Transport only: the calling lifecycle owns admission and exact command scope.
++ * The same bounded runner owns the child in a separate event loop so synchronous
++ * coordinator work cannot stall pipes or manufacture a subprocess timeout.
++ * This does not grant authority to execute any command or accept any result. */
++export async function runIsolatedExactDockerCommandTransport(
++  input: ExactDockerWorkspaceCommandInputV1,
++): Promise<ExactDockerWorkspaceCommandResultV1> {
++  return await new Promise(resolveResult => {
++    let worker: Worker;
++    let result: ExactDockerWorkspaceCommandResultV1 | undefined;
++    try {
++      worker = new Worker(new URL('./exact-docker-container-observation-worker.js', import.meta.url), {
++        workerData: input,
++        // --input-type only applies to the calling eval/stdin script, not a file.
++        execArgv: process.execArgv.filter(arg => !arg.startsWith('--input-type')),
++      });
++    } catch { resolveResult(unavailable()); return; }
++    worker.once('message', (message: ExactDockerWorkspaceCommandResultV1) => {
++      if (!message || (message.status !== null && !Number.isSafeInteger(message.status))
++        || (message.signal !== null && typeof message.signal !== 'string')
++        || typeof message.error !== 'boolean' || typeof message.overflow !== 'boolean'
++        || !(message.stdout instanceof Uint8Array) || !(message.stderr instanceof Uint8Array)
++        || message.stdout.byteLength > input.stdoutCeiling
++        || message.stderr.byteLength > input.stderrCeiling) {
++        result = unavailable(); return;
++      }
++      const diagnostic = message.diagnostic === undefined ? undefined
++        : parseExactDockerCommandDiagnostic(message.diagnostic);
++      if (diagnostic === null) { result = unavailable(); return; }
++      result = Object.freeze({ ...message, ...(diagnostic ? { diagnostic } : {}) });
++    });
++    worker.once('error', () => { result = unavailable(); });
++    // Only resolve after the command transport thread has retired. No detached poller
++    // or subprocess is deliberately left behind after a successful result.
++    worker.once('exit', code => resolveResult(code === 0 && result ? result : unavailable()));
++  });
++}
++
++/** Used only after the lifecycle producer has built an admitted capture command.
++ * Population and other mutation paths do not opt in. Custom platform runners
++ * keep their identity and their own custody/transport contract. */
++export function resolveExactDockerEffectCaptureRunner(
++  runner: ExactDockerWorkspaceCommandRunnerV1,
++): ExactDockerWorkspaceCommandRunnerV1 {
++  return runner === runExactDockerWorkspaceCommand
++    ? input => input.command === 'docker' && input.args[0] === 'run'
++      && input.stdin.byteLength === 0
++      ? runIsolatedExactDockerCommandTransport(input) : Promise.resolve(unavailable())
++    : runner;
++}
+--- a/tests/orchestra/exact-docker-observation.test.ts
++++ b/tests/orchestra/exact-docker-observation.test.ts
+@@ -6,6 +6,8 @@
+ vi.mock('node:worker_threads', () => ({ Worker: doubles.worker }));
+ import { runExactDockerWorkspaceCommand } from '../../src/orchestra/exact-docker-workspace-command.js';
+ import { isExactDockerReadOnlyObservation, runIsolatedExactDockerReadOnlyObservation, resolveExactDockerObservationRunner } from '../../src/orchestra/exact-docker-container-observation.js';
++
++import { resolveExactDockerEffectCaptureRunner } from '../../src/orchestra/exact-docker-command-transport.js';
+ 
+ const input = (args: string[]) => ({ command: 'docker' as const, args, stdin: new Uint8Array(),
+   timeoutMs: 100, stdoutCeiling: 1024, stderrCeiling: 1024 });
+@@ -80,3 +82,48 @@
+     expect(await pending).toMatchObject({status: 0, error: false});
+   });
+ });
++
++
++describe('admitted final capture transport', () => {
++  it('preserves injected lifecycle runner identity', () => {
++    const runner = vi.fn();
++    expect(resolveExactDockerEffectCaptureRunner(runner)).toBe(runner);
++  });
++  it('owns capture drainage in the worker and waits for its exit', async () => {
++    const worker = new EventEmitter();
++    doubles.worker.mockImplementation(function () { return worker; });
++    let settled = false;
++    const command = input(['run', '--rm', 'verified-image', 'node', '-e', 'trusted-helper']);
++    const pending = resolveExactDockerEffectCaptureRunner(runExactDockerWorkspaceCommand)(command)
++      .then(result => { settled = true; return result; });
++    expect(doubles.spawn).not.toHaveBeenCalled();
++    expect(doubles.worker.mock.calls[0]?.[1]).toMatchObject({ workerData: command });
++    const diagnostic = { reason: 'exit', exitCode: 0, signaled: false, timeoutMs: 100,
++      elapsedMs: 20, stdoutBytes: 2, stderrBytes: 0 };
++    worker.emit('message', { status: 0, signal: null, error: false, overflow: false,
++      stdout: new TextEncoder().encode('{}'), stderr: new Uint8Array(), diagnostic });
++    await Promise.resolve();
++    expect(settled).toBe(false);
++    worker.emit('exit', 0);
++    expect(await pending).toMatchObject({ status: 0, error: false, diagnostic });
++  });
++  it.each(['worker-error', 'malformed-diagnostic', 'abnormal-exit', 'oversize-output'])(
++    'does not promote %s to capture success', async fault => {
++      const worker = new EventEmitter();
++      doubles.worker.mockImplementation(function () { return worker; });
++      const pending = resolveExactDockerEffectCaptureRunner(runExactDockerWorkspaceCommand)(input(['run', 'image']));
++      worker.emit('message', { status: 0, signal: null, error: false, overflow: false,
++        stdout: new Uint8Array(fault === 'oversize-output' ? 1025 : 0), stderr: new Uint8Array(),
++        ...(fault === 'malformed-diagnostic' ? { diagnostic: { reason: 'invented' } } : {}) });
++      if (fault === 'worker-error') worker.emit('error', new Error('worker failed'));
++      worker.emit('exit', fault === 'abnormal-exit' ? 1 : 0);
++      expect(await pending).toMatchObject({ status: null, error: true });
++    });
++  it('does not route population stdin or unrelated commands through capture transport', async () => {
++    const runner = resolveExactDockerEffectCaptureRunner(runExactDockerWorkspaceCommand);
++    expect(await runner({ ...input(['run', 'image']), stdin: new Uint8Array([1]) })).toMatchObject({error:true});
++    expect(await runner(input(['volume', 'rm', 'v']))).toMatchObject({error:true});
++    expect(doubles.worker).not.toHaveBeenCalled();
++    expect(doubles.spawn).not.toHaveBeenCalled();
++  });
++});
+--- a/tests/orchestra/spawn-backend-docker-mounts.test.ts
++++ b/tests/orchestra/spawn-backend-docker-mounts.test.ts
+@@ -1640,7 +1640,7 @@
+     expect(source).toContain('EXACT_DOCKER_EFFECT_CLOCK_REGRESSION_TOLERANCE_MS');
+     expect(source).toContain('return new Date(lastTimestampMs).toISOString()');
+     const captureBefore = source.indexOf('const beforeGeneration = await inspectExactVolumeGeneration');
+-    const helperRun = source.indexOf('result = await run', captureBefore);
++    const helperRun = source.indexOf('result = await (populate ? run : runFinalCapture)', captureBefore);
+     const captureAfter = source.indexOf('const afterGeneration = await inspectExactVolumeGeneration', helperRun);
+     expect(captureBefore).toBeGreaterThan(0);
+     expect(helperRun).toBeGreaterThan(captureBefore);

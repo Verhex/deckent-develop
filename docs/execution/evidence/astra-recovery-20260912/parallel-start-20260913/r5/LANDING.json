@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-13T16:47:13.903520+00:00",
+  "sourceSha256": {
+    "src/orchestra/exact-plan-start-service.ts": "33264a45207461cc9c5356ec431716abd36a42c03cff05c91b0d062442a2e863",
+    "tests/orchestra/exact-plan-start-service.test.ts": "b511cb41c182f80b56955531d5d55a6e19c07babf5a2d0f7f9ad9143c406c012"
+  },
+  "testsExit": 0,
+  "tscExit": 0,
+  "buildAllExit": 0,
+  "diffCheckExit": 0,
+  "productClosure": "HOLD: canonical live recovery not replayed",
+  "observedAt": "2026-09-13T16:48:05.594641+00:00"
+}

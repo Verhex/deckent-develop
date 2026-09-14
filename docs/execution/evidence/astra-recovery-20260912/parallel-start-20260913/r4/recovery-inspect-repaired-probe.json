@@ -1,0 +1,9 @@
+{
+  "observedAt": "2026-09-13T15:38:54.012Z",
+  "elapsedMs": 12001,
+  "status": 1,
+  "error": false,
+  "stdout": "[]\n",
+  "stderr": "error: no such object: deckent-x-c7030198-e27e-8a15-8cd5-427cc3278277\n",
+  "exactAbsence": true
+}

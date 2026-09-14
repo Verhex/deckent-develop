@@ -1360,6 +1360,29 @@ export interface TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2 {
   readonly semanticEvidenceDigest: Sha256Digest;
 }
 
+/** Released resources with an unaccepted effect: preservation, never success. */
+export interface TaskAttemptCustodyEffectReleasedUnacceptedEvidenceV2 extends Omit<
+  TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2, 'phase'
+> {
+  readonly phase: 'RELEASED_EFFECT_UNACCEPTED';
+  readonly releaseProgress: TaskAttemptCustodyPreservedArtifactRefV2;
+}
+
+export interface TaskAttemptCustodyEffectReleasedUnacceptedCandidateV2 extends Omit<
+  TaskAttemptCustodyEffectCommittedReleasePendingCandidateV2, 'state' | 'evidence'
+> {
+  readonly state: 'EFFECT_RELEASED_UNACCEPTED_CANDIDATE';
+  readonly evidence: TaskAttemptCustodyEffectReleasedUnacceptedEvidenceV2;
+}
+
+export interface TaskAttemptCustodyEffectReleasedUnacceptedDispatchV2 extends Omit<
+  TaskAttemptCustodyEffectCommittedReleasePendingDispatchV2, 'kind' | 'state' | 'evidence'
+> {
+  readonly kind: 'task-attempt-custody-effect-released-unaccepted-dispatch';
+  readonly state: 'RELEASED_EFFECT_UNACCEPTED';
+  readonly evidence: TaskAttemptCustodyEffectReleasedUnacceptedEvidenceV2;
+}
+
 export interface TaskAttemptCustodyPreservedArtifactRefV2 {
   readonly artifactClass: TaskAttemptCustodyArtifactClass;
   readonly artifactKey: string;
@@ -5948,6 +5971,11 @@ export class TaskAttemptCustodyStore {
     return this.readSnapshot.memo(key, read);
   }
 
+  /** Consumer boundary only: keep the operation's native verification fences. */
+  releaseVerifiedReadSnapshotPayloads(): void {
+    this.readSnapshot?.releaseCachedValues();
+  }
+
   /** Immutable consumer facts share this operation's native read fence. Each
    * consumer keeps its namespace object private; context carries full authority. */
   readVerifiedSnapshotFact<T>(owner: object, context: unknown, read: () => T): T {
@@ -7570,6 +7598,10 @@ export class TaskAttemptCustodyStore {
     return childPath(dispatchAuthorityDirectory(identity), 'effect-committed-release-pending.json');
   }
 
+  private effectReleasedUnacceptedDispatchPath(identity: TaskAttemptCustodyIdentityV2): TaskAttemptCustodyRelativePath {
+    return childPath(dispatchAuthorityDirectory(identity), 'effect-released-unaccepted.json');
+  }
+
   private assertAttemptNotRetained(
     identity: TaskAttemptCustodyIdentityV2,
     policy: TaskAttemptCustodyPolicyV2,
@@ -7577,7 +7609,9 @@ export class TaskAttemptCustodyStore {
   ): void {
     // Any marker, including corrupt/incomplete authority, prevents resurrection.
     // This raw read deliberately does not call requireDispatchAdmissionRef.
-    if (this.readFirstWriterSnapshot(this.rejectedResultDispatchPath(identity),
+    if (this.readFirstWriterSnapshot(this.effectReleasedUnacceptedDispatchPath(identity),
+      metadataLimit(policy), operation, 'DISPATCH_AUTHORITY_INVALID') !== null
+      || this.readFirstWriterSnapshot(this.rejectedResultDispatchPath(identity),
       metadataLimit(policy), operation, 'DISPATCH_AUTHORITY_INVALID') !== null
       || this.readFirstWriterSnapshot(this.startedFailedDispatchPath(identity),
       metadataLimit(policy), operation, 'DISPATCH_AUTHORITY_INVALID') !== null
@@ -7778,7 +7812,7 @@ export class TaskAttemptCustodyStore {
   private latestEffectCommittedEvidenceTimestamp(
     admitted: Extract<TaskAttemptCustodyDispatchAdmissionReadV2, { readonly state: 'admitted' }>,
     policy: TaskAttemptCustodyPolicyV2,
-    evidence: TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2,
+    evidence: TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2 | TaskAttemptCustodyEffectReleasedUnacceptedEvidenceV2,
   ): number {
     const references = [
       evidence.landingRecoveryAnchor,
@@ -7787,6 +7821,7 @@ export class TaskAttemptCustodyStore {
       evidence.leaseEvidence,
       evidence.finalEvidence,
       evidence.finalManifest,
+      ...('releaseProgress' in evidence ? [evidence.releaseProgress] : []),
     ];
     let latest = Number.NEGATIVE_INFINITY;
     for (const reference of references) {
@@ -7928,6 +7963,7 @@ export class TaskAttemptCustodyStore {
       'recordedAt', 'stoppedExecutionEvidenceDigest'], 'DISPATCH_REQUEST_INVALID', 'settle-dispatch');
     const policy = snapshotPolicy(row.policy);
     const admitted = this.requireDispatchAdmissionRef(row.admissionRef, policy, 'settle-dispatch');
+    this.assertNoConflictingRetainedDisposition(policy, this.effectReleasedUnacceptedDispatchPath(admitted.ref.identity));
     const authority = snapshotDispatchRecoveryAuthority(row.recoveryAuthority);
     if (!authority || !isTimestamp(row.recordedAt) || !isDigest(row.stoppedExecutionEvidenceDigest)
       || !isDigest(row.sourceResultDigest)) hold('DISPATCH_REQUEST_INVALID', 'settle-dispatch');
@@ -8048,6 +8084,7 @@ export class TaskAttemptCustodyStore {
       'recordedAt', 'stoppedExecutionEvidenceDigest'], 'DISPATCH_REQUEST_INVALID', 'settle-dispatch');
     const policy = snapshotPolicy(row.policy);
     const admitted = this.requireDispatchAdmissionRef(row.admissionRef, policy, 'settle-dispatch');
+    this.assertNoConflictingRetainedDisposition(policy, this.effectReleasedUnacceptedDispatchPath(admitted.ref.identity));
     const authority = snapshotDispatchRecoveryAuthority(row.recoveryAuthority);
     if (!authority || !isTimestamp(row.recordedAt) || !isDigest(row.stoppedExecutionEvidenceDigest)
       || !admitted.ref.identity.taskId.startsWith(`${authority.executionId.slice('sprint-'.length)}-`)) {
@@ -8240,6 +8277,7 @@ export class TaskAttemptCustodyStore {
       'recordedAt', 'stoppedResourceEvidenceDigest', 'hostObservationDigest'], 'DISPATCH_REQUEST_INVALID', 'settle-dispatch');
     const policy = snapshotPolicy(row.policy);
     const admitted = this.requireDispatchAdmissionRef(row.admissionRef, policy, 'settle-dispatch');
+    this.assertNoConflictingRetainedDisposition(policy, this.effectReleasedUnacceptedDispatchPath(admitted.ref.identity));
     const authority = snapshotDispatchRecoveryAuthority(row.recoveryAuthority);
     if (!authority || !isTimestamp(row.recordedAt) || !isDigest(row.stoppedResourceEvidenceDigest)
       || !isDigest(row.hostObservationDigest)) hold('DISPATCH_REQUEST_INVALID', 'settle-dispatch');
@@ -8264,6 +8302,204 @@ export class TaskAttemptCustodyStore {
     this.publishDispatchFirstWriter(this.effectCommittedReleasePendingDispatchPath(admitted.ref.identity),
       canonicalTaskAttemptCustodyJson(disposition, policy.jsonBounds), metadataLimit(policy), 'settle-dispatch');
     const reread = this.readEffectCommittedReleasePendingDispatch({ admissionRef: admitted.ref, policy });
+    if (!reread || reread.receiptDigest !== disposition.receiptDigest) hold('DISPATCH_REQUEST_CONFLICT', 'settle-dispatch');
+    return reread;
+  }
+
+  inspectEffectReleasedUnacceptedCandidate(input: {
+    readonly admissionRef: TaskAttemptCustodyDispatchAdmissionRefV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly evidence: TaskAttemptCustodyEffectReleasedUnacceptedEvidenceV2;
+  }): TaskAttemptCustodyEffectReleasedUnacceptedCandidateV2 {
+    const row = requireExactDataRecord(input, ['admissionRef', 'policy', 'evidence'], 'DISPATCH_AUTHORITY_INVALID', 'read');
+    const policy = snapshotPolicy(row.policy);
+    const admitted = this.requireDispatchAdmissionRef(row.admissionRef, policy, 'read');
+    const lifecycle = this.inspectExactReleasedProviderLifecycle(admitted, policy);
+    const { terminal, exit } = lifecycle;
+    const evidenceRecord = snapshotExactDataRecord(row.evidence, [
+      'phase', 'landingRecoveryAnchor', 'readyLifecycle', 'committedJournal', 'leaseEvidence',
+      'finalEvidence', 'finalManifest', 'releaseProgress', 'semanticVerifier', 'semanticEvidenceDigest',
+    ]);
+    if (!evidenceRecord || evidenceRecord.phase !== 'RELEASED_EFFECT_UNACCEPTED'
+      || evidenceRecord.semanticVerifier !== 'orchestra-required-v1'
+      || !isDigest(evidenceRecord.semanticEvidenceDigest)) hold('DISPATCH_AUTHORITY_INVALID', 'read');
+    const expected: ReadonlyArray<readonly [string, Exclude<
+      TaskAttemptCustodyArtifactClass,
+      'task-admission-snapshot'
+    >]> = [
+      ['landingRecoveryAnchor', 'execution-effect-lifecycle-authority'],
+      ['readyLifecycle', 'execution-effect-lifecycle-authority'],
+      ['committedJournal', 'execution-effect-landing-journal'],
+      ['leaseEvidence', 'execution-effect-landing-receipt-evidence'],
+      ['finalEvidence', 'execution-effect-landing-receipt-evidence'],
+      ['finalManifest', 'execution-effect-manifest'],
+      ['releaseProgress', 'execution-effect-lifecycle-authority'],
+    ];
+    const refs: Record<string, TaskAttemptCustodyPreservedArtifactRefV2> = Object.create(null);
+    const requiredRefs: TaskAttemptCustodyPreservedArtifactRefV2[] = [];
+    for (const [key, artifactClass] of expected) {
+      const ref = snapshotExactDataRecord(evidenceRecord[key], [
+        'artifactClass', 'artifactKey', 'receiptDigest', 'contentDigest', 'byteLength',
+      ]);
+      if (!ref || ref.artifactClass !== artifactClass || typeof ref.artifactKey !== 'string'
+        || !isSafeArtifactKey(ref.artifactKey) || !isDigest(ref.receiptDigest)
+        || !isDigest(ref.contentDigest) || !assertNonnegativeSafeInteger(ref.byteLength)) {
+        hold('DISPATCH_AUTHORITY_INVALID', 'read');
+      }
+      const receipt = this.readArtifactReceipt({ identity: admitted.ref.identity, policy,
+        artifactClass, artifactKey: ref.artifactKey as string });
+      const artifact = receipt ? this.readVerifiedSnapshot(receipt.artifact,
+        policy.artifactLimits[artifactClass], 'read') : null;
+      if (!receipt || !artifact || receipt.receiptDigest !== ref.receiptDigest
+        || receipt.artifact.sha256 !== ref.contentDigest || receipt.artifact.byteLength !== ref.byteLength
+        || receipt.admissionReceiptDigest !== admitted.admission.receiptDigest
+        || receipt.policyDigest !== policy.policyDigest || !sameProof(artifact.proof, receipt.artifact)) {
+        hold('ARTIFACT_REPLAY_MISMATCH', 'read');
+      }
+      refs[key] = freezeObject({ artifactClass, artifactKey: ref.artifactKey as string,
+        receiptDigest: ref.receiptDigest as Sha256Digest, contentDigest: ref.contentDigest as Sha256Digest,
+        byteLength: ref.byteLength as number });
+      requiredRefs.push(refs[key]!);
+    }
+    const forbidden = new Set<string>([
+      'execution-effect-landing-receipt', 'canonical-accepted-result',
+      'production-wiring-host-settlement', 'evaluation-receipt', 'finalizer-receipt',
+      'settlement-receipt', 'archive-receipt',
+    ]);
+    const prefix = identityPrefix(admitted.ref.identity);
+    const inventory = this.inspectPreservedArtifactInventory(admitted, policy, forbidden);
+    const preservedArtifacts = inventory.artifacts;
+    for (const reference of requiredRefs) {
+      const inventoryReferenceExists = intrinsicArraySome(preservedArtifacts, candidate => (
+        candidate.artifactClass === reference.artifactClass
+        && candidate.artifactKey === reference.artifactKey
+        && candidate.receiptDigest === reference.receiptDigest
+        && candidate.contentDigest === reference.contentDigest
+        && candidate.byteLength === reference.byteLength
+      ));
+      const capturedAt = inventory.capturedAtByRef.get(
+        `${reference.artifactClass}\0${reference.artifactKey}\0${reference.receiptDigest}`,
+      );
+      if (!inventoryReferenceExists || !capturedAt
+        || Date.parse(capturedAt) < Date.parse(exit.receipt.observedAt)) {
+        hold('ARTIFACT_REPLAY_MISMATCH', 'read');
+      }
+    }
+    // Unaccepted release has no accepted chain authority at all. A nonempty directory is
+    // publication evidence, including an unknown future stage.
+    if (this.startedFailedDirectoryNames(childPath(prefix, 'chain')).length !== 0) {
+      hold('DISPATCH_TRANSITION_INVALID', 'read');
+    }
+    const evidence = freezeObject({ phase: 'RELEASED_EFFECT_UNACCEPTED' as const,
+      landingRecoveryAnchor: refs['landingRecoveryAnchor']!, readyLifecycle: refs['readyLifecycle']!,
+      committedJournal: refs['committedJournal']!, leaseEvidence: refs['leaseEvidence']!,
+      finalEvidence: refs['finalEvidence']!, finalManifest: refs['finalManifest']!,
+      releaseProgress: refs['releaseProgress']!,
+      semanticVerifier: 'orchestra-required-v1' as const,
+      semanticEvidenceDigest: evidenceRecord.semanticEvidenceDigest as Sha256Digest });
+    const preservationManifestDigest = taskAttemptCustodyDigest('effect-released-unaccepted-preservation', {
+      taskSnapshotDigest: admitted.admission.taskSnapshot.sha256, evidence,
+      providerObservations: lifecycle.observations
+        .filter(entry => entry !== null)
+        .map(entry => entry!.receipt),
+      artifacts: preservedArtifacts,
+    }, policy.jsonBounds);
+    const body = freezeObject({ state: 'EFFECT_RELEASED_UNACCEPTED_CANDIDATE' as const,
+      identity: cloneIdentity(admitted.ref.identity), admissionRefDigest: admitted.ref.refDigest,
+      admissionReceiptDigest: admitted.admission.receiptDigest,
+      releasedDispatchReceiptDigest: terminal.receiptDigest,
+      providerExitObservationReceiptDigest: exit.receipt.receiptDigest,
+      providerExitObservedAt: exit.receipt.observedAt, evidence, preservedArtifacts,
+      preservationManifestDigest });
+    return freezeObject({ ...body, evidenceDigest: taskAttemptCustodyDigest(
+      'effect-released-unaccepted-candidate', body, policy.jsonBounds) });
+  }
+
+  readEffectReleasedUnacceptedDispatch(input: {
+    readonly admissionRef: TaskAttemptCustodyDispatchAdmissionRefV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+  }): TaskAttemptCustodyEffectReleasedUnacceptedDispatchV2 | null {
+    const row = requireExactDataRecord(input, ['admissionRef', 'policy'], 'DISPATCH_AUTHORITY_INVALID', 'read');
+    const policy = snapshotPolicy(row.policy);
+    const admitted = this.requireDispatchAdmissionRef(row.admissionRef, policy, 'read');
+    const observed = this.readFirstWriterSnapshot(this.effectReleasedUnacceptedDispatchPath(admitted.ref.identity),
+      metadataLimit(policy), 'read', 'DISPATCH_AUTHORITY_INVALID');
+    if (!observed) return null;
+    let decoded: unknown; try { decoded = JSON.parse(Buffer.from(observed.bytes).toString('utf8')); }
+    catch { return hold('DISPATCH_AUTHORITY_INVALID', 'read'); }
+    const record = snapshotExactDataRecord(decoded, [
+      'schemaVersion', 'kind', 'state', 'identity', 'admissionRefDigest', 'admissionReceiptDigest',
+      'releasedDispatchReceiptDigest', 'providerExitObservationReceiptDigest', 'providerExitObservedAt',
+      'evidence', 'preservedArtifacts', 'preservationManifestDigest', 'evidenceDigest', 'custodyRootId',
+      'custodyCapabilityEvidenceDigest', 'recoveryAuthority', 'recoveryAuthorityDigest',
+      'stoppedResourceEvidenceDigest', 'hostObservationDigest', 'recordedAt', 'receiptDigest',
+    ]);
+    const authority = record ? snapshotDispatchRecoveryAuthority(record.recoveryAuthority) : null;
+    if (!record || !authority || record.schemaVersion !== TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION
+      || record.kind !== 'task-attempt-custody-effect-released-unaccepted-dispatch'
+      || record.state !== 'RELEASED_EFFECT_UNACCEPTED' || record.custodyRootId !== this.root.rootId
+      || record.custodyCapabilityEvidenceDigest !== this.root.capabilityEvidenceDigest
+      || !isDigest(record.stoppedResourceEvidenceDigest) || !isDigest(record.hostObservationDigest)
+      || !isTimestamp(record.recordedAt) || !isDigest(record.receiptDigest)) hold('DISPATCH_AUTHORITY_INVALID', 'read');
+    const candidate = this.inspectEffectReleasedUnacceptedCandidate({ admissionRef: admitted.ref, policy,
+      evidence: record.evidence as TaskAttemptCustodyEffectReleasedUnacceptedEvidenceV2 });
+    const latestCommittedAt = this.latestEffectCommittedEvidenceTimestamp(admitted, policy, candidate.evidence);
+    this.assertRecoveryAuthorityBoundToCandidate(authority, candidate.identity, record.recordedAt,
+      latestCommittedAt > Date.parse(candidate.providerExitObservedAt)
+        ? latestCommittedAt
+        : Date.parse(candidate.providerExitObservedAt), 'read');
+    const body = freezeObject({ ...candidate, schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      kind: 'task-attempt-custody-effect-released-unaccepted-dispatch' as const,
+      state: 'RELEASED_EFFECT_UNACCEPTED' as const, custodyRootId: this.root.rootId,
+      custodyCapabilityEvidenceDigest: this.root.capabilityEvidenceDigest, recoveryAuthority: authority,
+      recoveryAuthorityDigest: dispatchRecoveryAuthorityDigest(authority, policy.jsonBounds),
+      stoppedResourceEvidenceDigest: record.stoppedResourceEvidenceDigest as Sha256Digest,
+      hostObservationDigest: record.hostObservationDigest as Sha256Digest, recordedAt: record.recordedAt });
+    const result = freezeObject({ ...body, receiptDigest: taskAttemptCustodyDigest(
+      'effect-released-unaccepted-dispatch', body, policy.jsonBounds) });
+    if (!sameBytes(observed.bytes, canonicalTaskAttemptCustodyJson(result, policy.jsonBounds))) hold('DISPATCH_AUTHORITY_INVALID', 'read');
+    return result;
+  }
+
+  retainEffectReleasedUnacceptedDispatch(input: {
+    readonly admissionRef: TaskAttemptCustodyDispatchAdmissionRefV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly evidence: TaskAttemptCustodyEffectReleasedUnacceptedEvidenceV2;
+    readonly recoveryAuthority: TaskAttemptCustodyDispatchRecoveryAuthorityV2;
+    readonly recordedAt: string;
+    readonly stoppedResourceEvidenceDigest: Sha256Digest;
+    readonly hostObservationDigest: Sha256Digest;
+  }): TaskAttemptCustodyEffectReleasedUnacceptedDispatchV2 {
+    const row = requireExactDataRecord(input, ['admissionRef', 'policy', 'evidence', 'recoveryAuthority',
+      'recordedAt', 'stoppedResourceEvidenceDigest', 'hostObservationDigest'], 'DISPATCH_REQUEST_INVALID', 'settle-dispatch');
+    const policy = snapshotPolicy(row.policy);
+    const admitted = this.requireDispatchAdmissionRef(row.admissionRef, policy, 'settle-dispatch');
+    const authority = snapshotDispatchRecoveryAuthority(row.recoveryAuthority);
+    if (!authority || !isTimestamp(row.recordedAt) || !isDigest(row.stoppedResourceEvidenceDigest)
+      || !isDigest(row.hostObservationDigest)) hold('DISPATCH_REQUEST_INVALID', 'settle-dispatch');
+    this.assertNoConflictingRetainedDisposition(policy,
+      this.startedFailedDispatchPath(admitted.ref.identity));
+    this.assertNoConflictingRetainedDisposition(policy, this.rejectedResultDispatchPath(admitted.ref.identity));
+    this.assertNoConflictingRetainedDisposition(policy, this.effectCommittedReleasePendingDispatchPath(admitted.ref.identity));
+    const candidate = this.inspectEffectReleasedUnacceptedCandidate({ admissionRef: admitted.ref, policy,
+      evidence: row.evidence as TaskAttemptCustodyEffectReleasedUnacceptedEvidenceV2 });
+    const latestCommittedAt = this.latestEffectCommittedEvidenceTimestamp(admitted, policy, candidate.evidence);
+    this.assertRecoveryAuthorityBoundToCandidate(authority, candidate.identity, row.recordedAt,
+      latestCommittedAt > Date.parse(candidate.providerExitObservedAt)
+        ? latestCommittedAt
+        : Date.parse(candidate.providerExitObservedAt), 'settle-dispatch');
+    const body = freezeObject({ ...candidate, schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      kind: 'task-attempt-custody-effect-released-unaccepted-dispatch' as const,
+      state: 'RELEASED_EFFECT_UNACCEPTED' as const, custodyRootId: this.root.rootId,
+      custodyCapabilityEvidenceDigest: this.root.capabilityEvidenceDigest, recoveryAuthority: authority,
+      recoveryAuthorityDigest: dispatchRecoveryAuthorityDigest(authority, policy.jsonBounds),
+      stoppedResourceEvidenceDigest: row.stoppedResourceEvidenceDigest as Sha256Digest,
+      hostObservationDigest: row.hostObservationDigest as Sha256Digest, recordedAt: row.recordedAt });
+    const disposition = freezeObject({ ...body, receiptDigest: taskAttemptCustodyDigest(
+      'effect-released-unaccepted-dispatch', body, policy.jsonBounds) });
+    this.publishDispatchFirstWriter(this.effectReleasedUnacceptedDispatchPath(admitted.ref.identity),
+      canonicalTaskAttemptCustodyJson(disposition, policy.jsonBounds), metadataLimit(policy), 'settle-dispatch');
+    const reread = this.readEffectReleasedUnacceptedDispatch({ admissionRef: admitted.ref, policy });
     if (!reread || reread.receiptDigest !== disposition.receiptDigest) hold('DISPATCH_REQUEST_CONFLICT', 'settle-dispatch');
     return reread;
   }

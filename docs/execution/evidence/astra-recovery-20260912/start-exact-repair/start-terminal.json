@@ -1,0 +1,14 @@
+{
+  "flowId": "9ff8a134-f592-4f6e-a769-a36dcedc999c",
+  "attemptId": "5958f629-d5bc-43eb-a6b5-1837409bb81d",
+  "state": "FAILED",
+  "createdAt": "2026-09-12T23:48:54.949Z",
+  "updatedAt": "2026-09-13T00:05:15.123Z",
+  "settlement": {
+    "state": "FAILED",
+    "code": "EXACT_RUNTIME_FAILED_AFTER_ADMISSION",
+    "detail": "EXACT_HANDOFF_TERMINAL_AUTHORITY_HOLD:752-001:exact-terminal-result-authority-mismatch",
+    "settledAt": "2026-09-13T00:05:15.123Z"
+  },
+  "planDigest": "1730b916633954b80c5fb5f2241b85386460b5ac5ed94951f9755e29cbca77fe"
+}

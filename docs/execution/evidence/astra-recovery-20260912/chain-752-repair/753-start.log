@@ -1,0 +1,35 @@
+
+🛡  Sprint Cost Estimate
+==================================================
+Task count:          1
+Retry multiplier:    1.20x
+Cache hit ratio:     0%
+
+Model distribution:
+  openai/gpt-5.6-sol                 1 task (subscription)
+
+Token Estimate:
+  Uncached input:      3,240
+  Cache read:          0 (90% discount)
+  Cache creation:      0
+  Output:              90,000
+
+Cost Breakdown (USD):
+  openai               $0 (subscription; quota UNKNOWN)
+  ────────────────────────────────────────
+  Realistic:           $0.0000  ← current estimate
+  Optimistic (cache):  $0.0000
+  Worst case (retry):  $0.0000
+
+Subscription impact:
+  openai: UNKNOWN (provider-limit-evidence-not-supplied)
+
+API/USD budget check:
+  Sprint USD budget:   $1000.00 (config: cost_limits.sprint_max_usd)
+  API USD used:        0.0%
+  USD status:          ✅ Within API/USD budget
+
+Warnings:
+  ⚠ openai subscription quota is unknown: no authoritative provider-limit evidence was supplied. USD $0 is not a quota-availability verdict.
+[deckent] scheduler engine: reducer
+Error: EXACT_RUNTIME_FAILED_AFTER_ADMISSION:EXACT_HANDOFF_TERMINAL_AUTHORITY_HOLD:753-001:exact-terminal-result-authority-mismatch

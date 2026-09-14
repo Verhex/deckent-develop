@@ -1,3 +1,4 @@
+import { runInNewContext } from 'node:vm';
 import * as resultIngressForRejection from '../../src/orchestra/result-ingress.js';
 // ─── 593-001 F2c: design-catalog mount mask (flag-gated, default OFF) ───────
 //
@@ -325,6 +326,7 @@ function releasedReplayFixture() {
     projectionFence: authority.projectionFence,
   };
   const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
     readRejectedResultDispatch: vi.fn((): unknown => null),
     readStartedFailedDispatch: vi.fn((): unknown => null),
     readEffectCommittedReleasePendingDispatch: vi.fn((): unknown => null),
@@ -475,6 +477,7 @@ function exactHostWorkMonitorFixture(
   });
   let publishedHostWork: ReturnType<typeof custodyArtifactFixture> | null = null;
   const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
     ...replay.store,
     readDispatchObservation: vi.fn(() => ({
       receipt: { evidenceDigest: replay.providerExecutionReceipt.digest },
@@ -637,6 +640,7 @@ function coldExactDockerCompletionFixture(timestampOverrides: Readonly<{
     artifact,
   ]));
   const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
     readArtifactReceipt: vi.fn((input: { artifactClass: string; artifactKey: string }) => (
       artifactByKey.get(`${input.artifactClass}:${input.artifactKey}`)?.receipt ?? null
     )),
@@ -699,7 +703,8 @@ describe('exact Docker custody mounts', () => {
     const fixture = releasedReplayFixture();
     const entry = { state: 'admitted', ref: fixture.admissionRef, admission: fixture.scope.admission, reservation: {} };
     fixture.store.readRejectedResultDispatch.mockReturnValue({ state: 'REJECTED_RESULT_CLOSED' });
-    const store = { ...fixture.store,
+    const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null), ...fixture.store,
       listDispatchAdmissionsForRecovery: vi.fn(() => ({ entries: [entry], heldAdmissions: [] })),
     };
     const backend = new DockerSpawnBackend('/test/project');
@@ -726,7 +731,8 @@ describe('exact Docker custody mounts', () => {
     const fixture = releasedReplayFixture();
     const entry = { state: 'admitted', ref: fixture.admissionRef, admission: fixture.scope.admission, reservation: {} };
     fixture.store.readStartedFailedDispatch.mockReturnValue({ state: 'STARTED_FAILED_RETAINED' });
-    const store = { ...fixture.store,
+    const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null), ...fixture.store,
       listDispatchAdmissionsForRecovery: vi.fn(() => ({ entries: [entry], heldAdmissions: [] })),
     };
     const backend = new DockerSpawnBackend('/test/project');
@@ -777,6 +783,7 @@ describe('exact Docker custody mounts', () => {
       fixture.identity.taskId = '720-001';
       const entry = { state: 'admitted', ref: fixture.admissionRef, admission: fixture.scope.admission };
       const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
         ...fixture.store,
         readDispatchAdmission: vi.fn(() => entry),
         inspectStartedFailedDispatchCandidate: vi.fn(() => ({ evidenceDigest: digest('a') })),
@@ -1633,7 +1640,7 @@ describe('exact Docker custody mounts', () => {
     expect(source).toContain('EXACT_DOCKER_EFFECT_CLOCK_REGRESSION_TOLERANCE_MS');
     expect(source).toContain('return new Date(lastTimestampMs).toISOString()');
     const captureBefore = source.indexOf('const beforeGeneration = await inspectExactVolumeGeneration');
-    const helperRun = source.indexOf('result = await run', captureBefore);
+    const helperRun = source.indexOf('const helperCommand = Object.freeze', captureBefore);
     const captureAfter = source.indexOf('const afterGeneration = await inspectExactVolumeGeneration', helperRun);
     expect(captureBefore).toBeGreaterThan(0);
     expect(helperRun).toBeGreaterThan(captureBefore);
@@ -1820,6 +1827,7 @@ describe('exact Docker custody mounts', () => {
     const bytes = Buffer.from(canonicalJson(startBundle));
     const observation = { receiptDigest: digest('b'), evidenceDigest: digest('c'), bytes };
     const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
       readDispatchObservation: vi.fn(() => {
         order.push('durable-reread');
         return {
@@ -1907,6 +1915,20 @@ describe('exact Docker custody mounts', () => {
       { ...authorization, extraNonce: authorization.nonce }, expected, hash,
     )).toBe(false);
     const source = exactDockerCustodyPid1Source();
+    const renderer = source.slice(source.indexOf('const WORKER_ACTIVITY_HEARTBEAT_KIND'),
+      source.indexOf('const snapshot = JSON.parse'));
+    const rendered = runInNewContext(renderer + `;
+      bindWorkerPromptHeartbeatIdentity(HEARTBEAT_IDENTITY_HOLD, {
+        taskId: 'task-a', workerId: 'w-task-a', attemptId: 'provider-attempt-1', backend: 'docker'
+      });`);
+    expect(rendered).toContain('"attemptId": "provider-attempt-1"');
+    expect(rendered).toContain('"backend": "docker"');
+    expect(rendered).not.toContain('HEARTBEAT_IDENTITY_HOLD');
+    expect(source.indexOf('await readNonce(executionCommitPath'))
+      .toBeLessThan(source.indexOf('const boundPrompt ='));
+    expect(source.indexOf('writeFileSync(promptPath, boundPrompt'))
+      .toBeLessThan(source.indexOf("spawn(process.execPath, ['/run/deckent/runner.mjs']"));
+    expect(source).not.toContain('writeFileSync(promptPath, dispatch.prompt');
     expect(source.indexOf('verifyProviderStartAuthorization(authorization'))
       .toBeLessThan(source.indexOf('exact-docker-pid1-provider-start-ack'));
     expect(source.indexOf('exact-docker-pid1-provider-start-ack'))
@@ -2343,6 +2365,7 @@ describe('exact Docker custody mounts', () => {
       }),
     });
     const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
       publishDispatchObservation: vi.fn((input: { bytes: Uint8Array }) => {
         observationBytes = Uint8Array.from(input.bytes);
         return { receiptDigest: digest('6'), evidenceDigest: digest('7') };
@@ -2407,6 +2430,7 @@ describe('exact Docker custody mounts', () => {
     const invoke = (mode: 'clean' | 'receipt' | 'bytes') => {
       let published = new Uint8Array();
       const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
         publishDispatchObservation: vi.fn((input: { bytes: Uint8Array }) => {
           published = Uint8Array.from(input.bytes);
           return { receiptDigest: digest('1'), evidenceDigest: digest('2') };
@@ -2517,6 +2541,7 @@ describe('exact Docker custody mounts', () => {
       },
     };
     const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
       ...fixture.store,
       listDispatchAdmissionsForRecovery: vi.fn(() => ({ entries: [admitted], heldAdmissions: [] })),
       readDispatchObservationByClass: vi.fn(() => startObservation),
@@ -2608,6 +2633,7 @@ describe('exact Docker custody mounts', () => {
     const backend = new DockerSpawnBackend('/test/project', { custodyStateDir: '/test/state' });
     const observations = new Map<string, { receipt: Record<string, unknown>; bytes: Buffer }>();
     const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
       ...fixture.store,
       ...durable.store,
       readDispatchObservationByClass: vi.fn((input: { observationClass: string }) =>
@@ -2643,7 +2669,9 @@ describe('exact Docker custody mounts', () => {
     internals.commitExactDockerEffectLanding = vi.fn(async () => ({
       state: 'HOLD', phase, stage, code, sourceEvidenceDigest: digest('b'),
       capture: phase === 'FINAL_CAPTURE'
-        ? { schemaVersion: 1, stage: 'CONTAINMENT', adapterStage: null } : null,
+        ? { schemaVersion: 1, stage: 'CONTAINMENT', adapterStage: null, command: {
+          reason: 'timeout', exitCode: null, signaled: false, timeoutMs: 60000, elapsedMs: 60001,
+          stdoutBytes: 0, stderrBytes: 0 } } : null,
     }));
     internals.releaseExactDockerEffectLanding = vi.fn(async () => null);
 
@@ -2986,6 +3014,7 @@ describe('exact Docker custody mounts', () => {
       reservation: {},
     };
     const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
       ...fixture.store,
       listDispatchAdmissionsForRecovery: vi.fn(() => ({ entries: [admitted], heldAdmissions: [] })),
       readDispatchObservationByClass: vi.fn(() => null),
@@ -3036,6 +3065,7 @@ describe('exact Docker custody mounts', () => {
         : null
     ));
     const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
       ...fixture.store,
       listDispatchAdmissionsForRecovery: vi.fn(() => ({ entries: [admitted], heldAdmissions: [] })),
       readDispatchAuthority: vi.fn(() => ({
@@ -3085,6 +3115,7 @@ describe('exact Docker custody mounts', () => {
       reservation: {},
     };
     const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
       ...fixture.store,
       listDispatchAdmissionsForRecovery: vi.fn(() => ({ entries: [pending, admitted], heldAdmissions: [] })),
       readDispatchAuthority: vi.fn(() => ({
@@ -3137,6 +3168,7 @@ describe('exact Docker custody mounts', () => {
       transition: { receiptDigest: digest('3') },
     };
     const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
       ...fixture.store,
       listDispatchAdmissionsForRecovery: vi.fn(() => ({
         entries: [retired],
@@ -3178,6 +3210,7 @@ describe('exact Docker custody mounts', () => {
       reservation: {},
     };
     const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
       ...fixture.store,
       listDispatchAdmissionsForRecovery: vi.fn(() => ({
         entries: [admitted],
@@ -3237,6 +3270,7 @@ describe('exact Docker custody mounts', () => {
       reservation: {},
     };
     const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
       ...fixture.store,
       listDispatchAdmissionsForRecovery: vi.fn(() => ({ entries: [admitted], heldAdmissions: [] })),
     };
@@ -3290,6 +3324,7 @@ describe('exact Docker custody mounts', () => {
       },
     };
     const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
       ...fixture.store,
       listDispatchAdmissionsForRecovery: vi.fn(() => ({ entries: [admitted], heldAdmissions: [] })),
       readDispatchObservationByClass: vi.fn(() => startObservation),
@@ -4054,6 +4089,7 @@ describe('exact Docker custody mounts', () => {
     let acceptedChain: Record<string, unknown> | null = null;
     let durableHostWorkArtifact: ReturnType<typeof custodyArtifactFixture> | null = null;
     const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
       hasAttemptOutputArtifact: vi.fn(() => false),
       readDispatchObservationByClass: vi.fn(() => null),
       readDispatchAuthority: vi.fn(() => ({
@@ -5128,6 +5164,7 @@ describe('exact Docker custody mounts', () => {
     const projectionFence = digest('8');
     const query = { custodyRef, releaseReceipt, providerStartReceipt, projectionFence };
     const store = {
+      readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
       readDispatchAuthority: vi.fn(() => ({
         state: 'terminal',
         authority: {

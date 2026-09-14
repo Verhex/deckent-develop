@@ -1352,6 +1352,9 @@ export async function waitForResults(
      * and isolated collector callers may omit it and retain the historical
      * projection behavior.
      */
+    /** Progress projection only; emitted after the existing collection commit boundary. */
+    onResultCommitted?: (result: TaskResult) => void;
+    onTaskAuthorityHold?: (taskId: string) => void;
     evaluateCollectedResult?: (
       task: Task,
       result: TaskResult,
@@ -1388,9 +1391,22 @@ export async function waitForResults(
   const startTime = Date.now();
   let lastProgressLog = startTime;
   const results: TaskResult[] = [];
+  const appendCommittedResult = (result: TaskResult): void => {
+    results.push(result);
+    // A progress consumer cannot grant authority or roll back a committed result.
+    try { spawnOpts?.onResultCommitted?.(result); }
+    catch (error) { debugLog('waitForResults:committedProgress', error); }
+  };
   const taskIds = new Set(sprint.tasks.map(t => t.id));
   const taskMap = new Map(sprint.tasks.map(t => [t.id, t]));
   const collected = new Set<string>();
+  const authorityFailedTaskIds = new Set<string>();
+  const recordTaskAuthorityHold = (taskId: string): void => {
+    if (authorityFailedTaskIds.has(taskId)) return;
+    authorityFailedTaskIds.add(taskId);
+    try { spawnOpts?.onTaskAuthorityHold?.(taskId); }
+    catch (error) { debugLog('waitForResults:authorityHoldProgress', error); }
+  };
   const remainingQueue: Task[] = queue ? [...queue] : [];
   const deferRepairableDependencyFailures =
     config !== undefined
@@ -1623,16 +1639,12 @@ export async function waitForResults(
         }
       };
       await revalidate();
-      const previousStatus = taskRef.status;
+      // Do not expose an optimistic DONE to the coordinator heartbeat while
+      // final authority revalidation is still awaiting IO.
+      await revalidate();
       taskRef.status = evaluated.terminalDecisionAuthority.evaluationReceipt.verdict === 'NO_GO'
         ? TaskStatus.NO_GO
         : TaskStatus.DONE;
-      try {
-        await revalidate();
-      } catch (error) {
-        taskRef.status = previousStatus;
-        throw error;
-      }
       return;
     }
     if (spawnOpts?.evaluateCollectedResult) {
@@ -1648,15 +1660,31 @@ export async function waitForResults(
     applyStatusMutation(taskRef, result);
   };
 
-  const collectResults = async (): Promise<string[]> => {
+  const syncCollectedResult = async (...args: Parameters<typeof syncTaskStatusFromResult>): Promise<void> => {
+    try { await syncTaskStatusFromResult(...args); }
+    catch (error) {
+      if (error instanceof DeckentError && error.code === 'DECKENT_E077') recordTaskAuthorityHold(args[0]);
+      throw error;
+    }
+  };
+
+  const collectResults = async (readyOnly = false): Promise<string[]> => {
     const collectStart = Date.now();
     const newlyCollected: string[] = [];
     let terminalRecoveryAttempted = false;
+    let authorityFailure: DeckentError | null = null;
     for (const taskId of taskIds) {
-      if (collected.has(taskId)) continue;
-      let authority = readResultAuthority(taskId);
+      if (collected.has(taskId) || (readyOnly && authorityFailedTaskIds.has(taskId))) continue;
+      let authority: TaskResultAuthorityRead<TaskResult>;
+      try { authority = readResultAuthority(taskId); }
+      catch (error) {
+        if (!(error instanceof DeckentError) || error.code !== 'DECKENT_E077') throw error;
+        recordTaskAuthorityHold(taskId);
+        authorityFailure ??= error;
+        continue;
+      }
       if (
-        !terminalRecoveryAttempted
+        !readyOnly && !authorityFailure && !terminalRecoveryAttempted
         && authority.state === 'pending-settlement'
         && hasMalformedRawResult(authority.rawResultPath)
         && resolveTaskLifecycleOwner(taskId)?.reconcilePendingAttempts
@@ -1671,6 +1699,7 @@ export async function waitForResults(
       }
       if (authority.state === 'not-dispatched') {
         if (authority.attemptCount !== 0) {
+          recordTaskAuthorityHold(taskId);
           throw createExecutionAuthorityError(
             `Task ${taskId} not-dispatched authority attempted to mint execution`,
           );
@@ -1679,7 +1708,17 @@ export async function waitForResults(
         newlyCollected.push(taskId);
         continue;
       }
-      const collectorRead = readCollectorResult(authority, taskId);
+      let collectorRead: CollectorResultRead;
+      try { collectorRead = readCollectorResult(authority, taskId); }
+      catch (error) {
+        if (!(error instanceof DeckentError) || error.code !== 'DECKENT_E077') throw error;
+        recordTaskAuthorityHold(taskId);
+        authorityFailure ??= error;
+        continue;
+      }
+      // A fatal sibling cannot authorize timeout synthesis or another dispatch.
+      // Ready authoritative results still cross their normal settlement boundary.
+      if ((readyOnly || authorityFailure) && !collectorRead.result) continue;
       if (collectorRead.result) {
         const result = collectorRead.result;
         if (result) {
@@ -1808,7 +1847,7 @@ export async function waitForResults(
             persistEnrichedResult(projectRoot, result);
           }
           reportResultContractDrift(projectRoot, sprint.id, taskId, result, config);
-          await syncTaskStatusFromResult(taskId, result, collectorRead.exactAcceptedAuthority);
+          await syncCollectedResult(taskId, result, collectorRead.exactAcceptedAuthority);
           if (result.preDispatchSettlement) {
             const reasonCode = result.preDispatchSettlement.reasonCode;
             const disposition = isHostPreDispatchReasonCode(reasonCode)
@@ -1827,7 +1866,7 @@ export async function waitForResults(
           // host-owned evaluation has synchronized the aggregate task state.
           // If evaluation throws, the next tick must retry this exact result
           // without a duplicate array entry or a permanently skipped task.
-          results.push(result);
+          appendCommittedResult(result);
           collected.add(taskId);
           newlyCollected.push(taskId);
           // Sprint 278 COMM-1 — write sharedNotes to SharedMemory (best-effort, opt-in)
@@ -1881,8 +1920,8 @@ export async function waitForResults(
             persistEnrichedResult(projectRoot, lateResult);
           }
           reportResultContractDrift(projectRoot, sprint.id, taskId, lateResult, config);
-          await syncTaskStatusFromResult(taskId, lateResult, lateRead.exactAcceptedAuthority);
-          results.push(lateResult);
+          await syncCollectedResult(taskId, lateResult, lateRead.exactAcceptedAuthority);
+          appendCommittedResult(lateResult);
           collected.add(taskId);
           newlyCollected.push(taskId);
           debugLog('collectResults:lateResult', `taskId=${taskId} EXIT trap wrote .result (${lateResult.selfAssessment}), skipping synthetic NO_GO`);
@@ -1954,8 +1993,8 @@ export async function waitForResults(
             'utf-8',
           );
         } catch (e) { debugLog('collectResults:writeTimeoutResult', e); }
-        await syncTaskStatusFromResult(taskId, syntheticResult, null);
-        results.push(syntheticResult);
+        await syncCollectedResult(taskId, syntheticResult, null);
+        appendCommittedResult(syntheticResult);
         collected.add(taskId);
         newlyCollected.push(taskId);
 
@@ -1986,7 +2025,31 @@ export async function waitForResults(
     if (newlyCollected.length > 0) {
       metric('collect.batch', newlyCollected.length, { duration_ms: String(Date.now() - collectStart) });
     }
+    if (authorityFailure) throw authorityFailure;
     return newlyCollected;
+  };
+
+  const drainAfterAuthorityFailure = async (): Promise<void> => {
+    const registry = spawnOpts?.exactDockerRegistry;
+    if (registry) {
+      const owned = [...taskIds].filter(id => !collected.has(id) && registry.isExactTask(id));
+      // Await only promises already owned by dispatched exact attempts. This
+      // neither admits work nor polls/recreates private IPC/custody authority.
+      const completion = Promise.allSettled(owned.map(id => registry.awaitTaskResultAuthority(id)));
+      if (unlimited) await completion;
+      else {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([completion, new Promise<void>(resolve => {
+            timer = setTimeout(resolve, Math.max(0, timeout - (Date.now() - startTime)));
+          })]);
+        } finally { if (timer) clearTimeout(timer); }
+      }
+    }
+    // No dispatch, timeout result synthesis, terminal recovery or kill here.
+    // A still-live/unavailable sibling stays unresolved, never fake ABORTED.
+    try { await collectResults(true); }
+    catch (error) { debugLog('waitForResults:authorityDrain', error); }
   };
 
   // ─── Dependency-aware respawn (ADR-045 Decision 2) ──────────────
@@ -2535,8 +2598,8 @@ export async function waitForResults(
             'utf-8',
           );
         } catch (e) { debugLog('cascadeSkipDeadBlocked:write', e); }
-        await syncTaskStatusFromResult(t.id, skip, null);
-        results.push(skip);
+        await syncCollectedResult(t.id, skip, null);
+        appendCommittedResult(skip);
         collected.add(t.id);
         dispositionTerminalIds.add(t.id);
         totalSkipped++;
@@ -2682,6 +2745,10 @@ export async function waitForResults(
     // result that did not cross the transactional commit boundary above.
     // Provider ingress HOLD remains authority-bearing and must propagate.
     if (isProviderExecutionIngressHoldError(error)) throw error;
+    if (error instanceof DeckentError && error.code === 'DECKENT_E077') {
+      await drainAfterAuthorityFailure();
+      throw error;
+    }
     debugLog('waitForResults:initialCollect', error);
   }
   const shadowTickInitial = captureShadowTick('initial', initiallyCollected);
@@ -2967,6 +3034,12 @@ export async function waitForResults(
         }
         if (report.holds.length > 0) {
           const hold = report.holds[0]!;
+          // Completion may have retired the private IPC authority after a capture
+          // failure. Preserve the canonical result failure before the IPC symptom.
+          const resultAuthority = readResultAuthority(hold.taskId);
+          if (resultAuthority.state === 'authority-hold') {
+            readCollectorResult(resultAuthority, hold.taskId);
+          }
           throw createExecutionAuthorityError(
             `Task ${hold.taskId} exact IPC HOLD: ${hold.reasonCode}`,
           );
@@ -3002,6 +3075,11 @@ export async function waitForResults(
         lastProgressLog = now;
       }
     }
+  } catch (error) {
+    if (error instanceof DeckentError && error.code === 'DECKENT_E077') {
+      await drainAfterAuthorityFailure();
+    }
+    throw error;
   } finally {
     watcher.close();
     costGuard?.stop();
@@ -3009,44 +3087,55 @@ export async function waitForResults(
   }
   // Final sweep: collect any real .result files written during/after the last poll cycle
   // Note: Only read .result files here (not .timeout) to avoid side effects in edge cases
+  let finalAuthorityFailure: DeckentError | null = null;
   for (const taskId of taskIds) {
-    if (collected.has(taskId)) continue;
-    const finalAuthority = readResultAuthority(taskId);
-    if (finalAuthority.state === 'not-dispatched') {
-      if (finalAuthority.attemptCount !== 0) {
-        throw createExecutionAuthorityError(
-          `Task ${taskId} not-dispatched authority attempted to mint execution`,
-        );
-      }
-      collected.add(taskId);
-      continue;
-    }
-    const finalRead = readCollectorResult(finalAuthority, taskId);
-    if (finalRead.result) {
-      const result = finalRead.result;
-      if (result) {
-        if (!finalRead.corruptEvidence && !finalRead.exactAcceptedAuthority) {
-          await waitForBudgetTerminal(taskMap.get(taskId), taskId, result);
-          enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
-          enrichResultCost(result, taskMap.get(taskId), projectRoot, config?.auth_mode);
-          applyBudgetEvidence(taskMap.get(taskId), result, taskId);
+    try {
+      if (collected.has(taskId)) continue;
+      const finalAuthority = readResultAuthority(taskId);
+      if (finalAuthority.state === 'not-dispatched') {
+        if (finalAuthority.attemptCount !== 0) {
+          throw createExecutionAuthorityError(
+            `Task ${taskId} not-dispatched authority attempted to mint execution`,
+          );
         }
-        // Sprint 201 review-feedback — close the final-sweep race window: a
-        // worker whose real .result lands only after the watcher closed is a
-        // genuine worker-sourced filesChanged, same source as branches (a)/(b).
-        // The helper is idempotent + guarded, so this is harmless if already swept.
-        if (!finalRead.exactAcceptedAuthority) {
-          sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, result.filesChanged);
-        }
-        // Persist enriched tokenUsage + cost to the .result FILE (see above).
-        if (!finalRead.corruptEvidence && !finalRead.exactAcceptedAuthority) {
-          persistEnrichedResult(projectRoot, result);
-        }
-        await syncTaskStatusFromResult(taskId, result, finalRead.exactAcceptedAuthority);
-        results.push(result);
         collected.add(taskId);
+        continue;
       }
+      const finalRead = readCollectorResult(finalAuthority, taskId);
+      if (finalRead.result) {
+        const result = finalRead.result;
+        if (result) {
+          if (!finalRead.corruptEvidence && !finalRead.exactAcceptedAuthority) {
+            await waitForBudgetTerminal(taskMap.get(taskId), taskId, result);
+            enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
+            enrichResultCost(result, taskMap.get(taskId), projectRoot, config?.auth_mode);
+            applyBudgetEvidence(taskMap.get(taskId), result, taskId);
+          }
+          // Sprint 201 review-feedback — close the final-sweep race window: a
+          // worker whose real .result lands only after the watcher closed is a
+          // genuine worker-sourced filesChanged, same source as branches (a)/(b).
+          // The helper is idempotent + guarded, so this is harmless if already swept.
+          if (!finalRead.exactAcceptedAuthority) {
+            sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, result.filesChanged);
+          }
+          // Persist enriched tokenUsage + cost to the .result FILE (see above).
+          if (!finalRead.corruptEvidence && !finalRead.exactAcceptedAuthority) {
+            persistEnrichedResult(projectRoot, result);
+          }
+          await syncCollectedResult(taskId, result, finalRead.exactAcceptedAuthority);
+          appendCommittedResult(result);
+          collected.add(taskId);
+        }
+      }
+    } catch (error) {
+      if (!(error instanceof DeckentError) || error.code !== 'DECKENT_E077') throw error;
+      recordTaskAuthorityHold(taskId);
+      finalAuthorityFailure ??= error;
     }
+  }
+  if (finalAuthorityFailure) {
+    await drainAfterAuthorityFailure();
+    throw finalAuthorityFailure;
   }
   return results;
 }

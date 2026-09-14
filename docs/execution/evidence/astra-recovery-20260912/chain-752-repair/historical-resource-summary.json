@@ -1,0 +1,26 @@
+{
+  "observedAt": "2026-09-13T10:52:38.123351+00:00",
+  "source": ".deckent/runtime/resource-log-dogfood.jsonl",
+  "sourceSha256": "3da1f05973dcdae13c117eddce46acbf89986a949e867454c5422ba526398e6c",
+  "rows": 60569,
+  "uniqueContainerNames": 1579,
+  "first": "2026-07-20T06:51:10.446Z",
+  "last": "2026-08-29T15:42:55.957Z",
+  "memoryBytes": {
+    "samples": 60569,
+    "p50": 160641843,
+    "p95": 653891993,
+    "max": 3176128315
+  },
+  "cpuPercentOneCore": {
+    "samples": 60569,
+    "p50": 0.96,
+    "p95": 138.27,
+    "max": 475.02
+  },
+  "limitations": [
+    "Historical legacy containers, not sprint753 or current exact workers.",
+    "Sample distribution is not per-task or time-weighted utilization.",
+    "Container-name suffix is not reliable canonical task identity."
+  ]
+}

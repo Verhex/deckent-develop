@@ -58,7 +58,7 @@ import { isSprintLocked, releaseSprintLock } from '../core/multi-ide.js';
 import { pruneExpiredNervousPending } from '../core/pending-approvals.js';
 import { isExecutionLockAuthorityArtifactName } from '../core/file-lock.js';
 import { clearProviderExecutionHolds } from '../core/provider-execution-hold.js';
-import { publishCanonicalRunStatusReadModel } from '../core/run-status-read-model.js';
+import { publishCanonicalRunStatusReadModel, projectCanonicalRunLogicalProgress, type CanonicalRunLogicalProgress } from '../core/run-status-read-model.js';
 
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
@@ -362,12 +362,13 @@ export function safeDashboardUpdate(
   projectRoot: string,
   sprint: Sprint,
   errorMessage: string,
+  progress?: CanonicalRunLogicalProgress,
 ): void {
   try {
     updateDashboard(projectRoot, {
       sprint: { id: sprint.id, number: sprint.number, phase: sprint.phase, status: sprint.status },
       agents: [],
-      progress: { done: 0, active: 0, blocked: 0, total: sprint.tasks.length },
+      progress: progress ?? projectCanonicalRunLogicalProgress(sprint.tasks),
       alerts: [{ level: AlertLevel.WARNING, message: errorMessage, timestamp: new Date().toISOString() }],
       updatedAt: new Date().toISOString(),
     });

@@ -1,0 +1,121 @@
+{
+  "observedAt": "2026-09-13T15:06:35.962083+00:00",
+  "outcome": "MASTER3178 / parent120 OPEN",
+  "files": {
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/observer-relocation.json": "3012e1486937df1df0377508688ff1d4c912060cc170dd55531a322fcb58d370",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/directives-756.md": "43acf4c42e15ed0930a2bde66010603a4f6b8f70f524d364021dcda61054c1de",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/helper-4b474985d174-stderr.log": "ce2e69839604b61aee12e7600e9799898ec976930d9a3c99c63f69c158036bd3",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/RESOURCE-SUMMARY.json": "cf1dbcd6a7f38897f7e5787a77c07210d296efe2a5fac97b41df0e93fa99e87e",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/756-archive-verification.json": "a7483533ed101f590dde527b9787d2a0b6216cd91fe33023bf9f7a9ffbda9bbf",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/LAUNCH.json": "fc472f3048e209ffb2892cc1f267b41adf65bef5781afdce4cb0c3ec52da2aa2",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/756-canonical-status.json": "732a834dcfee160ae104cf2640df31fc2082ce4453d7ded4951a0674df8bdd39",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/start-revised.log.frozen-before-relocation": "6c87788e76c1b20b0d96f1c806db962870e50357317ffbe9aa0822b92e3a935b",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/attempt-observation.json": "5affcee61d10b6e49c65444ed15b2fbdbb9e246a0f39a0f24aa435bb42ab5be6",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/RESULT.md": "5a0b4605bc29759cbab97ea1b0420d660f277e0a88df0fe390baf29fb663413f",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/status-during-admission.json": "89dec21b3d014d0e041d862812736a728861a081ae9f2c1f7dc4ff593f2be53f",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/CPU-SUMMARY.json": "302df0b0f0ea3f326dd8d33ddd7b343041bf62fc07ad91514499d968a4275650",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/PLAN.json": "5d343570bf7c205a195eddf204d0e3e82d71ce8e33116a39dd146635b69b7d4c",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/756-revised-topology.json": "2cae7becd4579dd5c282230c07938d38576490ce1861c21a7c0ea4e6d0ba4879",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/native-image-probe.json": "4235c61900171c13c56d82e0ea1c156b69dedf6aa3fea57e767a9bffc45c73ff",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/756-scope-failure.json": "7ef7e5619cb93f8dbb278b110f11d70565bc473610da6c54ecf201cc44797741",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/helper-inspection.jsonl": "8425c49d3d0f2ebb605583bfb399f3f117861d04944b015ff48e3ef8678c0995",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/resources-revised.jsonl.frozen-before-relocation": "10e294223f3687b8e983e00ff3205409a4bda8f56968ca1e7c4c3f59ea6a83ed",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/resources-revised.jsonl": "addd86f1664214b7624ccec6bee488a4600e3c6a656035ae518ce8a9fb3eb879",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/start-revised.log": "a75b947c683f4cd61a95e75f31f330ca72cbf492572c1b00aec6b94bab4bb298",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/CPU-NATIVE-STACKS.json": "cda7496072f55671d3cc656179fd692672f9ba99f7ceacc66cb13d03ebc2e981",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/directives-before.md": "e2b6c66c5776168f82d264e0886e9b7f0b3666f27f775efd0d1ed27455d7c345",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/start.log": "79cfd1a94987f27178d5b048e22ec5ff0a596a7088bc842ef76a593bb18fb954",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/756-errors-at-exit.md": "0cb6963289ba81bfa587b40429eaf482730f184ed1d756b777cd882b5d4d47d6",
+    "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/resources.jsonl": "89605f2f91051e7efc8b07b148c8089e471913e9c2f5e5f47e8982468fca759d"
+  },
+  "externalProfiles": [
+    {
+      "path": "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171744.118385.9.010.cpuprofile",
+      "bytes": 11905,
+      "sha256": "e7080a98f850db94b35c19cdc516180d3ae5726182cf1e636e3a64987fb61d30",
+      "custody": "host external temporary profile; not committed"
+    },
+    {
+      "path": "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171631.118385.4.005.cpuprofile",
+      "bytes": 14188,
+      "sha256": "59e089787408c6a23221faa8a073bcb486d24093b00f502e05cae24446758258",
+      "custody": "host external temporary profile; not committed"
+    },
+    {
+      "path": "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171653.118385.5.006.cpuprofile",
+      "bytes": 9352,
+      "sha256": "c2462caf79de0ff2de883b65710b0eb5c332d943246df8e16a6cec78bf532e03",
+      "custody": "host external temporary profile; not committed"
+    },
+    {
+      "path": "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171538.118385.1.002.cpuprofile",
+      "bytes": 11521,
+      "sha256": "80bc12c0393988f5702c4fcf2466748545925adb28600aade42d9f21c962ef0c",
+      "custody": "host external temporary profile; not committed"
+    },
+    {
+      "path": "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171829.118385.11.012.cpuprofile",
+      "bytes": 8541,
+      "sha256": "0a035abafb10812659400dc43ef4bf7ddc83012c06b7009fd1f335b468ca3dea",
+      "custody": "host external temporary profile; not committed"
+    },
+    {
+      "path": "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171711.118385.6.007.cpuprofile",
+      "bytes": 10985,
+      "sha256": "49b0ede33c8163a02130a7542dd065db80b77a39767f886c2007d29f8aac8dfe",
+      "custody": "host external temporary profile; not committed"
+    },
+    {
+      "path": "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.164948.118385.0.001.cpuprofile",
+      "bytes": 162204540,
+      "sha256": "f610defe1d0417cc44e57095d2e2c00421db110b06bafd1968f5e219bc35ed12",
+      "custody": "host external temporary profile; not committed"
+    },
+    {
+      "path": "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171716.118385.7.008.cpuprofile",
+      "bytes": 10994,
+      "sha256": "81eec256c5fc866a50efbcc0490b83460155372fe94ffb392bc0fdbbb4445c90",
+      "custody": "host external temporary profile; not committed"
+    },
+    {
+      "path": "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171621.118385.3.004.cpuprofile",
+      "bytes": 9508,
+      "sha256": "b6d42fd4b15bb70e35e39d51715a269969326b58d7354f37c34640629fec88ea",
+      "custody": "host external temporary profile; not committed"
+    },
+    {
+      "path": "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171600.118385.2.003.cpuprofile",
+      "bytes": 11944,
+      "sha256": "9f9a5146d36a0cded0fde0158955621310e62fd9d041a953ca307e0854e87cf6",
+      "custody": "host external temporary profile; not committed"
+    },
+    {
+      "path": "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171807.118385.10.011.cpuprofile",
+      "bytes": 11313,
+      "sha256": "3ff6e1f55ac1c30479ed14f35a488555b3b3d63947295793eba1a4cbe4e070b3",
+      "custody": "host external temporary profile; not committed"
+    },
+    {
+      "path": "/tmp/deckent-parallel-start-20260913-profile/CPU.20260913.171740.118385.8.009.cpuprofile",
+      "bytes": 7405,
+      "sha256": "71e36a6473a966c0f33930d336ae5359380499fe7ecbe256764683b6f4a61a20",
+      "custody": "host external temporary profile; not committed"
+    }
+  ],
+  "sourceHashes": {
+    "src/core/scope-gate.ts": "03a7aed1794ef0d9e1e102b95050f32d9de4e29df996601da54ff25d814e4246",
+    "src/orchestra/run-flow-plan-service.ts": "58d519a6d40f135ef6ea1de682c94508b8311f4a0dcad10c3f1d077323c6086c",
+    "src/orchestra/spawn-backend-docker.ts": "bfeabbc4f7fd35559dc49c1ff6a4736465909a3ab1ecc9ee141cfec5b842ee48",
+    "src/orchestra/execution-effect-docker-lifecycle.ts": "e0be2c0c85f8b72fb886ca8ec9e5cd5faf74ec2af24f625c21c1e042d80a2fde",
+    "native/exec-authority/index.mjs": "1f005c28bd82fbaab26620760ab0715d29ec748a6f18c69f394e34e9d0e7d77e",
+    "src/core/task-attempt-custody-posix-adapter.ts": "843f56193a3da0c96a53ac5343fd30d0e2a9a42e9df7a40f980f2ea33515bd33"
+  },
+  "checks": {
+    "masterValidatorExitCode": 0,
+    "archiveVerificationExitCode": 0
+  },
+  "continuationManifest": {
+    "path": "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/757/MANIFEST.json",
+    "sha256": "1e43731639c170f9fb035171cc4555805953dfb2fb6f62fd8acb1c0768285632"
+  }
+}

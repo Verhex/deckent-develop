@@ -1,0 +1,50 @@
+[
+  {
+    "sampledSeconds": 58.596158,
+    "stack": "captured@index.mjs:3311 <- inspectNativeCustodyHandle@index.mjs:2407 <- requireNativeCustodyPreIdentity@index.mjs:2429 <- invoke@index.mjs:2864 <- identity@index.mjs:2922 <- inspectOpaqueHandle@exec-authority-native.js:1313 <- validateReturnedHandle@exec-authority-native.js:1338 <- validateOpenResult@exec-authority-native.js:1349 <- validateCustodyResult@exec-authority-native.js:1924 <- invoke@exec-authority-native.js:2630"
+  },
+  {
+    "sampledSeconds": 55.846342,
+    "stack": "captured@index.mjs:3311 <- inspectNativeCustodyHandle@index.mjs:2407 <- validatedCustodyTransportResult@index.mjs:2471 <- invoke@index.mjs:2864 <- identity@index.mjs:2922 <- inspectOpaqueHandle@exec-authority-native.js:1313 <- validateReturnedHandle@exec-authority-native.js:1338 <- validateOpenResult@exec-authority-native.js:1349 <- validateCustodyResult@exec-authority-native.js:1924 <- invoke@exec-authority-native.js:2630"
+  },
+  {
+    "sampledSeconds": 50.918101,
+    "stack": "captured@index.mjs:3311 <- invoke@index.mjs:2864 <- openRoot@index.mjs:2931 <- invokeNaturalCustodyOperation@exec-authority-native.js:1867 <- invoke@exec-authority-native.js:2630 <- openFreshBoundRoot@task-attempt-custody-posix-adapter.js:1909 <- openDirectoryComponents@task-attempt-custody-posix-adapter.js:1727 <- openParentDirectory@task-attempt-custody-posix-adapter.js:1766 <- openFile@task-attempt-custody-posix-adapter.js:1783 <- readFirstWriter@task-attempt-custody-posix-adapter.js:882"
+  },
+  {
+    "sampledSeconds": 35.808703,
+    "stack": "captured@index.mjs:3311 <- inspectNativeCustodyHandle@index.mjs:2407 <- requireNativeCustodyPreIdentity@index.mjs:2429 <- invoke@index.mjs:2864 <- openDirectoryAt@index.mjs:2923 <- invokeNaturalCustodyOperation@exec-authority-native.js:1867 <- invoke@exec-authority-native.js:2630 <- openDirectoryComponents@task-attempt-custody-posix-adapter.js:1727 <- openParentDirectory@task-attempt-custody-posix-adapter.js:1766 <- openFile@task-attempt-custody-posix-adapter.js:1783"
+  },
+  {
+    "sampledSeconds": 34.899322,
+    "stack": "captured@index.mjs:3311 <- invoke@index.mjs:2864 <- identity@index.mjs:2922 <- inspectOpaqueHandle@exec-authority-native.js:1313 <- validateReturnedHandle@exec-authority-native.js:1338 <- validateOpenResult@exec-authority-native.js:1349 <- validateCustodyResult@exec-authority-native.js:1924 <- invoke@exec-authority-native.js:2630 <- openDirectoryComponents@task-attempt-custody-posix-adapter.js:1727 <- openParentDirectory@task-attempt-custody-posix-adapter.js:1766"
+  },
+  {
+    "sampledSeconds": 34.884368,
+    "stack": "captured@index.mjs:3311 <- inspectNativeCustodyHandle@index.mjs:2407 <- validateReturnedCustodyHandle@index.mjs:2462 <- validatedCustodyTransportResult@index.mjs:2471 <- invoke@index.mjs:2864 <- openDirectoryAt@index.mjs:2923 <- invokeNaturalCustodyOperation@exec-authority-native.js:1867 <- invoke@exec-authority-native.js:2630 <- openDirectoryComponents@task-attempt-custody-posix-adapter.js:1727 <- openParentDirectory@task-attempt-custody-posix-adapter.js:1766"
+  },
+  {
+    "sampledSeconds": 18.65905,
+    "stack": "captured@index.mjs:3311 <- inspectNativeCustodyHandle@index.mjs:2407 <- requireNativeCustodyPreIdentity@index.mjs:2429 <- invoke@index.mjs:2864 <- identity@index.mjs:2922 <- inspectOpaqueHandle@exec-authority-native.js:1313 <- inspectRegisteredHandle@exec-authority-native.js:1784 <- preflightCustodyInvocation@exec-authority-native.js:1798 <- invoke@exec-authority-native.js:2630 <- openDirectoryComponents@task-attempt-custody-posix-adapter.js:1727"
+  },
+  {
+    "sampledSeconds": 17.473386,
+    "stack": "captured@index.mjs:3311 <- inspectNativeCustodyHandle@index.mjs:2407 <- validatedCustodyTransportResult@index.mjs:2471 <- invoke@index.mjs:2864 <- identity@index.mjs:2922 <- inspectOpaqueHandle@exec-authority-native.js:1313 <- inspectRegisteredHandle@exec-authority-native.js:1784 <- preflightCustodyInvocation@exec-authority-native.js:1798 <- invoke@exec-authority-native.js:2630 <- openDirectoryComponents@task-attempt-custody-posix-adapter.js:1727"
+  },
+  {
+    "sampledSeconds": 16.109693,
+    "stack": "captured@index.mjs:3311 <- invoke@index.mjs:2864 <- identity@index.mjs:2922 <- inspectOpaqueHandle@exec-authority-native.js:1313 <- inspectRegisteredHandle@exec-authority-native.js:1784 <- preflightCustodyInvocation@exec-authority-native.js:1798 <- invoke@exec-authority-native.js:2630 <- openDirectoryComponents@task-attempt-custody-posix-adapter.js:1727 <- openParentDirectory@task-attempt-custody-posix-adapter.js:1766 <- openFile@task-attempt-custody-posix-adapter.js:1783"
+  },
+  {
+    "sampledSeconds": 15.302159,
+    "stack": "captured@index.mjs:3311 <- invoke@index.mjs:2864 <- openDirectoryAt@index.mjs:2923 <- invokeNaturalCustodyOperation@exec-authority-native.js:1867 <- invoke@exec-authority-native.js:2630 <- openDirectoryComponents@task-attempt-custody-posix-adapter.js:1727 <- openParentDirectory@task-attempt-custody-posix-adapter.js:1766 <- openFile@task-attempt-custody-posix-adapter.js:1783 <- readFirstWriter@task-attempt-custody-posix-adapter.js:882 <- readDurableEffectMarker@task-attempt-custody-posix-adapter.js:717"
+  },
+  {
+    "sampledSeconds": 13.728245,
+    "stack": "captured@index.mjs:3311 <- invoke@index.mjs:2864 <- openDirectoryAt@index.mjs:2923 <- invokeNaturalCustodyOperation@exec-authority-native.js:1867 <- invoke@exec-authority-native.js:2630 <- openDirectoryComponents@task-attempt-custody-posix-adapter.js:1727 <- openParentDirectory@task-attempt-custody-posix-adapter.js:1766 <- openFile@task-attempt-custody-posix-adapter.js:1783 <- readFirstWriter@task-attempt-custody-posix-adapter.js:882 <- readVerified@task-attempt-custody-posix-adapter.js:908"
+  },
+  {
+    "sampledSeconds": 12.772008,
+    "stack": "captured@index.mjs:3311 <- invoke@index.mjs:2864 <- openDirectoryAt@index.mjs:2923 <- invokeNaturalCustodyOperation@exec-authority-native.js:1867 <- invoke@exec-authority-native.js:2630 <- openDirectoryComponents@task-attempt-custody-posix-adapter.js:1727 <- openParentDirectory@task-attempt-custody-posix-adapter.js:1766 <- openFile@task-attempt-custody-posix-adapter.js:1783 <- readFirstWriter@task-attempt-custody-posix-adapter.js:882 <- TaskAttemptCustodyStore.guarded.<computed>@task-attempt-custody-store.js:3583"
+  }
+]

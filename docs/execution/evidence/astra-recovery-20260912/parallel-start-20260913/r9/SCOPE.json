@@ -1,0 +1,64 @@
+{
+  "id": "R9-C-CANONICAL-PROGRESS",
+  "at": "2026-09-13T21:29:06.532129+00:00",
+  "outcome": "MASTER3178 / parent120",
+  "health": "DEGRADED",
+  "authority": "owner approved A-E continuation",
+  "scope": [
+    "src/core/run-status-read-model.ts",
+    "src/orchestra/sprint-controller.ts",
+    "src/orchestra/result-collector.ts",
+    "src/cli/commands/status.ts",
+    "src/mcp/tools/status.ts",
+    "src/api/status-reconcile.ts",
+    "src/cli/helpers/run-state-feed.ts",
+    "tests/core/run-status-read-model.test.ts",
+    "src/orchestra/sprint-lifecycle.ts",
+    "tests/orchestra/result-collector-settlement-authority.test.ts",
+    "tests/cli/status-terminal-publication-race.test.ts"
+  ],
+  "baseline": {
+    "src/core/run-status-read-model.ts": "108fa5054de652f9cd3bb2e2cb4a52d01278f95a1824cc9563d061a7cc49ab02",
+    "src/orchestra/sprint-controller.ts": "3a164dbdfffc41949b48f4a467ce9f148beb3047341f373d091eae9d917e8bc1",
+    "src/orchestra/result-collector.ts": "96e65b90d337909cc3db652b3079e1e2b6ce556a24edf60e34ffc50b496ec355",
+    "src/cli/commands/status.ts": "b8a7f15166c5a18f0323c4594511c14e2f5fb06594370bfa00a723d697afc428",
+    "src/mcp/tools/status.ts": "fb7474ff5c8bb09aa4b85a06de5fbbcc9083eb8919b6954ee865eafcf8b69a16",
+    "src/api/status-reconcile.ts": "35f468c0682f765e856169dbac83de168d7a96147203bf4c5f51ecfffec9372a",
+    "src/cli/helpers/run-state-feed.ts": "06c8b75f7a612bc0a007ab1496e2baac1b4f67d59809aded99773033ea320ddf",
+    "tests/core/run-status-read-model.test.ts": "719b13bb766b170a47eb9c4a88b63429d78198c92d0e1e98ad279f5c92aa2ff8",
+    "src/orchestra/sprint-lifecycle.ts": "9deee4d103bf387a0eb4577642df7dc2addbc4ba1f6acac262f0396e91547eff",
+    "tests/orchestra/result-collector-settlement-authority.test.ts": "e14fd35fddd8f28e8e168b73bfef415191a1e67a32160e0d5cfb967ae526da23",
+    "tests/cli/status-terminal-publication-race.test.ts": "9bb1a0a7d267b0affc4b2f6e07e0bcb7ed1b44a6633ab05fa4d23f822c19c9ce"
+  },
+  "evidence": [
+    "R6 persisted live model revision3165 total3/active3/done0 after 758-002 settlement; planned8",
+    "publisher re-reads only materialized task files",
+    "status consumers ignore coordinator generation",
+    "collector exposes optimistic DONE across final await"
+  ],
+  "design": [
+    "publish complete coordinator snapshot fenced to current sprint lease",
+    "project exact authority HOLD as blocked without changing runtime tasks",
+    "publish after committed result and fatal hold as well as heartbeat",
+    "require generation at status IO ingress; keep pure rendering pure",
+    "only NO_GO task lineages imply FIX pending",
+    "terminal status mutation only after last revalidation",
+    "fatal dashboard uses shared projected counts instead of resetting all progress to zero"
+  ],
+  "negativeScope": [
+    "no manual runtime/tasks/receipt/auth mutation",
+    "no live start until D",
+    "no kill/cleanup/commit/push",
+    "no terminal receipt invention; logical counts are not product closure",
+    "no unrelated Cursor edits"
+  ],
+  "budget": {
+    "implementationPass": 1,
+    "targetedVerificationPass": 1,
+    "correctionOnlyOnNewFailure": true,
+    "isolatedBuild": 1,
+    "mainBuild": 1,
+    "liveStart": 0
+  },
+  "returnBoundary": "D host latency investigation then E bounded eight-task start"
+}

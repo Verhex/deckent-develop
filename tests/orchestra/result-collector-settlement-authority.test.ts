@@ -486,7 +486,10 @@ describe('result collector settlement authority wire', () => {
 
     for (const invalid of [hugeFlat, oversizedHold, cyclicCurrent, getterCurrent]) {
       let revalidationCount = 0;
+      const visibleStatuses: TaskStatus[] = [];
+      const heldIds: string[] = [];
       await expect(waitForResults(root, sprint, 250, [], {
+        onTaskAuthorityHold: id => { heldIds.push(id); },
         ipcExecutionMode: 'normal-docker',
         resolveExactAttemptIpcAuthority: () => ({
           state: 'absent',
@@ -498,6 +501,7 @@ describe('result collector settlement authority wire', () => {
           authority: valid,
         }),
         revalidateExactAcceptedResultTerminalAuthority: async () => {
+          visibleStatuses.push(task.status);
           revalidationCount += 1;
           return revalidationCount === 1
             ? { state: 'current' as const, terminalAuthority: valid }
@@ -505,9 +509,66 @@ describe('result collector settlement authority wire', () => {
         },
       })).rejects.toThrow(/terminal revalidation HOLD/u);
       expect(revalidationCount).toBeGreaterThanOrEqual(2);
+      expect(visibleStatuses.every(status => status === TaskStatus.EXECUTING)).toBe(true);
+      expect(heldIds).toEqual([task.id]);
       expect(task.status).toBe(TaskStatus.EXECUTING);
     }
     expect(getterCalls).toBe(0);
+  });
+
+  it.each([false, true])('preserves an accepted sibling across fatal initial HOLD (deferred=%s), without new dispatch', async deferred => {
+    const exact = createTaskResultSettlementV2Fixture();
+    const taskId = exact.identity.taskId;
+    const { root, tasksDir, task, sprint } = fixture(taskId);
+    const accepted = readExactAuthoritativeTaskResult<TaskResult>({
+      executionMode: 'normal-docker', authorityKind: 'accepted-result', projectRoot: root, taskId,
+      custodyStore: exact.store, policy: exact.policy, expectedIdentity: exact.identity,
+      admission: exact.creation.admission,
+      acceptedResultRef: createExactAcceptedTaskResultRefV2(exact.creation.acceptedResultArtifact),
+      expectedAcceptedResultChainDigest: exact.creation.acceptedResultChain.receiptDigest,
+    });
+    const terminal = readExactSettledTaskResult<TaskResult>({
+      executionMode: 'normal-docker', authorityKind: 'attempt-settlement', projectRoot: root, taskId,
+      custodyStore: exact.store, policy: exact.policy, expectedIdentity: exact.identity,
+      admission: exact.creation.admission,
+      settlementRef: createExactTaskResultSettlementRefV2(exact.settlementArtifact),
+      expectedSettlementDigest: taskResultSettlementV2Digest(exact.settlement, exact.policy.jsonBounds),
+    });
+    if (!accepted.exactAcceptedAuthority || !terminal.exactAuthority) throw new Error('fixture authority missing');
+    const finalAuthority = terminalAuthority(accepted.exactAcceptedAuthority, terminal.exactAuthority, 'DONE');
+    const blocked = {...task, id: 'blocked-peer'};
+    const queued = {...task, id: 'never-started', status: TaskStatus.PENDING};
+    sprint.tasks = [blocked, task, queued];
+    let ready = !deferred;
+    const hold = {state:'authority-hold' as const, result:null, settlementRef:null,
+      rawResultPath:join(tasksDir,'task-blocked-peer.result'), holdReason:'EFFECT_FINAL_CAPTURE_HOLD'};
+    const pending = {state:'absent' as const, result:null, settlementRef:null,
+      rawResultPath:join(tasksDir,'task-pending.result')};
+    const read = (id:string) => id === blocked.id ? hold : id === taskId && ready ? accepted : pending;
+    const awaitTerminal = vi.fn(async (id:string) => {
+      if (id === taskId) { await new Promise(resolve => setTimeout(resolve, 10)); ready = true; }
+      return read(id);
+    });
+    const spawn = vi.fn(); const kill = vi.fn(); const progress = vi.fn();
+    const settle = vi.fn(async () => ({state:'settled' as const, authority:finalAuthority}));
+    await expect(waitForResults(root, sprint, 250, [queued], {
+      ipcExecutionMode:'normal-docker', readTaskResultAuthority:read,
+      onResultCommitted:progress,
+      resolveExactAttemptIpcAuthority:()=>({state:'hold',taskId:blocked.id,reasonCode:'PRIVATE_IPC_AUTHORITY_UNAVAILABLE'}),
+      exactDockerRegistry:{isExactTask:(id:string)=>id!==queued.id, resolveLifecycleOwner:()=>null,
+        awaitTaskResultAuthority:awaitTerminal} as unknown as NonNullable<Parameters<typeof waitForResults>[4]>['exactDockerRegistry'],
+      spawnBackend:{name:'docker',spawn,kill,list:()=>[],isAvailable:async()=>true},
+      settleExactAcceptedResult:settle,
+      revalidateExactAcceptedResultTerminalAuthority:async ({expectedTerminalAuthority})=>({state:'current',terminalAuthority:expectedTerminalAuthority}),
+    })).rejects.toThrow('exact result authority HOLD: EFFECT_FINAL_CAPTURE_HOLD');
+    expect(spawn).not.toHaveBeenCalled(); expect(kill).not.toHaveBeenCalled();
+    expect(progress).toHaveBeenCalledTimes(1);
+    expect(progress.mock.calls[0]?.[0].taskId).toBe(taskId);
+    expect(settle).toHaveBeenCalledTimes(1);
+    expect(task.status).toBe(TaskStatus.DONE);
+    expect(queued.status).toBe(TaskStatus.PENDING);
+    expect(existsSync(join(tasksDir,'task-blocked-peer.result'))).toBe(false);
+    if(deferred) expect(awaitTerminal).toHaveBeenCalledWith(taskId);
   });
 
   it('holds exact custody when no terminal settlement authority is supplied', async () => {
@@ -736,6 +797,25 @@ describe('result collector settlement authority wire', () => {
         notes: 'host repaired malformed raw result',
       }),
     ]);
+  });
+
+  it('preserves a capture failure that arrives during the IPC poll', async () => {
+    const { root, tasksDir, sprint } = fixture('capture-failure');
+    let held = false;
+    const check = vi.mocked(checkExactAttemptWorkerQuestions);
+    check.mockImplementationOnce(async () => {
+      held = true;
+      return { answered: [], pending: [], notDispatched: [], projectionHolds: [],
+        holds: [{ taskId: 'capture-failure', reasonCode: 'PRIVATE_IPC_AUTHORITY_UNAVAILABLE' }] };
+    });
+    await expect(waitForResults(root, sprint, 250, [], {
+      ipcExecutionMode: 'normal-docker',
+      readTaskResultAuthority: () => ({ state: held ? 'authority-hold' : 'absent',
+        result: null, settlementRef: null, rawResultPath: join(tasksDir, 'task-capture-failure.result'),
+        ...(held ? { holdReason: 'EFFECT_FINAL_CAPTURE_HOLD' } : {}) }),
+      resolveExactAttemptIpcAuthority: () => ({ state: 'hold', taskId: 'capture-failure',
+        reasonCode: 'PRIVATE_IPC_AUTHORITY_UNAVAILABLE' }),
+    })).rejects.toThrow('exact result authority HOLD: EFFECT_FINAL_CAPTURE_HOLD');
   });
 
   it('records exact IPC projection debt once without blocking private answer success', async () => {

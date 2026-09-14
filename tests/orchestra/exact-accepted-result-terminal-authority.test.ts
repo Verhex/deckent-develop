@@ -114,6 +114,22 @@ describe('exact accepted-result terminal authority parser', () => {
     expect(isExactAcceptedResultTerminalAuthorityV2(authority, accepted)).toBe(true);
   });
 
+  it('accepts identical authority after canonical disk key ordering', () => {
+    const { accepted, authority } = fixture();
+    const reorder = (value: unknown): unknown => value && typeof value === 'object'
+      ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b))
+          .map(([key, child]) => [key, reorder(child)])) : value;
+    const disk = reorder(authority) as typeof authority;
+    expect(isExactAcceptedResultTerminalAuthorityV2(disk, accepted)).toBe(true);
+    expect(isCurrentExactAcceptedTaskTerminalAuthorityRead(accepted.identity.taskId, authority, {
+      state: 'current', terminalAuthority: disk,
+      terminalResultAuthority: disk.terminalResultAuthority,
+      evaluationReceipt: { verdict: 'NO_GO' }, finalizerReceipt: { verdict: 'NO_GO' },
+      result: { taskId: accepted.identity.taskId, attemptCustody: { identity: reorder(accepted.identity) } },
+      projectedResult: { taskId: accepted.identity.taskId },
+    } as never)).toBe(true);
+  });
+
   it('rejects a sibling attempt and a changed artifact digest', () => {
     const { accepted, authority } = fixture();
     const sibling = fixture(accepted.identity.taskId, 'attempt-b').authority;

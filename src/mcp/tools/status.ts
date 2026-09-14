@@ -17,12 +17,13 @@ import { foldTaskLineages } from '../../core/task-lineage.js';
 import { projectTerminalPublicationStatus as projectSharedTerminalPublicationStatus } from '../../core/sprint-terminal-publication-status.js';
 import {
   readCanonicalRunStatusReadModel,
-  runStatusReadModelMatchesAuthority,
+  runStatusReadModelMatchesCurrentGeneration,
   type CanonicalRunStatusReadModel,
   type RunStatusReadiness,
 } from '../../core/run-status-read-model.js';
 import * as runStatusReadModelAuthority from '../../core/run-status-read-model.js';
 import { mcpToolDescription, mcpFieldDescription } from './description-catalog.js';
+import { getMessage, getLanguage } from '../../cli/helpers/messages.js';
 
 /**
  * Read the last N events from the event stream JSONL file.
@@ -343,7 +344,7 @@ function matchingRunStatusReadModel(
 ): CanonicalRunStatusReadModel | null {
   try {
     const model = readCanonicalRunStatusReadModel(root);
-    return model && runStatusReadModelMatchesAuthority(model, authority) ? model : null;
+    return model && runStatusReadModelMatchesCurrentGeneration(root, model, authority) ? model : null;
   } catch {
     return null;
   }
@@ -458,7 +459,9 @@ export function registerStatusTool(server: McpServer): void {
         }
         const noSprintData = {
           active: authority.active,
-          message: 'No active run.',
+          message: authority.active
+            ? getMessage('status.sprint_active', getLanguage(), { sprintId: authority.sprintId ?? '' })
+            : getMessage('status.no_sprint', getLanguage()),
           sprintId: authority.sprintId ?? canonicalSprintId,
           job: latestJob,
           lifecycle: authority.lifecycle,
@@ -467,6 +470,7 @@ export function registerStatusTool(server: McpServer): void {
           recoveryCommand: authority.recoveryCommand,
           finalizeCommand: authority.finalizeCommand,
           authority,
+          progress: readModel?.logicalProgress ?? null,
           terminalPublication: readModel?.terminalPublication ?? null,
           providerConcurrency,
           statusReadModel: statusReadModelSurface(readModel),
@@ -475,7 +479,7 @@ export function registerStatusTool(server: McpServer): void {
         if (json) {
           return { content: [{ type: 'text' as const, text: JSON.stringify(noSprintData) }] };
         }
-        const summary = formatStatusResponse(noSprintData);
+        const summary = formatStatusResponse({ ...noSprintData, progress: noSprintData.progress ?? undefined });
         return {
           content: [{
             type: 'text' as const,
@@ -511,7 +515,7 @@ export function registerStatusTool(server: McpServer): void {
 
       // Dashboard file is valid — extract fields for display
       const state = dashResult.state as unknown as Record<string, unknown>;
-      const progress = state['progress'] as { done?: number; total?: number } | undefined;
+      const progress = readModel?.logicalProgress;
       const done = progress?.done ?? 0;
       const total = progress?.total ?? 0;
       const agents = state['agents'] as unknown[] | undefined;
@@ -557,9 +561,7 @@ export function registerStatusTool(server: McpServer): void {
       const noGoCount = logicalTaskLineages.filter(
         lineage => lineage.resolvedTask.status === TaskStatus.NO_GO,
       ).length;
-      const logicalProgress = logicalTaskLineages.length > 0
-        ? readModel?.logicalProgress
-        : undefined;
+      const logicalProgress = readModel?.logicalProgress ?? null;
 
       const verboseFields = verbose ? {
         phase: state['phase'],
@@ -570,7 +572,7 @@ export function registerStatusTool(server: McpServer): void {
 
       const rawData = {
         ...state,
-        ...(logicalProgress ? { progress: logicalProgress } : {}),
+        progress: logicalProgress,
         // Override sprint.id with canonical source-of-truth value so dashboard
         // and MCP always report the same sprint, even when .dashboard is stale.
         sprint: sprint ? { ...sprint, id: resolvedSprintId } : { id: resolvedSprintId },

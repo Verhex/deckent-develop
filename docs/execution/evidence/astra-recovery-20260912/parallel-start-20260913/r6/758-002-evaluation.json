@@ -1,0 +1,275 @@
+{
+  "acceptanceDecision": {
+    "confirmationReceiptDigest": null,
+    "enforced": false,
+    "outcome": {
+      "action": "ROUTE",
+      "adapter": "llm",
+      "kind": "documentation",
+      "source": "default",
+      "verdict": "UNDECIDABLE"
+    },
+    "postRubricCause": null,
+    "routeClaim": null,
+    "settlement": {
+      "acceptanceDisposition": "pending",
+      "debtDisposition": "active",
+      "reasonCode": "CONFIRMATION_MISSING",
+      "receiptDisposition": "NONE",
+      "sourceVerdict": "UNDECIDABLE"
+    }
+  },
+  "acceptanceDecisionDigest": "sha256:f4c60a1fda282c7d7a86dac750721b3b36d62bdc0689744d2a67c172082a4ac0",
+  "acceptedResultArtifactReceiptDigest": "sha256:c3af30fa189a2bc0b23e17027b46c3415a811bf89f4cdd62b3b542bb0aa7b1bb",
+  "acceptedResultChainDigest": "sha256:b3b49b2019eb6d27375689add2a304c6a0506cbf36564f4ced3de069c3b8a2db",
+  "admissionReceiptDigest": "sha256:9edf55f128abfe0cab9829ab314140ec7480924a131684729a0c7aad7fdc6201",
+  "criteriaEvidenceDigest": "sha256:a59ebcdc28f7bc8fe1d8b2537a7c6a35f2b10ec432a3535922efac7d0f6b01b0",
+  "criterionEvaluationAuthorityDigest": "sha256:f89f076e65326d8fd3fdf87e0ca29911f9c767872c9c00ba2537def54b4c1d22",
+  "dispatchAdmissionRefDigest": "sha256:f48a5d11ec60111be1421023bacb0cf877e9d11f08c8bfe7cc0b09f431b90d3f",
+  "dispatchTaskMaterialDigest": "sha256:e13734f135b014cf40af23baccb0e15522d1ea0e1ffeda51cc55076fe3894e2d",
+  "effectLandingBindingDigest": "sha256:5abf5f3a54dc552b94adfcf9cfc12f97a0f073b75f1b7c5356a97ba1bc366616",
+  "effectLandingReceiptDigest": "sha256:94edb77c0af8c1b86670ef0bf58ac813d19279066c21ca24737006b0bc367e2b",
+  "evaluatedAt": "2026-09-13T17:36:20.674Z",
+  "evaluationPolicyDigest": "sha256:57cbf1e771b278b633670c40abdc821d50e5cf29bd34b9dbb63923f1775a93f5",
+  "evaluationSnapshot": {
+    "contractSummary": {
+      "decided": 0,
+      "total": 7,
+      "undecidableItems": [
+        {
+          "itemId": "criterion-go-53b982b4014fbd7f1a019de3804b303bb72320d9d7a427f2214b34fec802ab21",
+          "statement": "Target file(s) written to disk with the required content"
+        },
+        {
+          "itemId": "criterion-no-go-13185f4517c1a533857ac706f309d5fcf4849467279ce94de3af5a8b18647f11",
+          "statement": "Target file(s) missing or empty"
+        },
+        {
+          "itemId": "criterion-go-8e905eb228e6d976792e6ed70c5c3d50ce927097777b205ab0fcf5549dc9b2da",
+          "statement": "The declared report contains independently inspected source references and hashes."
+        },
+        {
+          "itemId": "criterion-go-d975e23c94014a7e0c0ff070e3f1687b310125013ea7b444c746169e37f21ccb",
+          "statement": "Observations and hypotheses are explicitly separated."
+        },
+        {
+          "itemId": "criterion-go-2819260f2320ffa9634166a22859cd3a9a860bb6f18248ecff6e93e951f627ae",
+          "statement": "The proposed next repair has exact file scope and preserves canonical authority."
+        },
+        {
+          "itemId": "criterion-go-f5f3e37581af704261a1c10ab63bbd9b059349b2f4aa24644f70f23bd4e44f19",
+          "statement": "Only the declared report changes and no product closure is claimed."
+        },
+        {
+          "itemId": "criterion-no-go-ee5778099700bac4bcf913f675434722f0fddc6613b6da63ed2fc281144a9b8d",
+          "statement": "Fabricated execution or measurements, source mutation, missing report, or unbounded history scan."
+        }
+      ]
+    },
+    "decision": "DONE",
+    "retryCount": 0,
+    "rubricScores": [
+      {
+        "criterion": "correctness",
+        "passed": true,
+        "reason": "verification task \u2014 tests passed, existing work confirmed",
+        "score": 100
+      },
+      {
+        "criterion": "test_coverage",
+        "passed": true,
+        "reason": "verification task \u2014 no new code to cover",
+        "score": 100
+      },
+      {
+        "criterion": "scope_compliance",
+        "passed": true,
+        "reason": "verification task \u2014 no files changed (expected)",
+        "score": 100
+      },
+      {
+        "criterion": "documentation",
+        "passed": true,
+        "reason": "verification task \u2014 notes provided",
+        "score": 100
+      },
+      {
+        "criterion": "goNogo:criterion-go-53b982b4014fbd7f1a019de3804b303bb72320d9d7a427f2214b34fec802ab21",
+        "passed": true,
+        "reason": "go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): Target file(s) written to disk with the required content",
+        "score": 50
+      },
+      {
+        "criterion": "goNogo:criterion-no-go-13185f4517c1a533857ac706f309d5fcf4849467279ce94de3af5a8b18647f11",
+        "passed": true,
+        "reason": "no-go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): Target file(s) missing or empty",
+        "score": 50
+      },
+      {
+        "criterion": "goNogo:criterion-go-8e905eb228e6d976792e6ed70c5c3d50ce927097777b205ab0fcf5549dc9b2da",
+        "passed": true,
+        "reason": "go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): The declared report contains independently inspected source references and hashes.",
+        "score": 50
+      },
+      {
+        "criterion": "goNogo:criterion-go-d975e23c94014a7e0c0ff070e3f1687b310125013ea7b444c746169e37f21ccb",
+        "passed": true,
+        "reason": "go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): Observations and hypotheses are explicitly separated.",
+        "score": 50
+      },
+      {
+        "criterion": "goNogo:criterion-go-2819260f2320ffa9634166a22859cd3a9a860bb6f18248ecff6e93e951f627ae",
+        "passed": true,
+        "reason": "go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): The proposed next repair has exact file scope and preserves canonical authority.",
+        "score": 50
+      },
+      {
+        "criterion": "goNogo:criterion-go-f5f3e37581af704261a1c10ab63bbd9b059349b2f4aa24644f70f23bd4e44f19",
+        "passed": true,
+        "reason": "go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): Only the declared report changes and no product closure is claimed.",
+        "score": 50
+      },
+      {
+        "criterion": "goNogo:criterion-no-go-ee5778099700bac4bcf913f675434722f0fddc6613b6da63ed2fc281144a9b8d",
+        "passed": true,
+        "reason": "no-go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): Fabricated execution or measurements, source mutation, missing report, or unbounded history scan.",
+        "score": 50
+      }
+    ],
+    "totalScore": 100
+  },
+  "evaluationSnapshotDigest": "sha256:a700cf5959140a4fa340f0d4361a5cc4e1cd81f0837af886c1021aacef751d68",
+  "failedCriteria": [],
+  "finalManifestDigest": "sha256:c9022be8ebbe5d4ad986c39472aca29424f1bcfa3fa528478f383af2b9e42b23",
+  "identity": {
+    "attemptId": "b1e6b9b8-b08c-8127-8c08-3c99e52e1d34",
+    "backend": "docker",
+    "generation": 1,
+    "projectId": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+    "projectRootSha256": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+    "schemaVersion": 2,
+    "taskId": "758-002"
+  },
+  "kind": "exact-task-evaluation-receipt-v2",
+  "productionWiringEvidenceDigest": null,
+  "productionWiringSettlementArtifactReceiptDigest": null,
+  "productionWiringSettlementDigest": null,
+  "providerExitAuthorityDigest": "sha256:84876c22c161a0af024d259064edad53f88dcd724b728b84100302da257fdebd",
+  "receiptDigest": "sha256:3eee3f4474640ee9d760d50b6e492c9f0ce2717a658b43717929cf09eb94bac2",
+  "resultDigest": "sha256:4259e861075d7b9f2db5a968124d71123c5d23013031387369c3aa35c823cd29",
+  "rubricEvaluationSnapshot": {
+    "contractSummary": {
+      "decided": 0,
+      "total": 7,
+      "undecidableItems": [
+        {
+          "itemId": "criterion-go-53b982b4014fbd7f1a019de3804b303bb72320d9d7a427f2214b34fec802ab21",
+          "statement": "Target file(s) written to disk with the required content"
+        },
+        {
+          "itemId": "criterion-no-go-13185f4517c1a533857ac706f309d5fcf4849467279ce94de3af5a8b18647f11",
+          "statement": "Target file(s) missing or empty"
+        },
+        {
+          "itemId": "criterion-go-8e905eb228e6d976792e6ed70c5c3d50ce927097777b205ab0fcf5549dc9b2da",
+          "statement": "The declared report contains independently inspected source references and hashes."
+        },
+        {
+          "itemId": "criterion-go-d975e23c94014a7e0c0ff070e3f1687b310125013ea7b444c746169e37f21ccb",
+          "statement": "Observations and hypotheses are explicitly separated."
+        },
+        {
+          "itemId": "criterion-go-2819260f2320ffa9634166a22859cd3a9a860bb6f18248ecff6e93e951f627ae",
+          "statement": "The proposed next repair has exact file scope and preserves canonical authority."
+        },
+        {
+          "itemId": "criterion-go-f5f3e37581af704261a1c10ab63bbd9b059349b2f4aa24644f70f23bd4e44f19",
+          "statement": "Only the declared report changes and no product closure is claimed."
+        },
+        {
+          "itemId": "criterion-no-go-ee5778099700bac4bcf913f675434722f0fddc6613b6da63ed2fc281144a9b8d",
+          "statement": "Fabricated execution or measurements, source mutation, missing report, or unbounded history scan."
+        }
+      ]
+    },
+    "decision": "DONE",
+    "retryCount": 0,
+    "rubricScores": [
+      {
+        "criterion": "correctness",
+        "passed": true,
+        "reason": "verification task \u2014 tests passed, existing work confirmed",
+        "score": 100
+      },
+      {
+        "criterion": "test_coverage",
+        "passed": true,
+        "reason": "verification task \u2014 no new code to cover",
+        "score": 100
+      },
+      {
+        "criterion": "scope_compliance",
+        "passed": true,
+        "reason": "verification task \u2014 no files changed (expected)",
+        "score": 100
+      },
+      {
+        "criterion": "documentation",
+        "passed": true,
+        "reason": "verification task \u2014 notes provided",
+        "score": 100
+      },
+      {
+        "criterion": "goNogo:criterion-go-53b982b4014fbd7f1a019de3804b303bb72320d9d7a427f2214b34fec802ab21",
+        "passed": true,
+        "reason": "go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): Target file(s) written to disk with the required content",
+        "score": 50
+      },
+      {
+        "criterion": "goNogo:criterion-no-go-13185f4517c1a533857ac706f309d5fcf4849467279ce94de3af5a8b18647f11",
+        "passed": true,
+        "reason": "no-go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): Target file(s) missing or empty",
+        "score": 50
+      },
+      {
+        "criterion": "goNogo:criterion-go-8e905eb228e6d976792e6ed70c5c3d50ce927097777b205ab0fcf5549dc9b2da",
+        "passed": true,
+        "reason": "go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): The declared report contains independently inspected source references and hashes.",
+        "score": 50
+      },
+      {
+        "criterion": "goNogo:criterion-go-d975e23c94014a7e0c0ff070e3f1687b310125013ea7b444c746169e37f21ccb",
+        "passed": true,
+        "reason": "go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): Observations and hypotheses are explicitly separated.",
+        "score": 50
+      },
+      {
+        "criterion": "goNogo:criterion-go-2819260f2320ffa9634166a22859cd3a9a860bb6f18248ecff6e93e951f627ae",
+        "passed": true,
+        "reason": "go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): The proposed next repair has exact file scope and preserves canonical authority.",
+        "score": 50
+      },
+      {
+        "criterion": "goNogo:criterion-go-f5f3e37581af704261a1c10ab63bbd9b059349b2f4aa24644f70f23bd4e44f19",
+        "passed": true,
+        "reason": "go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): Only the declared report changes and no product closure is claimed.",
+        "score": 50
+      },
+      {
+        "criterion": "goNogo:criterion-no-go-ee5778099700bac4bcf913f675434722f0fddc6613b6da63ed2fc281144a9b8d",
+        "passed": true,
+        "reason": "no-go \u00b7 llm \u00b7 undecidable \u2014 undecidable (non-deterministic requirement): Fabricated execution or measurements, source mutation, missing report, or unbounded history scan.",
+        "score": 50
+      }
+    ],
+    "totalScore": 100
+  },
+  "rubricEvaluationSnapshotDigest": "sha256:36d8223e394cd91771f455a5019c95a558314b0a8c009cee9fad8b2a61fb0591",
+  "runPolicyEvidenceDigest": null,
+  "schemaVersion": 2,
+  "state": "evaluated",
+  "taskSnapshotSha256": "sha256:b77968e858475d3775310e75e022eb2c4d66bdb434182a858717bfe4017c170c",
+  "testVerificationDigest": "sha256:61cd9971d65a7856f29f14787e9a538b2c9f65692005630cabe91592a581c143",
+  "totalScore": 100,
+  "verdict": "DONE"
+}

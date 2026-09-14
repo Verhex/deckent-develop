@@ -1,0 +1,1095 @@
+{
+  "at": "2026-09-13T21:35:37.439Z",
+  "kind": "compiled-isolated-ingress-not-live-dogfood",
+  "cases": [
+    {
+      "label": "no-task-or-dashboard-files",
+      "cli": {
+        "code": 0,
+        "payload": {
+          "active": true,
+          "lifecycle": "ACTIVE",
+          "resumable": false,
+          "sprintId": "sprint-900",
+          "authority": {
+            "schemaVersion": 1,
+            "lifecycle": "ACTIVE",
+            "active": true,
+            "resumable": false,
+            "sprintId": "sprint-900",
+            "phase": "EXECUTE",
+            "status": "ACTIVE",
+            "reason": null,
+            "recoveryCommand": null,
+            "finalizeCommand": null,
+            "coordinator": "alive",
+            "conflicts": [],
+            "recoveryReconciliation": {
+              "version": 1,
+              "sprintId": "sprint-900",
+              "evidence": {
+                "checkpointPresent": false,
+                "terminalReceipt": null,
+                "terminalReceiptConflict": null
+              },
+              "state": "consistent",
+              "mismatch": null,
+              "remediation": null
+            }
+          },
+          "readiness": {
+            "state": "READY"
+          },
+          "deathSweep": {
+            "closed": [],
+            "skipped": [],
+            "skippedSummary": {
+              "total": 0,
+              "classes": []
+            }
+          },
+          "statusReadModel": {
+            "state": "persisted",
+            "schemaVersion": 1,
+            "revision": 1,
+            "runGeneration": "lease:probe-current",
+            "modelDigest": "bdcacb4e78392528cda96fc15de6c0c17bb8bf548e14a41be8047e5a7787d656",
+            "holds": [
+              {
+                "reasonCode": "exact-result-authority-hold",
+                "evidenceRef": "coordinator:lease:probe-current:task:900-1",
+                "detail": "EXACT_RESULT_AUTHORITY_HOLD"
+              }
+            ]
+          },
+          "pendingApprovals": [],
+          "phase": "EXECUTE",
+          "status": "ACTIVE",
+          "reason": null,
+          "recoveryCommand": null,
+          "finalizeCommand": null,
+          "terminalPublication": {
+            "version": 1,
+            "state": "open",
+            "receipt": null
+          },
+          "providerConcurrency": []
+        },
+        "stderr": ""
+      },
+      "api": {
+        "sprint": {
+          "id": "sprint-900",
+          "phase": "EXECUTE",
+          "status": "ACTIVE"
+        },
+        "progress": {
+          "done": 1,
+          "active": 1,
+          "blocked": 6,
+          "total": 8,
+          "attemptCount": 8,
+          "lineages": [
+            {
+              "logicalTaskId": "900-1",
+              "attemptIds": [
+                "900-1"
+              ],
+              "attemptCount": 1,
+              "status": "blocked"
+            },
+            {
+              "logicalTaskId": "900-2",
+              "attemptIds": [
+                "900-2"
+              ],
+              "attemptCount": 1,
+              "status": "done"
+            },
+            {
+              "logicalTaskId": "900-3",
+              "attemptIds": [
+                "900-3"
+              ],
+              "attemptCount": 1,
+              "status": "active"
+            },
+            {
+              "logicalTaskId": "900-4",
+              "attemptIds": [
+                "900-4"
+              ],
+              "attemptCount": 1,
+              "status": "blocked"
+            },
+            {
+              "logicalTaskId": "900-5",
+              "attemptIds": [
+                "900-5"
+              ],
+              "attemptCount": 1,
+              "status": "blocked"
+            },
+            {
+              "logicalTaskId": "900-6",
+              "attemptIds": [
+                "900-6"
+              ],
+              "attemptCount": 1,
+              "status": "blocked"
+            },
+            {
+              "logicalTaskId": "900-7",
+              "attemptIds": [
+                "900-7"
+              ],
+              "attemptCount": 1,
+              "status": "blocked"
+            },
+            {
+              "logicalTaskId": "900-8",
+              "attemptIds": [
+                "900-8"
+              ],
+              "attemptCount": 1,
+              "status": "blocked"
+            }
+          ],
+          "fixRetry": []
+        },
+        "active": true,
+        "lifecycle": "ACTIVE",
+        "readiness": "READY",
+        "resumable": false,
+        "authority": {
+          "schemaVersion": 1,
+          "lifecycle": "ACTIVE",
+          "active": true,
+          "resumable": false,
+          "sprintId": "sprint-900",
+          "phase": "EXECUTE",
+          "status": "ACTIVE",
+          "reason": null,
+          "recoveryCommand": null,
+          "finalizeCommand": null,
+          "coordinator": "alive",
+          "conflicts": [],
+          "recoveryReconciliation": {
+            "version": 1,
+            "sprintId": "sprint-900",
+            "evidence": {
+              "checkpointPresent": false,
+              "terminalReceipt": null,
+              "terminalReceiptConflict": null
+            },
+            "state": "consistent",
+            "mismatch": null,
+            "remediation": null
+          }
+        },
+        "terminalPublication": {
+          "version": 1,
+          "state": "open",
+          "receipt": null
+        },
+        "providerConcurrency": [],
+        "statusReadModel": {
+          "state": "persisted",
+          "schemaVersion": 1,
+          "revision": 1,
+          "runGeneration": "lease:probe-current",
+          "modelDigest": "bdcacb4e78392528cda96fc15de6c0c17bb8bf548e14a41be8047e5a7787d656",
+          "holds": [
+            {
+              "reasonCode": "exact-result-authority-hold",
+              "evidenceRef": "coordinator:lease:probe-current:task:900-1",
+              "detail": "EXACT_RESULT_AUTHORITY_HOLD"
+            }
+          ]
+        },
+        "updatedAt": "2026-09-13T21:35:37.444Z"
+      },
+      "mcp": {
+        "active": true,
+        "message": "No active run.",
+        "sprintId": "sprint-900",
+        "job": null,
+        "lifecycle": "ACTIVE",
+        "readiness": "READY",
+        "resumable": false,
+        "recoveryCommand": null,
+        "finalizeCommand": null,
+        "authority": {
+          "schemaVersion": 1,
+          "lifecycle": "ACTIVE",
+          "active": true,
+          "resumable": false,
+          "sprintId": "sprint-900",
+          "phase": "EXECUTE",
+          "status": "ACTIVE",
+          "reason": null,
+          "recoveryCommand": null,
+          "finalizeCommand": null,
+          "coordinator": "alive",
+          "conflicts": [],
+          "recoveryReconciliation": {
+            "version": 1,
+            "sprintId": "sprint-900",
+            "evidence": {
+              "checkpointPresent": false,
+              "terminalReceipt": null,
+              "terminalReceiptConflict": null
+            },
+            "state": "consistent",
+            "mismatch": null,
+            "remediation": null
+          }
+        },
+        "terminalPublication": {
+          "version": 1,
+          "state": "open",
+          "receipt": null
+        },
+        "providerConcurrency": [],
+        "statusReadModel": {
+          "state": "persisted",
+          "schemaVersion": 1,
+          "revision": 1,
+          "runGeneration": "lease:probe-current",
+          "modelDigest": "bdcacb4e78392528cda96fc15de6c0c17bb8bf548e14a41be8047e5a7787d656",
+          "holds": [
+            {
+              "reasonCode": "exact-result-authority-hold",
+              "evidenceRef": "coordinator:lease:probe-current:task:900-1",
+              "detail": "EXACT_RESULT_AUTHORITY_HOLD"
+            }
+          ]
+        },
+        "pendingApprovals": []
+      },
+      "terminal": {
+        "statusReadModel": {
+          "state": "persisted",
+          "revision": 1,
+          "modelDigest": "bdcacb4e78392528cda96fc15de6c0c17bb8bf548e14a41be8047e5a7787d656"
+        },
+        "running": "sprint-900 · EXECUTE",
+        "next": "900-1"
+      }
+    },
+    {
+      "label": "three-stale-task-files",
+      "cli": {
+        "code": 0,
+        "payload": {
+          "sprint": {
+            "id": "sprint-900",
+            "phase": "EXECUTE",
+            "status": "ACTIVE",
+            "number": 900
+          },
+          "agents": [],
+          "progress": {
+            "done": 1,
+            "active": 0,
+            "blocked": 6,
+            "total": 8
+          },
+          "alerts": [],
+          "updatedAt": "2026-09-13T21:35:38.511Z",
+          "taskSettlements": [
+            {
+              "taskId": "900-1",
+              "resolvedTaskId": "900-1",
+              "attemptIds": [
+                "900-1"
+              ],
+              "attemptCount": 1,
+              "rawStatus": "EXECUTING",
+              "effectiveStatus": "EXECUTING",
+              "receiptRef": null,
+              "evidenceRefs": [],
+              "reasonCode": "store-absent"
+            },
+            {
+              "taskId": "900-2",
+              "resolvedTaskId": "900-2",
+              "attemptIds": [
+                "900-2"
+              ],
+              "attemptCount": 1,
+              "rawStatus": "EXECUTING",
+              "effectiveStatus": "EXECUTING",
+              "receiptRef": null,
+              "evidenceRefs": [],
+              "reasonCode": "store-absent"
+            },
+            {
+              "taskId": "900-3",
+              "resolvedTaskId": "900-3",
+              "attemptIds": [
+                "900-3"
+              ],
+              "attemptCount": 1,
+              "rawStatus": "EXECUTING",
+              "effectiveStatus": "EXECUTING",
+              "receiptRef": null,
+              "evidenceRefs": [],
+              "reasonCode": "store-absent"
+            }
+          ],
+          "active": true,
+          "lifecycle": "ACTIVE",
+          "resumable": false,
+          "sprintId": "sprint-900",
+          "phase": "EXECUTE",
+          "status": "ACTIVE",
+          "recoveryCommand": null,
+          "finalizeCommand": null,
+          "authority": {
+            "schemaVersion": 1,
+            "lifecycle": "ACTIVE",
+            "active": true,
+            "resumable": false,
+            "sprintId": "sprint-900",
+            "phase": "EXECUTE",
+            "status": "ACTIVE",
+            "reason": null,
+            "recoveryCommand": null,
+            "finalizeCommand": null,
+            "coordinator": "alive",
+            "conflicts": [],
+            "recoveryReconciliation": {
+              "version": 1,
+              "sprintId": "sprint-900",
+              "evidence": {
+                "checkpointPresent": false,
+                "terminalReceipt": null,
+                "terminalReceiptConflict": null
+              },
+              "state": "consistent",
+              "mismatch": null,
+              "remediation": null
+            }
+          },
+          "readiness": {
+            "state": "READY"
+          },
+          "deathSweep": {
+            "closed": [],
+            "skipped": [],
+            "skippedSummary": {
+              "total": 0,
+              "classes": []
+            }
+          },
+          "terminalPublication": {
+            "version": 1,
+            "state": "open",
+            "receipt": null
+          },
+          "providerConcurrency": [],
+          "statusReadModel": {
+            "state": "persisted",
+            "schemaVersion": 1,
+            "revision": 1,
+            "runGeneration": "lease:probe-current",
+            "modelDigest": "bdcacb4e78392528cda96fc15de6c0c17bb8bf548e14a41be8047e5a7787d656",
+            "holds": [
+              {
+                "reasonCode": "exact-result-authority-hold",
+                "evidenceRef": "coordinator:lease:probe-current:task:900-1",
+                "detail": "EXACT_RESULT_AUTHORITY_HOLD"
+              }
+            ]
+          },
+          "logicalProgress": {
+            "done": 1,
+            "active": 1,
+            "blocked": 6,
+            "total": 8,
+            "attemptCount": 8,
+            "lineages": [
+              {
+                "logicalTaskId": "900-1",
+                "attemptIds": [
+                  "900-1"
+                ],
+                "attemptCount": 1,
+                "status": "blocked"
+              },
+              {
+                "logicalTaskId": "900-2",
+                "attemptIds": [
+                  "900-2"
+                ],
+                "attemptCount": 1,
+                "status": "done"
+              },
+              {
+                "logicalTaskId": "900-3",
+                "attemptIds": [
+                  "900-3"
+                ],
+                "attemptCount": 1,
+                "status": "active"
+              },
+              {
+                "logicalTaskId": "900-4",
+                "attemptIds": [
+                  "900-4"
+                ],
+                "attemptCount": 1,
+                "status": "blocked"
+              },
+              {
+                "logicalTaskId": "900-5",
+                "attemptIds": [
+                  "900-5"
+                ],
+                "attemptCount": 1,
+                "status": "blocked"
+              },
+              {
+                "logicalTaskId": "900-6",
+                "attemptIds": [
+                  "900-6"
+                ],
+                "attemptCount": 1,
+                "status": "blocked"
+              },
+              {
+                "logicalTaskId": "900-7",
+                "attemptIds": [
+                  "900-7"
+                ],
+                "attemptCount": 1,
+                "status": "blocked"
+              },
+              {
+                "logicalTaskId": "900-8",
+                "attemptIds": [
+                  "900-8"
+                ],
+                "attemptCount": 1,
+                "status": "blocked"
+              }
+            ],
+            "fixRetry": []
+          },
+          "statusProjection": {
+            "schemaVersion": 1,
+            "lifecycleAuthority": "run-status-authority-v1",
+            "dashboardLifecycleNormalized": false,
+            "progressAdjusted": false
+          },
+          "pendingApprovals": []
+        },
+        "stderr": ""
+      },
+      "api": {
+        "sprint": {
+          "id": "sprint-900",
+          "phase": "EXECUTE",
+          "status": "ACTIVE"
+        },
+        "progress": {
+          "done": 1,
+          "active": 1,
+          "blocked": 6,
+          "total": 8,
+          "attemptCount": 8,
+          "lineages": [
+            {
+              "logicalTaskId": "900-1",
+              "attemptIds": [
+                "900-1"
+              ],
+              "attemptCount": 1,
+              "status": "blocked"
+            },
+            {
+              "logicalTaskId": "900-2",
+              "attemptIds": [
+                "900-2"
+              ],
+              "attemptCount": 1,
+              "status": "done"
+            },
+            {
+              "logicalTaskId": "900-3",
+              "attemptIds": [
+                "900-3"
+              ],
+              "attemptCount": 1,
+              "status": "active"
+            },
+            {
+              "logicalTaskId": "900-4",
+              "attemptIds": [
+                "900-4"
+              ],
+              "attemptCount": 1,
+              "status": "blocked"
+            },
+            {
+              "logicalTaskId": "900-5",
+              "attemptIds": [
+                "900-5"
+              ],
+              "attemptCount": 1,
+              "status": "blocked"
+            },
+            {
+              "logicalTaskId": "900-6",
+              "attemptIds": [
+                "900-6"
+              ],
+              "attemptCount": 1,
+              "status": "blocked"
+            },
+            {
+              "logicalTaskId": "900-7",
+              "attemptIds": [
+                "900-7"
+              ],
+              "attemptCount": 1,
+              "status": "blocked"
+            },
+            {
+              "logicalTaskId": "900-8",
+              "attemptIds": [
+                "900-8"
+              ],
+              "attemptCount": 1,
+              "status": "blocked"
+            }
+          ],
+          "fixRetry": []
+        },
+        "active": true,
+        "lifecycle": "ACTIVE",
+        "readiness": "READY",
+        "resumable": false,
+        "authority": {
+          "schemaVersion": 1,
+          "lifecycle": "ACTIVE",
+          "active": true,
+          "resumable": false,
+          "sprintId": "sprint-900",
+          "phase": "EXECUTE",
+          "status": "ACTIVE",
+          "reason": null,
+          "recoveryCommand": null,
+          "finalizeCommand": null,
+          "coordinator": "alive",
+          "conflicts": [],
+          "recoveryReconciliation": {
+            "version": 1,
+            "sprintId": "sprint-900",
+            "evidence": {
+              "checkpointPresent": false,
+              "terminalReceipt": null,
+              "terminalReceiptConflict": null
+            },
+            "state": "consistent",
+            "mismatch": null,
+            "remediation": null
+          }
+        },
+        "terminalPublication": {
+          "version": 1,
+          "state": "open",
+          "receipt": null
+        },
+        "providerConcurrency": [],
+        "statusReadModel": {
+          "state": "persisted",
+          "schemaVersion": 1,
+          "revision": 1,
+          "runGeneration": "lease:probe-current",
+          "modelDigest": "bdcacb4e78392528cda96fc15de6c0c17bb8bf548e14a41be8047e5a7787d656",
+          "holds": [
+            {
+              "reasonCode": "exact-result-authority-hold",
+              "evidenceRef": "coordinator:lease:probe-current:task:900-1",
+              "detail": "EXACT_RESULT_AUTHORITY_HOLD"
+            }
+          ]
+        },
+        "updatedAt": "2026-09-13T21:35:37.444Z"
+      },
+      "mcp": {
+        "sprint": {
+          "id": "sprint-900",
+          "number": 0,
+          "phase": "EXECUTE",
+          "status": "ACTIVE"
+        },
+        "agents": [],
+        "progress": {
+          "done": 1,
+          "active": 1,
+          "blocked": 6,
+          "total": 8,
+          "attemptCount": 8,
+          "lineages": [
+            {
+              "logicalTaskId": "900-1",
+              "attemptIds": [
+                "900-1"
+              ],
+              "attemptCount": 1,
+              "status": "blocked"
+            },
+            {
+              "logicalTaskId": "900-2",
+              "attemptIds": [
+                "900-2"
+              ],
+              "attemptCount": 1,
+              "status": "done"
+            },
+            {
+              "logicalTaskId": "900-3",
+              "attemptIds": [
+                "900-3"
+              ],
+              "attemptCount": 1,
+              "status": "active"
+            },
+            {
+              "logicalTaskId": "900-4",
+              "attemptIds": [
+                "900-4"
+              ],
+              "attemptCount": 1,
+              "status": "blocked"
+            },
+            {
+              "logicalTaskId": "900-5",
+              "attemptIds": [
+                "900-5"
+              ],
+              "attemptCount": 1,
+              "status": "blocked"
+            },
+            {
+              "logicalTaskId": "900-6",
+              "attemptIds": [
+                "900-6"
+              ],
+              "attemptCount": 1,
+              "status": "blocked"
+            },
+            {
+              "logicalTaskId": "900-7",
+              "attemptIds": [
+                "900-7"
+              ],
+              "attemptCount": 1,
+              "status": "blocked"
+            },
+            {
+              "logicalTaskId": "900-8",
+              "attemptIds": [
+                "900-8"
+              ],
+              "attemptCount": 1,
+              "status": "blocked"
+            }
+          ],
+          "fixRetry": []
+        },
+        "alerts": [],
+        "updatedAt": "2026-09-13T21:35:38.511Z",
+        "job": null,
+        "progressBar": "░░░░░░░░░░",
+        "eta": "unknown",
+        "workerSummary": "0 active",
+        "alertSummary": "0 alerts",
+        "agentAssignments": {},
+        "skillAssignments": {},
+        "failedTasks": 0,
+        "taskLineages": [
+          {
+            "taskId": "900-1",
+            "resolvedTaskId": "900-1",
+            "status": "EXECUTING",
+            "attemptIds": [
+              "900-1"
+            ],
+            "attemptCount": 1
+          },
+          {
+            "taskId": "900-2",
+            "resolvedTaskId": "900-2",
+            "status": "EXECUTING",
+            "attemptIds": [
+              "900-2"
+            ],
+            "attemptCount": 1
+          },
+          {
+            "taskId": "900-3",
+            "resolvedTaskId": "900-3",
+            "status": "EXECUTING",
+            "attemptIds": [
+              "900-3"
+            ],
+            "attemptCount": 1
+          }
+        ],
+        "eventStreamTail": [],
+        "lastOutputs": {},
+        "metricSnapshot": {},
+        "phaseCountdown": null,
+        "backendBreakdown": {
+          "unknown": 3
+        },
+        "active": true,
+        "lifecycle": "ACTIVE",
+        "readiness": "READY",
+        "resumable": false,
+        "recoveryCommand": null,
+        "finalizeCommand": null,
+        "authority": {
+          "schemaVersion": 1,
+          "lifecycle": "ACTIVE",
+          "active": true,
+          "resumable": false,
+          "sprintId": "sprint-900",
+          "phase": "EXECUTE",
+          "status": "ACTIVE",
+          "reason": null,
+          "recoveryCommand": null,
+          "finalizeCommand": null,
+          "coordinator": "alive",
+          "conflicts": [],
+          "recoveryReconciliation": {
+            "version": 1,
+            "sprintId": "sprint-900",
+            "evidence": {
+              "checkpointPresent": false,
+              "terminalReceipt": null,
+              "terminalReceiptConflict": null
+            },
+            "state": "consistent",
+            "mismatch": null,
+            "remediation": null
+          }
+        },
+        "terminalPublication": {
+          "version": 1,
+          "state": "open",
+          "receipt": null
+        },
+        "providerConcurrency": [],
+        "statusReadModel": {
+          "state": "persisted",
+          "schemaVersion": 1,
+          "revision": 1,
+          "runGeneration": "lease:probe-current",
+          "modelDigest": "bdcacb4e78392528cda96fc15de6c0c17bb8bf548e14a41be8047e5a7787d656",
+          "holds": [
+            {
+              "reasonCode": "exact-result-authority-hold",
+              "evidenceRef": "coordinator:lease:probe-current:task:900-1",
+              "detail": "EXACT_RESULT_AUTHORITY_HOLD"
+            }
+          ]
+        },
+        "pendingApprovals": []
+      },
+      "terminal": {
+        "statusReadModel": {
+          "state": "persisted",
+          "revision": 1,
+          "modelDigest": "bdcacb4e78392528cda96fc15de6c0c17bb8bf548e14a41be8047e5a7787d656"
+        },
+        "running": "sprint-900 · EXECUTE",
+        "next": "900-1"
+      }
+    },
+    {
+      "label": "successor-lease-same-authority",
+      "cli": {
+        "code": 0,
+        "payload": {
+          "sprint": {
+            "id": "sprint-900",
+            "phase": "EXECUTE",
+            "status": "ACTIVE",
+            "number": 900
+          },
+          "agents": [],
+          "progress": {
+            "done": 0,
+            "active": 0,
+            "blocked": 0,
+            "total": 3
+          },
+          "alerts": [],
+          "updatedAt": "2026-09-13T21:35:38.511Z",
+          "taskSettlements": [
+            {
+              "taskId": "900-1",
+              "resolvedTaskId": "900-1",
+              "attemptIds": [
+                "900-1"
+              ],
+              "attemptCount": 1,
+              "rawStatus": "EXECUTING",
+              "effectiveStatus": "EXECUTING",
+              "receiptRef": null,
+              "evidenceRefs": [],
+              "reasonCode": "store-absent"
+            },
+            {
+              "taskId": "900-2",
+              "resolvedTaskId": "900-2",
+              "attemptIds": [
+                "900-2"
+              ],
+              "attemptCount": 1,
+              "rawStatus": "EXECUTING",
+              "effectiveStatus": "EXECUTING",
+              "receiptRef": null,
+              "evidenceRefs": [],
+              "reasonCode": "store-absent"
+            },
+            {
+              "taskId": "900-3",
+              "resolvedTaskId": "900-3",
+              "attemptIds": [
+                "900-3"
+              ],
+              "attemptCount": 1,
+              "rawStatus": "EXECUTING",
+              "effectiveStatus": "EXECUTING",
+              "receiptRef": null,
+              "evidenceRefs": [],
+              "reasonCode": "store-absent"
+            }
+          ],
+          "active": true,
+          "lifecycle": "ACTIVE",
+          "resumable": false,
+          "sprintId": "sprint-900",
+          "phase": "EXECUTE",
+          "status": "ACTIVE",
+          "recoveryCommand": null,
+          "finalizeCommand": null,
+          "authority": {
+            "schemaVersion": 1,
+            "lifecycle": "ACTIVE",
+            "active": true,
+            "resumable": false,
+            "sprintId": "sprint-900",
+            "phase": "EXECUTE",
+            "status": "ACTIVE",
+            "reason": null,
+            "recoveryCommand": null,
+            "finalizeCommand": null,
+            "coordinator": "alive",
+            "conflicts": [],
+            "recoveryReconciliation": {
+              "version": 1,
+              "sprintId": "sprint-900",
+              "evidence": {
+                "checkpointPresent": false,
+                "terminalReceipt": null,
+                "terminalReceiptConflict": null
+              },
+              "state": "consistent",
+              "mismatch": null,
+              "remediation": null
+            }
+          },
+          "readiness": {
+            "state": "SELF_SUFFICIENT",
+            "reason": "proven-active-liveness"
+          },
+          "deathSweep": {
+            "closed": [],
+            "skipped": [],
+            "skippedSummary": {
+              "total": 0,
+              "classes": []
+            }
+          },
+          "terminalPublication": null,
+          "providerConcurrency": [],
+          "statusReadModel": {
+            "state": "unavailable-or-stale"
+          },
+          "logicalProgress": null,
+          "statusProjection": {
+            "schemaVersion": 1,
+            "lifecycleAuthority": "run-status-authority-v1",
+            "dashboardLifecycleNormalized": false,
+            "progressAdjusted": false
+          },
+          "pendingApprovals": []
+        },
+        "stderr": ""
+      },
+      "api": {
+        "sprint": {
+          "id": "sprint-900",
+          "phase": "EXECUTE",
+          "status": "ACTIVE"
+        },
+        "active": true,
+        "lifecycle": "ACTIVE",
+        "readiness": "SELF_SUFFICIENT",
+        "resumable": false,
+        "authority": {
+          "schemaVersion": 1,
+          "lifecycle": "ACTIVE",
+          "active": true,
+          "resumable": false,
+          "sprintId": "sprint-900",
+          "phase": "EXECUTE",
+          "status": "ACTIVE",
+          "reason": null,
+          "recoveryCommand": null,
+          "finalizeCommand": null,
+          "coordinator": "alive",
+          "conflicts": [],
+          "recoveryReconciliation": {
+            "version": 1,
+            "sprintId": "sprint-900",
+            "evidence": {
+              "checkpointPresent": false,
+              "terminalReceipt": null,
+              "terminalReceiptConflict": null
+            },
+            "state": "consistent",
+            "mismatch": null,
+            "remediation": null
+          }
+        },
+        "statusReadModel": {
+          "state": "unavailable-or-stale"
+        },
+        "updatedAt": "2026-09-13T21:35:40.064Z"
+      },
+      "mcp": {
+        "sprint": {
+          "id": "sprint-900",
+          "number": 0,
+          "phase": "EXECUTE",
+          "status": "ACTIVE"
+        },
+        "agents": [],
+        "progress": {
+          "done": 0,
+          "active": 3,
+          "blocked": 0,
+          "total": 3
+        },
+        "alerts": [],
+        "updatedAt": "2026-09-13T21:35:38.511Z",
+        "job": null,
+        "progressBar": "░░░░░░░░░░",
+        "eta": "unknown",
+        "workerSummary": "0 active",
+        "alertSummary": "0 alerts",
+        "agentAssignments": {},
+        "skillAssignments": {},
+        "failedTasks": 0,
+        "taskLineages": [
+          {
+            "taskId": "900-1",
+            "resolvedTaskId": "900-1",
+            "status": "EXECUTING",
+            "attemptIds": [
+              "900-1"
+            ],
+            "attemptCount": 1
+          },
+          {
+            "taskId": "900-2",
+            "resolvedTaskId": "900-2",
+            "status": "EXECUTING",
+            "attemptIds": [
+              "900-2"
+            ],
+            "attemptCount": 1
+          },
+          {
+            "taskId": "900-3",
+            "resolvedTaskId": "900-3",
+            "status": "EXECUTING",
+            "attemptIds": [
+              "900-3"
+            ],
+            "attemptCount": 1
+          }
+        ],
+        "eventStreamTail": [],
+        "lastOutputs": {},
+        "metricSnapshot": {},
+        "phaseCountdown": null,
+        "backendBreakdown": {
+          "unknown": 3
+        },
+        "active": true,
+        "lifecycle": "ACTIVE",
+        "readiness": "SELF_SUFFICIENT",
+        "resumable": false,
+        "recoveryCommand": null,
+        "finalizeCommand": null,
+        "authority": {
+          "schemaVersion": 1,
+          "lifecycle": "ACTIVE",
+          "active": true,
+          "resumable": false,
+          "sprintId": "sprint-900",
+          "phase": "EXECUTE",
+          "status": "ACTIVE",
+          "reason": null,
+          "recoveryCommand": null,
+          "finalizeCommand": null,
+          "coordinator": "alive",
+          "conflicts": [],
+          "recoveryReconciliation": {
+            "version": 1,
+            "sprintId": "sprint-900",
+            "evidence": {
+              "checkpointPresent": false,
+              "terminalReceipt": null,
+              "terminalReceiptConflict": null
+            },
+            "state": "consistent",
+            "mismatch": null,
+            "remediation": null
+          }
+        },
+        "terminalPublication": null,
+        "providerConcurrency": [],
+        "statusReadModel": {
+          "state": "unavailable-or-stale"
+        },
+        "pendingApprovals": []
+      },
+      "terminal": {
+        "running": "sprint-900 · EXECUTE",
+        "next": "900-1",
+        "statusReadModel": {
+          "state": "unavailable-or-stale"
+        }
+      }
+    }
+  ]
+}
+file:///home/alperen/deckent-dev/docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r9/compiled-status-probe.mjs:50
+   if(value.progress?.total!==8 || value.progress?.done!==1 || value.progress?.blocked!==6)throw new Error(`${row.label}: ${name} lost canonical progress`);
+                                                                                                 ^
+
+Error: no-task-or-dashboard-files: cli lost canonical progress
+    at file:///home/alperen/deckent-dev/docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r9/compiled-status-probe.mjs:50:98
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+Node.js v24.15.0

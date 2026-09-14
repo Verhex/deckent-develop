@@ -1,0 +1,16 @@
+{
+  "utc": "2026-09-13T23:26:17.268717+00:00",
+  "files": [
+    {
+      "path": "src/core/run-status-read-model.ts",
+      "before": "72586a2aaa2c9681189c1b1155d629f9aba99c08724b30c42878ff094401ab62",
+      "after": "088feb014d05d83b3f08d241d347e208ca42518e703ec3149fa793eb8e31844e"
+    },
+    {
+      "path": "tests/core/run-status-read-model.test.ts",
+      "before": "44d06e68d7a4976802d0019ba82350ebdb3d8255ab14a9a5912c66e5772fa1e8",
+      "after": "dcac04954e3664f2d22f5809d36e74c56911d800cb03666c0ff84d45754bf08b"
+    }
+  ],
+  "commit": false
+}

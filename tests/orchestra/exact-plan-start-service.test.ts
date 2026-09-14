@@ -1,3 +1,4 @@
+import { SpawnBackendRecoveryHoldError } from '../../src/orchestra/spawn-backend.js';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
@@ -688,9 +689,11 @@ describe('exact-plan start attempt lifecycle', () => {
   });
 
   it.each([
-    { admitted: false, expectedCode: 'EXACT_RUNTIME_FAILED_BEFORE_ADMISSION' },
-    { admitted: true, expectedCode: 'EXACT_RUNTIME_FAILED_AFTER_ADMISSION' },
-  ])('publishes a persisted runtime failure after admission=$admitted', async ({ admitted, expectedCode }) => {
+    { admitted: false, recovery: false, expectedCode: 'EXACT_RUNTIME_FAILED_BEFORE_ADMISSION' },
+    { admitted: false, recovery: true, expectedCode: 'EXACT_RUNTIME_FAILED_BEFORE_ADMISSION' },
+    { admitted: true, recovery: true, expectedCode: 'EXACT_RUNTIME_FAILED_AFTER_ADMISSION' },
+    { admitted: true, recovery: false, expectedCode: 'EXACT_RUNTIME_FAILED_AFTER_ADMISSION' },
+  ])('publishes a persisted runtime failure after admission=$admitted', async ({ admitted, recovery, expectedCode }) => {
     const root = mkdtempSync(join(tmpdir(), 'exact-start-failure-publication-'));
     const approved = snapshot(root);
     saveApprovedSnapshot(root, approved);
@@ -703,6 +706,14 @@ describe('exact-plan start attempt lifecycle', () => {
         publishSettlement: ({ attempt, settlement }) => {
           expect(attempt.settlement).toEqual(settlement);
           publications.push(settlement.code);
+          const persisted = loadStartAttempt(root, attempt.attemptId);
+          expect(persisted?.settlement).toEqual(settlement);
+          if (recovery) {
+            expect(JSON.parse(settlement.detail!)).toMatchObject({
+              totalCount: 1, holds: [{ taskId: 'task-757-003',
+                reasonCode: 'PRE_PROVIDER_RECONCILIATION_REQUIRED' }],
+            });
+          } else expect(settlement.detail).toBe('fixture runtime failure');
         },
       },
       spawnDetached: vi.fn(() => ({ pid: 200, startToken: 's200' })),
@@ -710,6 +721,12 @@ describe('exact-plan start attempt lifecycle', () => {
         if (admitted) {
           context.onExecutionAdmitted({ flowId: 'flow-1', jobId: 'job-failure', logRef: 'log-failure' });
         }
+        if (recovery) throw new SpawnBackendRecoveryHoldError([{
+          kind: 'spawn-backend-recovery-hold', backend: 'docker',
+          dispatchRequestId: 'dispatch-recovery', taskId: 'task-757-003',
+          admissionRefDigest: null, authorityState: 'DISPATCH_ABSENT',
+          reasonCode: 'PRE_PROVIDER_RECONCILIATION_REQUIRED',
+        }]);
         throw new Error('fixture runtime failure');
       },
     });

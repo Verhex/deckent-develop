@@ -1,0 +1,45 @@
+{
+  "at": "2026-09-13T20:34:36.528Z",
+  "task": "758-001",
+  "attempt": "139f645b-e8ae-80e1-8470-101cf1dc3783",
+  "stallMs": 65000.72416500001,
+  "windowCompletedAt": "2026-09-13T20:33:35.971Z",
+  "windowDeadlineAt": "2026-09-13T20:34:34.209Z",
+  "postGenerationExit": 0,
+  "postGenerationNameMatch": true,
+  "diagnostic": {
+    "reason": "exit",
+    "exitCode": 0,
+    "signaled": false,
+    "timeoutMs": 59972,
+    "elapsedMs": 1599.347436,
+    "stdoutBytes": 2218938,
+    "stderrBytes": 0
+  },
+  "status": 0,
+  "signal": null,
+  "error": false,
+  "overflow": false,
+  "stdoutSha256": "bffefeccb83ec9bc56773e89065ec7932873f343b8b2f6184381e213953c5b3f",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "errorCodes": [],
+  "parsed": {
+    "keys": [
+      "rootIdentityDigest",
+      "rootEntry",
+      "nativeCapture"
+    ],
+    "nativeCaptureKeys": [
+      "schemaVersion",
+      "kind",
+      "state",
+      "entryCount",
+      "entries",
+      "manifestDigest",
+      "totalBytes"
+    ],
+    "entryCount": 7256,
+    "totalBytes": 99078788
+  },
+  "productClosure": "HOLD; diagnostic probe only"
+}

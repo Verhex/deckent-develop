@@ -1,0 +1,8 @@
+{
+  "observedAt": "2026-09-13T14:04:20.523Z",
+  "elapsedMs": 708,
+  "exitCode": 0,
+  "stdout": "{\"available\":true,\"uid\":1000,\"gid\":1000,\"node\":\"v24.15.0\"}\n",
+  "stderr": "",
+  "scope": "provider-free readonly image/native-loader probe; no auth or source mounts"
+}

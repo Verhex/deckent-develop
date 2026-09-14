@@ -22,7 +22,7 @@ import { SprintStatus, SprintPhase } from '../core/types.js';
 import {
   readCanonicalRunStatusReadModel,
   resolveRunStatusReadiness,
-  runStatusReadModelMatchesAuthority,
+  runStatusReadModelMatchesCurrentGeneration,
   type CanonicalRunStatusReadModel,
 } from '../core/run-status-read-model.js';
 import { readCanonicalRunStatus } from '../core/run-status-authority.js';
@@ -139,7 +139,7 @@ export function reconcileStatusResponse(
   let model: CanonicalRunStatusReadModel | null = null;
   try {
     const candidate = readCanonicalRunStatusReadModel(projectRoot);
-    if (candidate && runStatusReadModelMatchesAuthority(candidate, authority)) model = candidate;
+    if (candidate && runStatusReadModelMatchesCurrentGeneration(projectRoot, candidate, authority)) model = candidate;
   } catch { /* An unreadable model is treated as unavailable by readiness. */ }
   const readiness = resolveRunStatusReadiness(authority, model);
   if (model) {

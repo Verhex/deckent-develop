@@ -204,3 +204,26 @@ export function renderWorkerActivityHeartbeatInstruction(
     'Do not add sequence, progress, PID, process-liveness, or verdict fields.',
   ].join('\n');
 }
+
+export const HEARTBEAT_IDENTITY_HOLD = 'HEARTBEAT_IDENTITY_HOLD: attemptId/backend were not host-bound. Do not write an ambiguous legacy heartbeat or infer identity from its filename.';
+
+/**
+ * Replaces the compile-time HOLD only after the spawn boundary has obtained the
+ * host's durable attempt identity. This deliberately reuses the canonical
+ * worker-activity renderer rather than introducing a second identity shape.
+ */
+export function bindWorkerPromptHeartbeatIdentity(
+  prompt: string,
+  identity: {
+    readonly taskId: string;
+    readonly workerId: string;
+    readonly attemptId: string;
+    readonly backend: WorkerActivityBackend;
+  },
+): string {
+  if (!prompt.includes(HEARTBEAT_IDENTITY_HOLD)) return prompt;
+  return prompt.replace(
+    HEARTBEAT_IDENTITY_HOLD,
+    renderWorkerActivityHeartbeatInstruction(identity),
+  );
+}

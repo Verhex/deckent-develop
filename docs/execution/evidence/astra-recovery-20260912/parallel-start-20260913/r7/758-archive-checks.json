@@ -1,0 +1,42 @@
+{
+  "at": "2026-09-13T18:41:41.798577+00:00",
+  "checks": [
+    {
+      "name": "task-758-001.json",
+      "exists": true,
+      "hashMatch": true,
+      "sourceAbsent": true
+    },
+    {
+      "name": "task-758-001.skill-delivery.json",
+      "exists": true,
+      "hashMatch": true,
+      "sourceAbsent": true
+    },
+    {
+      "name": "task-758-002.json",
+      "exists": true,
+      "hashMatch": true,
+      "sourceAbsent": true
+    },
+    {
+      "name": "task-758-002.skill-delivery.json",
+      "exists": true,
+      "hashMatch": true,
+      "sourceAbsent": true
+    },
+    {
+      "name": "task-758-003.json",
+      "exists": true,
+      "hashMatch": true,
+      "sourceAbsent": true
+    },
+    {
+      "name": "task-758-003.skill-delivery.json",
+      "exists": true,
+      "hashMatch": true,
+      "sourceAbsent": true
+    }
+  ],
+  "checkpointDigest": "sha256:b178445ecdfe896cd52cd46a32c88ace7965d44619eed744c0bad19aeb291f65"
+}

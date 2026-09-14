@@ -1,0 +1,45 @@
+{
+  "at": "2026-09-13T20:47:18.919734+00:00",
+  "id": "R8-C-COLLECTOR-DRAIN",
+  "outcome": "MASTER3178 / parent120",
+  "health": "DEGRADED",
+  "authority": "owner approved A-E continuation",
+  "scope": [
+    "src/orchestra/result-collector.ts",
+    "src/orchestra/sprint-controller.ts",
+    "tests/orchestra/result-collector-settlement-authority.test.ts"
+  ],
+  "baseline": {
+    "src/orchestra/result-collector.ts": "1f2bd4f2d2bf36afb8d64b49e4b3a2d490cb551f2fcaf82db460fbca9ef55183",
+    "src/orchestra/sprint-controller.ts": "7cf1f955d385a39aa564281b869787621eb438e213203a0da25c47fbf63e5925",
+    "tests/orchestra/result-collector-settlement-authority.test.ts": "5ed72ffaedcdac8be2d477f21e389382fe5c582c7f1870cea741341316bafde5"
+  },
+  "evidence": [
+    "result-collector.ts:2684 initial catch swallows E077 before scheduler",
+    "result-collector.ts:1682 first HOLD prevents sibling scan",
+    "sprint-controller.ts:3505 rejected wait loses committed local results",
+    "sprint-controller.ts:3549 generic catch permits post-collect recovery after authority failure"
+  ],
+  "design": [
+    "defer authority errors until ready sibling scan finishes",
+    "publish only committed results to caller progress",
+    "fatal authority failure waits existing exact terminal promises and drains ready accepted results without dispatch",
+    "controller preserves error and stops before EVALUATE/FIX; no automatic containment/kill expansion"
+  ],
+  "negativeScope": [
+    "no new live run until C/D blockers repaired",
+    "no manual runtime/receipt/task edits",
+    "no new provider authority or cross-provider receipt",
+    "no kill/cleanup or historical rewrite",
+    "no unrelated source edits"
+  ],
+  "budget": {
+    "implementationPass": 1,
+    "targetedVerificationPass": 1,
+    "tsc": 1,
+    "isolatedBuild": 1,
+    "mainBuild": 1,
+    "liveStart": 0
+  },
+  "returnBoundary": "remaining canonical terminal projection + D then bounded E eight-task start"
+}

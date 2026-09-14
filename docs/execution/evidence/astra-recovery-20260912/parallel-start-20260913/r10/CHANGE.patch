@@ -1,0 +1,141 @@
+--- a/src/core/task-attempt-custody-store.ts
++++ b/src/core/task-attempt-custody-store.ts
+@@ -6811,6 +6811,25 @@
+   }
+ 
+   readDispatchAdmission(input: {
++    readonly dispatchRequestId: string;
++    readonly policy: TaskAttemptCustodyPolicyV2;
++  }): TaskAttemptCustodyDispatchAdmissionReadV2 {
++    if (!this.readSnapshot || this.readSnapshotAdmissionProbe) {
++      return this.readDispatchAdmissionUncached(input);
++    }
++    // Validate before constructing the memo key; untrusted argument diagnostics
++    // and policy authority are identical to the ordinary reader.
++    const record = requireExactDataRecord(input, ['dispatchRequestId', 'policy'],
++      'DISPATCH_REQUEST_INVALID', 'read-dispatch');
++    if (!isDispatchRequestId(record.dispatchRequestId)) {
++      hold('DISPATCH_REQUEST_INVALID', 'read-dispatch');
++    }
++    const parsed = { dispatchRequestId: record.dispatchRequestId, policy: snapshotPolicy(record.policy) };
++    return this.snapshotMemo('readDispatchAdmission', parsed,
++      () => this.readDispatchAdmissionUncached(parsed));
++  }
++
++  private readDispatchAdmissionUncached(input: {
+     readonly dispatchRequestId: string;
+     readonly policy: TaskAttemptCustodyPolicyV2;
+   }): TaskAttemptCustodyDispatchAdmissionReadV2 {
+@@ -13402,6 +13421,19 @@
+   ): TaskAttemptCustodyRead | null {
+     const proof = parseFileProof(proofValue);
+     if (proof === null) hold('CAPABILITY_UNVERIFIED', operation);
++    if (this.readSnapshot && !this.readSnapshotAdmissionProbe) {
++      // Both native platform adapters implement verified reads as a private
++      // first-writer read followed by exact proof equality. Share that physical
++      // observation only inside the verified operation; its final native reread
++      // still fences content, object identity, privacy and durability.
++      const observed = this.readFirstWriterSnapshot(proof.relativePath, policy, operation, fallback);
++      if (observed !== null && !sameProof(observed.proof, proof)) {
++        this.readSnapshot.rejectChangedEvidence();
++      }
++      return observed;
++    }
++    // Discovery's old-epoch negative proofs keep their original typed reader
++    // and rejection fence; they are not ordinary reusable positive authority.
+     const read = () => this.readVerifiedSnapshotUncached(proof, policy, operation, fallback);
+     return this.observeSnapshotFile(`verified:${JSON.stringify(proof)}:${JSON.stringify(policy)}:${operation}:${fallback}`, read);
+   }
+--- a/src/core/custody-read-snapshot.ts
++++ b/src/core/custody-read-snapshot.ts
+@@ -54,6 +54,8 @@
+   }
+ 
+   denyMutation(): never { return this.fail('mutation'); }
++
++  rejectChangedEvidence(): never { return this.fail('changed'); }
+ 
+   /** Release payload ownership at a consumer boundary, retaining every original
+    * observation fence. Re-reading an evicted value must still match that fence.
+--- a/tests/core/task-attempt-custody-store.test.ts
++++ b/tests/core/task-attempt-custody-store.test.ts
+@@ -8534,3 +8534,65 @@
+   })).toThrow(TaskAttemptCustodyHold);
+   expect(adapter.files.size).toBe(before);
+ });
++
++
++describe('coalesced operation-local custody reads', () => {
++  const bounds = { maxEntries: 10_000, maxBytes: 16 * 1024 * 1024, maxDurationMs: 10_000 };
++  it('shares physical task bytes, copies caller buffers and still rereads at the final fence', () => {
++    const adapter = new InMemoryCustodyAdapter();
++    const firstReads = vi.spyOn(adapter, 'readFirstWriter');
++    const verifiedReads = vi.spyOn(adapter, 'readVerified');
++    const { store } = openedStore(adapter);
++    const p = policy(), id = identity(), admission = admit(store, id, p);
++    firstReads.mockClear();
++    verifiedReads.mockClear();
++    const input = { identity: id, policy: p, admissionReceiptDigest: admission.receiptDigest };
++    const outcome = store.withVerifiedReadSnapshot(bounds, () => {
++      const first = store.readTaskSnapshot(input)!;
++      const expected = new Uint8Array(first.bytes);
++      first.bytes.fill(0);
++      const second = store.readTaskSnapshot(input)!;
++      expect(second.bytes).toEqual(expected);
++      return second.proof;
++    });
++    expect(outcome.value).toEqual(admission.taskSnapshot);
++    expect(firstReads.mock.calls.filter(([arg]) => arg.relativePath === admission.taskSnapshot.relativePath)).toHaveLength(2);
++    expect(verifiedReads).not.toHaveBeenCalled();
++    store.readTaskSnapshot(input);
++    expect(verifiedReads).toHaveBeenCalled();
++  });
++
++  it('rejects a replaced file identity with identical content, even when caught inside the operation', () => {
++    const { store, adapter } = openedStore();
++    const p = policy(), id = identity(), admission = admit(store, id, p);
++    const path = admission.taskSnapshot.relativePath;
++    const file = adapter.files.get(path)!;
++    adapter.files.set(path, { ...file, proof: { ...file.proof, fileId: 'replacement-file' } });
++    expect(() => store.withVerifiedReadSnapshot(bounds, () => {
++      try { store.readTaskSnapshot({ identity: id, policy: p, admissionReceiptDigest: admission.receiptDigest }); }
++      catch { /* a caller cannot erase the failed evidence */ }
++      return 'ready';
++    })).toThrow(TaskAttemptCustodyHold);
++  });
++
++  it('memoizes dispatch facts only in the operation and rechecks changed reservation bytes', () => {
++    const { store, adapter } = openedStore();
++    const p = policy();
++    const admitted = reserveDispatch({ store, policy: p });
++    const input = { dispatchRequestId: dispatchId(), policy: p };
++    const outcome = store.withVerifiedReadSnapshot(bounds, () => {
++      const first = store.readDispatchAdmission(input);
++      expect(store.readDispatchAdmission(input)).toBe(first);
++      return first;
++    });
++    expect(outcome.value).toMatchObject({ state: 'admitted', ref: admitted.ref });
++    expect(outcome.statistics.semanticHits).toBeGreaterThan(0);
++    expect(store.readDispatchAdmission(input)).not.toBe(outcome.value);
++    expect(() => store.withVerifiedReadSnapshot(bounds, () => {
++      store.readDispatchAdmission(input);
++      const [path, file] = [...adapter.files].find(([path]) => path.endsWith('/reservation.json'))!;
++      adapter.files.set(path, { ...file, bytes: new Uint8Array(file.bytes.length) });
++      return store.readDispatchAdmission(input);
++    })).toThrow(TaskAttemptCustodyHold);
++  });
++});
+--- a/tests/core/custody-read-snapshot.test.ts
++++ b/tests/core/custody-read-snapshot.test.ts
+@@ -77,3 +77,11 @@
+     expect(() => failed.verify()).toThrow('changed');
+   });
+ });
++
++
++it('cannot hide an explicit proof mismatch by catching it', () => {
++  const view = new CustodyReadSnapshot(bounds, fail);
++  expect(() => view.rejectChangedEvidence()).toThrow('changed');
++  expect(() => view.memo('otherwise-valid', () => 1)).toThrow('changed');
++  expect(() => view.verify()).toThrow('changed');
++});

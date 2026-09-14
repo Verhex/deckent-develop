@@ -182,4 +182,27 @@ describe('deckent recover CLI application adapter', () => {
       'en',
     )).rejects.toThrow('adapter bug');
   });
+
+  it('routes released-unaccepted retention without reporting generic recovery completion', async () => {
+    const dispatchRequestId = `dreq-${'a'.repeat(64)}`;
+    mockRunRecoveryOperation.mockResolvedValue({ ...report, releasedUnacceptedAttempt: {
+      state: 'retained', dispatchRequestId, evidenceDigest: `sha256:${'b'.repeat(64)}`,
+      phase: 'RELEASED_EFFECT_UNACCEPTED', acceptedResult: 'ABSENT', settlement: 'UNRESOLVED',
+    } });
+    await runCommand(['sprint-150', '--force', '--retain-released-unaccepted', dispatchRequestId]);
+    expect(mockRunRecoveryOperation).toHaveBeenCalledWith('/fake/project', 'sprint-150',
+      expect.objectContaining({ releasedUnacceptedDispatchRequestId: dispatchRequestId,
+        approval: expect.objectContaining({ identity }) }));
+    expect(mockRestoreFromSnapshot).not.toHaveBeenCalled();
+    expect(mockPrint).not.toHaveBeenCalledWith(expect.stringContaining('Recovery complete'));
+    expect(mockPrint).not.toHaveBeenCalledWith(expect.stringContaining('Task files:'));
+  });
+
+  it('refuses conflicting exact retention modes before executing recovery', async () => {
+    const dispatchRequestId = `dreq-${'a'.repeat(64)}`;
+    await runCommand(['sprint-150', '--force', '--retain-released-unaccepted', dispatchRequestId,
+      '--retain-committed-unsettled', dispatchRequestId]);
+    expect(mockRunRecoveryOperation).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+  });
 });
