@@ -29,6 +29,7 @@ import {
   executionEffectLandingWorkspaceIdentityDigestV1,
   prepareExecutionEffectLandingV1,
   readExecutionEffectLandingLocatorV1,
+  readExecutionEffectLandingPartialJournalV1,
   readExecutionEffectLandingReceiptV1,
   reconcileExecutionEffectLandingV1,
   type ExecutionEffectLandingAdaptersV1,
@@ -233,7 +234,7 @@ function fakeEnvironment(baseline: ExecutionEffectManifest): FakeEnvironment {
       return pathState(post.path, createExecutionEffectLandingEntryStateV1({ entry: null }));
     }
     const existing = projectEntries.get(post.path);
-    const identity = operation.kind === 'MODE' && existing?.state === 'PRESENT'
+    const identity = (operation.kind === 'MODE' || operation.kind === 'REUSE_DIRECTORY') && existing?.state === 'PRESENT'
       ? existing.objectIdentityDigest
       : digest('test-landed-object', {
         operationDigest: operation.operationDigest,
@@ -1014,6 +1015,133 @@ describe('execution effect landing coordinator', () => {
     expect((await applyExecutionEffectLandingV1(prepared.session)).state).toBe('COMMITTED');
   });
 
+  it.each(['valid', 'gap', 'tampered', 'read-error', 'committed-marker', 'extra-step'] as const)(
+    'validates partial journal without adopting or mutating: %s', async fault => {
+      const baseline = manifest('baseline', ['new/a/file.txt'], [directory('.')]);
+      const final = manifest('final', ['new/a/file.txt'], [
+        directory('.'), directory('new'), directory('new/a'), file('new/a/file.txt', 'content'),
+      ]);
+      const environment = fakeEnvironment(baseline);
+      const native = environment.adapters.native;
+      const prepared = await prepareExecutionEffectLandingV1({
+        planId: 'partial-retention', baseline, final, decision: decision(baseline, final),
+        adapters: { ...environment.adapters, native: { ...native,
+          applyOperation: input => {
+            if (input.operation.index === 2) throw new Error('Interrupted before child file');
+            return native.applyOperation(input);
+          },
+        } },
+      });
+      expect(prepared.state).toBe('PREPARED');
+      if (prepared.state !== 'PREPARED') return;
+      expect((await applyExecutionEffectLandingV1(prepared.session)).state).toBe('HOLD');
+      const stem = `effect-landing/${prepared.transaction.transactionDigest.slice(7)}/`;
+      const firstKey = `${stem}step-0000000.json`;
+      if (fault === 'gap') environment.journalEntries.delete(firstKey);
+      if (fault === 'tampered') {
+        const artifact = environment.journalEntries.get(firstKey)!;
+        const value = JSON.parse(Buffer.from(artifact.bytes).toString('utf8'));
+        value.operationDigest = digest('wrong-operation', {});
+        const bytes = Buffer.from(canonicalJson(value));
+        environment.journalEntries.set(firstKey, { ...artifact, bytes, byteLength: bytes.length,
+          contentDigest: `sha256:${createHash('sha256').update(bytes).digest('hex')}` });
+      }
+      if (fault === 'extra-step' || fault === 'committed-marker') {
+        const key = `${stem}${fault === 'extra-step' ? 'step-0000003' : 'committed'}.json`;
+        environment.journalEntries.set(key, { ...environment.journalEntries.get(firstKey)!, key });
+      }
+      const originalJournal = environment.adapters.journal;
+      const journal = fault === 'read-error' ? { ...originalJournal,
+        readImmutable: (key: string) => {
+          if (key.endsWith('/step-0000001.json')) throw new Error('Read unavailable');
+          return originalJournal.readImmutable(key);
+        },
+      } : originalJournal;
+      const before = [...environment.projectEntries.entries()];
+      const journalSize = environment.journalEntries.size;
+      const result = readExecutionEffectLandingPartialJournalV1({
+        transactionDigest: prepared.transaction.transactionDigest, journal,
+      });
+      expect(result.state).toBe(fault === 'valid' ? 'PARTIAL_JOURNAL' : 'HOLD');
+      if (result.state === 'PARTIAL_JOURNAL') {
+        expect(result.steps.map(step => step.index)).toEqual([0, 1]);
+        expect(result.prepared.operations).toHaveLength(3);
+        expect(result.artifacts).toHaveLength(4);
+        expect(result.evidenceDigest).toMatch(/^sha256:[a-f0-9]{64}$/u);
+        expect(readExecutionEffectLandingPartialJournalV1({
+          transactionDigest: prepared.transaction.transactionDigest, journal,
+        })).toEqual(result);
+      }
+      expect([...environment.projectEntries.entries()]).toEqual(before);
+      expect(environment.journalEntries.size).toBe(journalSize);
+      expect(environment.resumeCalls).toBe(0);
+    },
+  );
+
+  it('reuses only identity-pinned derived directories while keeping the child ADD', async () => {
+    const baseline = manifest('baseline', ['new/a/file.txt'], [directory('.')]);
+    const final = manifest('final', ['new/a/file.txt'], [directory('.'), directory('new'), directory('new/a'), file('new/a/file.txt', 'content')]);
+    const environment = fakeEnvironment(baseline);
+    for (const path of ['new', 'new/a']) environment.projectEntries.set(path, createExecutionEffectLandingEntryStateV1({
+      entry: directory(path), objectIdentityDigest: digest('existing-directory', path), linkCount: null,
+    }));
+    const prepared = await prepareExecutionEffectLandingV1({planId: 'reuse-parent', baseline, final, decision: decision(baseline, final), adapters: environment.adapters});
+    expect(prepared, JSON.stringify(prepared)).toMatchObject({state: 'PREPARED'});
+    if (prepared.state !== 'PREPARED') return;
+    const artifact = [...environment.journalEntries.values()].find(value => value.key.endsWith('/prepared.json'))!;
+    const journal = JSON.parse(Buffer.from(artifact.bytes).toString('utf8'));
+    expect(journal.operations.map((operation: ExecutionEffectLandingOperationV1) => operation.kind)).toEqual(['REUSE_DIRECTORY', 'REUSE_DIRECTORY', 'ADD']);
+    expect((await applyExecutionEffectLandingV1(prepared.session)).state).toBe('COMMITTED');
+    expect(environment.projectEntries.get('new/a')).toMatchObject({objectIdentityDigest: digest('existing-directory', 'new/a')});
+  });
+
+  it('rejects replacement of a reused directory after preparation', async () => {
+    const baseline = manifest('baseline', ['new/file.txt'], [directory('.')]);
+    const final = manifest('final', ['new/file.txt'], [directory('.'), directory('new'), file('new/file.txt', 'content')]);
+    const environment = fakeEnvironment(baseline);
+    const state = (identity: string) => createExecutionEffectLandingEntryStateV1({entry: directory('new'), objectIdentityDigest: digest('directory-identity', identity), linkCount: null});
+    environment.projectEntries.set('new', state('original'));
+    const prepared = await prepareExecutionEffectLandingV1({planId: 'reuse-identity-conflict', baseline, final, decision: decision(baseline, final), adapters: environment.adapters});
+    expect(prepared.state).toBe('PREPARED');
+    if (prepared.state !== 'PREPARED') return;
+    environment.projectEntries.set('new', state('replacement'));
+    expect((await applyExecutionEffectLandingV1(prepared.session)).state).toBe('HOLD');
+    expect(environment.projectEntries.has('new/file.txt')).toBe(false);
+  });
+
+  it('rejects a shared derived directory with a conflicting mode', async () => {
+    const baseline = manifest('baseline', ['new/file.txt'], [directory('.')]);
+    const final = manifest('final', ['new/file.txt'], [directory('.'), directory('new'), file('new/file.txt', 'content')]);
+    const environment = fakeEnvironment(baseline);
+    environment.projectEntries.set('new', createExecutionEffectLandingEntryStateV1({entry: {...directory('new'), mode: 0o700}, objectIdentityDigest: digest('existing-directory', 'new'), linkCount: null}));
+    const result = await prepareExecutionEffectLandingV1({planId: 'reuse-mode-conflict', baseline, final, decision: decision(baseline, final), adapters: environment.adapters});
+    expect(result).toMatchObject({state: 'HOLD', code: 'PREIMAGE_MISMATCH'});
+  });
+
+  it('rejects a changed durable native prefix before successor lease adoption', async () => {
+    const baseline = manifest('baseline', ['new/a/file.txt'], [directory('.')]);
+    const final = manifest('final', ['new/a/file.txt'], [
+      directory('.'), directory('new'), directory('new/a'), file('new/a/file.txt', 'content'),
+    ]);
+    const change = { baseline, final, decision: decision(baseline, final) };
+    const environment = fakeEnvironment(baseline);
+    environment.failStepPublicationAtIndex = 1;
+    const prepared = await prepareExecutionEffectLandingV1({
+      planId: 'prefix-before-adoption', ...change, adapters: environment.adapters,
+    });
+    expect(prepared.state).toBe('PREPARED');
+    if (prepared.state !== 'PREPARED') return;
+    expect((await applyExecutionEffectLandingV1(prepared.session)).state).toBe('HOLD');
+    environment.projectEntries.delete('new');
+    const before = environment.resumeCalls;
+    const result = await reconcileExecutionEffectLandingV1({
+      transaction: prepared.transaction, adapters: environment.adapters,
+    });
+    expect(result).toMatchObject({ state: 'HOLD', code: 'CRASH_PREFIX_AMBIGUOUS' });
+    expect(environment.resumeCalls).toBe(before);
+    expect(environment.projectEntries.has('new/a/file.txt')).toBe(false);
+  });
+
   it('reconciles the exact applied crash prefix without replaying the native effect', async () => {
     const change = basicChange();
     const environment = fakeEnvironment(change.baseline);
@@ -1348,7 +1476,7 @@ describe('execution effect landing coordinator', () => {
       planId: 'plan-unicode', baseline, final, decision: decision(baseline, final),
       adapters: environment.adapters,
     });
-    expect(prepared.state).toBe('PREPARED');
+    expect(prepared, JSON.stringify(prepared)).toMatchObject({state: 'PREPARED'});
     if (prepared.state !== 'PREPARED') return;
     const artifact = [...environment.journalEntries.values()]
       .find(value => value.key.endsWith('/prepared.json'))!;

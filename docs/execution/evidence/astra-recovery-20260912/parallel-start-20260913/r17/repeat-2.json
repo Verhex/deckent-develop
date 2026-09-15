@@ -1,0 +1,157 @@
+{
+  "snapshotStatistics": {
+    "observations": 231,
+    "observationHits": 204,
+    "semanticHits": 181,
+    "retainedBytes": 20951065,
+    "peakRetainedBytes": 20951065,
+    "durationMs": 2215.931372
+  },
+  "error": null,
+  "storeReadCounts": {
+    "readAdmission": {
+      "count": 97,
+      "inclusiveMs": 62.17464199999975
+    },
+    "readAdmissionUncached": {
+      "count": 1,
+      "inclusiveMs": 55.00089800000001
+    },
+    "readAdmissionRecord": {
+      "count": 1,
+      "inclusiveMs": 54.02687499999999
+    },
+    "readFirstWriterSnapshot": {
+      "count": 167,
+      "inclusiveMs": 227.84579499999987
+    },
+    "readFirstWriterSnapshotUncached": {
+      "count": 136,
+      "inclusiveMs": 426.59630900000093
+    },
+    "readVerifiedSnapshot": {
+      "count": 141,
+      "inclusiveMs": 165.58712700000066
+    },
+    "readVerifiedSnapshotUncached": {
+      "count": 92,
+      "inclusiveMs": 308.5159539999994
+    },
+    "readPrivateDirectorySnapshot": {
+      "count": 1,
+      "inclusiveMs": 4.477183999999994
+    },
+    "readPrivateDirectorySnapshotUncached": {
+      "count": 2,
+      "inclusiveMs": 6.782891000000035
+    },
+    "requireCompletedDurableEffect": {
+      "count": 57,
+      "inclusiveMs": 190.9023519999997
+    },
+    "readDurableEffectMarker": {
+      "count": 126,
+      "inclusiveMs": 193.63398599999994
+    },
+    "readDurableEffectMarkerUncached": {
+      "count": 232,
+      "inclusiveMs": 358.15535000000244
+    },
+    "readVerifiedArtifact": {
+      "count": 49,
+      "inclusiveMs": 143.23092499999953
+    },
+    "readArtifactReceipt": {
+      "count": 88,
+      "inclusiveMs": 494.0349420000002
+    },
+    "readArtifactReceiptUncached": {
+      "count": 44,
+      "inclusiveMs": 486.5683500000009
+    },
+    "readChain": {
+      "count": 20,
+      "inclusiveMs": 504.2768019999999
+    },
+    "readChainUncached": {
+      "count": 6,
+      "inclusiveMs": 502.5300330000001
+    },
+    "requireAcceptedResultLandingBinding": {
+      "count": 1,
+      "inclusiveMs": 413.80822500000005
+    },
+    "readEffectLandingReceipt": {
+      "count": 2,
+      "inclusiveMs": 383.2140580000001
+    },
+    "readVerifiedEffectLanding": {
+      "count": 5,
+      "inclusiveMs": 383.42273399999993
+    },
+    "readVerifiedEffectLandingUncached": {
+      "count": 1,
+      "inclusiveMs": 373.24397500000003
+    },
+    "readTaskSnapshot": {
+      "count": 6,
+      "inclusiveMs": 1.373997000000145
+    },
+    "readDispatchAdmission": {
+      "count": 26,
+      "inclusiveMs": 17.149934999999914
+    },
+    "readDispatchReservationRecord": {
+      "count": 26,
+      "inclusiveMs": 8.709640000000036
+    },
+    "readDispatchReservationTransitionRecord": {
+      "count": 26,
+      "inclusiveMs": 3.6165279999996756
+    },
+    "readDispatchAuthority": {
+      "count": 6,
+      "inclusiveMs": 32.93574999999987
+    },
+    "readDispatchTerminalRecord": {
+      "count": 6,
+      "inclusiveMs": 4.4675269999999045
+    },
+    "readDispatchReconciliationRecord": {
+      "count": 6,
+      "inclusiveMs": 2.5250330000000076
+    },
+    "readPhysicalTransitionRecord": {
+      "count": 6,
+      "inclusiveMs": 5.514534999999796
+    },
+    "readDispatchObservation": {
+      "count": 14,
+      "inclusiveMs": 35.76055599999927
+    },
+    "readDispatchObservationByClass": {
+      "count": 4,
+      "inclusiveMs": 35.25428600000009
+    },
+    "readOptionalDispatchObservation": {
+      "count": 4,
+      "inclusiveMs": 30.562040000000138
+    },
+    "readVerifiedSnapshotFact": {
+      "count": 37,
+      "inclusiveMs": 1725.2426639999996
+    }
+  },
+  "startedAt": "2026-09-14T09:24:18.945Z",
+  "endedAt": "2026-09-14T09:24:21.161Z",
+  "elapsedMs": 2216.104153,
+  "cpu": {
+    "user": 2152309,
+    "system": 373217
+  },
+  "maxRSSKiB": 332836,
+  "state": "current",
+  "reason": null,
+  "verdict": "DONE",
+  "kind": "readonly-production-terminal-authority-single-call"
+}

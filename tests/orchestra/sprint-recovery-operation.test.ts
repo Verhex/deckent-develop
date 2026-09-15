@@ -44,6 +44,22 @@ describe('exact started-failed retention isolation', () => {
   const outcome = { state: 'retained' as const, dispatchRequestId, taskId: '482-001', attemptId: 'attempt-1',
     generation: 1, receiptDigest: `sha256:${'b'.repeat(64)}`, evidenceDigest: `sha256:${'c'.repeat(64)}` };
 
+  it('routes partial retention through the exact approved boundary without generic mutation', async () => {
+    const {approval}=fixture();
+    const boundary=vi.fn<NonNullable<SprintRecoveryOperationOptions['exactAbortedPartialRecovery']>>()
+      .mockImplementation(async input => {input.beforePublish();return outcome;});
+    const generic=vi.fn(()=>{throw new Error('Generic mutation forbidden');});
+    const options={abortedPartialDispatchRequestId:dispatchRequestId,partialTransactionDigest:`sha256:${'d'.repeat(64)}`,
+      exactAbortedPartialRecovery:boundary,exactCustodyInspection:generic};
+    await expect(runSprintRecoveryOperation(root,'sprint-482',options)).rejects.toMatchObject({code:'APPROVAL_REQUIRED'});
+    await expect(runSprintRecoveryOperation(root,'sprint-482',{...options,partialTransactionDigest:undefined,dryRun:true}))
+      .rejects.toMatchObject({code:'INVALID_DISPATCH_REQUEST_ID'});
+    const report=await runSprintRecoveryOperation(root,'sprint-482',{...options,approval});
+    expect(report.abortedPartialAttempt).toEqual(outcome);expect(report.startedFailedAttempt).toBeUndefined();
+    expect(boundary).toHaveBeenCalledOnce();expect(generic).not.toHaveBeenCalled();
+    expect(existsSync(join(root,'.tasks','task-482-001.json'))).toBe(true);
+  });
+
   it('dry-run inspects only the exact dispatch without approval, archive or generic custody scan', async () => {
     fixture();
     const boundary = vi.fn<NonNullable<SprintRecoveryOperationOptions['exactStartedFailedRecovery']>>()
@@ -388,6 +404,39 @@ describe('runSprintRecoveryOperation coordinator death fence', () => {
       quarantinedHistoricalAdmissions: 0,
       receiptDigest: `sha256:${'3'.repeat(64)}`,
     });
+  });
+
+  it('counts exact started attempts in preview and blocks generic mutation before containment', async () => {
+    const { root } = rootWithCoordinator();
+    const exactCustodyRecovery = vi.fn();
+    const kill = vi.fn();
+    const current = {
+      dispatchRequestId: `dreq-${'6'.repeat(64)}`, taskId: '482-001',
+      reasonCode: 'STARTED_ATTEMPT_RECONCILIATION_REQUIRED' as const, custodyHoldCode: null,
+    };
+    const options = {
+      skipAudit: true, approval: approval(root), exactCustodyRecovery,
+      exactCustodyInspection: () => ({
+        state: 'hold' as const, unresolved: [current, { ...current, taskId: '483-001' }],
+        recoveryListReceiptDigest: `sha256:${'7'.repeat(64)}`,
+      }),
+      terminationPolicy: policy,
+      terminationDeps: {
+        isAlive: () => true, verifyOwnership: () => 'owned' as const,
+        kill, wait: async () => undefined,
+      },
+    };
+    const report = await runSprintRecoveryOperation(root, 'sprint-482', { ...options, dryRun: true });
+    expect(report.exactCustodyReservations).toMatchObject({
+      unresolvedBeforeRecovery: 1, startedAttempts: [current],
+    });
+    await expect(runSprintRecoveryOperation(root, 'sprint-482', options)).rejects.toMatchObject({
+      code: 'SETTLEMENT_FAILED', details: {
+        disposition: 'HOLD', reason: 'STARTED_ATTEMPT_RECONCILIATION_REQUIRED', taskIds: '482-001',
+      },
+    });
+    expect(kill).not.toHaveBeenCalled();
+    expect(exactCustodyRecovery).not.toHaveBeenCalled();
   });
 
   it('reports admission-graph holds separately and counts canonical quarantine settlement', async () => {

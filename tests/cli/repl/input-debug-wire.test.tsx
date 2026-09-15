@@ -32,7 +32,7 @@ describe('InputBar input-debug production wire', () => {
     const mounted = mount(root, onSubmit);
     mounted.stdin.write('secret');
     mounted.stdin.write('\r');
-    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledWith('secret'));
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledWith('secret', expect.objectContaining({ wire: 'secret' })));
     mounted.unmount();
     expect(existsSync(path)).toBe(false);
   });
@@ -82,7 +82,7 @@ describe('InputBar input-debug production wire', () => {
     const mounted = mount(root, onSubmit, true, true);
     mounted.stdin.write('strict-secret');
     mounted.stdin.write('\r');
-    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledWith('strict-secret'));
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledWith('strict-secret', expect.objectContaining({ wire: 'strict-secret' })));
     mounted.unmount();
     await vi.waitFor(() => expect(readFileSync(path, 'utf8')).toContain('"action":"return"'));
     expect(readFileSync(path, 'utf8')).not.toContain('strict-secret');

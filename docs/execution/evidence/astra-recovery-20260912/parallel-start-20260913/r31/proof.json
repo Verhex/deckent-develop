@@ -1,0 +1,50 @@
+{
+  "utc": "2026-09-14T20:31:57.780Z",
+  "cases": [
+    {
+      "name": "direct",
+      "stallMs": 3500,
+      "status": null,
+      "error": true,
+      "diagnostic": {
+        "reason": "timeout",
+        "exitCode": 0,
+        "signaled": false,
+        "timeoutMs": 1000,
+        "elapsedMs": 3502.374647,
+        "stdoutBytes": 33,
+        "stderrBytes": 0
+      },
+      "absent": true
+    },
+    {
+      "name": "isolated",
+      "stallMs": 3500,
+      "status": 0,
+      "error": false,
+      "diagnostic": {
+        "reason": "exit",
+        "exitCode": 0,
+        "signaled": false,
+        "timeoutMs": 1000,
+        "elapsedMs": 130.35674400000016,
+        "stdoutBytes": 35,
+        "stderrBytes": 0
+      },
+      "absent": true
+    },
+    {
+      "name": "real-timeout",
+      "diagnostic": {
+        "reason": "timeout",
+        "exitCode": null,
+        "signaled": true,
+        "timeoutMs": 1000,
+        "elapsedMs": 1018.1124120000004,
+        "stdoutBytes": 0,
+        "stderrBytes": 0
+      },
+      "status": null
+    }
+  ]
+}

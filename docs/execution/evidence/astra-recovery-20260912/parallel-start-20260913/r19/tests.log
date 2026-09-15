@@ -1,0 +1,40 @@
+
+ RUN  v3.2.7 /tmp/deckent-r18-762-repair
+
+ ✓ tests/orchestra/execution-effect-landing-coordinator.test.ts (42 tests) 881ms
+   ✓ execution effect landing coordinator > bounds quarantine evidence after a late failure in a large operation set  607ms
+ ✓ tests/orchestra/execution-effect-lock-adapter.test.ts (8 tests) 1111ms
+ ✓ tests/orchestra/execution-effect-native-adapter.test.ts (37 tests) 4062ms
+   ✓ execution effect native adapter > transfers a large multi-chunk source through the real Docker and native adapters  3742ms
+ ✓ tests/orchestra/execution-effect-store-adapter.test.ts (24 tests) 89531ms
+   ✓ execution effect Store adapter > fails closed when a later cleanup artifact exists behind a missing predecessor  3621ms
+   ✓ execution effect Store adapter > publishes and rereads ALLOCATING before project-root landing authority exists  5086ms
+   ✓ execution effect Store adapter > publishes coordinator journals and exposes accepted authority only after full Store fan-in  3522ms
+   ✓ execution effect Store adapter > proves a committed coordinator journal without mutating Store bytes  4724ms
+   ✓ execution effect Store adapter > rejects prepared evidence when immutable bytes are missing  5200ms
+   ✓ execution effect Store adapter > rejects prepared evidence when immutable bytes are tampered  5184ms
+   ✓ execution effect Store adapter > rejects native evidence when immutable bytes are missing  5459ms
+   ✓ execution effect Store adapter > rejects native evidence when immutable bytes are tampered  5505ms
+   ✓ execution effect Store adapter > rejects final evidence when immutable bytes are missing  5286ms
+   ✓ execution effect Store adapter > rejects final evidence when immutable bytes are tampered  5259ms
+   ✓ execution effect Store adapter > rejects lease evidence when immutable bytes are missing  5184ms
+   ✓ execution effect Store adapter > rejects lease evidence when immutable bytes are tampered  5196ms
+   ✓ execution effect Store adapter > rejects committed-pending evidence after release progress is durable  5768ms
+   ✓ execution effect Store adapter > rejects journal replacement, forged references, missing landings and policy-null authority  3462ms
+   ✓ execution effect Store adapter > proves a production-shaped coordinator commit before release or accepted-result publication  1678ms
+   ✓ execution effect Store adapter > rejects prepared evidence when immutable bytes are missing  2027ms
+   ✓ execution effect Store adapter > rejects prepared evidence when immutable bytes are tampered  2031ms
+   ✓ execution effect Store adapter > rejects native evidence when immutable bytes are missing  2136ms
+   ✓ execution effect Store adapter > rejects native evidence when immutable bytes are tampered  2197ms
+   ✓ execution effect Store adapter > rejects final evidence when immutable bytes are missing  2141ms
+   ✓ execution effect Store adapter > rejects final evidence when immutable bytes are tampered  2141ms
+   ✓ execution effect Store adapter > rejects lease evidence when immutable bytes are missing  2110ms
+   ✓ execution effect Store adapter > rejects lease evidence when immutable bytes are tampered  2097ms
+   ✓ execution effect Store adapter > rejects committed-pending evidence after release progress is durable  2515ms
+ ✓ tests/core/execution-effect-persistence-contract.test.ts (11 tests) 59ms
+
+ Test Files  5 passed (5)
+      Tests  122 passed (122)
+   Start at  16:53:41
+   Duration  91.78s (transform 1.23s, setup 50ms, collect 2.67s, tests 95.65s, environment 0ms, prepare 176ms)
+

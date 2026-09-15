@@ -1,0 +1,2 @@
+DECKENT_BINARY_IDENTITY_OVERRIDE: explicit cross-checkout override accepted (reason: runtime-root-mismatch); runtime behavior may not match this source checkout.
+Error: Started-failed ve committed-unsettled koruma modları birlikte kullanılamaz.

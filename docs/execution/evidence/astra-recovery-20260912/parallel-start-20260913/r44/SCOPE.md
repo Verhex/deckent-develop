@@ -1,0 +1,7 @@
+# Owner-admitted deadline/drain/resume recovery
+
+MASTER3178 / parent120, existing ADR-D-007 recovery. Owner approved R43 follow-up direction, excluding new SIGKILL escalation and clock-regression work. Config-resolved broad development deadlines remain; no silent timeout disable/reset. Provider-window expiry with present daemon is not itself identity contradiction. Unresolved possibly-live execution must retain truthful evidence for operator recovery; no successful settlement or absent worker fabricated.
+
+R44 code slice: collector admission cutoff. Current collector deadline remains local until durable resume wiring is implemented. canAdmitDispatch callback propagates from collector to common spawn executor via legacy queue, dependency respawn and reducer driver. Initial/watcher dispatch uses same gate; shared executor checks before work and exact custody preparation rechecks after async prompt/provider preparation. Existing admitted custody keeps its own budget; no mid-admission rollback introduced. Nervous respawn entry is suppressed after cutoff. No new SIGKILL or automatic containment.
+
+Remaining connected work: durable exact execution-window reader, finite configurable post-provider observation window, collector draining with IPC retained, controller durable possibly-live disposition, resume-execute sharing same ingest/observation path; then real Docker A-C/B restart/operator recovery proof. Acceptance and landing are not declared bounded or fixed by this slice.

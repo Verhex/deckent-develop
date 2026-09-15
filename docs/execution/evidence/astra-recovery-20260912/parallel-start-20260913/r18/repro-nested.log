@@ -1,0 +1,69 @@
+
+ RUN  v3.2.7 /tmp/deckent-r18-762-repair
+
+ ❯ tests/orchestra/execution-effect-native-adapter.test.ts (37 tests | 1 failed | 36 skipped) 1469ms
+   ↓ execution effect native adapter > captures a canonical baseline manifest from the sealed Docker volume
+   ↓ execution effect native adapter > captures a canonical final manifest from the sealed Docker volume
+   ↓ execution effect native adapter > returns typed workspace-capture HOLD on darwin
+   ↓ execution effect native adapter > returns typed workspace-capture HOLD on win32
+   ↓ execution effect native adapter > rejects a workspace-capture receipt with foreign imageReference
+   ↓ execution effect native adapter > rejects a workspace-capture receipt with foreign volumeName
+   ↓ execution effect native adapter > rejects a workspace-capture receipt with foreign phase
+   ↓ execution effect native adapter > rejects a workspace-capture receipt with foreign workspaceRootIdentityDigest
+   ↓ execution effect native adapter > rejects Docker capture output above the hard 16 MiB ceiling
+   ↓ execution effect native adapter > rejects full-entry tampering even when the native path set is unchanged
+   ↓ execution effect native adapter > snapshots capture filesWrite before the async Docker boundary
+   ↓ execution effect native adapter > rejects a proxy capture input before Docker access
+   ↓ execution effect native adapter > returns typed HOLD on darwin
+   ↓ execution effect native adapter > returns typed HOLD on win32
+   ↓ execution effect native adapter > maps the canonical native missing-entry code to an absent project preimage
+   ↓ execution effect native adapter > retains Node ENOENT compatibility for an absent project preimage
+   ↓ execution effect native adapter > keeps non-not-found native inspection failures fail-closed
+   ↓ execution effect native adapter > writes every source and receipt byte after finite short writes
+   ↓ execution effect native adapter > retries interrupted, backpressured, and zero-progress writes without dropping bytes
+   ↓ execution effect native adapter > bounds persistent source-write backpressure by the existing deadline
+   ↓ execution effect native adapter > rejects invalid progress and preserves non-retryable write failures
+   ↓ execution effect native adapter > reads ADD and REPLACE preimages through the real native project adapter
+   × execution effect native adapter > transfers a large multi-chunk source through the real Docker and native adapters 1469ms
+     → EXECUTION_EFFECT_NATIVE_ADAPTER_HOLD:AUTHORITY_MISMATCH
+   ↓ execution effect native adapter > streams Docker bytes through native ingress and durable Store chunks
+   ↓ execution effect native adapter > supports a single durable zero-byte chunk
+   ↓ execution effect native adapter > rejects a validly sealed Docker receipt with foreign volumeName
+   ↓ execution effect native adapter > rejects a validly sealed Docker receipt with foreign imageReference
+   ↓ execution effect native adapter > rejects a validly sealed Docker receipt with foreign path
+   ↓ execution effect native adapter > fails verification after a Store chunk semantic tamper
+   ↓ execution effect native adapter > rejects staged-source replay under a foreign attempt digest
+   ↓ execution effect native adapter > snapshots source authority before the async Docker boundary
+   ↓ execution effect native adapter > rejects accessor-backed source authority before Docker access
+   ↓ execution effect native adapter > rejects root-separation uncertainty before Docker or Store access
+   ↓ execution effect native adapter > keeps capability identity stable when only root directory cardinality metadata changes
+   ↓ execution effect native adapter > treats native handle-close uncertainty as HOLD
+   ↓ execution effect native adapter > rematerializes Store chunks into a fresh native staging object per adapter invocation
+   ↓ execution effect native adapter > rejects a proxy factory input before native or Docker access
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/orchestra/execution-effect-native-adapter.test.ts > execution effect native adapter > transfers a large multi-chunk source through the real Docker and native adapters
+ExecutionEffectNativeAdapterHold: EXECUTION_EFFECT_NATIVE_ADAPTER_HOLD:AUTHORITY_MISMATCH
+ ❯ fail src/orchestra/execution-effect-native-adapter.ts:270:9
+    268|   evidence: unknown,
+    269| ): never {
+    270|   throw new ExecutionEffectNativeAdapterHold(
+       |         ^
+    271|     code,
+    272|     digest('execution-effect-native-adapter-hold-v1', { code, evidence…
+ ❯ parentIdentityDigest src/orchestra/execution-effect-native-adapter.ts:2121:5
+ ❯ operationEnvelope src/orchestra/execution-effect-native-adapter.ts:2153:15
+ ❯ nativeMutationReceipt src/orchestra/execution-effect-native-adapter.ts:2280:20
+ ❯ applyOperation src/orchestra/execution-effect-native-adapter.ts:2348:18
+ ❯ Object.applyOperation src/orchestra/execution-effect-native-adapter.ts:2763:12
+ ❯ tests/orchestra/execution-effect-native-adapter.test.ts:1241:27
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 36 skipped (37)
+   Start at  14:55:55
+   Duration  2.31s (transform 532ms, setup 14ms, collect 648ms, tests 1.47s, environment 0ms, prepare 31ms)
+

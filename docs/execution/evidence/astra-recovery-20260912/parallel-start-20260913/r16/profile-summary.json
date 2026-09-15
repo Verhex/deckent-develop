@@ -1,0 +1,155 @@
+{
+  "totalSampledMs": 43248.012,
+  "functions": [
+    {
+      "name": "captured",
+      "file": "index.mjs",
+      "line": 3311,
+      "selfMs": 18926.4
+    },
+    {
+      "name": "(garbage collector)",
+      "file": "",
+      "line": 0,
+      "selfMs": 1902.5
+    },
+    {
+      "name": "",
+      "file": "",
+      "line": 0,
+      "selfMs": 1619.0
+    },
+    {
+      "name": "(program)",
+      "file": "",
+      "line": 0,
+      "selfMs": 1192.5
+    },
+    {
+      "name": "ownData",
+      "file": "index.mjs",
+      "line": 574,
+      "selfMs": 1112.3
+    },
+    {
+      "name": "sortedOwnStringKeys",
+      "file": "index.mjs",
+      "line": 549,
+      "selfMs": 1096.2
+    },
+    {
+      "name": "serializeCanonicalJson",
+      "file": "task-attempt-custody-store.js",
+      "line": 620,
+      "selfMs": 823.7
+    },
+    {
+      "name": "portableEffectPathFailure",
+      "file": "execution-write-scope-policy.js",
+      "line": 124,
+      "selfMs": 663.2
+    },
+    {
+      "name": "update",
+      "file": "hash",
+      "line": 134,
+      "selfMs": 655.7
+    },
+    {
+      "name": "canonicalJson",
+      "file": "execution-effect-containment.js",
+      "line": 29,
+      "selfMs": 652.3
+    },
+    {
+      "name": "exactRecord",
+      "file": "execution-effect-containment.js",
+      "line": 55,
+      "selfMs": 612.4
+    },
+    {
+      "name": "isWindowsReservedName",
+      "file": "execution-write-scope-policy.js",
+      "line": 112,
+      "selfMs": 577.4
+    },
+    {
+      "name": "canonicalJson",
+      "file": "execution-effect-persistence-contract.js",
+      "line": 10,
+      "selfMs": 569.0
+    },
+    {
+      "name": "isCanonicalCustodyDecimal",
+      "file": "index.mjs",
+      "line": 2196,
+      "selfMs": 547.6
+    },
+    {
+      "name": "",
+      "file": "index.mjs",
+      "line": 564,
+      "selfMs": 519.2
+    },
+    {
+      "name": "validateManifest",
+      "file": "execution-effect-containment.js",
+      "line": 189,
+      "selfMs": 478.3
+    },
+    {
+      "name": "frozenSortedStringArray",
+      "file": "index.mjs",
+      "line": 797,
+      "selfMs": 449.1
+    },
+    {
+      "name": "canonicalJson",
+      "file": "execution-effect-docker-lifecycle.js",
+      "line": 33,
+      "selfMs": 440.4
+    }
+  ],
+  "files": [
+    {
+      "file": "index.mjs",
+      "selfMs": 24587.6
+    },
+    {
+      "file": "",
+      "selfMs": 5327.8
+    },
+    {
+      "file": "task-attempt-custody-store.js",
+      "selfMs": 3105.7
+    },
+    {
+      "file": "execution-effect-containment.js",
+      "selfMs": 2633.2
+    },
+    {
+      "file": "exec-authority-native.js",
+      "selfMs": 2189.7
+    },
+    {
+      "file": "execution-write-scope-policy.js",
+      "selfMs": 1584.8
+    },
+    {
+      "file": "execution-effect-persistence-contract.js",
+      "selfMs": 890.7
+    },
+    {
+      "file": "hash",
+      "selfMs": 785.3
+    },
+    {
+      "file": "execution-effect-docker-lifecycle.js",
+      "selfMs": 748.4
+    },
+    {
+      "file": "buffer",
+      "selfMs": 405.7
+    }
+  ]
+}

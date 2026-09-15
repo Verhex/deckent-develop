@@ -31,7 +31,7 @@ describe('repl-legacy-loop-lang-wire — entry.ts hands the project language to 
     // getLangFromConfig (the banner/health-line/menu language authority).
     // TERMINAL-TOOLS-002: the language is resolved ONCE per boot (`replLang`)
     // from getLangFromConfig and handed to every line the path emits.
-    expect(ENTRY_SRC).toMatch(/const replLang = getLangFromConfig\(healthRoot\);/);
+    expect(ENTRY_SRC).toMatch(/const replLang = getLanguage\(replConfig\?\.language\);/);
     expect(ENTRY_SRC).toMatch(/await runChatNativeLoop\(\{[\s\S]*?lang:\s*replLang,/);
   });
 });

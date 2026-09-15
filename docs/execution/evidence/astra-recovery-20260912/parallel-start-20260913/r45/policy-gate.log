@@ -1,0 +1,26 @@
+[operating-policy] canonical policy digest sha256=c4c96a971833ee892174b7d361e08c7f0eb53c629873381235deaa573594d863
+[operating-policy] active DECKENT-DEV-CONTROL digest sha256=22eeeb0cf384d01c8abdaf3f2db17fe576a3d948e65f9989d5d567e9de1460b3
+[operating-policy] ✗ DEV_CONTROL_BLOCK_DRIFT AGENTS.md vs CLAUDE.md vs .cursor/rules/deckent.mdc — control blocks are not byte-identical across host adapters
+[operating-policy] ✗ DEV_CONTROL_DECISION_REF_UNANCHORED docs/governance/deckent-dev-operating-policy.md — canonical policy does not reference DECISION_REF=owner-live-2026-09-15-refactor-cutover-dogfood-off
+[operating-policy] ✗ CAPSULE_FIELD_MISSING docs/execution/active/DOGFOOD-CROSS-SURFACE-ANALYSIS-PLAN.md — required field OUTCOME_ID: absent
+[operating-policy] ✗ CAPSULE_FIELD_MISSING docs/execution/active/DOGFOOD-CROSS-SURFACE-ANALYSIS-PLAN.md — required field DOGFOOD_MODE: absent
+[operating-policy] ✗ CAPSULE_FIELD_MISSING docs/execution/active/DOGFOOD-CROSS-SURFACE-ANALYSIS-PLAN.md — required field BASE_SHA: absent
+[operating-policy] ✗ CAPSULE_DONE_SECTION_MISSING docs/execution/active/DOGFOOD-CROSS-SURFACE-ANALYSIS-PLAN.md — capsule has no `## DONE` criteria section
+[operating-policy] ✗ CAPSULE_FIELD_MISSING docs/execution/active/DOGFOOD-RESTORATION-2026-09-12.md — required field OUTCOME_ID: absent
+[operating-policy] ✗ CAPSULE_FIELD_MISSING docs/execution/active/DOGFOOD-RESTORATION-2026-09-12.md — required field DOGFOOD_MODE: absent
+[operating-policy] ✗ CAPSULE_FIELD_MISSING docs/execution/active/DOGFOOD-RESTORATION-2026-09-12.md — required field BASE_SHA: absent
+[operating-policy] ✗ CAPSULE_DONE_SECTION_MISSING docs/execution/active/DOGFOOD-RESTORATION-2026-09-12.md — capsule has no `## DONE` criteria section
+[operating-policy] ✗ CAPSULE_FIELD_MISSING docs/execution/active/RECOVERY-DO-DOGFOOD-001-R0B.md — required field OUTCOME_ID: absent
+[operating-policy] ✗ CAPSULE_FIELD_MISSING docs/execution/active/RECOVERY-DO-DOGFOOD-001-R0B.md — required field DOGFOOD_MODE: absent
+[operating-policy] ✗ CAPSULE_FIELD_MISSING docs/execution/active/RECOVERY-DO-DOGFOOD-001-R0B.md — required field BASE_SHA: absent
+[operating-policy] ✗ CAPSULE_DONE_SECTION_MISSING docs/execution/active/RECOVERY-DO-DOGFOOD-001-R0B.md — capsule has no `## DONE` criteria section
+[operating-policy] ✗ CAPSULE_FIELD_MISSING docs/execution/active/RECOVERY-DO-DOGFOOD-001-R1-PLAN.md — required field OUTCOME_ID: absent
+[operating-policy] ✗ CAPSULE_FIELD_MISSING docs/execution/active/RECOVERY-DO-DOGFOOD-001-R1-PLAN.md — required field DOGFOOD_MODE: absent
+[operating-policy] ✗ CAPSULE_FIELD_MISSING docs/execution/active/RECOVERY-DO-DOGFOOD-001-R1-PLAN.md — required field BASE_SHA: absent
+[operating-policy] ✗ CAPSULE_DONE_SECTION_MISSING docs/execution/active/RECOVERY-DO-DOGFOOD-001-R1-PLAN.md — capsule has no `## DONE` criteria section
+[operating-policy] ✗ CAPSULE_FIELD_MISSING docs/execution/active/RECOVERY-DO-DOGFOOD-001-REPAIR-PLAN.md — required field OUTCOME_ID: absent
+[operating-policy] ✗ CAPSULE_FIELD_MISSING docs/execution/active/RECOVERY-DO-DOGFOOD-001-REPAIR-PLAN.md — required field DOGFOOD_MODE: absent
+[operating-policy] ✗ CAPSULE_FIELD_MISSING docs/execution/active/RECOVERY-DO-DOGFOOD-001-REPAIR-PLAN.md — required field BASE_SHA: absent
+[operating-policy] ✗ CAPSULE_DONE_SECTION_MISSING docs/execution/active/RECOVERY-DO-DOGFOOD-001-REPAIR-PLAN.md — capsule has no `## DONE` criteria section
+[operating-policy] ✗ CAPSULE_FIELD_MISSING docs/execution/active/RECOVERY-DO-DOGFOOD-001.md — required field OUTCOME_ID: absent
+[operating-policy] ✗ CAPSULE_DONE_SECTION_MISSING docs/execution/active/RECOVERY-DO-DOGFOOD-001.md — capsule has no `## DONE` criteria section

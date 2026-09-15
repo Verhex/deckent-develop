@@ -49,6 +49,7 @@ export function fromTaskEvaluation(evaluation: TaskEvaluation): NormativeVerdict
     case TaskEvaluation.NO_GO: return 'FAILED';
     case TaskEvaluation.DEFERRED: return 'HOLD';
     case TaskEvaluation.NOT_DISPATCHED: return 'HOLD';
+    case TaskEvaluation.EFFECT_HOLD: return 'HOLD';
   }
 }
 

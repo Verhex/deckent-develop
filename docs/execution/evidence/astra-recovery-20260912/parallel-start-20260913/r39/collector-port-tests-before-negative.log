@@ -1,0 +1,89 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/orchestra/spawn-backend-docker-ipc-authority.test.ts (3 tests) 2190ms
+   ✓ Docker exact-attempt private IPC authority port > retries a typed custody deadline on the next poll without poisoning terminal capture  516ms
+   ✓ Docker exact-attempt private IPC authority port > captures one private question, publishes the private answer, and rereads answered authority  1124ms
+   ✓ Docker exact-attempt private IPC authority port > cold-reconciles a durable answer whose answered cursor publication failed  550ms
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > syncs exact accepted custody only through terminal settlement authority
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > holds exact collection when worker-writable public result bytes predate projection
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > holds foreign or structurally forged terminal authority without mutating task status
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > holds foreign or structurally forged terminal authority without mutating task status
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > holds foreign or structurally forged terminal authority without mutating task status
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > holds foreign or structurally forged terminal authority without mutating task status
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > holds foreign or structurally forged terminal authority without mutating task status
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > holds foreign or structurally forged terminal authority without mutating task status
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > holds foreign or structurally forged terminal authority without mutating task status
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > rolls back status when bounded terminal revalidation returns oversized or cyclic authority
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > rolls back status when bounded terminal revalidation returns oversized or cyclic authority
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > rolls back status when bounded terminal revalidation returns oversized or cyclic authority
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > rolls back status when bounded terminal revalidation returns oversized or cyclic authority
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > preserves an accepted sibling across fatal initial HOLD (deferred=false), without new dispatch
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > preserves an accepted sibling across fatal initial HOLD (deferred=true), without new dispatch
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > settles independent B while A is held and dependent C stays unrun
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > holds exact custody when no terminal settlement authority is supplied
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > settles a no-dispatch authority with zero attempts and no synthetic result
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > fails closed instead of reading public question bytes in normal Docker mode
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > waits past an early raw Docker DONE and collects the later host settlement
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > repairs a malformed raw result through terminal-only reconciliation during the live wait
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > parks an unclassified capture HOLD that arrives during the IPC poll
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector-settlement-authority.test.ts > result collector settlement authority wire > records exact IPC projection debt once without blocking private answer success
+[deckent] scheduler engine: legacy
+
+ ✓ tests/orchestra/result-collector-settlement-authority.test.ts (16 tests) 11673ms
+   ✓ result collector settlement authority wire > syncs exact accepted custody only through terminal settlement authority  4669ms
+   ✓ result collector settlement authority wire > holds foreign or structurally forged terminal authority without mutating task status  1260ms
+   ✓ result collector settlement authority wire > rolls back status when bounded terminal revalidation returns oversized or cyclic authority  1228ms
+   ✓ result collector settlement authority wire > preserves an accepted sibling across fatal initial HOLD (deferred=false), without new dispatch  1241ms
+   ✓ result collector settlement authority wire > preserves an accepted sibling across fatal initial HOLD (deferred=true), without new dispatch  1266ms
+   ✓ result collector settlement authority wire > settles independent B while A is held and dependent C stays unrun  1253ms
+
+ Test Files  2 passed (2)
+      Tests  19 passed (19)
+   Start at  11:22:32
+   Duration  16.32s (transform 3.24s, setup 34ms, collect 5.30s, tests 13.86s, environment 0ms, prepare 93ms)
+

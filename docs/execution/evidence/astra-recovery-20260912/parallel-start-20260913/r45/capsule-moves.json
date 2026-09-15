@@ -1,0 +1,40 @@
+{
+  "scanRoot": "docs/execution/active",
+  "gateLines": [
+    34,
+    250,
+    254
+  ],
+  "moves": [
+    {
+      "from": "docs/execution/active/RECOVERY-DO-DOGFOOD-001.md",
+      "to": "docs/execution/archive/dogfood-recovery-2026-09/RECOVERY-DO-DOGFOOD-001.md",
+      "sha256": "68df8b30be460f609cab6f5abe44f614d6aa3564938d1a2b91abeda61289b16b"
+    },
+    {
+      "from": "docs/execution/active/RECOVERY-DO-DOGFOOD-001-R0B.md",
+      "to": "docs/execution/archive/dogfood-recovery-2026-09/RECOVERY-DO-DOGFOOD-001-R0B.md",
+      "sha256": "711c8c156ee0b3d90811a0fc640b302e6da02bab50a97749402d896e991241db"
+    },
+    {
+      "from": "docs/execution/active/RECOVERY-DO-DOGFOOD-001-R1-PLAN.md",
+      "to": "docs/execution/archive/dogfood-recovery-2026-09/RECOVERY-DO-DOGFOOD-001-R1-PLAN.md",
+      "sha256": "81d36eb510f08a536d56594a74061b2fda0b3c6f6f39c63b7f72ed7b3828095f"
+    },
+    {
+      "from": "docs/execution/active/RECOVERY-DO-DOGFOOD-001-REPAIR-PLAN.md",
+      "to": "docs/execution/archive/dogfood-recovery-2026-09/RECOVERY-DO-DOGFOOD-001-REPAIR-PLAN.md",
+      "sha256": "b4aa068672ce0a096983b0d5885de2f5a94ed9dd67c65f6536bbc3ad47eb46a6"
+    },
+    {
+      "from": "docs/execution/active/DOGFOOD-RESTORATION-2026-09-12.md",
+      "to": "docs/execution/archive/dogfood-recovery-2026-09/DOGFOOD-RESTORATION-2026-09-12.md",
+      "sha256": "3c478e086f3aebe41566e32a1d1fa8e62cd8747a7b3b01a3df28705c0e48ca94"
+    },
+    {
+      "from": "docs/execution/active/DOGFOOD-CROSS-SURFACE-ANALYSIS-PLAN.md",
+      "to": "docs/execution/archive/dogfood-recovery-2026-09/DOGFOOD-CROSS-SURFACE-ANALYSIS-PLAN.md",
+      "sha256": "40aafccd9acd144d4168ab218ef003503d85c1a7f2df15dea9177d1db0433bc4"
+    }
+  ]
+}

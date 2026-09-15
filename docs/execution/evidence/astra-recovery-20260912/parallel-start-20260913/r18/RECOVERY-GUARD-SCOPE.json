@@ -1,0 +1,21 @@
+{
+  "parent": "R18-762-LANDING-RECOVERY",
+  "observedAt": "2026-09-14T12:17:06.829321+00:00",
+  "role": "recovery admission foundation, dependency-bound to partial-landing closure",
+  "files": [
+    "src/orchestra/sprint-recovery-operation.ts",
+    "tests/orchestra/sprint-recovery-operation.test.ts"
+  ],
+  "baseline": {
+    "src/orchestra/sprint-recovery-operation.ts": "895be40c729a833336b210571d19a1652a17b7b38816e32b48fa5a9261a26892",
+    "tests/orchestra/sprint-recovery-operation.test.ts": "65aa26724a9ccc0e5ad9e023a37fd091288cc71c9fabedcc57ad9e1fd1b720b9"
+  },
+  "negative": [
+    "runtime mutation",
+    "quarantine override",
+    "auth",
+    "cleanup",
+    "commit/push"
+  ],
+  "proof": "targeted24 pass; tsc0; isolated build and real dry-run pending"
+}

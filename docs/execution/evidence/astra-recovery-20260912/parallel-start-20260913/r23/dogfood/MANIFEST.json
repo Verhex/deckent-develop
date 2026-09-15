@@ -1,0 +1,23 @@
+{
+  "utc": "2026-09-14T15:20:05.407193+00:00",
+  "files": {
+    "EXIT.json": "d8c814d430b6bad505d089f6f7e00963c5a7fe851f0423484f38c1ed5e5d98c6",
+    "RESULT.md": "ea638f5d6549b343c11fb37ff36d4ae888660621d37b140cf7d425ceeebca6b2",
+    "START.json": "cef04accaf898d6ad0abcca1e8ec01984a9a50824d99f5f4fd286b0224491e63",
+    "acknowledged-paths/EXIT.json": "d9b166173d8932bcb4886c397852a1c1a888a3501c749c9e127d4193a352b022",
+    "acknowledged-paths/START.json": "960e430756c1b0a5aadcabbc2897f4d8075b46516a7b9a2e6efff5a7d8507824",
+    "acknowledged-paths/final-status.json": "9120c0bc11d5835ac1074387da8c867dc5aee1d4d64a706e4bb6f53db6e2fc23",
+    "acknowledged-paths/monitor.py": "c1f8b1f9829f50bdf78b496d00be62241931e26c24b26298bc99be0ca993c7b3",
+    "acknowledged-paths/observation-120s.json": "b699e314b610dccd6f4fa310dca3c834433731c71cad31c94de879a6edd48177",
+    "acknowledged-paths/observations.jsonl": "47b9f47573b3c410ebe304516804ddd927f731e2fe260ac509a27c7e03b029d6",
+    "acknowledged-paths/process-io.jsonl": "5d922c31f58e4baa93fb2704a61b3d9f189fc2576b822bfa40bc0ff9f612f207",
+    "acknowledged-paths/resources.jsonl": "332964c26d2851637cd2bad7449d452137b1791d5937900baa5edd25052dc0f3",
+    "acknowledged-paths/start.log": "8b6c6d792b728f3f0a8b6a2aa6ac41c5a0a8b6661284e6d8b66d1a7e8f4b8fb3",
+    "monitor.py": "3249626c50b5e47c8585517e7972efff8fd2c4769ef3b943cdff6f46100abba5",
+    "post-scope-status.json": "5dda28ac02ccc0b418e2b9460e2527897a52ff9f6c2165f9715b07607ff055ed",
+    "resources.jsonl": "4f38d66639091e69693bcf4e6709f64b5a30528bd3a0eb82135d75313eabc320",
+    "scope-diagnosis.json": "89567d3db3f5ec3dfac6be700e7074abab10883becc70161129984f25a490cea",
+    "sprint-763.snapshot.json": "b4e59a06bf8987f20ff11d66a548416c7d84c13389a71c7d4394e8ad4d808694",
+    "start.log": "94b167377d497f6d843d6f31ed44acad983337b1485ff17a86323972f87f54b2"
+  }
+}

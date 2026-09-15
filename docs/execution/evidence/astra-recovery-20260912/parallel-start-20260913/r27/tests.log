@@ -1,0 +1,394 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/orchestra/result-assembler.test.ts (21 tests) 203ms
+ ❯ tests/orchestra/spawn-backend-docker-mounts.test.ts (93 tests | 10 failed) 1406ms
+   × exact Docker custody mounts > shares verified rejected-result closure between planning and startup without replaying effects 14ms
+     → expected undefined to deeply equal [ 'task' ]
+   × exact Docker custody mounts > treats verified retained failure as resolved history, never accepted or zero-work 2ms
+     → expected undefined to deeply equal [ 'task' ]
+   ✓ exact Docker custody mounts > does not label an admitted but unsettled attempt ready or write its missing accepted chain 1ms
+   ✓ exact Docker custody mounts > rejects non-exact recovery targets before Store or Docker access 1ms
+   ✓ exact Docker custody mounts > admits READY failure to stopped inspection only with verified pretransaction diagnostic: pretransaction 2ms
+   ✓ exact Docker custody mounts > admits READY failure to stopped inspection only with verified pretransaction diagnostic: missing 1ms
+   ✓ exact Docker custody mounts > admits READY failure to stopped inspection only with verified pretransaction diagnostic: postlease 1ms
+   ✓ exact Docker custody mounts > admits READY failure to stopped inspection only with verified pretransaction diagnostic: apply-stage 1ms
+   ✓ exact Docker custody mounts > admits READY failure to stopped inspection only with verified pretransaction diagnostic: wrong-phase 1ms
+   ✓ exact Docker custody mounts > keeps causal custody time ordered when the WSL2 wall clock steps backwards 0ms
+   ✓ exact Docker custody mounts > admits zero-byte staged effect content without weakening nonempty metadata artifacts 2ms
+   ✓ exact Docker custody mounts > accepts only an exact daemon no-such-container observation as no effect 0ms
+   ✓ exact Docker custody mounts > accepts only exact local-volume absence and a strict named-volume projection 2ms
+   ✓ exact Docker custody mounts > accepts one sorted portable snapshot inventory and excludes protected authority trees 1ms
+   ✓ exact Docker custody mounts > reads inventory through the bounded async git seam and rejects stderr ambiguity 2ms
+   ✓ exact Docker custody mounts > names portable case-fold collisions before any mount or provider effect 0ms
+   ✓ exact Docker custody mounts > excludes tracked worktree deletions before portable collision validation 0ms
+   ✓ exact Docker custody mounts > mounts only the immutable snapshot RO and attempt-private output RW 0ms
+   ✓ exact Docker custody mounts > derives one path-free restart-stable private volume identity per exact admission 0ms
+   ✓ exact Docker custody mounts > reads the named workspace volume by Docker Name, not daemon host mountpoint 1ms
+   ✓ exact Docker custody mounts > keeps image-owned dependency population bounded and verifies the copied tree 0ms
+   ✓ exact Docker custody mounts > binds workspace population to equal bounded pre, destination and post content manifests 1ms
+   ✓ exact Docker custody mounts > gives populate and capture helpers an owner-private executable native snapshot tmpfs 0ms
+   ✓ exact Docker custody mounts > creates the inert .deck readonly-mask target before baseline without copying protected authority 0ms
+   ✓ exact Docker custody mounts > streams a population inventory larger than a non-blocking pipe buffer 32ms
+   ✓ exact Docker custody mounts > fails population stdin closed when bytes exceed the declared authority 23ms
+   ✓ exact Docker custody mounts > runs exact provider auth phases asynchronously with bounded output and lifetime 1ms
+   ✓ exact Docker custody mounts > fails exact execution closed before provider or Docker launch when landing policy is absent 0ms
+   ✓ exact Docker custody mounts > binds exact native probe parity and compensation evidence into terminal no-effect truth 2ms
+   ✓ exact Docker custody mounts > durably preserves typed pre-mount detail while keeping the public reason constrained 2ms
+   ✓ exact Docker custody mounts > contains only the durable-identity-matched pre-provider container before volume compensation 1ms
+   ✓ exact Docker custody mounts > freshly rereads each exact volume generation around helpers and quiescence checks 0ms
+   ✓ exact Docker custody mounts > writes and rereads cleanup authority before each destructive release effect 0ms
+   ✓ exact Docker custody mounts > durably anchors terminal landing recovery before release can begin 0ms
+   ✓ exact Docker custody mounts > keeps PID1 provider creation behind the one-shot post-settlement start gate 0ms
+   ✓ exact Docker custody mounts > loads native custody only from trusted image code, never mutable workspace bytes 1ms
+   ✓ exact Docker custody mounts > rejects missing, wrong and early execution commits and delivers only after durable reread 1ms
+   ✓ exact Docker custody mounts > behaviorally rejects missing, extra and wrong raw start authorizations before PID1 ack 2ms
+   ✓ exact Docker custody mounts > snapshots nested prepare authority without invoking accessors or retaining caller mutation 66ms
+   ✓ exact Docker custody mounts > binds actual segment order and rendered delivery without assignment phantom credit 6ms
+   ✓ exact Docker custody mounts > rejects every missing, extra, foreign or mutated provider-start ack field 1ms
+   ✓ exact Docker custody mounts > accepts provider execution only from the strict post-spawn PID1 acknowledgement 1ms
+   ✓ exact Docker custody mounts > orders Store settlement and reread before start delivery and durable start before release 0ms
+   ✓ exact Docker custody mounts > keeps unknown daemon/permission inspect failures UNKNOWN during reconciliation 0ms
+   ✓ exact Docker custody mounts > keeps pre-release reconciliation evidence internally consistent 1ms
+   ✓ exact Docker custody mounts > rejects corrupt Store observation bytes or receipt evidence before release projection 1ms
+   ✓ exact Docker custody mounts > reopens the same live released dispatch without a second start and fails closed on map loss 3ms
+   × exact Docker custody mounts > rehydrates one durable released exact attempt once without redispatching the provider 1004ms
+     → expected "spy" to be called 1 times, but got 0 times
+   ✓ exact Docker custody mounts > durably preserves FINAL_CAPTURE first-failure identity and never releases on HOLD 7ms
+   ✓ exact Docker custody mounts > durably preserves READY_PUBLICATION first-failure identity and never releases on HOLD 3ms
+   ✓ exact Docker custody mounts > durably preserves LANDING first-failure identity and never releases on HOLD 3ms
+   ✓ exact Docker custody mounts > durably preserves LANDING first-failure identity and never releases on HOLD 3ms
+   ✓ exact Docker custody mounts > retains exact resources when host-work measurement-hold prevents durable attribution 2ms
+   ✓ exact Docker custody mounts > retains exact resources when host-work publication-failure prevents durable attribution 1ms
+   ✓ exact Docker custody mounts > retains exact resources when host-work reread-failure prevents durable attribution 1ms
+   ✓ exact Docker custody mounts > captures genuine Codex terminal usage for subscription without inventing USD billing 2ms
+   ✓ exact Docker custody mounts > captures immutable worker output but holds metered execution with no provider USD envelope 1ms
+   ✓ exact Docker custody mounts > captures immutable worker output before holding a missing provider usage envelope 1ms
+   ✓ exact Docker custody mounts > classifies malformed adapter usage before releasing the exact effect landing 1ms
+   ✓ exact Docker custody mounts > reconstructs cold exact completion only from durable post-cleanup artifacts 2ms
+   ✓ exact Docker custody mounts > HOLDs cold API reconciliation when the immutable provider stream lacks USD billing 1ms
+   ✓ exact Docker custody mounts > fails closed on stale host-work timestamp during cold reconstruction 1ms
+   ✓ exact Docker custody mounts > fails closed on stale result timestamp during cold reconstruction 2ms
+   ✓ exact Docker custody mounts > fails closed on stale landing timestamp during cold reconstruction 1ms
+   × exact Docker custody mounts > keeps leadership-free recovery out of exact adoption and HOLDs a gapped start chain 4ms
+     → expected { adopted: [], …(9) } to match object { adopted: [], …(2) }
+(8 matching properties omitted from actual)
+   × exact Docker custody mounts > rejects NOT_DISPATCHED recovery when durable provider execution evidence exists 1ms
+     → expected [] to deeply equal [ 'PROVIDER_START', …(1) ]
+   × exact Docker custody mounts > isolates one pending admission HOLD and still closes a later terminal zero-work record 2ms
+     → expected { adopted: [], …(9) } to match object { adopted: [], …(2) }
+(7 matching properties omitted from actual)
+   ✓ exact Docker custody mounts > treats an append-only retired-before-admission reservation as terminal history 1ms
+   × exact Docker custody mounts > reports one identity-bound discovery HOLD and still reconciles its valid sibling 2ms
+     → expected { adopted: [], …(9) } to match object { adopted: [], …(2) }
+(7 matching properties omitted from actual)
+   × exact Docker custody mounts > HOLDs a released exact attempt whose admitted landing policy is missing 1ms
+     → expected { adopted: [], …(9) } to match object { adopted: [], …(2) }
+(8 matching properties omitted from actual)
+   × exact Docker custody mounts > contains every exact durable admission through stop-and-record without monitor or landing 1ms
+     → expected { adopted: [], …(9) } to match object { adopted: [ 'task' ] }
+(9 matching properties omitted from actual)
+   ✓ exact Docker custody mounts > contains a live exact container through async inspect-stop-wait and durable exit reread 1ms
+   ✓ exact Docker custody mounts > re-observes Docker before accepting a recovered provider-exit as contained 1ms
+   ✓ exact Docker custody mounts > retains observed completion until accepted-result consumption and keeps HOLD state 1ms
+   ✓ exact Docker custody mounts > surfaces automatic acceptance rejection and HOLD through the public terminal await 1ms
+   ✓ exact Docker custody mounts > reopens hot/cold accepted authority with derived directory projection false 144ms
+   × exact Docker custody mounts > reopens hot/cold accepted authority with derived directory projection true 4ms
+     → lifecycleStoreAdapter.readLandingRecoveryAnchor is not a function
+   ✓ exact Docker custody mounts > rejects terminal queries with a missing or foreign provider-start receipt 1ms
+   ✓ prompt.catalog_mount_mask default (593-001 F2c) > defaults to false so worker mounts stay byte-identical until opted in 0ms
+   ✓ prompt.catalog_mount_mask default (593-001 F2c) > publishes English and Turkish config-reference metadata 0ms
+   ✓ buildCatalogMaskMountArgs (593-001 F2c) > masks exactly the two design catalogs, read-only, when the flag is on 0ms
+   ✓ buildCatalogMaskMountArgs (593-001 F2c) > emits ZERO args when the flag is off — the default, byte-identical argv pin 0ms
+   ✓ buildCatalogMaskMountArgs (593-001 F2c) > emits NO arg for a catalog the caller reports absent (no phantom host dir) 0ms
+   ✓ buildCatalogMaskMountArgs (593-001 F2c) > emits zero args when NO catalog exists on the host, even with the flag on 0ms
+   ✓ buildCatalogMaskMountArgs (593-001 F2c) > always mounts read-only (a worker must never write through the mask) 0ms
+   ✓ ensureCatalogMaskDir (593-001 F2c) > creates the shared empty mask source under .tasks/ idempotently 1ms
+   ✓ DockerSpawnBackend: catalog mount mask wiring (593-001 F2c) > emits ZERO catalog mounts by DEFAULT (flag off) even though both catalogs exist 8ms
+   ✓ DockerSpawnBackend: catalog mount mask wiring (593-001 F2c) > threads effective prompt.catalog_mount_mask through the factory into docker argv 2ms
+   ✓ DockerSpawnBackend: catalog mount mask wiring (593-001 F2c) > masks both catalogs read-only when the flag is on and both exist on the host 2ms
+   ✓ DockerSpawnBackend: catalog mount mask wiring (593-001 F2c) > skips a catalog missing on the host (no phantom .claude/agents in the repo) 1ms
+   ✓ DockerSpawnBackend: catalog mount mask wiring (593-001 F2c) > emits no catalog mount at all when NEITHER catalog exists on the host 2ms
+   ✓ DockerSpawnBackend: catalog mount mask wiring (593-001 F2c) > keeps every pre-existing mount byte-identical — the mask is purely additive 1ms
+   ✓ DockerSpawnBackend: catalog mount mask wiring (593-001 F2c) > produces argv identical to the unmasked spawn except for the mask args 3ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/orchestra/spawn-backend-docker-mounts.test.ts > exact Docker custody mounts > shares verified rejected-result closure between planning and startup without replaying effects
+AssertionError: expected undefined to deeply equal [ 'task' ]
+
+- Expected: 
+[
+  "task",
+]
+
++ Received: 
+undefined
+
+ ❯ tests/orchestra/spawn-backend-docker-mounts.test.ts:721:42
+    719|     expect(backend.inspectAdmissionResolvedForPlanning(store as never,…
+    720|     const report = await backend.reconcilePendingAttempts();
+    721|     expect(report.closedRejectedResults).toEqual([fixture.identity.tas…
+       |                                          ^
+    722|     expect(report.closedStartedFailed ?? []).toEqual([]);
+    723|     expect(report.closedNotDispatched).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/10]⎯
+
+ FAIL  tests/orchestra/spawn-backend-docker-mounts.test.ts > exact Docker custody mounts > treats verified retained failure as resolved history, never accepted or zero-work
+AssertionError: expected undefined to deeply equal [ 'task' ]
+
+- Expected: 
+[
+  "task",
+]
+
++ Received: 
+undefined
+
+ ❯ tests/orchestra/spawn-backend-docker-mounts.test.ts:748:40
+    746|     internals.rehydrateExactDockerEffectLaunch = vi.fn();
+    747|     const report = await backend.reconcilePendingAttempts();
+    748|     expect(report.closedStartedFailed).toEqual([fixture.identity.taskI…
+       |                                        ^
+    749|     expect(report.closedNotDispatched).toEqual([]);
+    750|     expect(report.adopted).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/10]⎯
+
+ FAIL  tests/orchestra/spawn-backend-docker-mounts.test.ts > exact Docker custody mounts > rehydrates one durable released exact attempt once without redispatching the provider
+AssertionError: expected "spy" to be called 1 times, but got 0 times
+ ❯ tests/orchestra/spawn-backend-docker-mounts.test.ts:2593:58
+    2591|     const firstPending = backend.reconcilePendingAttempts();
+    2592|     await vi.waitFor(() => {
+    2593|       expect(internals.rehydrateExactDockerEffectLaunch).toHaveBeenCal…
+       |                                                          ^
+    2594|     });
+    2595|     const secondPending = backend.reconcilePendingAttempts();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/10]⎯
+
+ FAIL  tests/orchestra/spawn-backend-docker-mounts.test.ts > exact Docker custody mounts > keeps leadership-free recovery out of exact adoption and HOLDs a gapped start chain
+AssertionError: expected { adopted: [], …(9) } to match object { adopted: [], …(2) }
+(8 matching properties omitted from actual)
+
+- Expected
++ Received
+
+@@ -2,13 +2,13 @@
+    "adopted": [],
+    "closedNotDispatched": [],
+    "held": [
+      {
+        "admissionRefDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+-       "authorityState": "DISPATCH_TERMINAL",
++       "authorityState": "RECOVERY_ENTRY_FAILED",
+        "dispatchRequestId": "dreq-2222222222222222222222222222222222222222222222222222222222222222",
+        "kind": "spawn-backend-recovery-hold",
+-       "reasonCode": "TERMINAL_RECONCILIATION_REQUIRED",
++       "reasonCode": "ENTRY_RECONCILIATION_FAILED",
+        "taskId": "task",
+      },
+    ],
+  }
+
+ ❯ tests/orchestra/spawn-backend-docker-mounts.test.ts:3040:5
+    3038|       .resolves.toMatchObject({ adopted: [] });
+    3039|     expect(internals.openExactDockerRecoveryStore).not.toHaveBeenCalle…
+    3040|     await expect(backend.reconcilePendingAttempts())
+       |     ^
+    3041|       .resolves.toMatchObject({
+    3042|         adopted: [],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/10]⎯
+
+ FAIL  tests/orchestra/spawn-backend-docker-mounts.test.ts > exact Docker custody mounts > rejects NOT_DISPATCHED recovery when durable provider execution evidence exists
+AssertionError: expected [] to deeply equal [ 'PROVIDER_START', …(1) ]
+
+- Expected
++ Received
+
+- [
+-   "PROVIDER_START",
+-   "PROVIDER_EXECUTION",
+- ]
++ []
+
+ ❯ tests/orchestra/spawn-backend-docker-mounts.test.ts:3098:8
+    3096|       .resolves.toMatchObject({ adopted: [], closedNotDispatched: [] }…
+    3097|     expect(readDispatchObservationByClass.mock.calls.map(([input]) => …
+    3098|       .toEqual(['PROVIDER_START', 'PROVIDER_EXECUTION']);
+       |        ^
+    3099|     expect(internals.reconstructExactDockerRecoveryScope).toHaveBeenCa…
+    3100|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/10]⎯
+
+ FAIL  tests/orchestra/spawn-backend-docker-mounts.test.ts > exact Docker custody mounts > isolates one pending admission HOLD and still closes a later terminal zero-work record
+AssertionError: expected { adopted: [], …(9) } to match object { adopted: [], …(2) }
+(7 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "adopted": [],
+-   "closedNotDispatched": [
+-     "task",
+-   ],
++   "closedNotDispatched": [],
+    "held": [
+      {
+        "admissionRefDigest": null,
+        "authorityState": "RESERVED_PENDING_ADMISSION",
++       "backend": "docker",
+        "dispatchRequestId": "dreq-3333333333333333333333333333333333333333333333333333333333333333",
+        "kind": "spawn-backend-recovery-hold",
+        "reasonCode": "ADMISSION_RECONCILIATION_REQUIRED",
++       "taskId": "task",
++     },
++     {
++       "admissionRefDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
++       "authorityState": "RECOVERY_ENTRY_FAILED",
++       "backend": "docker",
++       "dispatchRequestId": "dreq-2222222222222222222222222222222222222222222222222222222222222222",
++       "kind": "spawn-backend-recovery-hold",
++       "reasonCode": "ENTRY_RECONCILIATION_FAILED",
+        "taskId": "task",
+      },
+    ],
+  }
+
+ ❯ tests/orchestra/spawn-backend-docker-mounts.test.ts:3145:5
+    3143|     }));
+    3144| 
+    3145|     await expect(backend.reconcilePendingAttempts()).resolves.toMatchO…
+       |     ^
+    3146|       adopted: [],
+    3147|       closedNotDispatched: [fixture.identity.taskId],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/10]⎯
+
+ FAIL  tests/orchestra/spawn-backend-docker-mounts.test.ts > exact Docker custody mounts > reports one identity-bound discovery HOLD and still reconciles its valid sibling
+AssertionError: expected { adopted: [], …(9) } to match object { adopted: [], …(2) }
+(7 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "adopted": [],
+-   "closedNotDispatched": [
+-     "task",
+-   ],
++   "closedNotDispatched": [],
+    "held": [
+      {
+        "admissionRefDigest": null,
+        "authorityState": "ADMISSION_DISCOVERY_REJECTED",
++       "backend": "docker",
+        "custodyHoldCode": "INCOMPLETE_PUBLICATION",
+        "dispatchRequestId": "dreq-4444444444444444444444444444444444444444444444444444444444444444",
+        "kind": "spawn-backend-recovery-hold",
+        "reasonCode": "DISPATCH_DISCOVERY_TAMPERED_CANDIDATE",
+        "taskId": "identity-bound-unreadable-admission",
++     },
++     {
++       "admissionRefDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
++       "authorityState": "RECOVERY_ENTRY_FAILED",
++       "backend": "docker",
++       "dispatchRequestId": "dreq-2222222222222222222222222222222222222222222222222222222222222222",
++       "kind": "spawn-backend-recovery-hold",
++       "reasonCode": "ENTRY_RECONCILIATION_FAILED",
++       "taskId": "task",
+      },
+    ],
+  }
+
+ ❯ tests/orchestra/spawn-backend-docker-mounts.test.ts:3248:5
+    3246|     }));
+    3247| 
+    3248|     await expect(backend.reconcilePendingAttempts()).resolves.toMatchO…
+       |     ^
+    3249|       adopted: [],
+    3250|       closedNotDispatched: [fixture.identity.taskId],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/10]⎯
+
+ FAIL  tests/orchestra/spawn-backend-docker-mounts.test.ts > exact Docker custody mounts > HOLDs a released exact attempt whose admitted landing policy is missing
+AssertionError: expected { adopted: [], …(9) } to match object { adopted: [], …(2) }
+(8 matching properties omitted from actual)
+
+- Expected
++ Received
+
+@@ -2,13 +2,13 @@
+    "adopted": [],
+    "closedNotDispatched": [],
+    "held": [
+      {
+        "admissionRefDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+-       "authorityState": "DISPATCH_TERMINAL",
++       "authorityState": "RECOVERY_ENTRY_FAILED",
+        "dispatchRequestId": "dreq-2222222222222222222222222222222222222222222222222222222222222222",
+        "kind": "spawn-backend-recovery-hold",
+-       "reasonCode": "TERMINAL_RECONCILIATION_REQUIRED",
++       "reasonCode": "ENTRY_RECONCILIATION_FAILED",
+        "taskId": "task",
+      },
+    ],
+  }
+
+ ❯ tests/orchestra/spawn-backend-docker-mounts.test.ts:3297:5
+    3295|     internals.rehydrateExactDockerEffectLaunch = vi.fn();
+    3296| 
+    3297|     await expect(backend.reconcilePendingAttempts()).resolves.toMatchO…
+       |     ^
+    3298|       adopted: [],
+    3299|       closedNotDispatched: [],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/10]⎯
+
+ FAIL  tests/orchestra/spawn-backend-docker-mounts.test.ts > exact Docker custody mounts > contains every exact durable admission through stop-and-record without monitor or landing
+AssertionError: expected { adopted: [], …(9) } to match object { adopted: [ 'task' ] }
+(9 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "adopted": [
+-     "task",
+-   ],
++   "adopted": [],
+  }
+
+ ❯ tests/orchestra/spawn-backend-docker-mounts.test.ts:3380:5
+    3378| 
+    3379|     expect(backend.workerInventoryState(fixture.identity.taskId)).toBe…
+    3380|     await expect(backend.reconcilePendingAttempts({ mode: 'contain' }))
+       |     ^
+    3381|       .resolves.toMatchObject({ adopted: [fixture.identity.taskId] });
+    3382|     expect(internals.exactWorkspaceCommandRunner).toHaveBeenCalledTime…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/10]⎯
+
+ FAIL  tests/orchestra/spawn-backend-docker-mounts.test.ts > exact Docker custody mounts > reopens hot/cold accepted authority with derived directory projection true
+TypeError: lifecycleStoreAdapter.readLandingRecoveryAnchor is not a function
+ ❯ DockerSpawnBackend.readColdExactDockerCompletion src/orchestra/spawn-backend-docker.ts:15938:50
+    15936|       now: () => this.nextExactDockerTimestamp(),
+    15937|     });
+    15938|     const recoveryAnchor = lifecycleStoreAdapter.readLandingRecoveryAn…
+       |                                                  ^
+    15939|     if (!recoveryAnchor) return null;
+    15940|     const landingArtifactKey =
+ ❯ tests/orchestra/spawn-backend-docker-mounts.test.ts:4582:50
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/10]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  10 failed | 104 passed (114)
+   Start at  20:15:16
+   Duration  6.64s (transform 3.27s, setup 28ms, collect 5.20s, tests 1.61s, environment 0ms, prepare 74ms)
+

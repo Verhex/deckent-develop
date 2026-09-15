@@ -1,0 +1,16 @@
+{
+  "startedAt": "2026-09-14T17:20:47.193119+00:00",
+  "endedAt": "2026-09-14T17:21:03.294781+00:00",
+  "elapsedSeconds": 16.101667511000414,
+  "exitCode": 1,
+  "command": [
+    "node",
+    "dist/cli/entry.js",
+    "recover",
+    "sprint-764",
+    "--retain-released-unaccepted",
+    "dreq-726f6dd076ee6039f6df558c974272db1f387fdb15285b2738e5e78eec3ac3fe",
+    "--dry-run",
+    "--json"
+  ]
+}

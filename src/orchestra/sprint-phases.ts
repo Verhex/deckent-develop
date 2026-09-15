@@ -4666,6 +4666,7 @@ export interface OuterStagedSettlementBlocked {
   readonly stagedFoundationTaskIds: readonly string[];
   readonly closures: readonly StagedClosureStatus[];
   readonly blockedClosures: readonly StagedClosureStatus[];
+  readonly effectHeldTaskIds?: readonly string[];
   /** Independent settled work this barrier explicitly preserves (never discarded). */
   readonly preservedSettledTaskIds: readonly string[];
   /** Operator-runnable command that resumes exactly this held sprint. */
@@ -4800,7 +4801,9 @@ export function resolveOuterStagedSettlementBarrier(input: {
   }
 
   const blockedClosures = closures.filter(closure => !closure.settled);
-  if (blockedClosures.length === 0) {
+  const effectHeldTaskIds = tasks.filter(task => evaluations.get(task.id) === TaskEvaluation.EFFECT_HOLD)
+    .map(task => task.id);
+  if (blockedClosures.length === 0 && effectHeldTaskIds.length === 0) {
     return {
       state: 'AUTHORIZED',
       sprintId,
@@ -4826,6 +4829,7 @@ export function resolveOuterStagedSettlementBarrier(input: {
     stagedFoundationTaskIds: foundationTaskIds,
     closures,
     blockedClosures,
+    effectHeldTaskIds,
     preservedSettledTaskIds,
     resumeCommand: `deckent resume ${sprintId}`,
   };
@@ -4833,8 +4837,9 @@ export function resolveOuterStagedSettlementBarrier(input: {
 
 /** One-line, machine-greppable summary of why the barrier held. */
 export function describeStagedSettlementBlock(blocked: OuterStagedSettlementBlocked): string {
-  return blocked.blockedClosures
-    .map(closure => `${closure.foundationTaskId}->${closure.closureTaskId}:${closure.reasonCode}`)
+  return [...blocked.blockedClosures
+    .map(closure => `${closure.foundationTaskId}->${closure.closureTaskId}:${closure.reasonCode}`),
+    ...(blocked.effectHeldTaskIds ?? []).map(taskId => `${taskId}:EFFECT_HOLD`)]
     .join(',');
 }
 

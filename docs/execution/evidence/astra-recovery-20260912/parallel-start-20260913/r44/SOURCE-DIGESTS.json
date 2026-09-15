@@ -1,0 +1,9 @@
+{
+  "observedAt": "2026-09-15T14:56:06.011096+00:00",
+  "sha256": {
+    "src/orchestra/result-collector.ts": "95e252a72ed6904809183653a8589d84786f702ff7cb350dd410ade5140fb800",
+    "src/orchestra/scheduler-effects.ts": "30f4dc8d122f8754ab34f80554fd36b2d2739784662192b230a3a0e5f95cb75b",
+    "src/orchestra/sprint-spawner.ts": "2d29f6a8b8ff87d7c42c03d64969a5736c7c8714c14c179083f26f04cc82a065",
+    "tests/orchestra/scheduler-spawn-executor.test.ts": "c0c20e47e9a9dc736cfefd3e857f3ed7df76b16b7a6ed3b0c9d170b27e867aa5"
+  }
+}

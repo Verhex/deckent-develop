@@ -1,0 +1,32 @@
+{
+  "utc": "2026-09-14T15:41:53.897022+00:00",
+  "snapshot": {
+    "sprintId": "sprint-764",
+    "pid": 1395656,
+    "startToken": "s10414121",
+    "leaseId": "4e0651ba-97b2-45a5-ad23-3e1adcfa4b11",
+    "startedAt": "2026-09-14T15:39:17.357Z",
+    "currentWave": 0,
+    "taskStatuses": {
+      "764-001": "EXECUTING",
+      "764-002": "PENDING",
+      "764-003": "PENDING",
+      "764-004": "PENDING"
+    },
+    "metricsJsonlSize": 7,
+    "lastHeartbeat": "2026-09-14T15:41:33.546Z"
+  },
+  "task": {
+    "id": "764-001",
+    "status": "EXECUTING",
+    "assignedWorker": "w-764-001",
+    "provider": null,
+    "model": "gpt-5.6-luna",
+    "sprintId": "sprint-764"
+  },
+  "taskDigest": "6c002b5515768d98780a81c8bc5ba500c6230dbd66e5143ee30bf48f9980939b",
+  "processes": {
+    "exitCode": 0,
+    "stdout": "PID                 COMMAND\n1403154             MainThread\n1403563             MainThread\n1403574             MainThread\n1403581             codex\n1404423             codex-code-mode\n"
+  }
+}

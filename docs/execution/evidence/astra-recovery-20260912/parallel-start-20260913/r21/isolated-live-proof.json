@@ -1,0 +1,51 @@
+{
+  "utc": "2026-09-14T14:20:33.981Z",
+  "elapsedMs": 66.765967,
+  "auditMatch": true,
+  "quarantineMatch": true,
+  "wrongFenceRejected": true,
+  "actions": [
+    "boundary-entered",
+    "quarantined",
+    "recovered"
+  ],
+  "auditEventId": "77ccf374-dd7d-4b1a-b0d8-ebe65d1231fd",
+  "auditDigest": "14efb3bf084a3a07d71a1deb3a3a4aeae15bb73b060f4f452bdfa1061912f17b",
+  "lineageDigest": "e08b499bee2754a2555837b7c015cbd5892dfd5fb2837619a96e3daeace1161d",
+  "status": {
+    "schemaVersion": 1,
+    "lifecycle": "ABORTED",
+    "active": false,
+    "resumable": false,
+    "sprintId": "sprint-762",
+    "phase": "EXECUTE",
+    "status": "ABORTED",
+    "reason": null,
+    "recoveryCommand": null,
+    "finalizeCommand": null,
+    "coordinator": "absent",
+    "conflicts": [],
+    "recoveryReconciliation": {
+      "version": 1,
+      "sprintId": "sprint-762",
+      "evidence": {
+        "checkpointPresent": false,
+        "terminalReceipt": {
+          "version": 1,
+          "sprintId": "sprint-762",
+          "runId": "sprint-762",
+          "coordinatorGeneration": 2,
+          "terminalOutcome": "ABORTED",
+          "logicalSettlementDigest": "2bc0eba8d9580f1dbd3b2a57842265312333ef8124163d2cd673be8803b1d97b",
+          "priorAuthorityVersion": 0,
+          "authorityVersion": 1
+        },
+        "terminalReceiptConflict": null
+      },
+      "state": "consistent",
+      "mismatch": null,
+      "remediation": null
+    }
+  },
+  "disposition": "HOLD — partial-effect retention not yet implemented"
+}

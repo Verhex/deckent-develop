@@ -1,0 +1,14 @@
+{
+  "utc": "2026-09-14T12:29:03.045293+00:00",
+  "parentRecovery": "R18-762-LANDING-RECOVERY",
+  "files": {
+    "src/orchestra/execution-effect-landing-coordinator.ts": "da4412bf233b4e0b1376c64018078c94f4531e252d695a9279804acd6675ec2b",
+    "tests/orchestra/execution-effect-landing-coordinator.test.ts": "02755cd0f56cb7d8d27ec3d789030ce471ea2c2c2ad0dc3f91d74d2b3d1677e7"
+  },
+  "proof": {
+    "targetedTests": 47,
+    "testExit": 0,
+    "tscExit": 0
+  },
+  "status": "foundation wired into production reconcile before lease adoption; partial-quarantine successor transition remains HOLD"
+}

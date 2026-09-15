@@ -1,0 +1,65 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+stdout | tests/orchestra/result-collector.test.ts > result-collector timeout detection > detects .timeout file and writes synthetic NO_GO result
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector.test.ts > result-collector timeout detection > prefers real .result over .timeout when both exist
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector.test.ts > result-collector timeout detection > collects normal results without timeout marker
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector.test.ts > result-collector timeout detection > handles multiple tasks with mixed results and timeouts
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector.test.ts > result-collector timeout detection > cascade-skips a dependent whose dependency NO_GO'd, no EXECUTE hang (P0-A)
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector.test.ts > waitForResults — transactional collect/evaluate/sync > retries an evaluator throw without losing or duplicating the collected result
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector.test.ts > waitForResults — repairable dependency parking > yields to FIX with the dependent PAUSED and no synthetic result
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector.test.ts > waitForResults — token enrichment integration > enriches collected results with estimated tokenUsage
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector.test.ts > waitForResults — token enrichment integration > does not overwrite worker-reported tokenUsage during collection
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector.test.ts > waitForResults — token enrichment integration > enriches 12 tasks and total tokens > 0
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector.test.ts > exact effect HOLD collection > parks undefined evidence without a TaskResult or dispatching the dependent
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector.test.ts > exact effect HOLD collection > parks RECOVERABLE_EXHAUSTED evidence without a TaskResult or dispatching the dependent
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/result-collector.test.ts > exact effect HOLD collection > parks PUBLICATION_FAILED evidence without a TaskResult or dispatching the dependent
+[deckent] scheduler engine: legacy
+
+ ✓ tests/orchestra/result-collector.test.ts (30 tests) 461ms
+   ✓ exact effect HOLD collection > parks undefined evidence without a TaskResult or dispatching the dependent  346ms
+[scheduler-effects] task 700-005-fix: routing-lineage-missing: original task does-not-exist (fix target for 700-005-fix) could not be read at /tmp/sched3-inherit-ea64db78/.tasks/task-does-not-exist.json — spawn blocked
+[scheduler-effects] task 700-006-fix: routing-lineage-missing: original task 700-006 JSON is corrupt: Expected property name or '}' in JSON at position 2 (line 1 column 3) — spawn blocked
+stdout | tests/orchestra/scheduler-spawn-executor.test.ts > waitForResults — queue-completion trigger (processQueue) delegates to executeSpawnTask > spawns the queued fix-task with inherited routing fields and persists task-<id>.json (behavior a + b, live wiring)
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/scheduler-spawn-executor.test.ts > waitForResults — queue-completion trigger (processQueue) delegates to executeSpawnTask > propagates one provider-authority HOLD instead of retrying a queued task
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/scheduler-spawn-executor.test.ts > waitForResults — dep-ready trigger (dispatchReadyTasks) delegates to executeSpawnTask > spawns a dependency-ready fix-task with inherited routing fields and persists task-<id>.json (behavior a + b, live wiring)
+[deckent] scheduler engine: legacy
+
+ ✓ tests/orchestra/scheduler-spawn-executor.test.ts (38 tests) 2151ms
+   ✓ executeSpawnTask — exact normal-Docker publication order > preserves and freshly revalidates a current terminal across accepted recovery ownership transfer  990ms
+   ✓ waitForResults — queue-completion trigger (processQueue) delegates to executeSpawnTask > spawns the queued fix-task with inherited routing fields and persists task-<id>.json (behavior a + b, live wiring)  304ms
+   ✓ waitForResults — dep-ready trigger (dispatchReadyTasks) delegates to executeSpawnTask > spawns a dependency-ready fix-task with inherited routing fields and persists task-<id>.json (behavior a + b, live wiring)  302ms
+
+ Test Files  2 passed (2)
+      Tests  68 passed (68)
+   Start at  17:55:17
+   Duration  5.79s (transform 2.60s, setup 28ms, collect 4.77s, tests 2.61s, environment 0ms, prepare 70ms)
+

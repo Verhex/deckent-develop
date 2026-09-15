@@ -1,0 +1,16 @@
+{
+  "COMMAND-EXITS.json": "a82aaf7c055a5475fac0a47112cfded4d326350eb206c7672aa9627e8f751c2b",
+  "RESULT.md": "0dcd58b92ce12dadf8cdeb082c303cfe4ffee74f3f9a3af110459f6b136a9df3",
+  "before-retention-command.log": "a42783db7bfbfb717dae8a5c150f5929e85f768966e12309fb9582065f2d9ccb",
+  "before-retention-entries.jsonl": "39503783b2a1712c19fb08f4e31246a17dbf8e55dad3f4089c7023f55d480b27",
+  "before-retention-result.json": "9caab1989fb16daf303ec21b231f98d899d20a11d7f02e28a0e726faadcb80da",
+  "command.log": "6c20d2cc8b111a4d2552db656bb1f11a63bad78511293143f05450049557b162",
+  "entries.jsonl": "c4fa1d5f7e127f2fa137040d6790ffa8f0e29b65156e533097fa91ec4b9c7831",
+  "probe.mjs": "0d291946a16ddf75230c1994964255461217aba306a2da4371cc5a87336b28be",
+  "result.json": "3f9875b1e1923c5509b0f3fd1b5a1780e54f7356231c8c4aedc048b9f15449f1",
+  "retain-001.log": "f93927511cfba1d0441848f704bd4cf8d264d9e40e296f4f4a41477bf82f59dc",
+  "retain-002.log": "f528bf9adbe7af4e9f96529ae0b22ef76e4441c73c3fafc8efb3407bb9bf8d06",
+  "retain-004.log": "97565c4a076b5aeacff0a9cf6cd9210218fc0903dbfb85dbf4eff13e6f3ffca4",
+  "retained-001.log": "05907c2a1c33f5dfd00b3526875843236c5a56a6101d853196f4a245368d9f62",
+  "retained-004.log": "b991a51415f4c3aa85497b315b35ce9684fcaa93c8c48232fadb4ca3573f3e5a"
+}

@@ -769,3 +769,40 @@ describe('waitForResults — token enrichment integration', () => {
     }
   });
 });
+
+
+describe('exact effect HOLD collection', () => {
+  it.each([undefined, 'RECOVERABLE_EXHAUSTED', 'PUBLICATION_FAILED'] as const)(
+    'parks %s evidence without a TaskResult or dispatching the dependent', async classification => {
+      const root = makeTmpDir();
+      try {
+        const a = makeTask('held-a');
+        const c = makeTask('held-c');
+        c.dependencies = [a.id];
+        c.status = TaskStatus.PENDING;
+        const onHold = vi.fn();
+        const ipc = vi.fn(() => { throw new Error('held task must not poll IPC'); });
+        const results = await waitForResults(root, makeSprint([a, c]), 500, undefined, {
+          onTaskAuthorityHold: onHold,
+          ipcExecutionMode: 'normal-docker', isExactTaskAuthority: () => true,
+          resolveExactAttemptIpcAuthority: ipc,
+          readTaskResultAuthority: id => id === a.id ? {
+            state: 'authority-hold', result: null, settlementRef: null,
+            rawResultPath: join(root, '.tasks', `task-${id}.result`),
+            ...(classification ? { holdEvidence: { classification, taskId: id,
+              attemptId: 'attempt', generation: 1, admissionRefDigest: 'fixture',
+              replayReceiptDigest: 'fixture', outcomeReceiptDigest: 'fixture',
+              predecessorProgressDigest: 'fixture', finalProgressDigest: 'fixture', code: 'fixture' } } : {}),
+          } : { state: 'pending-settlement', result: null, settlementRef: null,
+            rawResultPath: join(root, '.tasks', `task-${id}.result`) },
+        });
+        expect(results).toEqual([]);
+        expect(a.status).toBe(TaskStatus.PAUSED);
+        expect(c.status).toBe(TaskStatus.PENDING);
+        expect(onHold).toHaveBeenCalledWith(a.id);
+        expect(ipc).not.toHaveBeenCalled();
+        expect(existsSync(join(root, '.tasks', `task-${a.id}.result`))).toBe(false);
+        expect(existsSync(join(root, '.tasks', `task-${c.id}.result`))).toBe(false);
+      } finally { rmSync(root, { recursive: true, force: true }); }
+    });
+});

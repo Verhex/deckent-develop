@@ -1149,8 +1149,8 @@ export function formatContextSnapshot(
   // units; an unknown value prints the unknown label, never 0. Absent progress
   // means no digest program ran in this session, so the block is omitted whole.
   const reference = snapshot.referenceProgress;
-  if (reference && labels.referenceHeader) {
-    const unknown = labels.referenceUnknown ?? '';
+  if (reference && labels.referenceHeader && labels.referenceUnknown !== undefined) {
+    const unknown: string = labels.referenceUnknown;
     const source = reference.sourcePath ?? `sha256:${reference.sourceDigest.slice(0, 12)}`;
     lines.push(`  ${labels.referenceHeader
       .replace('{source}', source)

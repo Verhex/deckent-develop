@@ -51,8 +51,12 @@ function driveLifecycle(
         toolCount = 0;
         break;
       case 'tool':
-        if (isOperatorStripTurnLive(turnEpoch, clearEpoch)) {
-          toolCount += 1;
+        if (!isOperatorStripTurnLive(turnEpoch, clearEpoch)) break;
+        toolCount += 1;
+        if (isOperatorPhaseSignal(step.info)) {
+          scrollback.push(step.info);
+          strip = null;
+        } else {
           strip = step.info;
         }
         break;
@@ -142,6 +146,17 @@ describe('operator strip lifecycle — clear/cancel/new turn (ENTRY 197 follow-u
     const turn = buildCommittedOperatorTurn(1, { verb: 'run', target: 'bash', budgetNotice: 'withheld' });
     expect(turn.role).toBe('operator');
     expect(turn.tool.budgetNotice).toBe('withheld');
+  });
+
+  it('failed tool A commits to scrollback before success B replaces live strip', () => {
+    const end = driveLifecycle([
+      { kind: 'start' },
+      { kind: 'tool', info: { verb: 'run', target: 'bash', failed: true } },
+      { kind: 'tool', info: { verb: 'read', target: 'ok.ts' } },
+      { kind: 'finalize' },
+    ]);
+    expect(end.scrollback.map((t) => t.target)).toEqual(['bash']);
+    expect(end.committed?.target).toBe('ok.ts');
   });
 
   it('stale tool after /clear does not update strip; new turn accepts fresh tool', () => {

@@ -1,0 +1,6 @@
+[lint-adr-sync] db=/home/alperen/deckent-dev/.brain/memory.db
+[lint-adr-sync] export=/home/alperen/deckent-dev/.brain/exports/decisions.md
+[lint-adr-sync] accepted-in-db=52 exported=52
+
+
+PASS: 52 accepted ADR(s) in sync with the export.

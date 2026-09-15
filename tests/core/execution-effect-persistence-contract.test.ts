@@ -10,6 +10,7 @@ import {
   createExecutionEffectLandingLeaseResumeResultV1,
   createExecutionEffectLandingReceiptV1,
   createExecutionEffectPersistenceOperationV1,
+  createExecutionEffectLandingDerivedParentProvenanceV1,
   createExecutionEffectResultProjectionV1,
   createExecutionEffectStagedSourceSealV1,
   createExecutionEffectDependencyResourceV1,
@@ -139,8 +140,9 @@ function manifest(
   return parsed;
 }
 
-function changedBundle() {
-  const writePolicy = compileExecutionEffectWritePolicy(['out.bin']);
+function changedBundle(reuseParent = false) {
+  const outputPath = reuseParent ? 'shared/out.bin' : 'out.bin';
+  const writePolicy = compileExecutionEffectWritePolicy([outputPath]);
   if (!writePolicy.ok) throw new Error('invalid execution-effect persistence test policy');
   const attemptDigest = domainDigest('execution-effect-attempt-v1', attempt);
   const workspaceCaptureCapabilityDigest = digestValue('1');
@@ -191,8 +193,9 @@ function changedBundle() {
     'final',
     [
       { path: '.', kind: 'directory', mode: 0o755 },
+      ...(reuseParent ? [{path: 'shared', kind: 'directory' as const, mode: 0o755}] : []),
       {
-        path: 'out.bin',
+        path: outputPath,
         kind: 'regular-file',
         mode: 0o640,
         size: sourceBytes.byteLength,
@@ -225,7 +228,7 @@ function changedBundle() {
     bytes: chunk,
   }));
   const stagedSource = createExecutionEffectStagedSourceSealV1({
-    path: 'out.bin',
+    path: outputPath,
     byteLength: sourceBytes.byteLength,
     contentDigest: executionEffectPersistenceRawDigest(sourceBytes),
     workspaceIdentityDigest: executionEffectWorkspaceAuthorityDigestV1(
@@ -258,22 +261,35 @@ function changedBundle() {
     ...rootStateBody,
     stateDigest: domainDigest('execution-effect-landing-entry-state-v1', rootStateBody),
   });
-  const finalEntry = final.entries.find(entry => entry.path === 'out.bin')!;
+  const finalEntry = final.entries.find(entry => entry.path === outputPath)!;
   const expectedPostBody = Object.freeze({ state: 'PRESENT' as const, entry: finalEntry });
   const expectedPost = Object.freeze({
     ...expectedPostBody,
     stateDigest: domainDigest('execution-effect-landing-expected-entry-state-v1', expectedPostBody),
   });
+  const sharedEntry = {path: 'shared', kind: 'directory' as const, mode: 0o755};
+  const sharedBody = {state: 'PRESENT' as const, entry: sharedEntry, objectIdentityDigest: digestValue('6'), linkCount: null};
+  const sharedState = {...sharedBody, stateDigest: domainDigest('execution-effect-landing-entry-state-v1', sharedBody)};
+  const sharedExpectedBody = {state: 'PRESENT' as const, entry: sharedEntry};
+  const reuseAuthority = reuseParent ? createExecutionEffectPersistenceOperationV1({
+    index: 0, kind: 'REUSE_DIRECTORY', path: 'shared', effectDigests: [],
+    derivedParent: createExecutionEffectLandingDerivedParentProvenanceV1({path: 'shared', childEffectDigests: [decision.effects[0]!.digest as ExecutionEffectPersistenceDigest]}),
+    stagedSource: null, entryPreimages: [{path: 'shared', entry: sharedState}],
+    entryPostimages: [{path: 'shared', entry: {...sharedExpectedBody, stateDigest: domainDigest('execution-effect-landing-expected-entry-state-v1', sharedExpectedBody)}}],
+    parentAuthorities: [{path: '.', source: 'PREPARED_PREIMAGE', entry: rootState}], nativeReceiptDigest: digestValue('a'), durabilityEvidenceDigest: digestValue('b'),
+  }) : null;
+  const reuseReceipt = reuseAuthority ? createExecutionEffectLandingNativeReceiptEvidenceV1({operation: reuseAuthority, entryPostimages: [{path: 'shared', entry: sharedState}], durabilityEvidenceDigest: digestValue('b')}) : null;
+  const reuseOperation = reuseAuthority && reuseReceipt ? createExecutionEffectPersistenceOperationV1({...reuseAuthority, nativeReceiptDigest: reuseReceipt.receiptDigest}) : null;
   const operationAuthority = createExecutionEffectPersistenceOperationV1({
-    index: 0,
+    index: reuseParent ? 1 : 0,
     kind: 'ADD',
-    path: 'out.bin',
+    path: outputPath,
     effectDigests: [decision.effects[0]!.digest as ExecutionEffectPersistenceDigest],
     derivedParent: null,
     stagedSource,
-    entryPreimages: [Object.freeze({ path: 'out.bin', entry: absentState })],
-    entryPostimages: [Object.freeze({ path: 'out.bin', entry: expectedPost })],
-    parentAuthorities: [Object.freeze({
+    entryPreimages: [Object.freeze({ path: outputPath, entry: absentState })],
+    entryPostimages: [Object.freeze({ path: outputPath, entry: expectedPost })],
+    parentAuthorities: reuseOperation ? [{path: 'shared', source: 'OPERATION_POSTIMAGE', operationIndex: 0, operationDigest: reuseOperation.operationDigest, expectedDirectory: sharedEntry}] : [Object.freeze({
       path: '.',
       source: 'PREPARED_PREIMAGE' as const,
       entry: rootState,
@@ -283,7 +299,7 @@ function changedBundle() {
   });
   const planDigest = domainDigest(
     'execution-effect-landing-plan-v1',
-    [operationAuthority.operationDigest],
+    [...(reuseOperation ? [reuseOperation.operationDigest] : []), operationAuthority.operationDigest],
   );
   const transactionBody = Object.freeze({
     version: 1 as const,
@@ -307,7 +323,7 @@ function changedBundle() {
     kind: 'execution-effect-landing-prepared' as const,
     phase: 'PREPARED' as const,
     transaction,
-    operations: Object.freeze([operationAuthority]),
+    operations: Object.freeze([...(reuseOperation ? [reuseOperation] : []), operationAuthority]),
     nativeCapabilityDigest: landingNativeCapabilityDigest,
     journalCapabilityDigest: digestValue('2'),
     leaseCapabilityDigest: digestValue('3'),
@@ -342,7 +358,7 @@ function changedBundle() {
     recordDigest: domainDigest('execution-effect-landing-applying-journal-v1', applyingBody),
   });
   const nativePostimages = Object.freeze([Object.freeze({
-      path: 'out.bin',
+      path: outputPath,
       entry: Object.freeze({
         state: 'PRESENT' as const,
         entry: finalEntry,
@@ -376,6 +392,12 @@ function changedBundle() {
     entryPostimages: nativePostimages,
     durabilityEvidenceDigest: canonicalNativeReceipt.durabilityEvidenceDigest,
   });
+  const reuseStepBody = reuseOperation && reuseReceipt ? {
+    version: 1, kind: 'execution-effect-landing-step', phase: 'STEP', transactionDigest: transaction.transactionDigest,
+    preparedJournalDigest: prepared.recordDigest, applyingJournalDigest: applying.recordDigest, previousJournalDigest: applying.recordDigest,
+    index: 0, operationDigest: reuseOperation.operationDigest, nativeReceipt: reuseReceipt, reconciledAfterCrash: false, appliedAt: '2026-09-01T08:02:25.000Z',
+  } : null;
+  const reuseStep = reuseStepBody ? {...reuseStepBody, recordDigest: domainDigest('execution-effect-landing-step-journal-v1', reuseStepBody)} : null;
   const stepBody = Object.freeze({
     version: 1 as const,
     kind: 'execution-effect-landing-step' as const,
@@ -383,8 +405,8 @@ function changedBundle() {
     transactionDigest: transaction.transactionDigest,
     preparedJournalDigest: prepared.recordDigest,
     applyingJournalDigest: applying.recordDigest,
-    previousJournalDigest: applying.recordDigest,
-    index: 0,
+    previousJournalDigest: reuseStep?.recordDigest ?? applying.recordDigest,
+    index: reuseParent ? 1 : 0,
     operationDigest: operation.operationDigest,
     nativeReceipt,
     reconciledAfterCrash: false,
@@ -397,8 +419,8 @@ function changedBundle() {
   const finalVerificationReceipt = createExecutionEffectLandingFinalReceiptEvidenceV1({
     transactionDigest: transaction.transactionDigest,
     planDigest,
-    operations: [operation],
-    nativeReceipts: [nativeReceipt],
+    operations: [...(reuseOperation ? [reuseOperation] : []), operation],
+    nativeReceipts: [...(reuseReceipt ? [reuseReceipt] : []), nativeReceipt],
     durabilityEvidenceDigest: digestValue('7'),
   });
   const committedAt = '2026-09-01T08:03:00.000Z';
@@ -411,7 +433,7 @@ function changedBundle() {
     preparedJournalDigest: prepared.recordDigest,
     applyingJournalDigest: applying.recordDigest,
     lastJournalDigest: step.recordDigest,
-    operationReceiptDigests: Object.freeze([nativeReceipt.receiptDigest]),
+    operationReceiptDigests: Object.freeze([...(reuseReceipt ? [reuseReceipt.receiptDigest] : []), nativeReceipt.receiptDigest]),
     finalVerificationReceipt,
     committedAt,
   });
@@ -419,12 +441,12 @@ function changedBundle() {
     ...committedBody,
     recordDigest: domainDigest('execution-effect-landing-committed-journal-v1', committedBody),
   });
-  const journalRecords = [prepared, applying, step, committed];
+  const journalRecords = [prepared, applying, ...(reuseStep ? [reuseStep] : []), step, committed];
   const journalArtifacts = journalRecords.map((record, index) => {
     const recordBytes = bytes(record);
     return Object.freeze({
       artifactKey: `journal-${index}`,
-      artifactReceiptDigest: digestValue(['8', '9', 'a', 'b'][index]!),
+      artifactReceiptDigest: digestValue(['8', '9', 'a', 'b', 'c'][index]!),
       contentDigest: executionEffectPersistenceRawDigest(recordBytes),
       byteLength: recordBytes.byteLength,
       bytes: recordBytes,
@@ -451,12 +473,12 @@ function changedBundle() {
       `effect-transaction:${transaction.transactionDigest}`,
     ].sort(),
   });
-  const receiptValues = [nativeReceipt, finalVerificationReceipt, leaseTerminalEvidence];
+  const receiptValues = [...(reuseReceipt ? [reuseReceipt] : []), nativeReceipt, finalVerificationReceipt, leaseTerminalEvidence];
   const receiptArtifacts = receiptValues.map((value, index) => {
     const valueBytes = bytes(value);
     return Object.freeze({
       artifactKey: `receipt-evidence-${index}`,
-      artifactReceiptDigest: digestValue(['c', 'd', 'e'][index]!),
+      artifactReceiptDigest: digestValue(['c', 'd', 'e', 'f'][index]!),
       contentDigest: executionEffectPersistenceRawDigest(valueBytes),
       byteLength: valueBytes.byteLength,
       bytes: valueBytes,
@@ -477,22 +499,22 @@ function changedBundle() {
     finalManifestDigest: final.digest as ExecutionEffectPersistenceDigest,
     effectDecisionDigest: decision.decisionDigest as ExecutionEffectPersistenceDigest,
     planId,
-    operations: [operation],
+    operations: [...(reuseOperation ? [reuseOperation] : []), operation],
     preparedJournalDigest: prepared.recordDigest,
     applyingJournalDigest: applying.recordDigest,
-    stepJournalDigests: [step.recordDigest],
+    stepJournalDigests: [...(reuseStep ? [reuseStep.recordDigest] : []), step.recordDigest],
     committedJournalDigest: committed.recordDigest,
     finalVerificationReceiptDigest: finalVerificationReceipt.receiptDigest,
     journalArtifacts: {
       prepared: journalRefs[0]!,
       applying: journalRefs[1]!,
-      steps: [journalRefs[2]!],
-      committed: journalRefs[3]!,
+      steps: journalRefs.slice(2, -1),
+      committed: journalRefs[journalRefs.length - 1]!,
     },
     receiptArtifacts: {
-      nativeReceipts: [receiptRefs[0]!],
-      finalVerificationReceipt: receiptRefs[1]!,
-      leaseTerminalReceipt: receiptRefs[2]!,
+      nativeReceipts: receiptRefs.slice(0, -2),
+      finalVerificationReceipt: receiptRefs[receiptRefs.length - 2]!,
+      leaseTerminalReceipt: receiptRefs[receiptRefs.length - 1]!,
     },
     leaseTerminal: 'COMPLETED',
     leaseTerminalReceiptDigest: leaseTerminalEvidence.terminalReceiptDigest,
@@ -591,6 +613,14 @@ describe('execution-effect persistence contract', () => {
     );
     expect(parseExecutionEffectResultProjectionV1(derivedDirectoryProjection))
       .toEqual(derivedDirectoryProjection);
+    const reusedDirectory = createExecutionEffectResultProjectionV1({
+      ...derivedDirectoryProjectionInput,
+      effects: [{ ...derivedDirectoryProjection.effects[0]!, operationKind: 'REUSE_DIRECTORY', status: 'unchanged' }],
+    });
+    expect(parseExecutionEffectResultProjectionV1(reusedDirectory)).toEqual(reusedDirectory);
+    expect(() => createExecutionEffectResultProjectionV1({
+      ...reusedDirectory, effects: [{ ...reusedDirectory.effects[0]!, status: 'added' }],
+    })).toThrow();
     expect(() => createExecutionEffectResultProjectionV1({
       ...derivedDirectoryProjectionInput,
       effects: [{
@@ -837,6 +867,14 @@ describe('execution-effect persistence contract', () => {
       ...source,
       chunks: [],
     })).toThrow(/execution effect stag/u);
+  });
+
+  it('verifies the complete reused-parent journal and reports no directory modification', () => {
+    const fixture = changedBundle(true);
+    const verified = verifyExecutionEffectPersistenceBundleV1(fixture.input);
+    expect(verified).not.toBeNull();
+    const projection = verified && projectVerifiedExecutionEffectResultV1(verified);
+    expect(projection?.effects.map(effect => [effect.path, effect.status])).toEqual([['shared', 'unchanged'], ['shared/out.bin', 'added']]);
   });
 
   it('recomputes manifests, decision, transaction and every staged raw chunk', () => {

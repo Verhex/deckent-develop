@@ -52,3 +52,51 @@ export async function runIsolatedExactDockerCaptureWindow(
     worker.once('exit', code => resolveResult(code === 0 ? result : null));
   });
 }
+
+/** Execution transport only. Callers retain all admission, identity and effect
+ * authority. Kept separate from the strictly read-only observation transport. */
+export function isExactDockerIsolatedExecution(input: ExactDockerWorkspaceCommandInputV1): boolean {
+  return input.command === 'docker' && Array.isArray(input.args)
+    && (input.args[0] === 'rm' || input.args[0] === 'run'
+      || (input.args[0] === 'volume' && input.args[1] === 'rm'));
+}
+
+export async function runIsolatedExactDockerExecution(
+  input: ExactDockerWorkspaceCommandInputV1,
+): Promise<ExactDockerWorkspaceCommandResultV1> {
+  const unavailable = (): ExactDockerWorkspaceCommandResultV1 => Object.freeze({
+    status: null, signal: null, stdout: new Uint8Array(), stderr: new Uint8Array(),
+    error: true, overflow: false,
+    diagnostic: { reason: 'unavailable' as const, exitCode: null, signaled: false,
+      timeoutMs: Number.isSafeInteger(input.timeoutMs) && input.timeoutMs >= 0 ? input.timeoutMs : 0,
+      elapsedMs: null, stdoutBytes: 0, stderrBytes: 0 },
+  });
+  if (!isExactDockerIsolatedExecution(input)) return unavailable();
+  return new Promise(resolveResult => {
+    let worker: Worker;
+    let result: ExactDockerWorkspaceCommandResultV1 | null = null;
+    let failed = false;
+    try {
+      worker = new Worker(new URL('./exact-docker-execution-worker.js', import.meta.url), {
+        workerData: input,
+        execArgv: process.execArgv.filter(arg => !arg.startsWith('--input-type')),
+      });
+    } catch { resolveResult(unavailable()); return; }
+    worker.on('message', (message: ExactDockerWorkspaceCommandResultV1) => {
+      if (result || !message || (message.status !== null && !Number.isSafeInteger(message.status))
+        || (message.signal !== null && typeof message.signal !== 'string')
+        || typeof message.error !== 'boolean' || typeof message.overflow !== 'boolean'
+        || !(message.stdout instanceof Uint8Array) || !(message.stderr instanceof Uint8Array)
+        || message.stdout.byteLength > input.stdoutCeiling
+        || message.stderr.byteLength > input.stderrCeiling
+        || !parseExactDockerCommandDiagnostic(message.diagnostic)) {
+        failed = true; return;
+      }
+      result = Object.freeze(message);
+    });
+    worker.once('error', () => { failed = true; });
+    // No parent timer: delayed delivery is not a subprocess timeout. The worker
+    // waits for child close, and transport retirement precedes result delivery.
+    worker.once('exit', code => resolveResult(code === 0 && !failed && result ? result : unavailable()));
+  });
+}

@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /tmp/deckent-r18-762-repair
+
+ ✓ tests/orchestra/sprint-recovery-operation.test.ts (24 tests) 177ms
+
+ Test Files  1 passed (1)
+      Tests  24 passed (24)
+   Start at  15:15:52
+   Duration  5.42s (transform 2.94s, setup 16ms, collect 4.00s, tests 177ms, environment 0ms, prepare 50ms)
+

@@ -1,0 +1,3 @@
+{"utc": "2026-09-14T15:09:11.452375+00:00", "elapsedSeconds": 0.0006848949997220188, "pid": 1381331, "process": {"State": "R (running)", "VmHWM": "496 kB", "VmRSS": "496 kB"}}
+{"utc": "2026-09-14T15:09:16.454790+00:00", "elapsedSeconds": 5.003119240005617, "pid": 1381331, "process": {"State": "S (sleeping)", "VmHWM": "266256 kB", "VmRSS": "266256 kB"}}
+{"utc": "2026-09-14T15:09:21.455172+00:00", "elapsedSeconds": 10.003498857011436, "pid": 1381331, "process": {"State": "R (running)", "VmHWM": "329488 kB", "VmRSS": "329488 kB"}}

@@ -68,7 +68,7 @@ describe('approval keyboard ownership transitions', () => {
       </>);
       view.stdin.write('x');
       view.stdin.write('\r');
-      await vi.waitFor(() => expect(submit).toHaveBeenCalledWith('x'));
+      await vi.waitFor(() => expect(submit).toHaveBeenCalledWith('x', expect.objectContaining({ wire: 'x' })));
     } finally { view.unmount(); rmSync(historyRoot, { recursive: true, force: true }); }
   });
 

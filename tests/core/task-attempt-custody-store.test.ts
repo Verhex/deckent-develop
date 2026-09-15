@@ -7554,6 +7554,27 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
     return { ...fixture, scope, providerExit, backend, failure };
   }
 
+  it('keeps release diagnostics in a distinct immutable Store slot', async () => {
+    const { store, scope, providerExit, backend, failure } = await realStoreEffectDiagnosticFixture();
+    const effect = backend.publishExactDockerEffectDiagnostic(scope, providerExit, failure);
+    const releaseFailure: ExactDockerEffectFailureV1 = { state: 'HOLD', phase: 'RELEASE',
+      stage: 'RELEASE', code: 'RELEASE_VOLUME_DELETE_UNCONFIRMED',
+      sourceEvidenceDigest: repeatedDigest('b'), capture: null,
+      release: { stage: 'DEPENDENCY_VOLUME_DELETE_INTENT_COMMAND_DELETE', command: {
+        reason: 'timeout', exitCode: 0, signaled: false, timeoutMs: 1000,
+        elapsedMs: 3500, stdoutBytes: 20, stderrBytes: 0,
+      } } };
+    const release = backend.publishExactDockerEffectDiagnostic(scope, providerExit, releaseFailure);
+    expect(release.failure).toEqual(releaseFailure);
+    expect(release.observationReceiptDigest).not.toBe(effect.observationReceiptDigest);
+    expect(store.readDispatchObservationByClass({ admissionRef: scope.admissionRef,
+      policy: scope.policy, observationClass: 'RELEASE_DIAGNOSTIC' })?.receipt.receiptDigest)
+      .toBe(release.observationReceiptDigest);
+    expect(backend.readExactDockerEffectDiagnostic(scope, providerExit)).toEqual(effect);
+    expect(backend.publishExactDockerEffectDiagnostic(scope, providerExit,
+      { ...releaseFailure, code: 'RELEASE_VOLUME_ABSENCE_UNCONFIRMED' })).toEqual(release);
+  });
+
   it('roundtrips real Store domain-separated EFFECT_DIAGNOSTIC through the Docker publisher and reader', async () => {
     const { store, scope, providerExit, backend, failure } = await realStoreEffectDiagnosticFixture();
     expect(backend.readExactDockerEffectDiagnostic(scope, providerExit)).toBeNull();
@@ -7625,6 +7646,34 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
     expect(backend.readExactDockerEffectDiagnostic({ ...scope, store: restarted }, providerExit)).toEqual(diagnostic);
     expect(restarted.readDispatchAuthority({ admissionRef: scope.admissionRef, policy: scope.policy }))
       .toMatchObject({ state: 'terminal', authority: { state: 'RELEASED', attemptCount: 1 } });
+  });
+
+  it('partial retention custody preserves usage and blocks resurrection and competing dispositions', async () => {
+    const {state, store, taskPolicy, admitted, input, stream} = await startedFailedFixture();
+    const evidence = { transactionDigest: repeatedDigest('1'), journalEvidenceDigest: repeatedDigest('2'),
+      recoveryAuditDigest: repeatedDigest('3'), terminalReceiptDigest: repeatedDigest('4'),
+      nativeObservationDigest: repeatedDigest('5'), recoveryOccurredAt: '2026-08-30T20:03:03.000Z' };
+    expectHold(() => store.retainAbortedPartialDispatch({...input,evidence}), 'DISPATCH_TRANSITION_INVALID');
+    // Opaque custody fixture only. Orchestra must independently verify journal,
+    // native state, ABORTED receipt and recovered audit before issuing this call.
+    for (const key of ['locator', 'prepared', 'applying', 'step']) {
+      store.publishHostArtifact({identity:admitted.ref.identity, policy:taskPolicy,
+        admissionReceiptDigest:admitted.ref.admissionReceiptDigest,
+        artifactClass:'execution-effect-landing-journal', artifactKey:key,
+        capturedAt:'2026-08-30T20:03:03.000Z',bytes:Buffer.from('{}')});
+    }
+    expectHold(() => store.retainStartedFailedDispatch(input), 'DISPATCH_TRANSITION_INVALID');
+    const disposition = store.retainAbortedPartialDispatch({...input,evidence});
+    expect(disposition.state).toBe('ABORTED_PARTIAL_EFFECT_RETAINED');
+    expect(disposition.preservedArtifacts.some(ref => ref.receiptDigest === stream.receiptDigest)).toBe(true);
+    const restarted=openedStore(new InMemoryCustodyAdapter(state)).store;
+    expect(restarted.readAbortedPartialDispatch({admissionRef:admitted.ref,policy:taskPolicy})).toEqual(disposition);
+    expect(restarted.retainAbortedPartialDispatch({...input,evidence})).toEqual(disposition);
+    expectHold(() => restarted.publishHostArtifact({identity:admitted.ref.identity,policy:taskPolicy,
+      admissionReceiptDigest:admitted.ref.admissionReceiptDigest,artifactClass:'execution-effect-landing-journal',
+      artifactKey:'late',capturedAt:input.recordedAt,bytes:Buffer.from('{}')}), 'DISPATCH_TRANSITION_INVALID');
+    expectHold(() => restarted.retainStartedFailedDispatch(input), 'DISPATCH_TRANSITION_INVALID');
+    expectHold(() => restarted.retainAbortedPartialDispatch({...input,evidence:{...evidence,nativeObservationDigest:repeatedDigest('6')}}), 'DISPATCH_REQUEST_CONFLICT');
   });
 
   it('retains started failure without erasing usage or reclassifying RELEASED as no-effect', async () => {

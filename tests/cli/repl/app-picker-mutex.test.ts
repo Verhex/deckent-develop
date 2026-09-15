@@ -49,7 +49,7 @@ describe('wiring — app.tsx + run.tsx', () => {
     expect(app.indexOf('<InboxCard')).toBeLessThan(app.indexOf('<PickerCard'));
   });
   it('run.tsx injects pickerLabels, pickerSpecs (native + legacy), saveDefault and the ascii/noColor gates', () => {
-    expect(run).toMatch(/pickerLabels=\{buildPickerLabels\(t\)\}/);
+    expect(run).toMatch(/pickerLabels=\{buildPickerLabels\(terminalLabel\)\}/);
     expect(run).toMatch(/pickerSpecs=\{/);
     expect(run).toMatch(/saveDefault=\{/);
     expect(run).toMatch(/setConfigValues\(/);

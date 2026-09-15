@@ -1,0 +1,16 @@
+{
+  "utc": "2026-09-14T14:01:08.123Z",
+  "ms": 31140.163141999998,
+  "health": {
+    "state": "hold",
+    "unresolved": [
+      {
+        "dispatchRequestId": "dreq-8252f4be5c0bf0c1c6a475926ed7fce186469bb119ababcf5f8cd875339abff3",
+        "taskId": "762-002",
+        "reasonCode": "STARTED_ATTEMPT_RECONCILIATION_REQUIRED",
+        "custodyHoldCode": null
+      }
+    ],
+    "recoveryListReceiptDigest": "sha256:274155ed34d1fb855d39458666de56d1ff1f3e16229551d22b25dd8f70a142e5"
+  }
+}

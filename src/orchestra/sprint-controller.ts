@@ -1,3 +1,4 @@
+import { isResumableTaskAuthorityHold } from './task-result-authority.js';
 // ═══ Sprint Controller (Thin Orchestration Layer) ══════════════════
 // Sprint 136: Slimmed from ~1894 LoC to a thin barrel re-export layer.
 // Only runSprint(), waitForResults(), and evaluateResultSync() remain here.
@@ -1340,18 +1341,22 @@ export async function waitForResults(
   );
 }
 
-function snapshotExactTerminalAuthorities(
+export function snapshotExactTerminalAuthorities(
   registry: ExactNormalDockerExecutionRegistryV2,
+  sprint?: Pick<Sprint, 'tasks'>,
 ): ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead> {
-  const snapshot = registry.snapshotExactTerminalAuthorities();
+  const taskIds = sprint ? new Set(sprint.tasks.map(task => task.id)) : undefined;
+  const snapshot = registry.snapshotExactTerminalAuthorities(taskIds);
   const current = new Map<string, ExactAcceptedTaskTerminalAuthorityRead>();
   for (const [taskId, authority] of snapshot) {
+    // History remains in the registry for recovery, never in another run's lifecycle.
+    if (taskIds && !taskIds.has(taskId)) continue;
     if (authority.state === 'current') {
       current.set(taskId, authority);
       continue;
     }
     const resultAuthority = registry.readTaskResultAuthority(taskId);
-    if (resultAuthority.state === 'authority-hold') {
+    if (resultAuthority.state === 'authority-hold' && !isResumableTaskAuthorityHold(resultAuthority)) {
       throw new DeckentError(
         'DECKENT_E077',
         `EXACT_TERMINAL_AUTHORITY_HOLD:${taskId}:${authority.reasonCode}`,
@@ -1367,7 +1372,7 @@ function snapshotExactCheckpointAuthorities(
 ): ReadonlyMap<string, ExactAcceptedResultTerminalAuthorityV2> {
   const sprintTaskIds = new Set(sprint.tasks.map(task => task.id));
   const checkpointAuthorities = new Map<string, ExactAcceptedResultTerminalAuthorityV2>();
-  for (const [taskId, authority] of snapshotExactTerminalAuthorities(registry)) {
+  for (const [taskId, authority] of snapshotExactTerminalAuthorities(registry, sprint)) {
     if (sprintTaskIds.has(taskId) && authority.state === 'current') {
       checkpointAuthorities.set(taskId, authority.terminalAuthority);
     }
@@ -1454,8 +1459,9 @@ function exactTaskRequiresTerminalAuthority(
   registry: ExactNormalDockerExecutionRegistryV2,
   taskId: string,
 ): boolean {
-  return registry.isExactTask(taskId)
-    && registry.readTaskResultAuthority(taskId).state !== 'not-dispatched';
+  const authority = registry.readTaskResultAuthority(taskId);
+  return registry.isExactTask(taskId) && authority.state !== 'not-dispatched'
+    && !isResumableTaskAuthorityHold(authority);
 }
 
 function seedExactNotDispatchedEvaluations(
@@ -1464,6 +1470,11 @@ function seedExactNotDispatchedEvaluations(
   registry: ExactNormalDockerExecutionRegistryV2,
 ): void {
   for (const task of sprint.tasks) {
+    if (registry.isExactTask(task.id) && isResumableTaskAuthorityHold(registry.readTaskResultAuthority(task.id))) {
+      evaluations.set(task.id, TaskEvaluation.EFFECT_HOLD);
+      task.status = TaskStatus.PAUSED;
+      continue;
+    }
     if (
       registry.isExactTask(task.id)
       && registry.readTaskResultAuthority(task.id).state === 'not-dispatched'
@@ -2860,7 +2871,7 @@ export async function runSprint(
           isResumeEvaluate = true;
           recoveredSprint = recovery.restoredSprint ?? null;
           if (recoveredSprint) {
-            const exactRecoveryAuthorities = snapshotExactTerminalAuthorities(exactDockerRegistry);
+            const exactRecoveryAuthorities = snapshotExactTerminalAuthorities(exactDockerRegistry, recoveredSprint);
             for (const t of recoveredSprint.tasks) {
               const exactAuthority = exactRecoveryAuthorities.get(t.id);
               if (exactAuthority?.state === 'current') {
@@ -3244,6 +3255,12 @@ export async function runSprint(
     }
 
     try {
+      // Exact admission has succeeded. Publish this generation's lifecycle
+      // before the strict coordinator read-model snapshot, as on resume.
+      // A retained terminal state must not select the previous sprint here.
+      // Keep canonical identity/liveness checks: failed state publication
+      // must still prevent dispatch rather than bypass authority.
+      writeSprintState(projectRoot, sprint);
       await activateCoordinatorSnapshotWriter(sprint);
     } catch (error) {
       clearPid(projectRoot, sprint.id);
@@ -3281,6 +3298,7 @@ export async function runSprint(
           'provider-routing-hold',
           exactDockerRegistry,
           {
+            currentTaskIds: new Set(sprint.tasks.map(task => task.id)),
             isHistoricalForeignTask:
               createHistoricalForeignTaskPredicate(projectRoot, sprint.id),
           },
@@ -3562,6 +3580,7 @@ export async function runSprint(
           sprint.id,
           exactDockerRegistry,
           {
+            currentTaskIds: new Set(sprint.tasks.map(task => task.id)),
             isHistoricalForeignTask:
               createHistoricalForeignTaskPredicate(projectRoot, sprint.id),
           },
@@ -3907,7 +3926,7 @@ export async function runSprint(
     await ensureCrossVerifyInvocationFactory();
   seedExactNotDispatchedEvaluations(sprint, evaluations, exactDockerRegistry);
   if (evaluations.size < sprint.tasks.length) {
-    const exactTerminalAuthorities = snapshotExactTerminalAuthorities(exactDockerRegistry);
+    const exactTerminalAuthorities = snapshotExactTerminalAuthorities(exactDockerRegistry, sprint);
     await runEvaluatePhase(
       projectRoot, sprint, results, evaluations, config.coverage_hard_floor,
       config, undefined, deferredTaskIds, {
@@ -3968,7 +3987,8 @@ export async function runSprint(
       'provider-execution-hold',
       exactDockerRegistry,
       {
-        isHistoricalForeignTask:
+        currentTaskIds: new Set(sprint.tasks.map(task => task.id)),
+            isHistoricalForeignTask:
           createHistoricalForeignTaskPredicate(projectRoot, sprint.id),
       },
     );
@@ -4143,7 +4163,8 @@ export async function runSprint(
         'fix-spawn-failure',
         exactDockerRegistry,
         {
-          isHistoricalForeignTask:
+          currentTaskIds: new Set(sprint.tasks.map(task => task.id)),
+            isHistoricalForeignTask:
             createHistoricalForeignTaskPredicate(projectRoot, sprint.id),
         },
       );
@@ -4221,6 +4242,7 @@ export async function runSprint(
     );
   }
   await prepareExactSprintLifecycle(exactDockerRegistry, 'contain', {
+    currentTaskIds: new Set(sprint.tasks.map(task => task.id)),
     isHistoricalForeignTask: createHistoricalForeignTaskPredicate(projectRoot, sprint.id),
   });
   if (applyCascadeCircuitBreaker(
@@ -4283,6 +4305,8 @@ export async function runSprint(
       `BLOCKED ${describeStagedSettlementBlock(stagedSettlement)}`,
     );
     sprint.status = SprintStatus.PAUSED;
+    writeSprintState(projectRoot, sprint);
+    writeExactPhaseCheckpoint(projectRoot, sprint, exactDockerRegistry);
 
     if (heartbeatDaemon) {
       try { heartbeatDaemon.stop(); } catch (e) { debugLog('runSprint:staged-hold:hb-stop', e); }
@@ -4310,7 +4334,8 @@ export async function runSprint(
       progress: {
         done: stagedSettlement.preservedSettledTaskIds.length,
         active: 0,
-        blocked: stagedSettlement.blockedClosures.length,
+        blocked: new Set([...stagedSettlement.blockedClosures.map(item => item.closureTaskId),
+          ...(stagedSettlement.effectHeldTaskIds ?? [])]).size,
         total: sprint.tasks.length,
       },
       alerts: [],
@@ -4342,7 +4367,7 @@ export async function runSprint(
     opts?.testMode,
     opts?.flowId,
     true,
-    snapshotExactTerminalAuthorities(exactDockerRegistry),
+    snapshotExactTerminalAuthorities(exactDockerRegistry, sprint),
     (taskId: string) => exactDockerRegistry.isExactTask(taskId),
     (taskId: string) => exactTaskRequiresTerminalAuthority(exactDockerRegistry, taskId),
   );

@@ -1,0 +1,528 @@
+[
+  {
+    "title": "Inventory startup authority boundaries",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-01/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-01/ANALYSIS.md"
+      ]
+    },
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Inventory worker custody boundaries",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-02/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-02/ANALYSIS.md"
+      ]
+    },
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Inventory result and effect boundaries",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-03/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-03/ANALYSIS.md"
+      ]
+    },
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Inventory observable run boundaries",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-04/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-04/ANALYSIS.md"
+      ]
+    },
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Specify startup timing attribution",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-05/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts",
+        "docs/execution/active/dogfood-comparison/twenty/task-01/ANALYSIS.md"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-05/ANALYSIS.md"
+      ]
+    },
+    "dependencies": [
+      "Inventory startup authority boundaries"
+    ],
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Specify worker birth evidence",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-06/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts",
+        "docs/execution/active/dogfood-comparison/twenty/task-02/ANALYSIS.md"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-06/ANALYSIS.md"
+      ]
+    },
+    "dependencies": [
+      "Inventory worker custody boundaries"
+    ],
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Specify effect acceptance contract",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-07/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts",
+        "docs/execution/active/dogfood-comparison/twenty/task-03/ANALYSIS.md"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-07/ANALYSIS.md"
+      ]
+    },
+    "dependencies": [
+      "Inventory result and effect boundaries"
+    ],
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Specify operator state consistency",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-08/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts",
+        "docs/execution/active/dogfood-comparison/twenty/task-04/ANALYSIS.md"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-08/ANALYSIS.md"
+      ]
+    },
+    "dependencies": [
+      "Inventory observable run boundaries"
+    ],
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Compare admission and worker critical paths",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-09/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts",
+        "docs/execution/active/dogfood-comparison/twenty/task-05/ANALYSIS.md",
+        "docs/execution/active/dogfood-comparison/twenty/task-06/ANALYSIS.md"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-09/ANALYSIS.md"
+      ]
+    },
+    "dependencies": [
+      "Specify startup timing attribution",
+      "Specify worker birth evidence"
+    ],
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Compare settlement and visible completion",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-10/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts",
+        "docs/execution/active/dogfood-comparison/twenty/task-07/ANALYSIS.md",
+        "docs/execution/active/dogfood-comparison/twenty/task-08/ANALYSIS.md"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-10/ANALYSIS.md"
+      ]
+    },
+    "dependencies": [
+      "Specify effect acceptance contract",
+      "Specify operator state consistency"
+    ],
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Map restart and retained result behavior",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-11/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts",
+        "docs/execution/active/dogfood-comparison/twenty/task-05/ANALYSIS.md",
+        "docs/execution/active/dogfood-comparison/twenty/task-07/ANALYSIS.md"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-11/ANALYSIS.md"
+      ]
+    },
+    "dependencies": [
+      "Specify startup timing attribution",
+      "Specify effect acceptance contract"
+    ],
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Map resource usage and task readiness",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-12/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts",
+        "docs/execution/active/dogfood-comparison/twenty/task-06/ANALYSIS.md",
+        "docs/execution/active/dogfood-comparison/twenty/task-08/ANALYSIS.md"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-12/ANALYSIS.md"
+      ]
+    },
+    "dependencies": [
+      "Specify worker birth evidence",
+      "Specify operator state consistency"
+    ],
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Define dependency failure propagation proof",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-13/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts",
+        "docs/execution/active/dogfood-comparison/twenty/task-09/ANALYSIS.md",
+        "docs/execution/active/dogfood-comparison/twenty/task-11/ANALYSIS.md"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-13/ANALYSIS.md"
+      ]
+    },
+    "dependencies": [
+      "Compare admission and worker critical paths",
+      "Map restart and retained result behavior"
+    ],
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Define scope collision and derived directory proof",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-14/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts",
+        "docs/execution/active/dogfood-comparison/twenty/task-09/ANALYSIS.md",
+        "docs/execution/active/dogfood-comparison/twenty/task-12/ANALYSIS.md"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-14/ANALYSIS.md"
+      ]
+    },
+    "dependencies": [
+      "Compare admission and worker critical paths",
+      "Map resource usage and task readiness"
+    ],
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Define archive and replay proof",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-15/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts",
+        "docs/execution/active/dogfood-comparison/twenty/task-10/ANALYSIS.md",
+        "docs/execution/active/dogfood-comparison/twenty/task-11/ANALYSIS.md"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-15/ANALYSIS.md"
+      ]
+    },
+    "dependencies": [
+      "Compare settlement and visible completion",
+      "Map restart and retained result behavior"
+    ],
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Define cross-surface freshness proof",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-16/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts",
+        "docs/execution/active/dogfood-comparison/twenty/task-10/ANALYSIS.md",
+        "docs/execution/active/dogfood-comparison/twenty/task-12/ANALYSIS.md"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-16/ANALYSIS.md"
+      ]
+    },
+    "dependencies": [
+      "Compare settlement and visible completion",
+      "Map resource usage and task readiness"
+    ],
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Assemble execution correctness acceptance matrix",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-17/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts",
+        "docs/execution/active/dogfood-comparison/twenty/task-13/ANALYSIS.md",
+        "docs/execution/active/dogfood-comparison/twenty/task-14/ANALYSIS.md"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-17/ANALYSIS.md"
+      ]
+    },
+    "dependencies": [
+      "Define dependency failure propagation proof",
+      "Define scope collision and derived directory proof"
+    ],
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Assemble settlement visibility acceptance matrix",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-18/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts",
+        "docs/execution/active/dogfood-comparison/twenty/task-15/ANALYSIS.md",
+        "docs/execution/active/dogfood-comparison/twenty/task-16/ANALYSIS.md"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-18/ANALYSIS.md"
+      ]
+    },
+    "dependencies": [
+      "Define archive and replay proof",
+      "Define cross-surface freshness proof"
+    ],
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Rank repairs using both acceptance matrices",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-19/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts",
+        "docs/execution/active/dogfood-comparison/twenty/task-17/ANALYSIS.md",
+        "docs/execution/active/dogfood-comparison/twenty/task-18/ANALYSIS.md"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-19/ANALYSIS.md"
+      ]
+    },
+    "dependencies": [
+      "Assemble execution correctness acceptance matrix",
+      "Assemble settlement visibility acceptance matrix"
+    ],
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  },
+  {
+    "title": "Produce final evidence-linked repair decision",
+    "description": "Read only declared inputs. Deliver a concise, evidence-backed specification in the exact assigned document. Cite path:line and SHA256; separate measured fact, inference and unknown. No runtime/provider calls, no source/config changes, no build, no cleanup, no commit/push. Read predecessor documents only after their accepted dependency settlement; do not invent missing inputs or claim product DONE. The document must advance MASTER3178 recovery decisions for both dogfood and product operators, with cross-platform/tenant scope. Do not repeat whole predecessor reports; synthesize only this task contribution.\n### goNogo\n- goCriteria: Exact assigned document exists with attributable sources.; Declared predecessor inputs are cited by content digest.; Findings distinguish facts from hypotheses\\; no fabricated receipts or test results.\n- nogo: Missing required dependency output.; Any write outside assigned file or unsupported completion claim.",
+    "scope": {
+      "directories": [
+        "docs/execution/active/dogfood-comparison/twenty/task-20/"
+      ],
+      "filesRead": [
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/core/run-status-read-model.ts",
+        "docs/execution/active/dogfood-comparison/twenty/task-19/ANALYSIS.md"
+      ],
+      "filesWrite": [
+        "docs/execution/active/dogfood-comparison/twenty/task-20/ANALYSIS.md"
+      ]
+    },
+    "dependencies": [
+      "Rank repairs using both acceptance matrices"
+    ],
+    "productionWiringApplicability": {
+      "state": "not-applicable",
+      "reasonCode": "documentation-only-scope"
+    }
+  }
+]

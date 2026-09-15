@@ -25,6 +25,7 @@ import { getMessage, getMessageLanguages } from '../../../src/cli/helpers/messag
 import type { SlashCommand } from '../../../src/cli/commands/chat-slash-registry.js';
 
 const tick = (ms = 40): Promise<void> => new Promise((r) => setTimeout(r, ms));
+const PASTE_CHIP_EN = getMessage('tui.composer.paste_chip', 'en');
 
 /** 12 commands → 8-row window leaves exactly 4 below the fold. */
 const TWELVE: SlashCommand[] = Array.from({ length: 12 }, (_, i) => ({
@@ -79,7 +80,7 @@ describe('InputBar — `/` menu scroll hint (ink-testing-library)', () => {
         menuMoreAbove={tr.menuMoreAbove}
         menuMoreBelow={tr.menuMoreBelow}
         reverseSearchLabel={tr.reverseSearch}
-        composerPasteChip={en.composerPasteChip}
+        composerPasteChip={PASTE_CHIP_EN}
         historyProjectRoot={root}
       />,
     );
@@ -109,7 +110,7 @@ describe('InputBar — `/` menu scroll hint (ink-testing-library)', () => {
             slashRegistry={TWELVE}
             historyProjectRoot={root}
             reverseSearchLabel={getMessage('tui.reverse_search', lang)}
-        composerPasteChip={en.composerPasteChip}
+        composerPasteChip={PASTE_CHIP_EN}
             {...missing}
           />
         </ReplErrorBoundary>,
@@ -139,7 +140,7 @@ describe('InputBar — `/` menu scroll hint (ink-testing-library)', () => {
     const { lastFrame, unmount } = render(
       <ReplErrorBoundary label={getMessage('tui.render_error', 'en')}>
         <InputBar active onSubmit={() => {}} onInterrupt={() => {}} slashRegistry={TWELVE} historyProjectRoot={root} reverseSearchLabel={getMessage('tui.reverse_search', 'en')}
-        composerPasteChip={en.composerPasteChip} {...missing} />
+        composerPasteChip={PASTE_CHIP_EN} {...missing} />
       </ReplErrorBoundary>,
     );
     await tick();

@@ -1137,7 +1137,7 @@ export function parseStagedSource(value: unknown): ExecutionEffectStagedSourceSe
 export interface ExecutionEffectPersistenceOperationV1 {
   readonly version: 1;
   readonly index: number;
-  readonly kind: 'ADD_DIRECTORY' | 'ADD' | 'REPLACE' | 'DELETE' | 'MODE';
+  readonly kind: 'ADD_DIRECTORY' | 'REUSE_DIRECTORY' | 'ADD' | 'REPLACE' | 'DELETE' | 'MODE';
   readonly path: string;
   readonly effectDigests: readonly ExecutionEffectPersistenceDigest[];
   readonly derivedParent: ExecutionEffectLandingDerivedParentProvenanceV1 | null;
@@ -1289,7 +1289,7 @@ export function executionEffectLandingOperationDigestV1(
   ]);
   if (record === null || record.version !== 1 || !Number.isSafeInteger(record.index)
     || (record.index as number) < 0
-    || !['ADD_DIRECTORY', 'ADD', 'REPLACE', 'DELETE', 'MODE'].includes(record.kind as string)
+    || !['ADD_DIRECTORY', 'REUSE_DIRECTORY', 'ADD', 'REPLACE', 'DELETE', 'MODE'].includes(record.kind as string)
     || !safePath(record.path) || !Array.isArray(record.effectDigests)
     || record.effectDigests.some(value => !isDigest(value))
     || record.effectDigests.some((value, index, values) => index > 0
@@ -1308,9 +1308,19 @@ export function executionEffectLandingOperationDigestV1(
     || ((record.kind === 'ADD' || record.kind === 'REPLACE') !== (source !== null))
     || (derivedParent === null
       ? record.derivedParent !== null || record.effectDigests.length === 0
-      : record.kind !== 'ADD_DIRECTORY' || record.effectDigests.length !== 0
+      : !['ADD_DIRECTORY', 'REUSE_DIRECTORY'].includes(record.kind as string) || record.effectDigests.length !== 0
         || derivedParent.path !== record.path)) {
     throw new TypeError('Invalid execution effect landing operation state authority');
+  }
+  if (record.kind === 'REUSE_DIRECTORY') {
+    const pre = record.entryPreimages.length === 1 ? parseAuthorityPathState(record.entryPreimages[0]) : null;
+    const post = record.entryPostimages.length === 1 ? parseAuthorityExpectedPathState(record.entryPostimages[0]) : null;
+    if (!derivedParent || pre?.path !== record.path || post?.path !== record.path
+      || pre?.entry.state !== 'PRESENT' || post?.entry.state !== 'PRESENT'
+      || pre.entry.entry.kind !== 'directory' || !isDigest(pre.entry.objectIdentityDigest)
+      || !sameCanonicalJson(pre.entry.entry, post.entry.entry)) {
+      throw new TypeError('Invalid execution effect directory reuse authority');
+    }
   }
   const body = Object.freeze({
     version: 1 as const,
@@ -1334,7 +1344,7 @@ function parseOperation(value: unknown, index: number): ExecutionEffectPersisten
     'durabilityEvidenceDigest', 'operationDigest',
   ]);
   if (record === null || record.version !== 1 || record.index !== index
-    || !['ADD_DIRECTORY', 'ADD', 'REPLACE', 'DELETE', 'MODE'].includes(record.kind as string)
+    || !['ADD_DIRECTORY', 'REUSE_DIRECTORY', 'ADD', 'REPLACE', 'DELETE', 'MODE'].includes(record.kind as string)
     || !safePath(record.path) || !Array.isArray(record.effectDigests)
     || record.effectDigests.some(value => !isDigest(value))
     || new Set(record.effectDigests).size !== record.effectDigests.length
@@ -1348,7 +1358,7 @@ function parseOperation(value: unknown, index: number): ExecutionEffectPersisten
   if (requiresSource !== (stagedSource !== null)
     || (derivedParent === null
       ? record.derivedParent !== null || record.effectDigests.length === 0
-      : record.kind !== 'ADD_DIRECTORY' || record.effectDigests.length !== 0
+      : !['ADD_DIRECTORY', 'REUSE_DIRECTORY'].includes(record.kind as string) || record.effectDigests.length !== 0
         || derivedParent.path !== record.path)
     || (stagedSource !== null && stagedSource.path !== record.path)) return null;
   const entryPreimages = parseOrderedAuthorityArray(
@@ -2250,7 +2260,7 @@ export interface ExecutionEffectResultProjectionV1 {
   readonly effects: readonly Readonly<{
     readonly operationIndex: number;
     readonly path: string;
-    readonly status: 'added' | 'modified' | 'deleted';
+    readonly status: 'added' | 'modified' | 'deleted' | 'unchanged';
     readonly operationKind: ExecutionEffectPersistenceOperationV1['kind'];
     readonly entryKind: 'regular-file' | 'directory';
     readonly lineMetrics: 'REQUIRED' | 'NOT_APPLICABLE_DIRECTORY';
@@ -2298,6 +2308,7 @@ export function createExecutionEffectResultProjectionV1(
     const operationKind = effect.operationKind;
     const expectedStatus = operationKind === 'ADD' || operationKind === 'ADD_DIRECTORY'
       ? 'added'
+      : operationKind === 'REUSE_DIRECTORY' ? 'unchanged'
       : operationKind === 'DELETE' ? 'deleted'
         : operationKind === 'REPLACE' || operationKind === 'MODE' ? 'modified' : null;
     if (expectedStatus === null || effect.status !== expectedStatus) {
@@ -2305,13 +2316,13 @@ export function createExecutionEffectResultProjectionV1(
     }
     const isDerivedParent = effect.derivedParentProvenanceDigest !== null;
     if (isDerivedParent
-      ? operationKind !== 'ADD_DIRECTORY' || effect.effectDigests.length !== 0
+      ? !['ADD_DIRECTORY', 'REUSE_DIRECTORY'].includes(operationKind as string) || effect.effectDigests.length !== 0
       : effect.effectDigests.length === 0) {
       throw new TypeError('Invalid execution effect result projection');
     }
     if ((effect.entryKind !== 'regular-file' && effect.entryKind !== 'directory')
       || (operationKind === 'ADD' && effect.entryKind !== 'regular-file')
-      || (operationKind === 'ADD_DIRECTORY' && effect.entryKind !== 'directory')
+      || (['ADD_DIRECTORY', 'REUSE_DIRECTORY'].includes(operationKind as string) && effect.entryKind !== 'directory')
       || (operationKind === 'REPLACE' && effect.entryKind !== 'regular-file')
       || effect.lineMetrics !== (effect.entryKind === 'regular-file'
         ? 'REQUIRED' : 'NOT_APPLICABLE_DIRECTORY')) {
@@ -2395,6 +2406,7 @@ export function projectVerifiedExecutionEffectResultV1(
     paths.add(operation.path);
     const status = operation.kind === 'ADD' || operation.kind === 'ADD_DIRECTORY'
       ? 'added' as const
+      : operation.kind === 'REUSE_DIRECTORY' ? 'unchanged' as const
       : operation.kind === 'DELETE' ? 'deleted' as const : 'modified' as const;
     const authorityStates = operation.kind === 'DELETE'
       ? operation.entryPreimages : operation.entryPostimages;
@@ -3038,7 +3050,12 @@ export function verifyExecutionEffectPersistenceBundleV1(input: Readonly<{
       if (!sameCanonicalJson(expectedProvenance, operation.derivedParent)
         || operation.entryPreimages.length !== 1
         || operation.entryPreimages[0]?.path !== operation.path
-        || operation.entryPreimages[0]?.entry.state !== 'ABSENT'
+        || (operation.kind === 'REUSE_DIRECTORY'
+          ? operation.entryPreimages[0]?.entry.state !== 'PRESENT'
+            || operation.entryPreimages[0].entry.entry.kind !== 'directory'
+            || !operation.entryPreimages[0].entry.objectIdentityDigest
+            || !sameCanonicalJson(operation.entryPreimages[0].entry.entry, finalByPath.get(operation.path))
+          : operation.entryPreimages[0]?.entry.state !== 'ABSENT')
         || operation.entryPostimages.length !== 1
         || operation.entryPostimages[0]?.path !== operation.path
         || operation.entryPostimages[0]?.entry.state !== 'PRESENT'
@@ -3059,7 +3076,7 @@ export function verifyExecutionEffectPersistenceBundleV1(input: Readonly<{
       if (parent.source !== 'OPERATION_POSTIMAGE') continue;
       const producer = terminal.operations[parent.operationIndex];
       if (!producer || parent.operationIndex >= operation.index
-        || producer.kind !== 'ADD_DIRECTORY' || producer.path !== parent.path
+        || !['ADD_DIRECTORY', 'REUSE_DIRECTORY'].includes(producer.kind) || producer.path !== parent.path
         || producer.operationDigest !== parent.operationDigest) return null;
       if (producer.derivedParent) referencedDerivedOperationIndexes.add(parent.operationIndex);
     }

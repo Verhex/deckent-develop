@@ -76,6 +76,7 @@ vi.mock('../../src/orchestra/sprint-spawner.js', async (importOriginal) => {
 import type { ExactNormalDockerExecutionRegistryV2 } from '../../src/orchestra/scheduler-effects.js';
 import { savePlannedSprint, saveRunHandle } from '../../src/core/run-flow-store.js';
 import {
+  snapshotExactTerminalAuthorities,
   isBoundRecoveredAttemptIdentity,
   readOwningRunTerminalDisposition,
   isDecidedExactSettlementHold,
@@ -204,7 +205,7 @@ function terminalAuthority(taskId: string): ExactAcceptedResultTerminalAuthority
 }
 
 describe('exact controller terminal fan-in behavior', () => {
-  it('writes a fresh PLAN checkpoint without a recovered historical terminal authority', async () => {
+  it.each(['absent', 'ABORTED', 'COMPLETE'] as const)('writes fresh PLAN authority before coordinator publication with prior state %s', async (priorStatus) => {
     const projectRoot = mkdtempSync(join(tmpdir(), 'exact-checkpoint-sprint-scope-'));
     roots.push(projectRoot);
     mkdirSync(join(projectRoot, '.deckent'), { recursive: true });
@@ -238,6 +239,13 @@ describe('exact controller terminal fan-in behavior', () => {
       JSON.stringify(task),
       'utf-8',
     );
+
+    if (priorStatus !== 'absent') {
+      writeFileSync(join(projectRoot, '.deckent', 'sprint-state.json'), JSON.stringify({
+        sprintId: 'sprint-724', phase: SprintPhase.EXECUTE, status: priorStatus,
+        startedAt: '2026-09-05T00:00:00.000Z', taskIds: ['724-001'],
+      }));
+    }
 
     const historicalTaskId = '724-001';
     const historicalAuthority = terminalAuthority(historicalTaskId);
@@ -394,7 +402,7 @@ describe('exact controller terminal fan-in behavior', () => {
       {} as never,
       registry,
     )).rejects.toThrow(
-      `EXACT_TERMINAL_AUTHORITY_HOLD:${task.id}:terminal-store-reread-failed`,
+      `EXACT_CHECKPOINT_TERMINAL_AUTHORITY_MISSING:${task.id}`,
     );
     expect(recoveryControlProbe.terminalize).not.toHaveBeenCalled();
   });
@@ -1514,5 +1522,27 @@ describe('exact controller terminal fan-in behavior', () => {
     } finally {
       createHandoff.mockRestore();
     }
+  });
+});
+
+
+describe('run-scoped terminal authority projection', () => {
+  it('keeps recovered history out of the current lifecycle without discarding registry evidence', () => {
+    const old = { state: 'current', terminalAuthority: terminalAuthority('764-001') };
+    const active = { state: 'current', terminalAuthority: terminalAuthority('765-001') };
+    const all = new Map([['764-001', old], ['765-001', active]]);
+    const registry = { snapshotExactTerminalAuthorities: () => all } as unknown as ExactNormalDockerExecutionRegistryV2;
+    const sprint = { tasks: [{ id: '765-001' }] } as Parameters<typeof snapshotExactTerminalAuthorities>[1];
+    expect([...snapshotExactTerminalAuthorities(registry, sprint).keys()]).toEqual(['765-001']);
+    expect([...snapshotExactTerminalAuthorities(registry).keys()]).toEqual(['764-001', '765-001']);
+    expect(all.size).toBe(2);
+  });
+  it('preserves fail-closed handling for a current task authority hold', () => {
+    const registry = {
+      snapshotExactTerminalAuthorities: () => new Map([['765-001', { state: 'hold', reasonCode: 'tampered' }]]),
+      readTaskResultAuthority: () => ({ state: 'authority-hold', holdEvidence: { classification: 'AUTHORITY_CONTRADICTION' } }),
+    } as unknown as ExactNormalDockerExecutionRegistryV2;
+    const sprint = { tasks: [{ id: '765-001' }] } as Parameters<typeof snapshotExactTerminalAuthorities>[1];
+    expect(() => snapshotExactTerminalAuthorities(registry, sprint)).toThrow('EXACT_TERMINAL_AUTHORITY_HOLD');
   });
 });

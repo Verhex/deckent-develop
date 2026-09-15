@@ -1,0 +1,95 @@
+
+ RUN  v3.2.7 /tmp/deckent-r18-762-repair
+
+ ❯ tests/core/task-execution-fence.test.ts (69 tests | 1 failed) 8775ms
+   ✓ task execution lock authority > publishes an exact schema-v3 document with a durable compound fence 64ms
+   ✓ task execution lock authority > initializes exact DB v4 quarantine tables, indexes, and guards 77ms
+   ✓ task execution lock authority > transactionally migrates v3 boundary authority and audit bytes to v4  388ms
+   ✓ task execution lock authority > keeps migration, projection, and quarantine reconciliation bounded by keyset pages 169ms
+   ✓ task execution lock authority > keeps normal task renewal and release task-scoped with more than a thousand unrelated canonical rows 121ms
+   ✓ task execution lock authority > transactionally migrates real v2 payloads into deterministic audited quarantine 93ms
+   ✓ task execution lock authority > rolls back the entire v2 migration when any legacy row is malformed 78ms
+   ✓ task execution lock authority > uses a unique owner generation and rejects concurrent task re-entry 50ms
+   ✓ task execution lock authority > renews only the owning generation and preserves immutable metadata 78ms
+   ✓ task execution lock authority > releases only the owning generation 82ms
+   ✓ task execution lock authority > commits an in-flight boundary before side effects and never lease-retires it 125ms
+   ✓ task execution lock authority > requires the exact live owner and exact fence to renew and complete in-flight work 127ms
+   ✓ task execution lock authority > refuses exact active-generation adoption when expired owner liveness is alive 54ms
+   ✓ task execution lock authority > refuses exact active-generation adoption when expired owner liveness is unknown 55ms
+   ✓ task execution lock authority > refuses exact active-generation adoption when expired owner liveness is foreign-host 54ms
+   ✓ task execution lock authority > durably adopts and exactly replays a dead active generation before atomic no-change settlement 127ms
+   ✓ task execution lock authority > resolves active adoption from canonical current authority after projection publication crashes 88ms
+   ✓ task execution lock authority > exposes a bounded oldest-to-current active adoption lineage across repeated restarts 112ms
+   ✓ task execution lock authority > rejects an active owner/fence transfer without its exact durable adoption audit 52ms
+   ✓ task execution lock authority > refuses active-generation adoption after an irreversible boundary exists 73ms
+   ✓ task execution lock authority > refuses expired in-flight boundary adoption when owner liveness is alive 75ms
+   ✓ task execution lock authority > refuses expired in-flight boundary adoption when owner liveness is unknown 74ms
+   ✓ task execution lock authority > refuses expired in-flight boundary adoption when owner liveness is foreign-host 73ms
+   ✓ task execution lock authority > fence-transfers only proven-dead in-flight work and replays its resumed terminal chain 164ms
+   ✓ task execution lock authority > resolves the final boundary resume hop after canonical commit and projection crash 105ms
+   ✓ task execution lock authority > atomically settles and exactly replays a durable no-change boundary 81ms
+   × task execution lock authority > keeps a committed completion authoritative when projection cleanup is uncertain 105ms
+     → quarantine is not defined
+   ✓ task execution lock authority > monotonically quarantines failures and recovers only verified exact attestations 135ms
+   ✓ task execution lock authority > resolves exact recovered authority with resume=false, without accepting sibling generations 157ms
+   ✓ task execution lock authority > resolves exact recovered authority with resume=true, without accepting sibling generations 193ms
+   ✓ task execution lock authority > does not reinterpret successful completion as recovery 95ms
+   ✓ task execution lock authority > keeps a committed recovery authoritative when projection cleanup is uncertain 103ms
+   ✓ task execution lock authority > never unlinks a successor projection after the released DB commit 95ms
+   ✓ task execution lock authority > surfaces a committed release when lock-directory projection cleanup loses its generation 65ms
+   ✓ task execution lock authority > never recovers a non-expired lock even when a probe reports dead 51ms
+   ✓ task execution lock authority > recovers an expired generation only after its owner is proven dead 73ms
+   ✓ task execution lock authority > preserves an expired generation when owner liveness is alive 51ms
+   ✓ task execution lock authority > preserves an expired generation when owner liveness is unknown 50ms
+   ✓ task execution lock authority > fails closed for malformed lock metadata and exposes malformed inspection state 9ms
+   ✓ task execution lock authority > fails closed for a malformed per-task mutation guard 5ms
+   ✓ task execution lock authority > fails closed on crashed temp/sidecar artifacts and leaves no unbounded artifacts  388ms
+   ✓ task execution lock authority > reconciles canonical DB authority after projection loss without reusing a fence 98ms
+   ✓ task execution lock authority > holds on canonical DB loss and never silently resets the authority epoch  1502ms
+   ✓ task execution lock authority > keeps restored-snapshot fences byte-unique and rejects counter replay 160ms
+   ✓ task execution lock authority > holds on DB/sentinel epoch disagreement 75ms
+   ✓ task execution lock authority > keeps cross-namespace mount ids observational and can audit an explicit metadata adoption 205ms
+   ✓ task execution lock authority > refuses mount adoption while a canonical execution is active 49ms
+   ✓ task execution lock authority > rejects a second authority bootstrap after the bound lock directory is replaced 52ms
+   ✓ task execution lock authority > rejects a second authority bootstrap after the bound project directory is replaced 77ms
+   ✓ task execution lock authority > surfaces a committed renewal when projection repair loses the lock-directory generation 68ms
+   ✓ task execution lock authority > surfaces a committed renewal after exact projection reconciliation 79ms
+   ✓ task execution lock authority > rejects hardlinked DB, sentinel, and projection authority files 201ms
+   ✓ task execution lock authority > burns the fence and compensates the exact DB owner on projection publish failure 83ms
+   ✓ task execution lock authority > never unlinks a successor projection after the compensated DB commit 85ms
+   ✓ task execution lock authority > reclaims an exact-owner crashed staging file only after owner death proof 76ms
+   ✓ task execution lock authority > serializes mutations across processes with BEGIN IMMEDIATE  878ms
+   ✓ task execution lock authority > provides project-wide maintenance admission and ownerPid authority 121ms
+   ✓ task execution lock authority > rejects a maintenance actor on a non-maintenance projection 52ms
+   ✓ task execution lock authority > rejects a non-maintenance actor on the maintenance projection 53ms
+   ✓ task execution lock authority > returns typed foreign-host HOLD unless a distributed probe proves dead 71ms
+   ✓ task execution lock authority > fails closed when .locks is a symlink/junction 2ms
+   ✓ task execution lock authority > fails closed on symlink and oversized projection entries 12ms
+   ✓ task execution lock authority > preserves a completed value as typed uncertainty when quarantine persistence is unreadable 55ms
+   ✓ task execution lock authority > aborts cooperatively and reports uncertainty when heartbeat quarantine cannot persist 58ms
+   ✓ task execution lock authority > labels a completed outcome quarantined only after exact durable re-read 99ms
+   ✓ task execution lock authority > heartbeats a long operation and releases the lock after natural completion 143ms
+   ✓ task execution lock authority > exposes the renewed live lock handle to the protected operation 98ms
+   ✓ task execution lock authority > releases its generation when the protected operation throws 74ms
+   ✓ task execution lock authority > validates task, lease, and heartbeat inputs before publishing authority 37ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/core/task-execution-fence.test.ts > task execution lock authority > keeps a committed completion authoritative when projection cleanup is uncertain
+ReferenceError: quarantine is not defined
+ ❯ tests/core/task-execution-fence.test.ts:1627:59
+    1625|       projectionCleanup: 'uncertain',
+    1626|     });
+    1627|     expect(readRecoveredExecutionLockBoundary(root, lock, quarantine.q…
+       |                                                           ^
+    1628|       .toMatchObject({ recovered: quarantine, audit: recovered.audit }…
+    1629|     const db = new Database(executionAuthorityDbPath(root), { readonly…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 68 passed (69)
+   Start at  17:18:52
+   Duration  10.67s (transform 588ms, setup 16ms, collect 705ms, tests 8.77s, environment 0ms, prepare 36ms)
+

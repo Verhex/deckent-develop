@@ -1238,6 +1238,7 @@ export const TASK_ATTEMPT_CUSTODY_DISPATCH_OBSERVATION_CLASSES = intrinsicObject
   'PROVIDER_EXECUTION',
   'PROVIDER_EXIT',
   'EFFECT_DIAGNOSTIC',
+  'RELEASE_DIAGNOSTIC',
 ] as const);
 
 export type TaskAttemptCustodyDispatchObservationClass =
@@ -1254,6 +1255,7 @@ const TASK_ATTEMPT_CUSTODY_DISPATCH_OBSERVATION_PATH_SEGMENTS: Readonly<Record<
   PROVIDER_EXECUTION: 'provider-execution',
   PROVIDER_EXIT: 'provider-exit',
   EFFECT_DIAGNOSTIC: 'effect-diagnostic',
+  RELEASE_DIAGNOSTIC: 'release-diagnostic',
 });
 
 /** Path-free durable ref for one exact physical dispatch observation. */
@@ -1304,6 +1306,72 @@ export interface TaskAttemptCustodyStartedFailedDispatchV2 extends Omit<
   readonly schemaVersion: typeof TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION;
   readonly kind: 'task-attempt-custody-started-failed-dispatch';
   readonly state: 'STARTED_FAILED_RETAINED';
+  readonly custodyRootId: Sha256Digest;
+  readonly custodyCapabilityEvidenceDigest: Sha256Digest;
+  readonly recoveryAuthority: TaskAttemptCustodyDispatchRecoveryAuthorityV2;
+  readonly recoveryAuthorityDigest: Sha256Digest;
+  readonly stoppedExecutionEvidenceDigest: Sha256Digest;
+  readonly recordedAt: string;
+  readonly receiptDigest: Sha256Digest;
+}
+
+export interface TaskAttemptCustodyAbortedPartialEvidenceV2 {
+  readonly transactionDigest: Sha256Digest;
+  readonly journalEvidenceDigest: Sha256Digest;
+  readonly recoveryAuditDigest: Sha256Digest;
+  readonly terminalReceiptDigest: Sha256Digest;
+  readonly nativeObservationDigest: Sha256Digest;
+  readonly recoveryOccurredAt: string;
+}
+
+function snapshotAbortedPartialEvidence(value: unknown): TaskAttemptCustodyAbortedPartialEvidenceV2 {
+  const row = snapshotExactDataRecord(value, ['transactionDigest', 'journalEvidenceDigest',
+    'recoveryAuditDigest', 'terminalReceiptDigest', 'nativeObservationDigest', 'recoveryOccurredAt']);
+  if (!row || !isDigest(row.transactionDigest) || !isDigest(row.journalEvidenceDigest)
+    || !isDigest(row.recoveryAuditDigest) || !isDigest(row.terminalReceiptDigest)
+    || !isDigest(row.nativeObservationDigest) || !isTimestamp(row.recoveryOccurredAt)) {
+    hold('DISPATCH_AUTHORITY_INVALID', 'read');
+  }
+  return freezeObject({ transactionDigest: row.transactionDigest as Sha256Digest,
+    journalEvidenceDigest: row.journalEvidenceDigest as Sha256Digest,
+    recoveryAuditDigest: row.recoveryAuditDigest as Sha256Digest,
+    terminalReceiptDigest: row.terminalReceiptDigest as Sha256Digest,
+    nativeObservationDigest: row.nativeObservationDigest as Sha256Digest,
+    recoveryOccurredAt: row.recoveryOccurredAt });
+}
+
+export interface TaskAttemptCustodyAbortedPartialCandidateV2 {
+  readonly state: 'ABORTED_PARTIAL_EFFECT_CANDIDATE';
+  readonly evidence: TaskAttemptCustodyAbortedPartialEvidenceV2;
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly admissionRefDigest: Sha256Digest;
+  readonly admissionReceiptDigest: Sha256Digest;
+  readonly releasedDispatchReceiptDigest: Sha256Digest;
+  readonly providerStartObservationReceiptDigest: Sha256Digest;
+  readonly providerExecutionObservationReceiptDigest: Sha256Digest;
+  readonly providerExitObservationReceiptDigest: Sha256Digest;
+  readonly providerExitObservedAt: string;
+  readonly preservationManifestDigest: Sha256Digest;
+  readonly preservedArtifacts: readonly Readonly<{
+    artifactClass: TaskAttemptCustodyArtifactClass;
+    artifactKey: string;
+    receiptDigest: Sha256Digest;
+    contentDigest: Sha256Digest;
+    byteLength: number;
+  }>[];
+  readonly evidenceDigest: Sha256Digest;
+}
+
+/** Retained aborted partial effect, never successful settlement.
+ * The caller proves fresh coordinator fencing, exact stopped container identity,
+ * and exclusive mutation ownership plus journal/native/abort/recovered-audit semantics.
+ * Store validates durable custody only; it never infers process death from a hash. */
+export interface TaskAttemptCustodyAbortedPartialDispatchV2 extends Omit<
+  TaskAttemptCustodyAbortedPartialCandidateV2, 'state'
+> {
+  readonly schemaVersion: typeof TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION;
+  readonly kind: 'task-attempt-custody-aborted-partial-effect-dispatch';
+  readonly state: 'ABORTED_PARTIAL_EFFECT_RETAINED';
   readonly custodyRootId: Sha256Digest;
   readonly custodyCapabilityEvidenceDigest: Sha256Digest;
   readonly recoveryAuthority: TaskAttemptCustodyDispatchRecoveryAuthorityV2;
@@ -7588,6 +7656,10 @@ export class TaskAttemptCustodyStore {
     return childPath(dispatchAuthorityDirectory(identity), 'started-failed-retained.json');
   }
 
+  private abortedPartialDispatchPath(identity: TaskAttemptCustodyIdentityV2): TaskAttemptCustodyRelativePath {
+    return childPath(dispatchAuthorityDirectory(identity), 'aborted-partial-effect-retained.json');
+  }
+
   private rejectedResultDispatchPath(identity: TaskAttemptCustodyIdentityV2): TaskAttemptCustodyRelativePath {
     return childPath(dispatchAuthorityDirectory(identity), 'rejected-result-closed.json');
   }
@@ -7609,7 +7681,9 @@ export class TaskAttemptCustodyStore {
   ): void {
     // Any marker, including corrupt/incomplete authority, prevents resurrection.
     // This raw read deliberately does not call requireDispatchAdmissionRef.
-    if (this.readFirstWriterSnapshot(this.effectReleasedUnacceptedDispatchPath(identity),
+    if (this.readFirstWriterSnapshot(this.abortedPartialDispatchPath(identity),
+      metadataLimit(policy), operation, 'DISPATCH_AUTHORITY_INVALID') !== null
+      || this.readFirstWriterSnapshot(this.effectReleasedUnacceptedDispatchPath(identity),
       metadataLimit(policy), operation, 'DISPATCH_AUTHORITY_INVALID') !== null
       || this.readFirstWriterSnapshot(this.rejectedResultDispatchPath(identity),
       metadataLimit(policy), operation, 'DISPATCH_AUTHORITY_INVALID') !== null
@@ -7963,6 +8037,7 @@ export class TaskAttemptCustodyStore {
       'recordedAt', 'stoppedExecutionEvidenceDigest'], 'DISPATCH_REQUEST_INVALID', 'settle-dispatch');
     const policy = snapshotPolicy(row.policy);
     const admitted = this.requireDispatchAdmissionRef(row.admissionRef, policy, 'settle-dispatch');
+    this.assertNoConflictingRetainedDisposition(policy, this.abortedPartialDispatchPath(admitted.ref.identity));
     this.assertNoConflictingRetainedDisposition(policy, this.effectReleasedUnacceptedDispatchPath(admitted.ref.identity));
     const authority = snapshotDispatchRecoveryAuthority(row.recoveryAuthority);
     if (!authority || !isTimestamp(row.recordedAt) || !isDigest(row.stoppedExecutionEvidenceDigest)
@@ -8084,6 +8159,7 @@ export class TaskAttemptCustodyStore {
       'recordedAt', 'stoppedExecutionEvidenceDigest'], 'DISPATCH_REQUEST_INVALID', 'settle-dispatch');
     const policy = snapshotPolicy(row.policy);
     const admitted = this.requireDispatchAdmissionRef(row.admissionRef, policy, 'settle-dispatch');
+    this.assertNoConflictingRetainedDisposition(policy, this.abortedPartialDispatchPath(admitted.ref.identity));
     this.assertNoConflictingRetainedDisposition(policy, this.effectReleasedUnacceptedDispatchPath(admitted.ref.identity));
     const authority = snapshotDispatchRecoveryAuthority(row.recoveryAuthority);
     if (!authority || !isTimestamp(row.recordedAt) || !isDigest(row.stoppedExecutionEvidenceDigest)
@@ -8105,6 +8181,136 @@ export class TaskAttemptCustodyStore {
     this.publishDispatchFirstWriter(this.startedFailedDispatchPath(admitted.ref.identity),
       canonicalTaskAttemptCustodyJson(disposition, policy.jsonBounds), metadataLimit(policy), 'settle-dispatch');
     const reread = this.readStartedFailedDispatch({ admissionRef: admitted.ref, policy });
+    if (!reread || reread.receiptDigest !== disposition.receiptDigest) hold('DISPATCH_REQUEST_CONFLICT', 'settle-dispatch');
+    return reread;
+  }
+
+  inspectAbortedPartialDispatchCandidate(input: {
+    readonly admissionRef: TaskAttemptCustodyDispatchAdmissionRefV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly evidence: TaskAttemptCustodyAbortedPartialEvidenceV2;
+  }): TaskAttemptCustodyAbortedPartialCandidateV2 {
+    const record = requireExactDataRecord(input, ['admissionRef', 'policy', 'evidence'], 'DISPATCH_AUTHORITY_INVALID', 'read');
+    const policy = snapshotPolicy(record.policy);
+    const admitted = this.requireDispatchAdmissionRef(record.admissionRef, policy, 'read');
+    const evidence = snapshotAbortedPartialEvidence(record.evidence);
+    const lifecycle = this.inspectExactReleasedProviderLifecycle(admitted, policy);
+    const { terminal, observations, start, execution, exit } = lifecycle;
+    const prefix = identityPrefix(admitted.ref.identity);
+    // Partial journal bytes are preserved. The orchestra consumer verifies their
+    // full semantics; accepted/released/settled effects are forbidden here.
+    const forbidden = new Set<TaskAttemptCustodyArtifactClass>([
+      'execution-workspace-release',
+      'execution-effect-landing-receipt-evidence', 'execution-effect-landing-receipt',
+      'canonical-accepted-result', 'production-wiring-host-settlement',
+      'evaluation-receipt', 'finalizer-receipt', 'settlement-receipt', 'archive-receipt',
+    ]);
+    // Admission preallocates the chain directory; only a verified empty scan
+    // is inert. In contrast, forbidden artifact-class directories are lazy.
+    if (this.startedFailedDirectoryNames(childPath(prefix, 'chain')).length !== 0) {
+      hold('DISPATCH_TRANSITION_INVALID', 'read');
+    }
+    const preserved = this.inspectPreservedArtifactInventory(admitted, policy, forbidden).artifacts;
+    if (preserved.filter(ref => ref.artifactClass === 'execution-effect-landing-journal').length < 4) {
+      hold('DISPATCH_TRANSITION_INVALID', 'read');
+    }
+    const preservationManifestDigest = taskAttemptCustodyDigest('aborted-partial-effect-preservation', {
+      taskSnapshotDigest: admitted.admission.taskSnapshot.sha256,
+      observations: observations.filter(entry => entry !== null).map(entry => entry!.receipt),
+      artifacts: preserved,
+    }, policy.jsonBounds);
+    const body = freezeObject({
+      state: 'ABORTED_PARTIAL_EFFECT_CANDIDATE' as const, evidence, identity: cloneIdentity(admitted.ref.identity),
+      admissionRefDigest: admitted.ref.refDigest, admissionReceiptDigest: admitted.admission.receiptDigest,
+      releasedDispatchReceiptDigest: terminal.receiptDigest,
+      providerStartObservationReceiptDigest: start.receipt.receiptDigest,
+      providerExecutionObservationReceiptDigest: execution.receipt.receiptDigest,
+      providerExitObservationReceiptDigest: exit.receipt.receiptDigest,
+      providerExitObservedAt: exit.receipt.observedAt, preservationManifestDigest, preservedArtifacts: preserved,
+    });
+    return freezeObject({ ...body, evidenceDigest: taskAttemptCustodyDigest('aborted-partial-effect-candidate', body, policy.jsonBounds) });
+  }
+
+  readAbortedPartialDispatch(input: {
+    readonly admissionRef: TaskAttemptCustodyDispatchAdmissionRefV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+  }): TaskAttemptCustodyAbortedPartialDispatchV2 | null {
+    const record = requireExactDataRecord(input, ['admissionRef', 'policy'], 'DISPATCH_AUTHORITY_INVALID', 'read');
+    const policy = snapshotPolicy(record.policy);
+    const admitted = this.requireDispatchAdmissionRef(record.admissionRef, policy, 'read');
+    const observed = this.readFirstWriterSnapshot(this.abortedPartialDispatchPath(admitted.ref.identity),
+      metadataLimit(policy), 'read', 'DISPATCH_AUTHORITY_INVALID');
+    if (observed === null) return null;
+    let decoded: unknown;
+    try { decoded = JSON.parse(Buffer.from(observed.bytes).toString('utf8')); }
+    catch { return hold('DISPATCH_AUTHORITY_INVALID', 'read'); }
+    const row = snapshotExactDataRecord(decoded, [
+      'schemaVersion', 'kind', 'state', 'identity', 'admissionRefDigest', 'admissionReceiptDigest',
+      'releasedDispatchReceiptDigest', 'providerStartObservationReceiptDigest',
+      'providerExecutionObservationReceiptDigest', 'providerExitObservationReceiptDigest',
+      'providerExitObservedAt', 'preservationManifestDigest', 'preservedArtifacts', 'evidenceDigest',
+      'evidence', 'custodyRootId', 'custodyCapabilityEvidenceDigest', 'recoveryAuthority', 'recoveryAuthorityDigest',
+      'stoppedExecutionEvidenceDigest', 'recordedAt', 'receiptDigest',
+    ]);
+    const authority = row ? snapshotDispatchRecoveryAuthority(row.recoveryAuthority) : null;
+    if (!row || !authority || row.schemaVersion !== TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION
+      || row.kind !== 'task-attempt-custody-aborted-partial-effect-dispatch' || row.state !== 'ABORTED_PARTIAL_EFFECT_RETAINED'
+      || row.custodyRootId !== this.root.rootId || row.custodyCapabilityEvidenceDigest !== this.root.capabilityEvidenceDigest
+      || !isDigest(row.stoppedExecutionEvidenceDigest) || !isTimestamp(row.recordedAt)
+      || !isDigest(row.receiptDigest)) hold('DISPATCH_AUTHORITY_INVALID', 'read');
+    const candidate = this.inspectAbortedPartialDispatchCandidate({ admissionRef: admitted.ref, policy,
+      evidence: row.evidence as TaskAttemptCustodyAbortedPartialEvidenceV2 });
+    this.assertRecoveryAuthorityBoundToCandidate(authority, candidate.identity, row.recordedAt,
+      Math.max(Date.parse(candidate.providerExitObservedAt), Date.parse(candidate.evidence.recoveryOccurredAt)), 'read');
+    const body = freezeObject({ ...candidate, schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      kind: 'task-attempt-custody-aborted-partial-effect-dispatch' as const, state: 'ABORTED_PARTIAL_EFFECT_RETAINED' as const,
+      custodyRootId: this.root.rootId, custodyCapabilityEvidenceDigest: this.root.capabilityEvidenceDigest,
+      recoveryAuthority: authority, recoveryAuthorityDigest: dispatchRecoveryAuthorityDigest(authority, policy.jsonBounds),
+      stoppedExecutionEvidenceDigest: row.stoppedExecutionEvidenceDigest as Sha256Digest, recordedAt: row.recordedAt,
+    });
+    const disposition = freezeObject({ ...body, receiptDigest: taskAttemptCustodyDigest('aborted-partial-effect-dispatch', body, policy.jsonBounds) });
+    if (!sameBytes(observed.bytes, canonicalTaskAttemptCustodyJson(disposition, policy.jsonBounds))) {
+      hold('DISPATCH_AUTHORITY_INVALID', 'read');
+    }
+    return disposition;
+  }
+
+  retainAbortedPartialDispatch(input: {
+    readonly admissionRef: TaskAttemptCustodyDispatchAdmissionRefV2;
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly evidence: TaskAttemptCustodyAbortedPartialEvidenceV2;
+    readonly recoveryAuthority: TaskAttemptCustodyDispatchRecoveryAuthorityV2;
+    readonly recordedAt: string;
+    readonly stoppedExecutionEvidenceDigest: Sha256Digest;
+  }): TaskAttemptCustodyAbortedPartialDispatchV2 {
+    const row = requireExactDataRecord(input, ['admissionRef', 'policy', 'evidence', 'recoveryAuthority',
+      'recordedAt', 'stoppedExecutionEvidenceDigest'], 'DISPATCH_REQUEST_INVALID', 'settle-dispatch');
+    const policy = snapshotPolicy(row.policy);
+    const admitted = this.requireDispatchAdmissionRef(row.admissionRef, policy, 'settle-dispatch');
+    this.assertNoConflictingRetainedDisposition(policy, this.startedFailedDispatchPath(admitted.ref.identity));
+    this.assertNoConflictingRetainedDisposition(policy, this.rejectedResultDispatchPath(admitted.ref.identity));
+    this.assertNoConflictingRetainedDisposition(policy, this.effectReleasedUnacceptedDispatchPath(admitted.ref.identity));
+    const authority = snapshotDispatchRecoveryAuthority(row.recoveryAuthority);
+    if (!authority || !isTimestamp(row.recordedAt) || !isDigest(row.stoppedExecutionEvidenceDigest)
+      || !admitted.ref.identity.taskId.startsWith(`${authority.executionId.slice('sprint-'.length)}-`)) {
+      hold('DISPATCH_REQUEST_INVALID', 'settle-dispatch');
+    }
+    this.assertNoConflictingRetainedDisposition(policy,
+      this.effectCommittedReleasePendingDispatchPath(admitted.ref.identity));
+    const candidate = this.inspectAbortedPartialDispatchCandidate({ admissionRef: admitted.ref, policy,
+      evidence: row.evidence as TaskAttemptCustodyAbortedPartialEvidenceV2 });
+    this.assertRecoveryAuthorityBoundToCandidate(authority, candidate.identity, row.recordedAt,
+      Math.max(Date.parse(candidate.providerExitObservedAt), Date.parse(candidate.evidence.recoveryOccurredAt)), 'settle-dispatch');
+    const body = freezeObject({ ...candidate, schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      kind: 'task-attempt-custody-aborted-partial-effect-dispatch' as const, state: 'ABORTED_PARTIAL_EFFECT_RETAINED' as const,
+      custodyRootId: this.root.rootId, custodyCapabilityEvidenceDigest: this.root.capabilityEvidenceDigest,
+      recoveryAuthority: authority, recoveryAuthorityDigest: dispatchRecoveryAuthorityDigest(authority, policy.jsonBounds),
+      stoppedExecutionEvidenceDigest: row.stoppedExecutionEvidenceDigest as Sha256Digest, recordedAt: row.recordedAt,
+    });
+    const disposition = freezeObject({ ...body, receiptDigest: taskAttemptCustodyDigest('aborted-partial-effect-dispatch', body, policy.jsonBounds) });
+    this.publishDispatchFirstWriter(this.abortedPartialDispatchPath(admitted.ref.identity),
+      canonicalTaskAttemptCustodyJson(disposition, policy.jsonBounds), metadataLimit(policy), 'settle-dispatch');
+    const reread = this.readAbortedPartialDispatch({ admissionRef: admitted.ref, policy });
     if (!reread || reread.receiptDigest !== disposition.receiptDigest) hold('DISPATCH_REQUEST_CONFLICT', 'settle-dispatch');
     return reread;
   }
@@ -8277,6 +8483,7 @@ export class TaskAttemptCustodyStore {
       'recordedAt', 'stoppedResourceEvidenceDigest', 'hostObservationDigest'], 'DISPATCH_REQUEST_INVALID', 'settle-dispatch');
     const policy = snapshotPolicy(row.policy);
     const admitted = this.requireDispatchAdmissionRef(row.admissionRef, policy, 'settle-dispatch');
+    this.assertNoConflictingRetainedDisposition(policy, this.abortedPartialDispatchPath(admitted.ref.identity));
     this.assertNoConflictingRetainedDisposition(policy, this.effectReleasedUnacceptedDispatchPath(admitted.ref.identity));
     const authority = snapshotDispatchRecoveryAuthority(row.recoveryAuthority);
     if (!authority || !isTimestamp(row.recordedAt) || !isDigest(row.stoppedResourceEvidenceDigest)
@@ -8474,6 +8681,7 @@ export class TaskAttemptCustodyStore {
       'recordedAt', 'stoppedResourceEvidenceDigest', 'hostObservationDigest'], 'DISPATCH_REQUEST_INVALID', 'settle-dispatch');
     const policy = snapshotPolicy(row.policy);
     const admitted = this.requireDispatchAdmissionRef(row.admissionRef, policy, 'settle-dispatch');
+    this.assertNoConflictingRetainedDisposition(policy, this.abortedPartialDispatchPath(admitted.ref.identity));
     const authority = snapshotDispatchRecoveryAuthority(row.recoveryAuthority);
     if (!authority || !isTimestamp(row.recordedAt) || !isDigest(row.stoppedResourceEvidenceDigest)
       || !isDigest(row.hostObservationDigest)) hold('DISPATCH_REQUEST_INVALID', 'settle-dispatch');
@@ -8648,6 +8856,7 @@ export class TaskAttemptCustodyStore {
       || observationClass === 'PROVIDER_EXECUTION'
       || observationClass === 'PROVIDER_EXIT'
       || observationClass === 'EFFECT_DIAGNOSTIC'
+      || observationClass === 'RELEASE_DIAGNOSTIC'
     ) {
       // Provider lifecycle observations are downstream of release. readDispatchAuthority
       // deliberately consumes neither class, so this gate cannot recurse through them.
@@ -8693,7 +8902,7 @@ export class TaskAttemptCustodyStore {
             && (providerStart === null || providerExit !== null))
           || (observationClass === 'PROVIDER_EXIT'
             && (providerStart === null || providerExecution === null))
-          || (observationClass === 'EFFECT_DIAGNOSTIC'
+          || ((observationClass === 'EFFECT_DIAGNOSTIC' || observationClass === 'RELEASE_DIAGNOSTIC')
             && (providerStart === null || providerExecution === null || providerExit === null))
         ) {
           hold('DISPATCH_TRANSITION_INVALID', 'settle-dispatch');

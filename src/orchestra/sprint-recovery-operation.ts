@@ -41,6 +41,7 @@ import {
   reconcileExactDockerPendingReservationsForSprint,
   retainExactDockerCommittedUnsettledAttempt,
   retainExactDockerStartedFailedAttempt,
+  retainExactDockerAbortedPartialAttempt,
   closeExactDockerRejectedResultAttempt,
   retainExactDockerReleasedUnacceptedAttempt,
   type ExactDockerPlanningRecoveryHealth,
@@ -85,6 +86,7 @@ export class SprintRecoveryOperationError extends Error {
 export interface SprintRecoveryReport {
   releasedUnacceptedAttempt?: Awaited<ReturnType<typeof retainExactDockerReleasedUnacceptedAttempt>>;
   rejectedResultAttempt?: Awaited<ReturnType<typeof closeExactDockerRejectedResultAttempt>>;
+  abortedPartialAttempt?: Awaited<ReturnType<typeof retainExactDockerAbortedPartialAttempt>>;
   startedFailedAttempt?: Awaited<ReturnType<typeof retainExactDockerStartedFailedAttempt>>;
   committedUnsettledAttempt?: Awaited<ReturnType<typeof retainExactDockerCommittedUnsettledAttempt>>;
   identity: SprintRecoverySettlementIdentity;
@@ -95,6 +97,8 @@ export interface SprintRecoveryReport {
   taskFilesArchived: number;
   taskFilesPreserved: number;
   exactCustodyReservations: {
+    /** Admitted attempts require effect recovery, never reservation housekeeping. */
+    readonly startedAttempts?: ExactDockerPlanningRecoveryHealth['unresolved'];
     readonly pendingBeforeAdmission: number;
     readonly heldAdmissionGraphs: number;
     readonly unresolvedBeforeRecovery: number;
@@ -124,6 +128,9 @@ export interface SprintRecoveryOperationOptions {
   readonly exactReleasedUnacceptedRecovery?: typeof retainExactDockerReleasedUnacceptedAttempt;
   readonly rejectedResultDispatchRequestId?: string;
   readonly exactRejectedResultRecovery?: typeof closeExactDockerRejectedResultAttempt;
+  readonly abortedPartialDispatchRequestId?: string;
+  readonly partialTransactionDigest?: string;
+  readonly exactAbortedPartialRecovery?: typeof retainExactDockerAbortedPartialAttempt;
   readonly startedFailedDispatchRequestId?: string;
   readonly exactStartedFailedRecovery?: typeof retainExactDockerStartedFailedAttempt;
   readonly committedUnsettledDispatchRequestId?: string;
@@ -512,7 +519,11 @@ export async function runSprintRecoveryOperation(
   assertSprintId(sprintId);
   const identity = readSprintRecoverySettlementIdentity(root, sprintId);
   const authorityBeforeMutation = readCanonicalRunStatus(root, { sprintIdHint: sprintId });
-  if ([opts.startedFailedDispatchRequestId, opts.committedUnsettledDispatchRequestId,
+  if ((opts.abortedPartialDispatchRequestId === undefined) !== (opts.partialTransactionDigest === undefined)
+    || (opts.partialTransactionDigest !== undefined && !/^sha256:[a-f0-9]{64}$/u.test(opts.partialTransactionDigest))) {
+    throw new SprintRecoveryOperationError('INVALID_DISPATCH_REQUEST_ID', { sprintId });
+  }
+  if ([opts.abortedPartialDispatchRequestId, opts.startedFailedDispatchRequestId, opts.committedUnsettledDispatchRequestId,
     opts.rejectedResultDispatchRequestId, opts.releasedUnacceptedDispatchRequestId].filter(value => value !== undefined).length > 1) {
     throw new SprintRecoveryOperationError('RETENTION_MODE_CONFLICT', { sprintId });
   }
@@ -611,8 +622,8 @@ export async function runSprintRecoveryOperation(
       remediation: null,
     };
   }
-  if (opts.startedFailedDispatchRequestId !== undefined) {
-    const dispatchRequestId = opts.startedFailedDispatchRequestId;
+  if (opts.startedFailedDispatchRequestId !== undefined || opts.abortedPartialDispatchRequestId !== undefined) {
+    const dispatchRequestId = (opts.abortedPartialDispatchRequestId ?? opts.startedFailedDispatchRequestId)!;
     if (!/^dreq-[a-f0-9]{64}$/u.test(dispatchRequestId)) {
       throw new SprintRecoveryOperationError('INVALID_DISPATCH_REQUEST_ID', { sprintId });
     }
@@ -657,7 +668,10 @@ export async function runSprintRecoveryOperation(
       }
       assertFreshFence();
     }
-    const startedFailedAttempt = await (opts.exactStartedFailedRecovery ?? retainExactDockerStartedFailedAttempt)({
+    const startedFailedAttempt = await (opts.abortedPartialDispatchRequestId !== undefined
+      ? (opts.exactAbortedPartialRecovery ?? retainExactDockerAbortedPartialAttempt)
+      : (opts.exactStartedFailedRecovery ?? retainExactDockerStartedFailedAttempt))({
+      transactionDigest: opts.partialTransactionDigest!,
       projectRoot: root, sprintId, dispatchRequestId, dryRun: opts.dryRun === true,
       recoveryAuthority: {
         executionId: identity.executionId, taskId: identity.taskId, attemptId: identity.attemptId,
@@ -668,7 +682,8 @@ export async function runSprintRecoveryOperation(
       beforePublish: assertFreshFence,
     });
     return {
-      identity, startedFailedAttempt, audit: { overallGate: 'SKIPPED' }, orphanIpcDirs: [],
+      identity, ...(opts.abortedPartialDispatchRequestId !== undefined
+        ? { abortedPartialAttempt: startedFailedAttempt } : { startedFailedAttempt }), audit: { overallGate: 'SKIPPED' }, orphanIpcDirs: [],
       staleLocksCleaned: 0, staleSpawnLocksCleaned: 0, taskFilesArchived: 0, taskFilesPreserved: 0,
       exactCustodyReservations: { pendingBeforeAdmission: 0, heldAdmissionGraphs: 0,
         unresolvedBeforeRecovery: 0, admittedFromStagedSnapshot: 0, retiredBeforeAdmission: 0,
@@ -701,6 +716,10 @@ export async function runSprintRecoveryOperation(
     entry.reasonCode === 'ADMISSION_GRAPH_HOLD'
     && entry.taskId.startsWith(`${sprintNumber}-`)
   ));
+  const startedExactCustody = exactCustodyInspection.unresolved.filter(entry => (
+    entry.reasonCode === 'STARTED_ATTEMPT_RECONCILIATION_REQUIRED'
+    && entry.taskId.startsWith(`${sprintNumber}-`)
+  ));
   const report: SprintRecoveryReport = {
     identity,
     audit: { overallGate: 'SKIPPED' },
@@ -712,7 +731,8 @@ export async function runSprintRecoveryOperation(
     exactCustodyReservations: {
       pendingBeforeAdmission: pendingExactCustody.length,
       heldAdmissionGraphs: heldExactCustody.length,
-      unresolvedBeforeRecovery: pendingExactCustody.length + heldExactCustody.length,
+      unresolvedBeforeRecovery: pendingExactCustody.length + heldExactCustody.length + startedExactCustody.length,
+      ...(startedExactCustody.length > 0 ? { startedAttempts: Object.freeze(startedExactCustody) } : {}),
       admittedFromStagedSnapshot: 0,
       retiredBeforeAdmission: 0,
       quarantinedHistoricalAdmissions: 0,
@@ -749,6 +769,17 @@ export async function runSprintRecoveryOperation(
     || !sameIdentity(opts.approval.identity, identity)
   ) {
     throw new SprintRecoveryOperationError('APPROVAL_MISMATCH', { sprintId });
+  }
+
+  // Reservation cleanup cannot settle an admitted effect. Keep every retained
+  // task and its checkpoint intact until the exact attempt recovery closes it.
+  if (startedExactCustody.length > 0 && opts.intent !== 'FINALIZE_CONTAINMENT') {
+    throw new SprintRecoveryOperationError('SETTLEMENT_FAILED', {
+      sprintId,
+      disposition: 'HOLD',
+      reason: 'STARTED_ATTEMPT_RECONCILIATION_REQUIRED',
+      taskIds: startedExactCustody.map(entry => entry.taskId).join(','),
+    });
   }
 
   await containSprintRecoveryCoordinator(root, sprintId, {

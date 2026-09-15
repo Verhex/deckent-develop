@@ -132,7 +132,7 @@ export type RecoveryReport = SprintRecoveryReport;
 export async function runRecovery(
   root: string,
   sprintId: string,
-  opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; retainStartedFailed?: string; retainCommittedUnsettled?: string; closeRejectedResult?: string; retainReleasedUnaccepted?: string },
+  opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; retainAbortedPartial?: string; effectTransaction?: string; retainStartedFailed?: string; retainCommittedUnsettled?: string; closeRejectedResult?: string; retainReleasedUnaccepted?: string },
   lang: string,
 ): Promise<RecoveryReport> {
   try {
@@ -140,6 +140,8 @@ export async function runRecovery(
     return await runSprintRecoveryOperation(root, sprintId, {
       dryRun: opts.dryRun,
       skipAudit: opts.skipAudit,
+      abortedPartialDispatchRequestId: opts.retainAbortedPartial,
+      partialTransactionDigest: opts.effectTransaction,
       startedFailedDispatchRequestId: opts.retainStartedFailed,
       committedUnsettledDispatchRequestId: opts.retainCommittedUnsettled,
       rejectedResultDispatchRequestId: opts.closeRejectedResult,
@@ -183,6 +185,8 @@ export function registerRecover(program: Command): void {
     .option('--force', getMessage('recover.force_option', registerLang))
     .option('--skip-audit', getMessage('recover.skip_audit_option', registerLang))
     .option('--restore-tasks', getMessage('recover.restore_tasks_option', registerLang))
+    .option('--retain-aborted-partial <dispatch-request-id>', getMessage('recover.retain_aborted_partial_option', registerLang))
+    .option('--effect-transaction <sha256>', getMessage('recover.effect_transaction_option', registerLang))
     .option('--retain-started-failed <dispatch-request-id>', getMessage('recover.retain_started_failed_option', registerLang))
     .option('--retain-committed-unsettled <dispatch-request-id>', getMessage('recover.retain_committed_unsettled_option', registerLang))
     .option('--close-rejected-result <dispatch-request-id>', getMessage('recover.close_rejected_result_option', registerLang))
@@ -191,12 +195,20 @@ export function registerRecover(program: Command): void {
     .option('--auto-approve', getMessage('recover.auto_approve_option', registerLang), false)
     .option('--force-scope', getMessage('recover.force_scope_option', registerLang), false)
     .option('--json', getMessage('recover.json_option', registerLang))
-    .action(async (sprintId: string, opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; restoreTasks?: boolean; resume?: boolean; autoApprove?: boolean; forceScope?: boolean; json?: boolean; retainStartedFailed?: string; retainCommittedUnsettled?: string; closeRejectedResult?: string; retainReleasedUnaccepted?: string }) => {
+    .action(async (sprintId: string, opts: { dryRun?: boolean; force?: boolean; skipAudit?: boolean; restoreTasks?: boolean; resume?: boolean; autoApprove?: boolean; forceScope?: boolean; json?: boolean; retainAbortedPartial?: string; effectTransaction?: string; retainStartedFailed?: string; retainCommittedUnsettled?: string; closeRejectedResult?: string; retainReleasedUnaccepted?: string }) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);
 
       try {
         assertCanonicalSprintId(sprintId, lang);
+        if ((opts.retainAbortedPartial === undefined) !== (opts.effectTransaction === undefined)
+          || (opts.effectTransaction !== undefined && !/^sha256:[a-f0-9]{64}$/u.test(opts.effectTransaction))
+          || (opts.retainAbortedPartial !== undefined && !/^dreq-[a-f0-9]{64}$/u.test(opts.retainAbortedPartial))) {
+          throw new DeckentError('E_RECOVER_PARTIAL_IDENTITY', getMessage('recover.partial_identity_invalid', lang));
+        }
+        if (opts.retainAbortedPartial !== undefined && (opts.resume || opts.restoreTasks)) {
+          throw new DeckentError('E_RECOVER_RETENTION_CONFLICT', getMessage('recover.retain_started_failed_conflict', lang));
+        }
         if (opts.retainStartedFailed !== undefined) {
           if (!/^dreq-[a-f0-9]{64}$/u.test(opts.retainStartedFailed)) {
             throw new DeckentError('E_RECOVER_INVALID_DISPATCH_REQUEST_ID', getMessage('recover.invalid_dispatch_request_id', lang));
@@ -229,7 +241,7 @@ export function registerRecover(program: Command): void {
             throw new DeckentError('E_RECOVER_RETENTION_CONFLICT', getMessage('recover.retain_started_failed_conflict', lang));
           }
         }
-        if ([opts.retainStartedFailed, opts.retainCommittedUnsettled, opts.closeRejectedResult, opts.retainReleasedUnaccepted].filter(value => value !== undefined).length > 1) {
+        if ([opts.retainAbortedPartial, opts.retainStartedFailed, opts.retainCommittedUnsettled, opts.closeRejectedResult, opts.retainReleasedUnaccepted].filter(value => value !== undefined).length > 1) {
           throw new DeckentError('E_RECOVER_RETENTION_MODE_CONFLICT', getMessage('recover.retention_modes_conflict', lang));
         }
         if (opts.dryRun && opts.restoreTasks) {
@@ -312,6 +324,7 @@ export function registerRecover(program: Command): void {
             },
             artifactPolicy: report.artifactPolicy,
             remediation: report.remediation,
+            ...(report.abortedPartialAttempt ? { abortedPartialAttempt: report.abortedPartialAttempt } : {}),
             ...(report.startedFailedAttempt ? { startedFailedAttempt: report.startedFailedAttempt } : {}),
             ...(report.committedUnsettledAttempt ? { committedUnsettledAttempt: report.committedUnsettledAttempt } : {}),
             ...(report.releasedUnacceptedAttempt ? { releasedUnacceptedAttempt: report.releasedUnacceptedAttempt } : {}),
@@ -325,6 +338,11 @@ export function registerRecover(program: Command): void {
           print(getMessage('recover.separator', lang));
 
           const report = await runRecovery(root, sprintId, { ...opts, dryRun: true }, lang);
+          if (report.abortedPartialAttempt) {
+            print(getMessage('recover.aborted_partial_result', lang, { state: report.abortedPartialAttempt.state,
+              dispatchRequestId: report.abortedPartialAttempt.dispatchRequestId,
+              evidenceDigest: report.abortedPartialAttempt.evidenceDigest }));
+          }
           if (report.startedFailedAttempt) {
             print(getMessage('recover.started_failed_result', lang, { state: report.startedFailedAttempt.state,
               dispatchRequestId: report.startedFailedAttempt.dispatchRequestId,
@@ -373,6 +391,9 @@ export function registerRecover(program: Command): void {
 
         // Interactive confirmation (unless --force)
         if (!opts.force) {
+          if (opts.retainAbortedPartial) {
+            print(getMessage('recover.retain_aborted_partial_confirm', lang, { dispatchRequestId: opts.retainAbortedPartial }));
+          }
           if (opts.retainStartedFailed) {
             print(getMessage('recover.retain_started_failed_confirm', lang, { dispatchRequestId: opts.retainStartedFailed }));
           } else if (opts.retainReleasedUnaccepted) {
@@ -403,6 +424,11 @@ export function registerRecover(program: Command): void {
 
         print(getMessage('recover.recovering', lang, { sprintId }));
         const report = await runRecovery(root, sprintId, opts, lang);
+        if (report.abortedPartialAttempt) {
+          print(getMessage('recover.aborted_partial_result', lang, { state: report.abortedPartialAttempt.state,
+            dispatchRequestId: report.abortedPartialAttempt.dispatchRequestId,
+            evidenceDigest: report.abortedPartialAttempt.evidenceDigest }));
+        }
         if (report.startedFailedAttempt) {
           print(getMessage('recover.started_failed_result', lang, { state: report.startedFailedAttempt.state,
             dispatchRequestId: report.startedFailedAttempt.dispatchRequestId,

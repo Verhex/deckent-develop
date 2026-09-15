@@ -1,0 +1,236 @@
+[
+  {
+    "taskId": "764-003",
+    "dispatch": "dreq-9cf94f9838481c5c81e72313d2f7329cfaf7ebb934797837fae5fafb25a64fd1",
+    "authority": {
+      "state": "terminal",
+      "authority": {
+        "schemaVersion": 2,
+        "kind": "task-attempt-custody-dispatch-authority",
+        "state": "NOT_DISPATCHED",
+        "admissionRef": {
+          "schemaVersion": 2,
+          "kind": "task-attempt-custody-dispatch-admission-ref",
+          "state": "admitted",
+          "dispatchRequestId": "dreq-9cf94f9838481c5c81e72313d2f7329cfaf7ebb934797837fae5fafb25a64fd1",
+          "dispatchRequestMaterialDigest": "sha256:1fd6c08c57b44b4113af668f908317692ff8293d789c48e1b382040132bd6719",
+          "reservationReceiptDigest": "sha256:de796abcab9d6b7e63c93fb61d345962ee0c72110f7014d672c98826e05e9c2e",
+          "identity": {
+            "schemaVersion": 2,
+            "backend": "docker",
+            "projectRootSha256": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+            "projectId": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+            "taskId": "764-003",
+            "attemptId": "b53cbb81-612f-8c9d-8ed2-bf6e7ef0854f",
+            "generation": 1
+          },
+          "admissionReceiptDigest": "sha256:00469921bbd0cb46c4fe1b97cc29debdc6cb95466eb211a1ca43d6b5a716c7aa",
+          "refDigest": "sha256:bcdffbf50d71d2c3803ea65a4ed1a27cffb0fe6755968fb105a5da25c3bc8bc7"
+        },
+        "attemptCount": 0,
+        "providerExecutionAttempt": null,
+        "backendExecutionId": null,
+        "mountReceiptDigest": null,
+        "mountTransferEvidenceDigest": null,
+        "releaseEvidence": null,
+        "releaseReceiptDigest": null,
+        "releaseEvidenceDigest": null,
+        "noEffectEvidence": {
+          "schemaVersion": 2,
+          "kind": "task-attempt-custody-no-effect-evidence",
+          "mountEffect": "ABSENT",
+          "daemonEffect": "ABSENT",
+          "providerEffect": "ABSENT",
+          "observation": {
+            "schemaVersion": 2,
+            "kind": "task-attempt-custody-no-effect-observation",
+            "daemonContainerState": "ABSENT",
+            "providerReleaseState": "ABSENT",
+            "daemonInspectionReceiptDigest": "sha256:b66f9adb97ccf1e3e3fa6c9171057d4a0b05d886567c797caee7cff14bed929d",
+            "providerReleaseProbeEvidenceDigest": "sha256:82e72d91498f8ae98d55d4fbbead0be5f7496b44f40f3207a39964b1aae34da9",
+            "backendProbeEvidenceDigest": "sha256:f55a4dba8b4ad07c31bec7c7fa1bf8cd7f5da1041452965fea6396faace768cf",
+            "containmentEvidenceDigest": "sha256:7563f6a046e1f3f132f240073dfc33536a2673e373d3f00f7cf05ceb146fc05f",
+            "observationReceiptDigest": "sha256:554bda862216ea6782ecd002d64d5f4d393bc4f4c8f6b763faacebe77a33c3d4",
+            "observationEvidenceDigest": "sha256:21ea40ef3863570ec546b8fccf875cb064f0c9d98752aeaed842e72b584362c4",
+            "observedAt": "2026-09-14T15:42:53.979Z"
+          },
+          "observationBindingDigest": "sha256:a4eaa3cbd7c8546b1da76aeb6924ca987e3ebaf0849a017be915d2e376bb8a35",
+          "verifiedAt": "2026-09-14T15:42:53.979Z",
+          "evidenceDigest": "sha256:07cf848817915a82d74fda0b75927903a1462878bab2efcff3537fbb0c53b30f"
+        },
+        "reasonCode": "PRE_MOUNT_ABORTED",
+        "projectionFence": "sha256:6848249c5b00124be6cbb959ff5bc87f356221be60cbcf2cfef1ae82cc9822e9",
+        "recordedAt": "2026-09-14T15:42:53.979Z",
+        "receiptDigest": "sha256:db762dc14b5c068de02bfab7272abff57fa6c9d94004f061af2096f967fee894"
+      },
+      "reconciliation": null
+    },
+    "resolved": true
+  },
+  {
+    "taskId": "764-002",
+    "dispatch": "dreq-726f6dd076ee6039f6df558c974272db1f387fdb15285b2738e5e78eec3ac3fe",
+    "authority": {
+      "state": "terminal",
+      "authority": {
+        "schemaVersion": 2,
+        "kind": "task-attempt-custody-dispatch-authority",
+        "state": "RELEASED",
+        "admissionRef": {
+          "schemaVersion": 2,
+          "kind": "task-attempt-custody-dispatch-admission-ref",
+          "state": "admitted",
+          "dispatchRequestId": "dreq-726f6dd076ee6039f6df558c974272db1f387fdb15285b2738e5e78eec3ac3fe",
+          "dispatchRequestMaterialDigest": "sha256:3dfaaf5f0376252770e17d23fae6aff8e14930e57165c2a9097de314c083c2b8",
+          "reservationReceiptDigest": "sha256:48d13b7a021e9cc6dd571c1b6303da7130d8a9cc6ecf891dbdc2319f68466465",
+          "identity": {
+            "schemaVersion": 2,
+            "backend": "docker",
+            "projectRootSha256": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+            "projectId": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+            "taskId": "764-002",
+            "attemptId": "7153a353-2621-8969-8f94-5e232f403bf2",
+            "generation": 1
+          },
+          "admissionReceiptDigest": "sha256:4e2cf2b2b2557e0cd529e90597d9ccd208cbb26bdd0ea83f92db60862c98868c",
+          "refDigest": "sha256:165f6a23444c251c97c1f2e691110da49b5f27aab899bf886f66870228e945d5"
+        },
+        "attemptCount": 1,
+        "providerExecutionAttempt": {
+          "schemaVersion": 2,
+          "kind": "task-attempt-custody-provider-execution-attempt",
+          "providerExecutionAttemptId": "a5f6e62b-79c2-8d3d-853e-df6feaa282d9",
+          "custodyIdentity": {
+            "schemaVersion": 2,
+            "backend": "docker",
+            "projectRootSha256": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+            "projectId": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+            "taskId": "764-002",
+            "attemptId": "7153a353-2621-8969-8f94-5e232f403bf2",
+            "generation": 1
+          },
+          "admissionReceiptDigest": "sha256:4e2cf2b2b2557e0cd529e90597d9ccd208cbb26bdd0ea83f92db60862c98868c",
+          "backendExecutionId": "72fc2a281e0a9c22f366c03b0e1376255aa2b0567a755fdfcad9c6a472e7a34a",
+          "identityDigest": "sha256:f86a99067c10e5dc3167689ae4c88426cebbc4eff9239514be11ce9b205cddce"
+        },
+        "backendExecutionId": "72fc2a281e0a9c22f366c03b0e1376255aa2b0567a755fdfcad9c6a472e7a34a",
+        "mountReceiptDigest": "sha256:a9b8c09f824011b39dd7786d4d34221d05922d5c95ded506578adc82387b7ea4",
+        "mountTransferEvidenceDigest": "sha256:e2079b76aceb7c009ed48e1f2099cd8893422baf139793ebcac64eaaedb5829d",
+        "releaseEvidence": {
+          "schemaVersion": 2,
+          "kind": "task-attempt-custody-dispatch-release-evidence",
+          "containerId": "72fc2a281e0a9c22f366c03b0e1376255aa2b0567a755fdfcad9c6a472e7a34a",
+          "imageDigest": "sha256:fd185dfe854fd9027ccea56f104bae2b30fa1a6908a937cc4258d9520ba255f9",
+          "mountReceiptDigest": "sha256:a9b8c09f824011b39dd7786d4d34221d05922d5c95ded506578adc82387b7ea4",
+          "mountTransferEvidenceDigest": "sha256:e2079b76aceb7c009ed48e1f2099cd8893422baf139793ebcac64eaaedb5829d",
+          "daemonAuthorityLabelDigest": "sha256:ae8d70acdee91427e2fcfc85c9ba7ccd9efbd82575d29bc8470784ae62be754a",
+          "releaseNonceDigest": "sha256:f69518c64be6d285a79200133730864450d243efea2fbcd41981c7db101849d0",
+          "providerInvocationDigest": "sha256:930bcbe1d3cc206b7d270da3c7a5bc78bb8fd35d3d87444c5557ef93ad3d1398",
+          "gateAckReceiptDigest": "sha256:c30bd2b996e29007da48e8c67d3b05c9646f44109bcc9cb67e85496e7677e949",
+          "gateAckEvidenceDigest": "sha256:dbc5b2fda57db5b9e1a64d883eb64c490a540e92101e127616eaf801105f396b",
+          "releasedAt": "2026-09-14T15:41:43.421Z",
+          "ackMethod": "HOST_RELEASE_GATE",
+          "ackStatus": "ACKNOWLEDGED",
+          "evidenceDigest": "sha256:76918532b8b766f0197cfecfbbce88826ffa55aafb2cc6c3962d926d33e90809",
+          "receiptDigest": "sha256:ac405888ace56286c721ea149a1c53afe0f0743562108a789c49d237321f4014"
+        },
+        "releaseReceiptDigest": "sha256:ac405888ace56286c721ea149a1c53afe0f0743562108a789c49d237321f4014",
+        "releaseEvidenceDigest": "sha256:76918532b8b766f0197cfecfbbce88826ffa55aafb2cc6c3962d926d33e90809",
+        "noEffectEvidence": null,
+        "reasonCode": null,
+        "projectionFence": "sha256:b9a95c1ad0fc699fcb34f65a49c433fad0d196d1b2cc3c03241b1fef928b9802",
+        "recordedAt": "2026-09-14T15:41:43.421Z",
+        "receiptDigest": "sha256:30b65e23deaf29854d550dff3e6185c18201bc4821f9436959f2483d8471b50b"
+      },
+      "reconciliation": null
+    },
+    "resolved": false
+  },
+  {
+    "taskId": "764-001",
+    "dispatch": "dreq-2825d584c18fdf8e1f5ab741ece23f07c7b5d7a15add6b29c313569270f4d07f",
+    "error": {
+      "message": "EXACT_DOCKER_ACCEPTED_RESULT_READER_INVALID",
+      "stack": "ExactDockerCustodyFailure: EXACT_DOCKER_ACCEPTED_RESULT_READER_INVALID\n    at DockerSpawnBackend.exactCanonicalHostWorkAuthorityFromAccepted (file:///home/alperen/deckent-dev/dist/orchestra/spawn-backend-docker.js:13164:19)\n    at b.exactCanonicalHostWorkAuthorityFromAccepted (file:///tmp/deckent-r25/attempts.mjs:9:17)\n    at DockerSpawnBackend.readExactDockerAcceptedResult (file:///home/alperen/deckent-dev/dist/orchestra/spawn-backend-docker.js:12265:40)\n    at DockerSpawnBackend.readColdExactDockerAcceptedResult (file:///home/alperen/deckent-dev/dist/orchestra/spawn-backend-docker.js:12765:21)\n    at DockerSpawnBackend.inspectAdmissionResolvedForPlanning (file:///home/alperen/deckent-dev/dist/orchestra/spawn-backend-docker.js:14527:38)\n    at file:///tmp/deckent-r25/attempts.mjs:11:294\n    at TaskAttemptCustodyStore.withVerifiedReadSnapshot (file:///home/alperen/deckent-dev/dist/core/task-attempt-custody-store.js:3627:27)\n    at file:///tmp/deckent-r25/attempts.mjs:11:123\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)"
+    }
+  },
+  {
+    "taskId": "764-004",
+    "dispatch": "dreq-b3148471a2297e6169470812e1dc1350edb3603cbb469152b26ebbc1c127a41b",
+    "authority": {
+      "state": "terminal",
+      "authority": {
+        "schemaVersion": 2,
+        "kind": "task-attempt-custody-dispatch-authority",
+        "state": "RELEASED",
+        "admissionRef": {
+          "schemaVersion": 2,
+          "kind": "task-attempt-custody-dispatch-admission-ref",
+          "state": "admitted",
+          "dispatchRequestId": "dreq-b3148471a2297e6169470812e1dc1350edb3603cbb469152b26ebbc1c127a41b",
+          "dispatchRequestMaterialDigest": "sha256:3cb4bba97dce29f18125cc5895692e8a8066fb20b3b9fdb248dba15cec123bbe",
+          "reservationReceiptDigest": "sha256:13c5cd41ad51f041dcb5c356d12fb7d9bf72d23bbe30c9417c9d8436a5cbacf8",
+          "identity": {
+            "schemaVersion": 2,
+            "backend": "docker",
+            "projectRootSha256": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+            "projectId": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+            "taskId": "764-004",
+            "attemptId": "830e4044-ae75-86c3-8f75-5c6ff6264091",
+            "generation": 1
+          },
+          "admissionReceiptDigest": "sha256:8d51e67bd93f8ec2cd7cd2fbc55495e0b1c4d56a305c1df61f90270fbc5ccc00",
+          "refDigest": "sha256:19a1dd1fd7f9ce0ccaf49500938f63fe1609880861f469e2647ab1d44fb57f9c"
+        },
+        "attemptCount": 1,
+        "providerExecutionAttempt": {
+          "schemaVersion": 2,
+          "kind": "task-attempt-custody-provider-execution-attempt",
+          "providerExecutionAttemptId": "e6b8ce66-212e-86ee-8bff-f60ef7cce2a5",
+          "custodyIdentity": {
+            "schemaVersion": 2,
+            "backend": "docker",
+            "projectRootSha256": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+            "projectId": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+            "taskId": "764-004",
+            "attemptId": "830e4044-ae75-86c3-8f75-5c6ff6264091",
+            "generation": 1
+          },
+          "admissionReceiptDigest": "sha256:8d51e67bd93f8ec2cd7cd2fbc55495e0b1c4d56a305c1df61f90270fbc5ccc00",
+          "backendExecutionId": "a12c669b751011449c44c10690eadc6d7c737fe889022adbfc3e50e685e1e278",
+          "identityDigest": "sha256:84d97ecc7cadf3eaee7c3cf6bd2c813f18a116be6d873c94ede378f020b21f3a"
+        },
+        "backendExecutionId": "a12c669b751011449c44c10690eadc6d7c737fe889022adbfc3e50e685e1e278",
+        "mountReceiptDigest": "sha256:0c9bb1aa61450c55d359887f96c8d11abf0fd832b34ad93f184c26f6eb94bc05",
+        "mountTransferEvidenceDigest": "sha256:87b3ddf5bdf47c4a5837d8784bc685776ecac3614e0979b27eb7d86b97357e87",
+        "releaseEvidence": {
+          "schemaVersion": 2,
+          "kind": "task-attempt-custody-dispatch-release-evidence",
+          "containerId": "a12c669b751011449c44c10690eadc6d7c737fe889022adbfc3e50e685e1e278",
+          "imageDigest": "sha256:fd185dfe854fd9027ccea56f104bae2b30fa1a6908a937cc4258d9520ba255f9",
+          "mountReceiptDigest": "sha256:0c9bb1aa61450c55d359887f96c8d11abf0fd832b34ad93f184c26f6eb94bc05",
+          "mountTransferEvidenceDigest": "sha256:87b3ddf5bdf47c4a5837d8784bc685776ecac3614e0979b27eb7d86b97357e87",
+          "daemonAuthorityLabelDigest": "sha256:b14de33a44ba91a82b995eea93beffdd361851722de9e3725c0b28ebec85ad6b",
+          "releaseNonceDigest": "sha256:7c9c570e86e70906c125961d35ce7a1fe574db0e9186ed9ee431a032975514b4",
+          "providerInvocationDigest": "sha256:930bcbe1d3cc206b7d270da3c7a5bc78bb8fd35d3d87444c5557ef93ad3d1398",
+          "gateAckReceiptDigest": "sha256:32c896c9858e6cd92ab21b2193df01f0e21e839b4347368362e6aeec99bc8bd6",
+          "gateAckEvidenceDigest": "sha256:986052f2108c36d21ea9787e02ed0be655cd31f7068b079f8621982bddfdea67",
+          "releasedAt": "2026-09-14T15:43:52.896Z",
+          "ackMethod": "HOST_RELEASE_GATE",
+          "ackStatus": "ACKNOWLEDGED",
+          "evidenceDigest": "sha256:954b1958c231984d487bd5e4cb6b3259d7b3826c6334ab1830af4f6088777693",
+          "receiptDigest": "sha256:26565ea7df08fd4c3a99dab790110652f76172e2a79148601ba290848d84801b"
+        },
+        "releaseReceiptDigest": "sha256:26565ea7df08fd4c3a99dab790110652f76172e2a79148601ba290848d84801b",
+        "releaseEvidenceDigest": "sha256:954b1958c231984d487bd5e4cb6b3259d7b3826c6334ab1830af4f6088777693",
+        "noEffectEvidence": null,
+        "reasonCode": null,
+        "projectionFence": "sha256:4806dd6deff0203a00bd9fb3c01257164da4dd408f8dae803777f2513c45338e",
+        "recordedAt": "2026-09-14T15:43:52.896Z",
+        "receiptDigest": "sha256:77c299816bb45e8cba958804f7e548bcd6c5b15ea03cb152e5301bf73a5653e4"
+      },
+      "reconciliation": null
+    },
+    "resolved": true
+  }
+]

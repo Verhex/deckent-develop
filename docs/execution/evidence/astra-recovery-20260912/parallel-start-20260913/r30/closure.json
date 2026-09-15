@@ -1,0 +1,43 @@
+{
+  "utc": "2026-09-14T19:58:38.355Z",
+  "status": {
+    "schemaVersion": 1,
+    "lifecycle": "ABORTED",
+    "active": false,
+    "resumable": false,
+    "sprintId": "sprint-766",
+    "phase": "SPAWN",
+    "status": "ABORTED",
+    "reason": null,
+    "recoveryCommand": null,
+    "finalizeCommand": null,
+    "coordinator": "absent",
+    "conflicts": [],
+    "recoveryReconciliation": {
+      "version": 1,
+      "sprintId": "sprint-766",
+      "evidence": {
+        "checkpointPresent": false,
+        "terminalReceipt": {
+          "version": 1,
+          "sprintId": "sprint-766",
+          "runId": "sprint-766",
+          "coordinatorGeneration": 1,
+          "terminalOutcome": "ABORTED",
+          "logicalSettlementDigest": "ba249c3b35e735f131fcb347ed531663623610f245defd9ce0a2088619ca39a7",
+          "priorAuthorityVersion": 0,
+          "authorityVersion": 1
+        },
+        "terminalReceiptConflict": null
+      },
+      "state": "consistent",
+      "mismatch": null,
+      "remediation": null
+    }
+  },
+  "remaining766": [],
+  "debts": {
+    "openCount": 1,
+    "relevant": []
+  }
+}

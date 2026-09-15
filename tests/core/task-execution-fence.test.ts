@@ -53,6 +53,7 @@ import {
   readExecutionLockActiveAdoption,
   readExecutionLockBoundaryResume,
   readCompletedExecutionLockBoundary,
+  readRecoveredExecutionLockBoundary,
   releaseExecutionLock,
   renewExecutionLock,
   resumeExecutionLockIrreversibleBoundary,
@@ -1795,6 +1796,107 @@ describe('task execution lock authority', () => {
     db.close();
   });
 
+  it.each([false, true])('resolves exact recovered authority with resume=%s, without accepting sibling generations', resumed => {
+    const firstIdentity = {
+      hostInstanceId: 'recovery-host', bootSessionId: 'recovery-boot', processSessionId: 'recovery-first',
+    };
+    const successorIdentity = { ...firstIdentity, processSessionId: 'recovery-successor' };
+    const initial = acquireExecutionLock(root, 'recovery-reader', 'dispatch', {
+      now: () => BASE_TIME, leaseDurationMs: 100, runtimeIdentity: firstIdentity,
+    });
+    const boundary = beginExecutionLockIrreversibleBoundary(root, initial,
+      { evidenceRefs: ['effect:exact-boundary'] },
+      { now: () => BASE_TIME + 1, runtimeIdentity: firstIdentity });
+    expect(readRecoveredExecutionLockBoundary(root, initial, boundary.quarantineId)).toBeNull();
+    const current = resumed ? resumeExecutionLockIrreversibleBoundary(root, boundary,
+      { evidenceRefs: ['effect:exact-boundary'] }, {
+        now: () => BASE_TIME + 101, runtimeIdentity: successorIdentity,
+        livenessProbe: { inspect: () => 'dead' },
+      }).resumed.lock : initial;
+    const identity = resumed ? successorIdentity : firstIdentity;
+    const quarantine = quarantineExecutionLock(root, current,
+      { reason: 'partial-mutation', evidenceRefs: ['effect:retained-prefix'] },
+      { now: () => BASE_TIME + 102, runtimeIdentity: identity });
+    expect(readRecoveredExecutionLockBoundary(root, current, quarantine.quarantineId)).toBeNull();
+    const recovered = recoverQuarantinedExecutionLock(root, current, {
+      schemaVersion: EXECUTION_LOCK_RECOVERY_ATTESTATION_SCHEMA_VERSION,
+      quarantineId: quarantine.quarantineId, fencingToken: current.fencingToken,
+      operatorId: 'operator-reader', justification: 'Verified retained effect disposition',
+      evidenceRefs: ['effect:retained-prefix'], attestedAt: new Date(BASE_TIME + 103).toISOString(),
+    }, {
+      now: () => BASE_TIME + 103,
+      recoveryAttestationVerifier: context => context.quarantine.quarantineId === quarantine.quarantineId
+        && context.attestation.evidenceRefs[0] === 'effect:retained-prefix',
+    });
+    const resolution = readRecoveredExecutionLockBoundary(root, current, quarantine.quarantineId);
+    expect(resolution).toMatchObject({ recovered: quarantine, audit: recovered.audit });
+    expect(resolution!.lineage.map(event => event.action)).toEqual(resumed
+      ? ['boundary-entered', 'resumed', 'quarantined', 'recovered']
+      : ['boundary-entered', 'quarantined', 'recovered']);
+    expect(readRecoveredExecutionLockBoundary(root, current, randomUUID())).toBeNull();
+    for (const wrong of [
+      { ...current, taskId: 'sibling-task' },
+      { ...current, ownerId: randomUUID() },
+      { ...current, fencingToken: { ...current.fencingToken, nonce: 'f'.repeat(32) } },
+    ]) {
+      expect(() => readRecoveredExecutionLockBoundary(root, wrong, quarantine.quarantineId))
+        .toThrowError(expect.objectContaining({ reason: 'ownership-lost' }));
+    }
+    expect(() => readRecoveredExecutionLockBoundary(root, current, '../boundary'))
+      .toThrowError(expect.objectContaining({ reason: 'invalid-input' }));
+    // A later task generation must neither erase the historical recovery nor
+    // make that old receipt authorize the successor.
+    const next = acquireExecutionLock(root, current.taskId, 'dispatch');
+    expect(readRecoveredExecutionLockBoundary(root, current, quarantine.quarantineId)?.audit)
+      .toEqual(recovered.audit);
+    expect(() => readRecoveredExecutionLockBoundary(root, next, quarantine.quarantineId))
+      .toThrowError(expect.objectContaining({ reason: 'ownership-lost' }));
+  });
+
+  it.each(['orphan', 'early', 'foreign-owner', 'still-active'] as const)(
+    'rejects a structurally valid but unproven recovered audit: %s', fault => {
+      const lock = acquireExecutionLock(root, 'recovery-corrupt', 'dispatch', { now: () => BASE_TIME });
+      const quarantine = quarantineExecutionLock(root, lock,
+        { reason: 'partial-mutation', evidenceRefs: ['effect:partial'] },
+        { now: () => BASE_TIME + 2 });
+      const quarantineId = fault === 'orphan' ? randomUUID() : quarantine.quarantineId;
+      const occurredAt = new Date(BASE_TIME + (fault === 'early' ? 1 : 3)).toISOString();
+      const event = {
+        schemaVersion: 1, eventId: randomUUID(), action: 'recovered', quarantineId,
+        taskId: lock.taskId, ownerId: fault === 'foreign-owner' ? randomUUID() : lock.ownerId,
+        fencingToken: lock.fencingToken, occurredAt,
+        payload: {
+          schemaVersion: EXECUTION_LOCK_RECOVERY_ATTESTATION_SCHEMA_VERSION,
+          quarantineId, fencingToken: lock.fencingToken, operatorId: 'operator-corrupt',
+          justification: 'Fixture of an unproven terminal event', evidenceRefs: ['effect:partial'],
+          attestedAt: occurredAt,
+        },
+      };
+      // Hermetic corrupt fixture: no production DB, no disabled schema guards.
+      // A syntactically valid INSERT alone must never prove recovery.
+      const db = new Database(executionAuthorityDbPath(root));
+      db.prepare(`INSERT INTO execution_lock_quarantine_audit
+        (event_id, action, quarantine_id, task_id, owner_id, fencing_epoch,
+         fencing_counter, fencing_nonce, occurred_at, payload_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(event.eventId, event.action, quarantineId, event.taskId, event.ownerId,
+          lock.fencingToken.epoch, lock.fencingToken.counter, lock.fencingToken.nonce,
+          occurredAt, JSON.stringify(event));
+      db.close();
+      expect(() => readRecoveredExecutionLockBoundary(root, lock, quarantineId))
+        .toThrowError(expect.objectContaining({ reason: 'malformed' }));
+    },
+  );
+
+  it('does not reinterpret successful completion as recovery', () => {
+    const lock = acquireExecutionLock(root, 'completed-not-recovered', 'dispatch');
+    const boundary = beginExecutionLockIrreversibleBoundary(root, lock,
+      { evidenceRefs: ['effect:completed'] });
+    completeExecutionLockIrreversibleBoundary(root, lock,
+      { quarantineId: boundary.quarantineId, evidenceRefs: ['effect:completed'] });
+    expect(readRecoveredExecutionLockBoundary(root, lock, boundary.quarantineId)).toBeNull();
+  });
+
   it('keeps a committed recovery authoritative when projection cleanup is uncertain', () => {
     const lock = acquireExecutionLock(
       root,
@@ -1839,6 +1941,8 @@ describe('task execution lock authority', () => {
       audit: expect.objectContaining({ action: 'recovered' }),
       projectionCleanup: 'uncertain',
     });
+    expect(readRecoveredExecutionLockBoundary(root, lock, quarantine.quarantineId))
+      .toMatchObject({ recovered: quarantine, audit: recovered.audit });
     const db = new Database(executionAuthorityDbPath(root), { readonly: true });
     expect(db.prepare(`
       SELECT

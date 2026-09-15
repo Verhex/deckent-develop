@@ -1,0 +1,27 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/orchestra/execution-continuation-runner.test.ts (13 tests) 948ms
+ ✓ tests/orchestra/exact-docker-release-recovery.test.ts (3 tests) 3ms
+[scheduler-effects] task 700-005-fix: routing-lineage-missing: original task does-not-exist (fix target for 700-005-fix) could not be read at /tmp/sched3-inherit-ab95a53b/.tasks/task-does-not-exist.json — spawn blocked
+[scheduler-effects] task 700-006-fix: routing-lineage-missing: original task 700-006 JSON is corrupt: Expected property name or '}' in JSON at position 2 (line 1 column 3) — spawn blocked
+stdout | tests/orchestra/scheduler-spawn-executor.test.ts > waitForResults — queue-completion trigger (processQueue) delegates to executeSpawnTask > spawns the queued fix-task with inherited routing fields and persists task-<id>.json (behavior a + b, live wiring)
+[deckent] scheduler engine: legacy
+
+ ✓ tests/orchestra/spawn-backend-docker-mounts.test.ts (93 tests) 502ms
+stdout | tests/orchestra/scheduler-spawn-executor.test.ts > waitForResults — queue-completion trigger (processQueue) delegates to executeSpawnTask > propagates one provider-authority HOLD instead of retrying a queued task
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/scheduler-spawn-executor.test.ts > waitForResults — dep-ready trigger (dispatchReadyTasks) delegates to executeSpawnTask > spawns a dependency-ready fix-task with inherited routing fields and persists task-<id>.json (behavior a + b, live wiring)
+[deckent] scheduler engine: legacy
+
+ ✓ tests/orchestra/scheduler-spawn-executor.test.ts (35 tests) 2234ms
+   ✓ executeSpawnTask — exact normal-Docker publication order > preserves and freshly revalidates a current terminal across accepted recovery ownership transfer  1053ms
+   ✓ waitForResults — queue-completion trigger (processQueue) delegates to executeSpawnTask > spawns the queued fix-task with inherited routing fields and persists task-<id>.json (behavior a + b, live wiring)  304ms
+   ✓ waitForResults — dep-ready trigger (dispatchReadyTasks) delegates to executeSpawnTask > spawns a dependency-ready fix-task with inherited routing fields and persists task-<id>.json (behavior a + b, live wiring)  303ms
+
+ Test Files  4 passed (4)
+      Tests  144 passed (144)
+   Start at  07:30:23
+   Duration  5.96s (transform 3.79s, setup 57ms, collect 9.15s, tests 3.69s, environment 0ms, prepare 128ms)
+

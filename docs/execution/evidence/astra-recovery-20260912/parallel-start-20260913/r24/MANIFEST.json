@@ -1,0 +1,15 @@
+{
+  "utc": "2026-09-14T15:31:21.801085+00:00",
+  "files": {
+    "run-command.py": "8afb84a076db18346f96484a2e330302754e1492eaaa6d047c3df5b4c446fed9",
+    "main-build.stderr": "ccb6bf354a0674eeb1e49df9a880a000b75240079fdb849282bb899d81eeb58c",
+    "preflight.json": "fa61c27ebf310780780e5a67f08a2135ed3e83b9ef771094d6ab34efb8a17822",
+    "RESULT.md": "bd37755e5845c23eaa29f5bb0fa56cc4417e44e2ec9b3396ea1f3cf9d66c7974",
+    "red.log": "f63d84c5d134bcdaf834ba1c2dcd78b76dcae2dfc0893c798441a816c57a27fa",
+    "main-build.stdout": "cfc0ebed1d3605fb3b6a2494a85a34194cf075b2a10020a3bb916530da45a251",
+    "before-fix-tests.log": "71f1742021e8c2bdcb103f6bc22b0a597be375bdebcae6300e95a657fc31fd65",
+    "main-build.json": "8e7868c8a640247cef4d38ba75f1f1d6c4f88cb024c09476c6f077f88d8fc773",
+    "tsc.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tests.log": "c60020e59d6ffcd5147e72481f320a68172492a07b2f2eb3d718157e863047ff"
+  }
+}

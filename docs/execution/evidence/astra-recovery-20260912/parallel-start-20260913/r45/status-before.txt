@@ -1,0 +1,574 @@
+ M .codex/skills/deckent-authority-bootstrap/SKILL.md
+ M .codex/skills/deckent-readonly-audit/SKILL.md
+ D .deckent/run-gate.json
+ D .deckent/runtime/sprint-525-bootstrap-seam.json
+ M .deckent/settings/features-manifest.json
+ M .deckent/workspace/TOOLS.md
+ D .test/shared.txt
+ D .test/sleep-result.txt
+ D .test/sprint-168-smoke-directives.md
+ M AGENTS.md
+ M DIRECTIVES.md
+ D deckent-test-12092026.md
+ M docs/CHANGELOG.md
+ M docs/MASTER-PLAN.md
+ M docs/SPRINT-LOG.md
+ M docs/generated/master-plan-active.json
+ M docs/generated/master-plan-active.md
+ M durum-raporu.md
+ M follow-up-works/current-flow.md
+ D follow-up-works/cursor-7099-cli-help-matrix.md
+ D follow-up-works/fable-7104-sync-async.md
+ D follow-up-works/research-terminal-ecosystem-7114.md
+ M native/exec-authority/src/custody_posix.c
+ D proof/cursor-cli-help-matrix-v4/ARCHIVE.md
+ D proof/cursor-cli-help-matrix-v4/manifest.json
+ M src/cli/commands/recover.ts
+ M src/cli/helpers/messages.ts
+ M src/cli/repl/run.tsx
+ M src/core/execution-effect-persistence-contract.ts
+ M src/core/file-lock.ts
+ M src/core/task-attempt-custody-store.ts
+ M src/core/task-types.ts
+ M src/core/verdict-types.ts
+ M src/orchestra/exact-docker-command-transport.ts
+ M src/orchestra/exact-docker-container-observation.ts
+ M src/orchestra/execution-continuation-runner.ts
+ M src/orchestra/execution-effect-landing-coordinator.ts
+ M src/orchestra/execution-effect-native-adapter.ts
+ M src/orchestra/execution-effect-store-adapter.ts
+ M src/orchestra/ipc-registry.ts
+ M src/orchestra/result-collector.ts
+ M src/orchestra/result-evaluator.ts
+ M src/orchestra/scheduler-effects.ts
+ M src/orchestra/spawn-backend-docker.ts
+ M src/orchestra/spawn-backend.ts
+ M src/orchestra/sprint-controller.ts
+ M src/orchestra/sprint-lifecycle.ts
+ M src/orchestra/sprint-phases.ts
+ M src/orchestra/sprint-recovery-operation.ts
+ M src/orchestra/sprint-spawner.ts
+ M src/orchestra/task-result-authority.ts
+ M tests/cli/repl-errorboundary-i18n.test.ts
+ M tests/cli/repl-i18n-flip.test.ts
+ M tests/cli/repl-legacy-loop-lang-wire.test.ts
+ M tests/cli/repl/app-picker-mutex.test.ts
+ M tests/cli/repl/approval-keyboard-transition.test.tsx
+ M tests/cli/repl/input-debug-wire.test.tsx
+ M tests/cli/repl/native-permission-round.test.tsx
+ M tests/cli/repl/operator-strip-lifecycle.test.tsx
+ M tests/cli/repl/picker.test.ts
+ M tests/cli/repl/slash-menu-more-labels.test.tsx
+ M tests/core/execution-effect-persistence-contract.test.ts
+ M tests/core/task-attempt-custody-store.test.ts
+ M tests/core/task-execution-fence.test.ts
+ M tests/orchestra/exact-controller-terminal-fanin.test.ts
+ M tests/orchestra/exact-docker-observation.test.ts
+ M tests/orchestra/execution-effect-landing-coordinator.test.ts
+ M tests/orchestra/execution-effect-native-adapter.test.ts
+ M tests/orchestra/production-wiring-outer-barrier.test.ts
+ M tests/orchestra/result-collector-settlement-authority.test.ts
+ M tests/orchestra/result-collector.test.ts
+ M tests/orchestra/scheduler-spawn-executor.test.ts
+ M tests/orchestra/spawn-backend-docker-ipc-authority.test.ts
+ M tests/orchestra/spawn-backend-docker-mounts.test.ts
+ M tests/orchestra/sprint-recovery-operation.test.ts
+?? docs/execution/active/DOGFOOD-CROSS-SURFACE-ANALYSIS-PLAN.md
+?? docs/execution/active/DOGFOOD-UNIFIED-AUDIT-20260913/INVENTORY.jsonl
+?? docs/execution/active/DOGFOOD-UNIFIED-AUDIT-20260913/MANIFEST.json
+?? docs/execution/active/DOGFOOD-UNIFIED-AUDIT-20260913/PLAN.md
+?? docs/execution/active/DOGFOOD-UNIFIED-AUDIT-20260913/REPORT.md
+?? docs/execution/active/DOGFOOD-UNIFIED-AUDIT-20260913/UNTRACKED.json
+?? docs/execution/active/dogfood-comparison/single/result/ANALYSIS.md
+?? docs/execution/active/dogfood-comparison/twenty/task-01/ANALYSIS.md
+?? docs/execution/active/dogfood-comparison/twenty/task-03/ANALYSIS.md
+?? docs/execution/active/parallel-4-post-recovery-762/settlement/ANALYSIS.md
+?? docs/execution/active/parallel-4-post-recovery-762/startup/ANALYSIS.md
+?? docs/execution/evidence/astra-recovery-20260912/chain-752-repair/752-read-probe.mjs
+?? docs/execution/evidence/astra-recovery-20260912/chain-752-repair/753-live-read-probe.mjs
+?? docs/execution/evidence/astra-recovery-20260912/chain-752-repair/754-inspect-contention-after.mjs
+?? docs/execution/evidence/astra-recovery-20260912/chain-752-repair/754-inspect-contention.mjs
+?? docs/execution/evidence/astra-recovery-20260912/chain-752-repair/observe-start-resources.py
+?? docs/execution/evidence/astra-recovery-20260912/chain-752-repair/task-753-001.hb
+?? docs/execution/evidence/astra-recovery-20260912/chain-752-repair/task-753-001.result
+?? docs/execution/evidence/astra-recovery-20260912/cursor-entry-233.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r10/baseline/src/core/custody-read-snapshot.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r10/baseline/src/core/task-attempt-custody-store.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r10/baseline/tests/core/custody-read-snapshot.test.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r10/baseline/tests/core/task-attempt-custody-store.test.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r10/candidate-after.cpuprofile
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r10/candidate-before.cpuprofile
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r10/profile-candidate.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r11/baseline/src/core/task-attempt-custody-posix-adapter.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r11/baseline/tests/core/task-attempt-custody-posix-adapter.test.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r11/native-read-probe.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r13/baseline/src/core/run-status-read-model.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r13/baseline/tests/core/run-status-read-model.test.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r13/first-snapshot-probe.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r14/TIMING-CORRECTION.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r14/baseline/src/orchestra/exact-docker-container-observation.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r14/baseline/src/orchestra/execution-effect-docker-lifecycle.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r14/baseline/src/orchestra/spawn-backend-docker.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r14/baseline/tests/orchestra/exact-docker-observation.test.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r14/baseline/tests/orchestra/execution-effect-docker-lifecycle.test.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r14/population-probe.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r14/task-760-001.result
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r15/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r15/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r15/depth-profile.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r15/depth-profile.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r15/native-read-probe.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r15/native-read-proof.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r16/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r16/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r16/cpu-profile-reference.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r16/profile-summary.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r16/terminal-authority-counts.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r16/terminal-authority-counts.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r16/terminal-authority-profile.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r16/terminal-authority-profile.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r16/terminal-authority-snapshot.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r16/terminal-authority-snapshot.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/LANDING.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/SCOPE.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/build-main.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/dogfood/ANALYSIS.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/dogfood/EXIT.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/dogfood/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/dogfood/START.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/dogfood/job.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/dogfood/monitor.py
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/dogfood/resources.jsonl
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/dogfood/sprint-761-events.jsonl
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/dogfood/sprint-761-terminal-receipt.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/dogfood/start.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/dogfood/status-after.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/dogfood/task-761-001.accepted-result.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/dogfood/task-761-001.result
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/r17-public-proof.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/r17-public-proof.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/repeat-1.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/repeat-2.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/repeat-3.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r17/tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/LANDING.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/PARTIAL-RECOVERY-CONTRACT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/PREFIX-LANDING.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/RECOVERY-GUARD-SCOPE.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/SCOPE.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/aborted-retention/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/aborted-retention/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/aborted-retention/attempt-1.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/aborted-retention/build-all-result.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/aborted-retention/build-all.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/aborted-retention/post-build.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/aborted-retention/post-status.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/aborted-retention/proof.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/aborted-retention/recover.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/aborted-retention/recovery-result.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/aborted-retention/scope.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/build-isolated.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/build-main.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/final-tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/final-tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/force-finalize/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/force-finalize/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/force-finalize/archive-verification.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/force-finalize/before.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/force-finalize/command.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/force-finalize/post-status.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/force-finalize/result.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/prefix-final-tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/prefix-tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/recovery-dry-run.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/recovery-dry-run.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/recovery-guard-build.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/recovery-guard-tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/recovery-guard-tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/repaired-recovery-diagnostic-exit.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/repaired-recovery-diagnostic.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/repaired-recovery-diagnostic.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/repro-nested.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/snapshot-candidate.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r18/snapshot-candidate.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r19/LANDING.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r19/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r19/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r19/SCOPE.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r19/binary-identity.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r19/build-all-result.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r19/build-all.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r19/initial-tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r19/isolated-build.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r19/tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r19/tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r20/COMMAND-EXITS.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r20/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r20/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r20/before-retention-command.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r20/before-retention-entries.jsonl
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r20/before-retention-result.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r20/command.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r20/entries.jsonl
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r20/probe.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r20/result.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r20/retain-001.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r20/retain-002.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r20/retain-004.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r20/retained-001.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r20/retained-004.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r21/COMMAND-EXITS.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r21/LANDING.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r21/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r21/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r21/SCOPE.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r21/binary-identity.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r21/build-all-result.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r21/build-all.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r21/isolated-build.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r21/isolated-live-proof.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r21/main-live-proof.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r21/probe.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r21/tests-first.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r21/tests-second.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r21/tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r21/tsc-first.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r21/tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r22/COMMAND-EXITS.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r22/LANDING.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r22/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r22/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r22/SCOPE.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r22/binary-identity.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r22/build-all-result.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r22/build-all.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r22/isolated-build.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r22/isolated-live-proof.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r22/main-live-proof.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r22/probe.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r22/tests-dist-drift.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r22/tests-first.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r22/tests-two-files.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r22/tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r22/tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/COMMAND-EXITS.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/DIRECTIVES-before.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/DIRECTIVES-next.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/LANDING.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/SCOPE.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/binary-identity.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/conflicting-mode.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/conflicting-mode.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/conflicting-mode.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/directive-change.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/EXIT.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/START.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/acknowledged-paths/EXIT.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/acknowledged-paths/START.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/acknowledged-paths/final-status.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/acknowledged-paths/monitor.py
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/acknowledged-paths/observation-120s.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/acknowledged-paths/observations.jsonl
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/acknowledged-paths/process-io.jsonl
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/acknowledged-paths/resources.jsonl
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/acknowledged-paths/start.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/monitor.py
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/post-scope-status.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/resources.jsonl
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/scope-diagnosis.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/sprint-763.snapshot.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/dogfood/start.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/health.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/isolated-build.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/isolated-dry-run.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/isolated-dry-run.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/isolated-dry-run.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/main-build.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/main-build.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/main-build.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/main-retain.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/main-retain.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/main-retain.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/production-health.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/production-health.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/production-health.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/run-command.py
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/tsc-first.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/wrong-transaction.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/wrong-transaction.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r23/wrong-transaction.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r24/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r24/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r24/before-fix-tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r24/main-build.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r24/main-build.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r24/main-build.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r24/preflight.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r24/red.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r24/run-command.py
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r24/tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r24/tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/COMMAND-EXITS.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/DAG.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/DIRECTIVES-single.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/DIRECTIVES-twenty.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/admissions.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/attempts.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/attempts.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/attempts.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/diagnostics.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/diagnostics.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/errors-764.txt
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/inspect.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/parsed-single.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/parsed-twenty.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/plans.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/recovery-002-dryrun.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/recovery-002-dryrun.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/run764/EXIT.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/run764/START.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/run764/admitted-status.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/run764/first-worker-proof.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/run764/monitor.py
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/run764/resources.jsonl
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/run764/start.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r25/work-authority-diagnostic.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r26/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r26/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r26/attempts.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r26/finalize.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r26/finalize.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r26/finalize.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r26/post-finalize-attempts.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r26/run-command.py
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r26/status.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/DIRECTIVES-before.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/accept-after.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/accept.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/accept.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/accept.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/accept.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/attempts-after.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/attempts.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/build.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/build.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/build.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/cold-proof.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/cold-proof.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/cold-proof.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/debts-after.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/debts-before.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/effect.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/effect.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/effect.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/reader-proof.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/reader-tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/release-after.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/release-before.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/release-preview.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/release-preview.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/release.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/release.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/release.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/release.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/retention-preview.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/retention-preview.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/retention-preview.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/run-command.py
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/tests-final.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/tests-verified.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r27/tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/DAG.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/DIRECTIVES-twenty.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/build.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/build.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/build.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/finalize.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/finalize.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/finalize.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/parsed-twenty.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/run-command.py
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/scope.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/single-765/EXIT.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/single-765/START.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/single-765/findings.jsonl
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/single-765/monitor.py
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/single-765/resources.jsonl
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/single-765/start.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/single-765/status-observed.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/status-after-finalize.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/tests-final.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r28/tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r30/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r30/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r30/base-head.txt
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r30/closure.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r30/dirty-numstat.txt
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r30/finalize.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r30/finalize.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r30/finalize.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r31/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r31/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r31/SOURCE-DIGESTS.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r31/build.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r31/build.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r31/build.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r31/proof.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r31/proof.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r31/real-docker.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r31/real-docker.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r31/real-docker.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r31/run-command.py
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r31/suite.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r31/tests-final.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r31/tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r31/tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r32/FABLE-ANALYSIS.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/FABLE-FOLLOWUP.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/MANIFEST.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/SOURCE-DIGESTS.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/accept-after.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/accept.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/accept.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/accept.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/accept.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/attempts-after.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/attempts.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/build.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/build.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/build.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/cold-proof.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/cold-proof.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/cold-proof.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/debt.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/release-after.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/release-before.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/release.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/release.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/release.stderr
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/release.stdout
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/run-command.py
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/tests-compensation.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/tests-final.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/tsc-compensation.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/tsc-final.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/tsc-next.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/tsc-repaired.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r33/tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r34/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r34/SOURCE-DIGESTS.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r34/e3-tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r34/store-tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r34/tsc-final.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r35/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r35/SOURCE-DIGESTS.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r35/tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r35/tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r36/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r36/SOURCE-DIGESTS.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r36/tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r36/tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r37/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r37/SOURCE-DIGESTS.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r37/abc-first-failure.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r37/checks-before-abc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r37/final-collector-tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r37/tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r38/IPC-RETRY-ANALYSIS.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r38/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r38/SOURCE-DIGESTS.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r38/tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r38/tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r39/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r39/SOURCE-DIGESTS.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r39/collector-port-tests-before-negative.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r39/ipc-tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r39/port-tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r39/tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r40/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r40/SOURCE-DIGESTS.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r40/tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r40/tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r41/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r41/SOURCE-DIGESTS.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r41/initial-tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r41/prior-expectation-failure.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r41/tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r41/tsc.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r42/FABLE-TIMEOUT-ANALYSIS.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r42/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r42/SOURCE-DIGESTS.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r42/binary.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r42/build.exit
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r42/build.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r42/inspect-proof.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r42/inspect-proof.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r43/FABLE-OWNERSHIP-CLARIFICATION.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r43/IMPLEMENTATION-CONTRACT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r43/SOURCE-DIGESTS.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r44/RESULT.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r44/SCOPE.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r44/SOURCE-DIGESTS.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r44/binary.json
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r44/build.exit
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r44/build.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r44/tests.log
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r45/CUTOVER-PACKAGE.md
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r45/branches-before.txt
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r45/worktrees-before.txt
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r6/timeline.py
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r7/B-capture-blocked.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r7/B-capture-isolated.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r7/B-capture-probe.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r7/B-capture-window.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r7/B-command-probe.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r9/baseline/src/api/status-reconcile.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r9/baseline/src/cli/commands/status.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r9/baseline/src/cli/helpers/run-state-feed.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r9/baseline/src/core/run-status-read-model.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r9/baseline/src/mcp/tools/status.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r9/baseline/src/orchestra/result-collector.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r9/baseline/src/orchestra/sprint-controller.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r9/baseline/src/orchestra/sprint-lifecycle.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r9/baseline/tests/cli/status-terminal-publication-race.test.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r9/baseline/tests/core/run-status-read-model.test.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r9/baseline/tests/orchestra/result-collector-settlement-authority.test.ts
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r9/compiled-status-probe.mjs
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/resources-revised.jsonl.frozen-before-relocation
+?? docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/start-revised.log.frozen-before-relocation
+?? docs/execution/evidence/astra-recovery-20260912/start-exact-repair/task-752-001.result
+?? docs/execution/evidence/parallel-start-20260913/parallel-environment-analysis-20260913.md
+?? docs/execution/evidence/parallel-start-20260913/parallel-events-analysis-20260913.md
+?? docs/execution/evidence/parallel-start-20260913/parallel-history-analysis-20260913.md
+?? docs/execution/evidence/parallel-start-20260913/parallel-resources-analysis-20260913.md
+?? docs/execution/evidence/parallel-start-20260913/parallel-scheduler-analysis-20260913.md
+?? docs/execution/evidence/parallel-start-20260913/parallel-status-analysis-20260913.md
+?? docs/execution/evidence/parallel-start-20260913/parallel-supervision-analysis-20260913.md
+?? docs/execution/evidence/parallel-start-20260913/parallel-timers-analysis-20260913.md
+?? src/orchestra/exact-docker-execution-worker.ts
+?? src/orchestra/exact-docker-release-outcome.ts
+?? tests/orchestra/exact-docker-release-recovery.test.ts
+?? tests/orchestra/exact-held-containment-barrier.test.ts
+?? tests/orchestra/result-evaluator-derived-directory.test.ts
+?? tests/orchestra/terminal-authority-snapshot-boundary.test.ts

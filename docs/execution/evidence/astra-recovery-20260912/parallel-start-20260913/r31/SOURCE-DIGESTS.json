@@ -1,0 +1,8 @@
+{
+  "src/orchestra/exact-docker-command-transport.ts": "dc34db0ee7e721dab1690b4192d099b7894bec6a7f26ffb98c36a99e6f1089eb",
+  "src/orchestra/exact-docker-execution-worker.ts": "913c338656cf24ec840b0d25bbb2e3159ada14a164301240d856973dddcb29f2",
+  "src/orchestra/exact-docker-container-observation.ts": "6e838d5aeb1d52aad8da3d108d8cf90139fd18c4f04abf3258757d6f3b202c38",
+  "src/orchestra/spawn-backend.ts": "6eed5b74474274c77cc2481963e5a340689c0ac2972c04f84e7b4e52fcde393d",
+  "src/orchestra/spawn-backend-docker.ts": "a16cd2a74f6a8e784634241981637db992cc8ea9ea4abd7fc3661fa1c3c4ead5",
+  "tests/orchestra/exact-docker-observation.test.ts": "7a93656b7ac7a50c59be69af1ea6df27313789db7b900dba4711b3fa4c429bcd"
+}

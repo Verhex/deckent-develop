@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it, onTestFinished } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { DockerSpawnBackend } from '../../src/orchestra/spawn-backend-docker.js';
 import {
@@ -12,6 +12,7 @@ import {
 import { createTaskResultSettlementV2Fixture } from '../helpers/task-result-settlement-v2-fixture.js';
 import {
   TaskAttemptCustodyStore,
+  TaskAttemptCustodyHold,
   createTaskAttemptCustodyDirectoryScanReceiptV2,
   taskAttemptCustodyDigest,
   type TaskAttemptCustodyDirectoryScanReceiptV2,
@@ -193,6 +194,45 @@ function installCompletion(
 }
 
 describe('Docker exact-attempt private IPC authority port', () => {
+  it('retries a typed custody deadline on the next poll without poisoning terminal capture', async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'deckent-ipc-transient-'));
+    onTestFinished(() => rmSync(projectRoot, { recursive: true, force: true }));
+    const prepared = exactIpcFixture('transient');
+    seedSealedQuestion(prepared.fixture, prepared.store, prepared.dispatch.ref.dispatchRequestId,
+      1, 'Continue after the read deadline?');
+    const backend = new DockerSpawnBackend(projectRoot, { custodyStateDir: '/fixture/state' });
+    installCompletion(backend, prepared);
+    vi.spyOn(prepared.store, 'readWorkerIpcConversationCursor').mockImplementationOnce(() => {
+      throw new TaskAttemptCustodyHold('DISPATCH_DISCOVERY_DEADLINE_EXCEEDED', 'read');
+    });
+    const report = await checkExactAttemptWorkerQuestions(projectRoot,
+      new Set([prepared.fixture.identity.taskId]), new Set(), {
+        resolveAuthority: () => backend.resolveExactAttemptIpcAuthority(prepared.query as never),
+        transientRegistry: createExactAttemptIpcTransientRegistry(projectRoot),
+      });
+    expect(report.holds).toEqual([]);
+    expect(report.unavailable).toEqual([{ taskId: prepared.fixture.identity.taskId,
+      transient: true, cause: 'CUSTODY_READ_DEADLINE' }]);
+    expect(report.pending).toEqual([prepared.fixture.identity.taskId]);
+    const internal = backend as unknown as { exactPendingCaptureFailures: Map<string, unknown> };
+    expect(internal.exactPendingCaptureFailures.size).toBe(0);
+    expect(backend.resolveExactAttemptIpcAuthority(prepared.query as never).state).toBe('question-ready');
+  });
+
+  it('does not treat changed private bytes as transient unavailability', () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'deckent-ipc-changed-'));
+    onTestFinished(() => rmSync(projectRoot, { recursive: true, force: true }));
+    const prepared = exactIpcFixture('changed');
+    const backend = new DockerSpawnBackend(projectRoot, { custodyStateDir: '/fixture/state' });
+    installCompletion(backend, prepared);
+    vi.spyOn(prepared.store, 'readWorkerIpcConversationCursor').mockImplementationOnce(() => {
+      throw new TaskAttemptCustodyHold('ARTIFACT_CHANGED', 'read');
+    });
+    expect(backend.resolveExactAttemptIpcAuthority(prepared.query as never).state).toBe('hold');
+    const internal = backend as unknown as { exactPendingCaptureFailures: Map<string, {code: string}> };
+    expect([...internal.exactPendingCaptureFailures.values()].map(value => value.code)).toEqual(['ARTIFACT_CHANGED']);
+  });
+
   it('captures one private question, publishes the private answer, and rereads answered authority', async () => {
     const projectRoot = mkdtempSync(join(tmpdir(), 'deckent-docker-ipc-authority-'));
     onTestFinished(() => rmSync(projectRoot, { recursive: true, force: true }));

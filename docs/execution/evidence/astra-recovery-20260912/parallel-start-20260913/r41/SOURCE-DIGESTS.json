@@ -1,0 +1,8 @@
+{
+  "observedAt": "2026-09-15T10:30:25.555119+00:00",
+  "sha256": {
+    "src/orchestra/spawn-backend-docker.ts": "72e1c81bdbd040148cf752b23e23493d27886bc0d730f1b7ef38abff06e4b4d8",
+    "tests/orchestra/exact-held-containment-barrier.test.ts": "7cc2dc7076fdf68fff6854bd316308d1c2dba99e22c46789a22a9346fc8a8956",
+    "tests/orchestra/spawn-backend-docker-mounts.test.ts": "daaf4fa992c3ce998505cf526c0ca2159db754dba83ebc036bd9340571c1efba"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "utc": "2026-09-14T17:09:01.728Z",
+  "status": {
+    "schemaVersion": 1,
+    "lifecycle": "ABORTED",
+    "active": false,
+    "resumable": false,
+    "sprintId": "sprint-764",
+    "phase": "EXECUTE",
+    "status": "ABORTED",
+    "reason": null,
+    "recoveryCommand": null,
+    "finalizeCommand": null,
+    "coordinator": "absent",
+    "conflicts": [],
+    "recoveryReconciliation": {
+      "version": 1,
+      "sprintId": "sprint-764",
+      "evidence": {
+        "checkpointPresent": false,
+        "terminalReceipt": {
+          "version": 1,
+          "sprintId": "sprint-764",
+          "runId": "sprint-764",
+          "coordinatorGeneration": 2,
+          "terminalOutcome": "ABORTED",
+          "logicalSettlementDigest": "d900b772273d9fcd12b47ad1da9e605a62dccdb06dcd4de2f279120342efddff",
+          "priorAuthorityVersion": 0,
+          "authorityVersion": 1
+        },
+        "terminalReceiptConflict": null
+      },
+      "state": "consistent",
+      "mismatch": null,
+      "remediation": null
+    }
+  }
+}

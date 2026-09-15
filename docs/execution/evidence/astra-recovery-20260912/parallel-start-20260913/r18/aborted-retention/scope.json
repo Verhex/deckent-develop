@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "kind": "ADR-D-007-aborted-empty-directory-retention",
+  "root": "/home/alperen/deckent-dev",
+  "sprintId": "sprint-762",
+  "taskId": "762-002",
+  "attemptId": "b5c1c5f2-b364-83e5-8f20-dfa802b5939e",
+  "transactionDigest": "sha256:c20efb30993a836f2ac1cf3d8509bf74129540105b83275e471b6a5a6185a94f",
+  "operatorId": "astra-epoch7",
+  "ownerInstruction": "Owner authorized force-finalize followed by manual repair; confirmed Evet after remaining partial-mutation blocker was reported. Retain exactly proven empty derived directories as aborted residue, never accept output or resume worker.",
+  "files": [
+    {
+      "path": "/home/alperen/.local/state/deckent/runtime/task-attempt-custody/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/v2/projects/c382ed0187fa864185980851b324b929c3193aec707454b98fb40ef88dcdcf29/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/tasks/750c733f57d93749a81fbb40d0b9d6ec46707a7af384818a7762e2eb0617ce4b/attempts/b5c1c5f2-b364-83e5-8f20-dfa802b5939e/generations/1/artifacts/execution-effect-landing-journal/el-81131b83fc5911cf36c692de8afdfc5c9546675a64f2c98150dc018bd2068f0a-prepared.bin",
+      "sha256": "ed81fcd1d1520da3abf8f7871635e9d34109fa60a3c7f36106fa6016564b2a1a"
+    },
+    {
+      "path": "/home/alperen/.local/state/deckent/runtime/task-attempt-custody/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/v2/projects/c382ed0187fa864185980851b324b929c3193aec707454b98fb40ef88dcdcf29/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/tasks/750c733f57d93749a81fbb40d0b9d6ec46707a7af384818a7762e2eb0617ce4b/attempts/b5c1c5f2-b364-83e5-8f20-dfa802b5939e/generations/1/artifacts/execution-effect-landing-journal/el-c20efb30993a836f2ac1cf3d8509bf74129540105b83275e471b6a5a6185a94f-step-0000000.bin",
+      "sha256": "faa84b1367de1b30e0af46a021ab5f8aa335bf8b65e57cc0734a8e93530767f0"
+    },
+    {
+      "path": "/home/alperen/.local/state/deckent/runtime/task-attempt-custody/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/v2/projects/c382ed0187fa864185980851b324b929c3193aec707454b98fb40ef88dcdcf29/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/tasks/750c733f57d93749a81fbb40d0b9d6ec46707a7af384818a7762e2eb0617ce4b/attempts/b5c1c5f2-b364-83e5-8f20-dfa802b5939e/generations/1/artifacts/execution-effect-landing-journal/el-c20efb30993a836f2ac1cf3d8509bf74129540105b83275e471b6a5a6185a94f-step-0000001.bin",
+      "sha256": "b324b72f1815d824eeb6a2b5e16bb6046cfefff6b56492176c386b54898bca58"
+    },
+    {
+      "path": "/home/alperen/.local/state/deckent/runtime/task-attempt-custody/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/v2/projects/c382ed0187fa864185980851b324b929c3193aec707454b98fb40ef88dcdcf29/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/tasks/750c733f57d93749a81fbb40d0b9d6ec46707a7af384818a7762e2eb0617ce4b/attempts/b5c1c5f2-b364-83e5-8f20-dfa802b5939e/generations/1/artifacts/execution-effect-landing-journal/el-c20efb30993a836f2ac1cf3d8509bf74129540105b83275e471b6a5a6185a94f-prepared.bin",
+      "sha256": "8f91d5e74365145dc3d7905ce9bc0f868fa9c5f8283fc5b65b53ba28849b5689"
+    },
+    {
+      "path": "/home/alperen/.local/state/deckent/runtime/task-attempt-custody/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/v2/projects/c382ed0187fa864185980851b324b929c3193aec707454b98fb40ef88dcdcf29/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/tasks/750c733f57d93749a81fbb40d0b9d6ec46707a7af384818a7762e2eb0617ce4b/attempts/b5c1c5f2-b364-83e5-8f20-dfa802b5939e/generations/1/artifacts/execution-effect-landing-journal/el-c20efb30993a836f2ac1cf3d8509bf74129540105b83275e471b6a5a6185a94f-applying.bin",
+      "sha256": "89e93ba559d4d65a93119c579dac1a930b250f3b1569414e8cea1f8ce9e9d1d1"
+    }
+  ]
+}

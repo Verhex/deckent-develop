@@ -1,0 +1,3 @@
+Uyarı: 1 sürmekte olan görevle sonlandırma zorlanıyor.
+Zaten sonlandırılmıştı: 1 worker sweep öncesinde zaten ölüydü (765-001)
+Run sprint-765, ABORTED olarak zorla kapatıldı: 1 logical taskın 0 tanesi tamamlanmıştı, 1 tanesi unresolved kaldı. Hiçbir unresolved lineage COMPLETE durumuna yükseltilmedi.

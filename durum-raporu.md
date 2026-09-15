@@ -1794,3 +1794,19 @@ Ink lock7.1.1; iki Dockerfile eşit. Aday image gerçek tsc0, retention69/71 exi
 host build0, image unit31PASS/3SKIP. Eski image etiketi korunuyor; native HOLD ve
 ikiretention hatası kapanmadı. Cursor'a223 ile terminal/start.ts kapanış paketi
 atandı; ACK henüz yok. [Tam kanıt ve kalan işler](docs/execution/evidence/astra-recovery-20260912/r1-image/RESULT.md).
+
+## 2026-09-13 — Diğer yüzeyleri kapsayan analiz planı
+
+[Dogfood cross-surface analiz/kapanış planı](docs/execution/active/DOGFOOD-CROSS-SURFACE-ANALYSIS-PLAN.md) hazır. Engine GO ile Terminal/Desktop/Dashboard/API/MCP/Autonomous/Process/connector parity ayrı kapılar. Mevcut R1 kapsamı korunur; yeni kapsam bulgu olarak ayrılır, MASTER değiştirilmedi. Son durum:751 negative retention kalıcı; R1-E native candidate10,3s deadline, defaultOFF; build başarılı fakat dogfoodGO yok. Plan turunda yalnız doküman/kanıt envanteri yazıldı; test/build/run/provider çağrısı yok.
+
+## Gerçek dogfood canary752
+
+[Canary752 sonucu](docs/execution/evidence/astra-recovery-20260912/dogfood-canary-752/RESULT.md): image candidate resmi config ile seçildi; start --auto-approve --timeout300000 PLAN/EXACT_DOCKER_TASK_PROJECTION_ADMISSION_REQUIRED exit1.6:14 elapsed gözleminden sonra bitti; worker/task752 yok. Final current status IDLE,752 terminal receipt iddiası yok. İkinci do başlatılmadı. Sıradaki R1-D exact admission wiring; latency/status/timeout ayrıca açık.
+
+## 2026-09-13 — Birleşik dogfood audit
+
+[Güncel birleşik rapor](docs/execution/active/DOGFOOD-UNIFIED-AUDIT-20260913/REPORT.md) ve [analiz planı](docs/execution/active/DOGFOOD-UNIFIED-AUDIT-20260913/PLAN.md): 12 bulgu, yüzey coverage ve enterprise kabul matrisi. 6568 tracked envanter; 25 kritik kaynak dosyasında bağlantı izleme; bütün repo/live surface incelemesi değildir. Kaynaklar UTC/HEAD/digest ile MANIFEST'te sabitlendi. İlk paket normal start exact admission + erken invocation truth, ardından başlangıç performansı/süre, gerçek worker-supervision, cross-surface parity, enterprise/platform proof. Bu tur ürün kodu/run/build/test/cleanup/commit değişikliği yok; önceki751/752 kanıtları korundu. Dogfood uçtan uca GO değil; çözüm uygulaması audit sonrası ayrı adım.
+
+## 2026-09-13 — START ilk onarım ve canlı worker kanıtı
+
+[Sonuç](docs/execution/evidence/astra-recovery-20260912/start-exact-repair/RESULT.md): normal start exact admission bağlandı,77/77+tsc0+ilkbuild0.752 worker gerçekten doğdu; heartbeat identity eksikliği nedeniyle NO_GO. Outer FAILED terminal-authority-mismatch; finalbuild task/RunFlow projection HOLD. Start DONE değil,do başlamadı. Güncel imleç follow-up-works/current-flow.md;MASTER3178 OPEN.

@@ -1,0 +1,30 @@
+{
+  "observedAt": "2026-09-14T09:27:10.119Z",
+  "kind": "built-public-api-no-injection",
+  "rows": [
+    {
+      "state": "current",
+      "verdict": "DONE",
+      "ms": 2206.568783
+    },
+    {
+      "state": "current",
+      "verdict": "DONE",
+      "ms": 2006.6763620000002
+    },
+    {
+      "state": "current",
+      "verdict": "DONE",
+      "ms": 1964.2966340000003
+    }
+  ],
+  "wrongTask": {
+    "state": "hold",
+    "reason": "checkpoint-task-mismatch"
+  },
+  "tampered": {
+    "state": "hold",
+    "reason": "spoofed-settlement"
+  },
+  "exitCode": 0
+}

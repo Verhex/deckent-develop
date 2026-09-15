@@ -302,6 +302,7 @@ export enum TaskEvaluation {
   NO_GO = 'NO_GO',
   DEFERRED = 'DEFERRED',
   NOT_DISPATCHED = 'NOT_DISPATCHED',
+  EFFECT_HOLD = 'EFFECT_HOLD',
 }
 
 export type SelfAssessment = 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';

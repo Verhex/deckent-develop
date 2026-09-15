@@ -72,13 +72,15 @@ describe('production recovery observation routing', () => {
     worker.emit('exit', 0);
     expect(await pending).toMatchObject({status: 1, error: false});
   });
-  it('keeps mutation on the owned coordinator command path', async () => {
-    const child = Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter(), stdin: Object.assign(new EventEmitter(), { end: vi.fn() }), kill: vi.fn() });
-    doubles.spawn.mockReturnValue(child);
+  it('routes admitted mutation through execution transport, never observation or coordinator IO', async () => {
+    const worker = new EventEmitter(); doubles.worker.mockImplementation(function () { return worker; });
     const pending = resolveExactDockerObservationRunner(runExactDockerWorkspaceCommand)(input(['volume', 'rm', 'v']));
-    expect(doubles.spawn).toHaveBeenCalledOnce();
-    expect(doubles.worker).not.toHaveBeenCalled();
-    child.emit('close', 0, null);
+    expect(doubles.spawn).not.toHaveBeenCalled();
+    expect(String(doubles.worker.mock.calls[0][0])).toContain('exact-docker-execution-worker.js');
+    worker.emit('message', { status: 0, signal: null, error: false, overflow: false,
+      stdout: new Uint8Array(), stderr: new Uint8Array(), diagnostic: { reason: 'exit', exitCode: 0,
+      signaled: false, timeoutMs: 100, elapsedMs: 10, stdoutBytes: 0, stderrBytes: 0 } });
+    worker.emit('exit', 0);
     expect(await pending).toMatchObject({status: 0, error: false});
   });
 });
@@ -127,3 +129,18 @@ describe('admitted capture IO window', () => {
    expect(isExactDockerProductionRunner(custom)).toBe(false);
    expect(resolveExactDockerObservationRunner(custom)).toBe(custom);
  });
+
+it.each(['worker-error', 'bad-diagnostic', 'abnormal-exit', 'duplicate'])(
+  'isolated mutation rejects %s without coordinator fallback', async fault => {
+    const worker = new EventEmitter(); doubles.worker.mockImplementation(function () { return worker; });
+    const pending = resolveExactDockerObservationRunner(runExactDockerWorkspaceCommand)(input(['rm', 'owned-container']));
+    const message = { status: 0, signal: null, error: false, overflow: false,
+      stdout: new Uint8Array(), stderr: new Uint8Array(), diagnostic: { reason: 'exit', exitCode: 0,
+      signaled: false, timeoutMs: 100, elapsedMs: 1, stdoutBytes: 0, stderrBytes: 0 } };
+    worker.emit('message', fault === 'bad-diagnostic' ? { ...message, diagnostic: {} } : message);
+    if (fault === 'duplicate') worker.emit('message', message);
+    if (fault === 'worker-error') worker.emit('error', new Error('transport failure'));
+    worker.emit('exit', fault === 'abnormal-exit' ? 1 : 0);
+    expect(await pending).toMatchObject({ status: null, error: true, diagnostic: { reason: 'unavailable' } });
+    expect(doubles.spawn).not.toHaveBeenCalled();
+  });

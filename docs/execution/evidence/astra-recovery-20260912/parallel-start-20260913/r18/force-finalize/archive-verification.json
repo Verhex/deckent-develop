@@ -1,0 +1,44 @@
+[
+  {
+    "path": ".deckent/archive/sprints/sprint-762/tasks/task-762-004.json",
+    "exists": true,
+    "beforeSha256": "ce155d31b7352eeae3689f3b12df54352e6eeb4ded2556da2749b03f91f922ca",
+    "afterSha256": "dc7bfbeb8ac507506382c94d66abada202836b1a10ef0c4d82633c1a6b8200a0",
+    "status": "ABORTED"
+  },
+  {
+    "path": ".deckent/archive/sprints/sprint-762/tasks/task-762-002.skill-delivery.json",
+    "exists": true,
+    "beforeSha256": "9f09c2c1c0407e38c640440a04a5e6d73601ca88284d5496f4b4b951c88710bb",
+    "afterSha256": "9f09c2c1c0407e38c640440a04a5e6d73601ca88284d5496f4b4b951c88710bb",
+    "status": null
+  },
+  {
+    "path": ".deckent/archive/sprints/sprint-762/tasks/task-762-002.json",
+    "exists": true,
+    "beforeSha256": "a055c40e9caa13d05e0630ada13c4b8c49bda3ff3856aa4f49ecace8b2b733d0",
+    "afterSha256": "7da0a52e7a6459a8ccbc5796f03898e11388a83d316efb154fb37b78d6d88301",
+    "status": "ABORTED"
+  },
+  {
+    "path": ".deckent/archive/sprints/sprint-762/tasks/task-762-001.json",
+    "exists": true,
+    "beforeSha256": "50cdfca72431c1574e6a33f613e91e2496721be865ff989a42a174bd562f9035",
+    "afterSha256": "977eaeaad4d574edf6c28cf6b2c1dd8942f66f61f45fe900cff4f7f0fb9d369b",
+    "status": "ABORTED"
+  },
+  {
+    "path": ".deckent/archive/sprints/sprint-762/tasks/task-762-004.skill-delivery.json",
+    "exists": true,
+    "beforeSha256": "b6305b827f0eab2fe1110676d3aac5accc51adf45433ee83498a6852ddaf3449",
+    "afterSha256": "b6305b827f0eab2fe1110676d3aac5accc51adf45433ee83498a6852ddaf3449",
+    "status": null
+  },
+  {
+    "path": ".deckent/archive/sprints/sprint-762/tasks/task-762-001.skill-delivery.json",
+    "exists": true,
+    "beforeSha256": "7e40fc8b68e797bc4eaacfe30e60fea483737c358830d1cb5db7f9c87b327b0a",
+    "afterSha256": "7e40fc8b68e797bc4eaacfe30e60fea483737c358830d1cb5db7f9c87b327b0a",
+    "status": null
+  }
+]

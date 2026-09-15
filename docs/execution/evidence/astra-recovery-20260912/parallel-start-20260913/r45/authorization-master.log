@@ -1,0 +1,8 @@
+
+> deckent@0.100.0 docs:master-plan
+> node scripts/lint-master-plan.mjs --write
+
+  ✓ docs/generated/master-plan-active.md — in-sync
+  ✓ docs/generated/master-plan-active.json — in-sync
+
+[master-plan] OK — 599 rows, 510 active, 232 receipts, 13 blocker classes; projections in sync.

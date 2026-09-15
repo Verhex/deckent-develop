@@ -1,0 +1,11 @@
+{
+  "startedAt": "2026-09-14T20:31:23.580247+00:00",
+  "endedAt": "2026-09-14T20:31:49.047523+00:00",
+  "elapsedSeconds": 27.251821414000005,
+  "exitCode": 0,
+  "command": [
+    "npm",
+    "run",
+    "build:all"
+  ]
+}

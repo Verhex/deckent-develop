@@ -18161,3 +18161,214 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 751-001: MASTER120 STATE-RETENTION-001 retention writer onarımını aynı oturumda tamamla (EXECUTING)
 
 ---
+## Sprint 755 — sprint-755
+
+**Status:** COMPLETE
+**Date:** 2026-09-13
+**Duration:** 1610s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1609874ms |
+
+### Tasks
+
+- 755-001: Repair transient rotation recovery and amortized writer checks (DONE)
+
+---
+## Sprint 756 — sprint-756
+
+**Status:** COMPLETE
+**Date:** 2026-09-13
+**Duration:** 1371s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 8 |
+| Coverage | 0.0% |
+| Duration | 1370689ms |
+
+### Tasks
+
+- 756-001: Document Historical verification amplification (PENDING)
+- 756-002: Document Lifecycle duration accounting (PENDING)
+- 756-003: Document Parallel admission and dependency scheduling (PENDING)
+- 756-004: Document Worker resource visibility inventory (PENDING)
+- 756-005: Document Main status freshness contract (PENDING)
+- 756-006: Document Auditor and Nervous supervision coverage (PENDING)
+- 756-007: Document Cross-process event delivery contract (PENDING)
+- 756-008: Document Worker environment parameter inventory (PENDING)
+
+---
+## Sprint 759 — sprint-759
+
+**Status:** COMPLETE
+**Date:** 2026-09-13
+**Duration:** 676s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 675644ms |
+
+### Tasks
+
+- 759-001: Measure native custody read amplification and define the exact guarded repair (PENDING)
+
+---
+## Sprint 760 — sprint-760
+
+**Status:** COMPLETE
+**Date:** 2026-09-14
+**Duration:** 1584s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1584404ms |
+
+### Tasks
+
+- 760-001: Measure native custody read amplification and define the exact guarded repair (DONE)
+
+---
+## Sprint 761 — sprint-761
+
+**Status:** COMPLETE
+**Date:** 2026-09-14
+**Duration:** 1184s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1183860ms |
+
+### Tasks
+
+- 761-001: Pin production terminal revalidation snapshot isolation and fail-closed behavior (DONE)
+
+---
+## Sprint 762 — sprint-762
+
+**Status:** ABORTED
+**Date:** 2026-09-14
+**Duration:** 4139s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 4138986ms |
+
+### Tasks
+
+- 762-001: Map and bound pre-worker startup latency (EXECUTING)
+- 762-002: Map remaining post-task settlement latency (EXECUTING)
+- 762-004: Map dashboard event and KPI truth repairs (EXECUTING)
+
+---
+## Sprint 764 — sprint-764
+
+**Status:** ABORTED
+**Date:** 2026-09-14
+**Duration:** 5370s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 5369725ms |
+
+### Tasks
+
+- 764-001: Map and bound pre-worker startup latency (EXECUTING)
+- 764-002: Map remaining post-task settlement latency (EXECUTING)
+- 764-004: Map dashboard event and KPI truth repairs (EXECUTING)
+
+---
+## Sprint 765 — sprint-765
+
+**Status:** ABORTED
+**Date:** 2026-09-14
+**Duration:** 4242s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 4242249ms |
+
+### Tasks
+
+- 765-001: Single-worker control: result acceptance and derived directory evidence (EXECUTING)
+
+---
+## Sprint 766 — sprint-766
+
+**Status:** ABORTED
+**Date:** 2026-09-14
+**Duration:** 3523s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 3523231ms |
+
+### Tasks
+
+- 766-001: Inventory startup authority boundaries (EXECUTING)
+- 766-002: Inventory worker custody boundaries (EXECUTING)
+- 766-003: Inventory result and effect boundaries (EXECUTING)
+
+---

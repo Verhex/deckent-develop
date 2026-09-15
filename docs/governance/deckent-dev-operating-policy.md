@@ -24,6 +24,8 @@ generated içerik.
 
 ---
 
+Alperen 2026-09-15: `DECISION_REF=owner-live-2026-09-15-refactor-cutover-dogfood-off` — recovery R44’te donduruldu, kapsamlı refaktör için DOGFOOD_MODE=OFF; refaktör ayrı outcome.
+
 ## 1. Sıfır-ihlal ilkesi ve enforcement haritası
 
 Hedef (Alperen, 2026-08-17): **provider fark etmeksizin** (Claude, Codex, local-LLM, diğer)

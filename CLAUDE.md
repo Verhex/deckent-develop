@@ -5,7 +5,7 @@
 
 <!-- DECKENT-DEV-CONTROL:START -->
 SCHEMA_VERSION=1
-DOGFOOD_MODE=ON
+DOGFOOD_MODE=OFF
 WORKSPACE_MODE=MAIN
 DELIVERY_MODE=DIRECT_MAIN
 PR_REQUIRED=false
@@ -15,7 +15,7 @@ LOCAL_VERIFICATION_MODE=REQUIRED
 EXECUTION_AUTHORITY=CODEX
 ANALYSIS_AUTHORITY=CODEX
 OWNER_AUTHORITY=ALPEREN
-DECISION_REF=owner-live-2026-08-23-repo-hygiene-complete-dogfood-on
+DECISION_REF=owner-live-2026-09-15-refactor-cutover-dogfood-off
 <!-- DECKENT-DEV-CONTROL:END -->
 
 > Yukarıdaki blok aktif repo-development mode değerlerinin TEK persisted projection'ıdır

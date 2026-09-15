@@ -359,7 +359,7 @@ export type ExecutionEffectLandingParentAuthorityV1 =
 export interface ExecutionEffectLandingOperationV1 {
   readonly version: typeof EXECUTION_EFFECT_LANDING_VERSION;
   readonly index: number;
-  readonly kind: 'ADD_DIRECTORY' | 'ADD' | 'REPLACE' | 'DELETE' | 'MODE';
+  readonly kind: 'ADD_DIRECTORY' | 'REUSE_DIRECTORY' | 'ADD' | 'REPLACE' | 'DELETE' | 'MODE';
   readonly path: string;
   readonly effectDigests: readonly string[];
   readonly derivedParent: ExecutionEffectLandingDerivedParentProvenanceV1 | null;
@@ -1322,7 +1322,7 @@ function operationSeeds(effects: readonly ExecutionEffect[]): readonly Operation
     }));
   }
   const rank: Record<OperationSeed['kind'], number> = {
-    DELETE: 0, ADD_DIRECTORY: 1, ADD: 2, REPLACE: 3, MODE: 4,
+    DELETE: 0, ADD_DIRECTORY: 1, REUSE_DIRECTORY: 1, ADD: 2, REPLACE: 3, MODE: 4,
   };
   const depth = (path: string): number => path.split('/').length;
   return objectFreeze(seeds.sort((left, right) => rank[left.kind] - rank[right.kind]
@@ -1400,7 +1400,7 @@ async function buildOperations(
     }));
   }
   const rank: Record<OperationSeed['kind'], number> = {
-    DELETE: 0, ADD_DIRECTORY: 1, ADD: 2, REPLACE: 3, MODE: 4,
+    DELETE: 0, ADD_DIRECTORY: 1, REUSE_DIRECTORY: 1, ADD: 2, REPLACE: 3, MODE: 4,
   };
   const depth = (path: string): number => path.split('/').length;
   expandedSeeds.sort((left, right) => rank[left.kind] - rank[right.kind]
@@ -1410,14 +1410,18 @@ async function buildOperations(
   const operations: ExecutionEffectLandingOperationV1[] = [];
   const directoryAdds = new Map<string, ExecutionEffectLandingOperationV1>();
   for (let index = 0; index < expandedSeeds.length; index += 1) {
-    const seed = expandedSeeds[index]!;
+    const originalSeed = expandedSeeds[index]!;
+    const existing = originalSeed.derivedParent ? inspect(native, originalSeed.path) : null;
+    const seed = existing?.state === 'PRESENT' && originalSeed.derivedParent
+      ? { ...originalSeed, kind: 'REUSE_DIRECTORY' as const } : originalSeed;
     if (seed.path === '.') return reject('PLAN_UNSUPPORTED');
     const affected = [seed.path];
     const preimages: ExecutionEffectLandingPathStateV1[] = [];
     const postimages: ExecutionEffectLandingExpectedPathStateV1[] = [];
     for (const path of affected) {
       const observed = inspect(native, path);
-      if (!observed || !stateMatchesEntry(observed, before.get(path))) {
+      if (!observed || !stateMatchesEntry(observed, seed.kind === 'REUSE_DIRECTORY' ? after.get(path) : before.get(path))
+        || (seed.kind === 'REUSE_DIRECTORY' && (observed.state !== 'PRESENT' || observed.entry.kind !== 'directory' || !observed.objectIdentityDigest))) {
         return reject('PREIMAGE_MISMATCH');
       }
       preimages.push(pathState(path, observed));
@@ -1456,6 +1460,14 @@ async function buildOperations(
     const parentAuthorities: ExecutionEffectLandingParentAuthorityV1[] = [];
     for (const path of parents) {
       const observed = inspect(native, path);
+      const preparedParent = directoryAdds.get(path);
+      const preparedDirectory = after.get(path);
+      if (preparedParent && preparedDirectory?.kind === 'directory') {
+        parentAuthorities.push(objectFreeze({ path, source: 'OPERATION_POSTIMAGE' as const,
+          operationIndex: preparedParent.index, operationDigest: preparedParent.operationDigest,
+          expectedDirectory: preparedDirectory, }));
+        continue;
+      }
       if (observed?.state === 'PRESENT' && observed.entry.kind === 'directory') {
         parentAuthorities.push(objectFreeze({
           path, source: 'PREPARED_PREIMAGE' as const, entry: observed,
@@ -1497,7 +1509,7 @@ async function buildOperations(
       }),
     });
     operations.push(operation);
-    if (seed.kind === 'ADD_DIRECTORY' && finalEntry?.kind === 'directory') {
+    if ((seed.kind === 'ADD_DIRECTORY' || seed.kind === 'REUSE_DIRECTORY') && finalEntry?.kind === 'directory') {
       directoryAdds.set(seed.path, operation);
     }
   }
@@ -1559,12 +1571,14 @@ function revalidatePreparedAuthority(
       }
     }
     for (const parent of operation.parentAuthorities) {
-      const expectedDigest = parent.source === 'PREPARED_PREIMAGE'
-        ? parent.entry.stateDigest : createExecutionEffectLandingEntryStateV1({ entry: null }).stateDigest;
+      const producer = parent.source === 'OPERATION_POSTIMAGE' ? operations[parent.operationIndex] : undefined;
+      const expectedParent = parent.source === 'PREPARED_PREIMAGE' ? parent.entry
+        : producer?.kind === 'REUSE_DIRECTORY' && producer.operationDigest === parent.operationDigest
+          ? producer.entryPreimages[0]!.entry : createExecutionEffectLandingEntryStateV1({ entry: null });
+      const expectedDigest = expectedParent.stateDigest;
       try {
         const current = snapshotState(native.inspectProjectEntry(parent.path));
-        if (!current || (parent.source === 'PREPARED_PREIMAGE'
-          ? !sameJson(current, parent.entry) : current.state !== 'ABSENT')) {
+        if (!current || !sameJson(current, expectedParent)) {
           return reject('PARENT_AUTHORITY_MISMATCH', 'PARENT_AUTHORITY', 'AUTHORITY_MISMATCH',
             operation, parent.path, expectedDigest, current?.stateDigest ?? null);
         }
@@ -1673,6 +1687,151 @@ function resumeContext(
     });
   } catch {
     return null;
+  }
+}
+
+/** A durable prefix is evidence of past application, not current native state
+ * or authority to retain, resume, complete, or release any effect. */
+export interface ExecutionEffectLandingPartialJournalV1 {
+  readonly state: 'PARTIAL_JOURNAL';
+  readonly prepared: PreparedJournalV1;
+  readonly applying: ApplyingJournalV1;
+  readonly steps: readonly StepJournalV1[];
+  readonly artifacts: readonly ExecutionEffectLandingJournalArtifactV1[];
+  readonly evidenceDigest: string;
+}
+
+function readStrictJournalArtifact(
+  journal: Pick<ExecutionEffectLandingJournalAdapterV1, 'readImmutable'>,
+  key: string,
+): { artifact: ExecutionEffectLandingJournalArtifactV1; value: unknown } | null {
+  // Read errors and malformed bytes are not absence. Recovery must not turn a
+  // failed read into a shorter supposedly safe effect prefix.
+  const raw = journal.readImmutable(key);
+  if (raw === null) return null;
+  const artifact = artifactSnapshot(raw);
+  if (!artifact || artifact.key !== key) throw new TypeError('Invalid recovery journal artifact');
+  const text = Buffer.from(artifact.bytes).toString('utf8');
+  const value = JSON.parse(text) as unknown;
+  if (canonicalJson(value) !== text) throw new TypeError('Noncanonical recovery journal artifact');
+  return { artifact, value };
+}
+
+function readDurableStepPrefix(
+  journal: Pick<ExecutionEffectLandingJournalAdapterV1, 'readImmutable'>,
+  prepared: PreparedJournalV1,
+  applying: ApplyingJournalV1,
+): { steps: readonly StepJournalV1[]; artifacts: readonly ExecutionEffectLandingJournalArtifactV1[] } {
+  const transactionDigest = prepared.transaction.transactionDigest;
+  const steps: StepJournalV1[] = [];
+  const artifacts: ExecutionEffectLandingJournalArtifactV1[] = [];
+  let previous = applying.recordDigest;
+  let previousAt = applying.applyingAt;
+  let missing = false;
+  if (Date.parse(previousAt) < Date.parse(prepared.preparedAt)) {
+    throw new TypeError('Noncausal recovery journal');
+  }
+  for (const operation of prepared.operations) {
+    const read = readStrictJournalArtifact(journal,
+      journalKey(transactionDigest, `step-${String(operation.index).padStart(7, '0')}`));
+    if (read === null) { missing = true; continue; }
+    const step = missing ? null : stepSnapshot(read.value, prepared, applying, previous, operation.index);
+    if (!step || Date.parse(step.appliedAt) < Date.parse(previousAt)) {
+      throw new TypeError('Invalid recovery journal prefix');
+    }
+    steps.push(step); artifacts.push(read.artifact);
+    previous = step.recordDigest; previousAt = step.appliedAt;
+  }
+  if (journal.readImmutable(journalKey(transactionDigest,
+    `step-${String(prepared.operations.length).padStart(7, '0')}`)) !== null) {
+    throw new TypeError('Unexpected recovery journal suffix');
+  }
+  return { steps: objectFreeze(steps), artifacts: objectFreeze(artifacts) };
+}
+
+/** Strict structural/semantic journal proof, without native, lease or provider
+ * operations. The custody caller must separately inventory ALL artifact keys,
+ * verify original admission/READY/locator capabilities, recovered authority,
+ * stopped resources and current native prefix before publishing a disposition. */
+export function readExecutionEffectLandingPartialJournalV1(input: {
+  readonly transactionDigest: string;
+  readonly journal: ExecutionEffectLandingJournalAdapterV1;
+}): ExecutionEffectLandingPartialJournalV1 | ExecutionEffectLandingHoldV1 {
+  if (!exactDataObject(input, ['transactionDigest', 'journal']) || !isDigest(input.transactionDigest)
+    || !exactDataObject(input.journal, ['capability', 'publishImmutable', 'readImmutable'])) {
+    return hold('INVALID_INPUT', 'reconcile', null);
+  }
+  const transactionDigest = input.transactionDigest;
+  const capability = validateSimpleCapability(input.journal.capability,
+    'execution-effect-landing-journal-capability-v1');
+  const read = method(input.journal, 'readImmutable');
+  if (!capability || !read) return hold('ADAPTER_UNSUPPORTED', 'reconcile', transactionDigest);
+  const journal = { readImmutable: (key: string) => reflectApply(read, undefined, [key]) as
+    ExecutionEffectLandingJournalArtifactV1 | null };
+  try {
+    // Presence, even malformed, bars negative partial retention.
+    if (journal.readImmutable(journalKey(transactionDigest, 'committed')) !== null) {
+      return hold('TRANSACTION_QUARANTINED', 'reconcile', transactionDigest);
+    }
+    const preparedRead = readStrictJournalArtifact(journal, journalKey(transactionDigest, 'prepared'));
+    const prepared = preparedRead ? preparedSnapshot(preparedRead.value) : null;
+    if (!preparedRead || !prepared || prepared.transaction.transactionDigest !== transactionDigest
+      || prepared.journalCapabilityDigest !== capability.capabilityDigest) {
+      return hold('JOURNAL_MALFORMED', 'reconcile', transactionDigest);
+    }
+    const applyingRead = readStrictJournalArtifact(journal, journalKey(transactionDigest, 'applying'));
+    const applying = applyingRead ? applyingSnapshot(applyingRead.value, prepared) : null;
+    if (!applyingRead || !applying) return hold('JOURNAL_MALFORMED', 'reconcile', transactionDigest);
+    const prefix = readDurableStepPrefix(journal, prepared, applying);
+    if (prefix.steps.length === 0 || prefix.steps.length >= prepared.operations.length) {
+      return hold('CRASH_PREFIX_AMBIGUOUS', 'reconcile', transactionDigest);
+    }
+    const artifacts = objectFreeze([preparedRead.artifact, applyingRead.artifact, ...prefix.artifacts]);
+    const evidenceDigest = digest('execution-effect-landing-partial-journal-v1', {
+      transactionDigest, preparedJournalDigest: prepared.recordDigest,
+      applyingJournalDigest: applying.recordDigest,
+      stepJournalDigests: prefix.steps.map(step => step.recordDigest),
+      artifacts: artifacts.map(({ bytes: _bytes, ...reference }) => reference),
+    });
+    return objectFreeze({ state: 'PARTIAL_JOURNAL' as const, prepared, applying,
+      steps: prefix.steps, artifacts, evidenceDigest });
+  } catch {
+    return hold('JOURNAL_MALFORMED', 'reconcile', transactionDigest);
+  }
+}
+
+/** Re-read the durable applied prefix before asking for successor ownership.
+ * This is an observation, never authority to release quarantine or mutate files. */
+function verifyRecoveryPrefix(
+  adapters: SnapshottedAdapters,
+  prepared: PreparedJournalV1,
+  applying: ApplyingJournalV1,
+): ExecutionEffectLandingHoldV1 | null {
+  const transactionDigest = prepared.transaction.transactionDigest;
+  let prefix: ReturnType<typeof readDurableStepPrefix>;
+  try { prefix = readDurableStepPrefix(adapters.journal, prepared, applying); }
+  catch { return hold('JOURNAL_MALFORMED', 'reconcile', transactionDigest); }
+  const receipts: ExecutionEffectLandingNativeMutationReceiptV1[] = [];
+  try {
+    for (const step of prefix.steps) {
+      const operation = prepared.operations[step.index]!;
+      const dependencyReceipts = operation.parentAuthorities
+        .filter(parent => parent.source === 'OPERATION_POSTIMAGE')
+        .map(parent => receipts[parent.operationIndex])
+        .filter((receipt): receipt is ExecutionEffectLandingNativeMutationReceiptV1 => receipt !== undefined);
+      const observed = adapters.native.reconcileOperation(objectFreeze({
+        operation, dependencyReceipts: objectFreeze(dependencyReceipts),
+      }));
+      const receipt = exactDataObject(observed, ['state', 'receipt']) && observed.state === 'APPLIED'
+        ? validateReceipt(observed.receipt, operation) : null;
+      if (!receipt || !sameJson(receipt.entryPostimages, step.nativeReceipt.entryPostimages)) {
+        return hold('CRASH_PREFIX_AMBIGUOUS', 'reconcile', transactionDigest, [step.recordDigest]);
+      }
+      receipts.push(step.nativeReceipt);
+    }
+    return null;
+  } catch {
+    return hold('CRASH_PREFIX_AMBIGUOUS', 'reconcile', transactionDigest);
   }
 }
 
@@ -1788,7 +1947,7 @@ function operationSnapshot(value: unknown): ExecutionEffectLandingOperationV1 | 
     'stagedSource', 'entryPreimages', 'entryPostimages', 'parentAuthorities',
     'operationDigest',
   ]) || value.version !== 1 || !Number.isSafeInteger(value.index) || (value.index as number) < 0
-    || !['ADD_DIRECTORY', 'ADD', 'REPLACE', 'DELETE', 'MODE'].includes(value.kind as string)
+    || !['ADD_DIRECTORY', 'REUSE_DIRECTORY', 'ADD', 'REPLACE', 'DELETE', 'MODE'].includes(value.kind as string)
     || !safeRelativePath(value.path)
     || !Array.isArray(value.effectDigests) || !Array.isArray(value.entryPreimages)
     || !Array.isArray(value.entryPostimages) || !Array.isArray(value.parentAuthorities)
@@ -1815,7 +1974,7 @@ function operationSnapshot(value: unknown): ExecutionEffectLandingOperationV1 | 
   }
   if (derivedParent === null
     ? value.derivedParent !== null || effectDigests.length === 0
-    : value.kind !== 'ADD_DIRECTORY' || effectDigests.length !== 0
+    : !['ADD_DIRECTORY', 'REUSE_DIRECTORY'].includes(value.kind as string) || effectDigests.length !== 0
       || derivedParent.path !== value.path) return null;
   const snapshotStates = (raw: unknown[]): readonly ExecutionEffectLandingPathStateV1[] | null => {
     const values: ExecutionEffectLandingPathStateV1[] = [];
@@ -2060,7 +2219,7 @@ function validateReceipt(
     && operation.entryPostimages.some(item => item.entry.state === 'PRESENT'
       && item.entry.entry.kind === 'regular-file')
     && operation.stagedSource === null) return null;
-  if (operation.kind === 'MODE') {
+  if (operation.kind === 'MODE' || operation.kind === 'REUSE_DIRECTORY') {
     const before = pre[0]?.entry;
     const after = post[0]?.entry;
     if (!before || !after || before.state !== 'PRESENT' || after.state !== 'PRESENT'
@@ -3241,6 +3400,10 @@ export async function reconcileExecutionEffectLandingV1(
   );
   const applying = applyingRead ? applyingSnapshot(applyingRead.value, durable.prepared) : null;
   if (applyingRead && !applying) return hold('JOURNAL_MALFORMED', 'reconcile', transaction.transactionDigest);
+  if (applying) {
+    const prefixHold = verifyRecoveryPrefix(adapters, durable.prepared, applying);
+    if (prefixHold) return prefixHold;
+  }
   const context = resumeContext(
     transaction,
     durable.prepared,

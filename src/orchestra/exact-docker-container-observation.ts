@@ -1,3 +1,4 @@
+import { isExactDockerIsolatedExecution, runIsolatedExactDockerExecution } from './exact-docker-command-transport.js';
 import { Worker } from 'node:worker_threads';
 import { runExactDockerWorkspaceCommand, type ExactDockerWorkspaceCommandInputV1, type ExactDockerWorkspaceCommandResultV1, type ExactDockerWorkspaceCommandRunnerV1 } from './exact-docker-workspace-command.js';
 
@@ -70,7 +71,7 @@ export async function runIsolatedExactDockerReadOnlyObservation(
 
 /** One production command seam covers allocation, containment and compensation.
  * Only the canonical runner is wrapped; injected platform/test runners retain
- * their authority. Mutating commands never cross the observation thread. */
+ * their authority. Mutations use a separate execution thread, never the observation thread. */
 const productionObservationRunners = new WeakSet<ExactDockerWorkspaceCommandRunnerV1>();
 
 /** Process-local provenance; custom adapters cannot opt into production capture IO. */
@@ -84,7 +85,7 @@ export function resolveExactDockerObservationRunner(
   if (runner !== runExactDockerWorkspaceCommand) return runner;
   const wrapped: ExactDockerWorkspaceCommandRunnerV1 = input => isExactDockerReadOnlyObservation(input)
     ? runIsolatedExactDockerReadOnlyObservation(input)
-    : runner(input);
+    : isExactDockerIsolatedExecution(input) ? runIsolatedExactDockerExecution(input) : runner(input);
   productionObservationRunners.add(wrapped);
   return wrapped;
 }

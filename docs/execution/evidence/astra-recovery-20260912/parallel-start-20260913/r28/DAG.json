@@ -1,0 +1,169 @@
+{
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Inventory startup authority boundaries",
+      "dependencies": [],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-01/ANALYSIS.md"
+    },
+    {
+      "id": 2,
+      "title": "Inventory worker custody boundaries",
+      "dependencies": [],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-02/ANALYSIS.md"
+    },
+    {
+      "id": 3,
+      "title": "Inventory result and effect boundaries",
+      "dependencies": [],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-03/ANALYSIS.md"
+    },
+    {
+      "id": 4,
+      "title": "Inventory observable run boundaries",
+      "dependencies": [],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-04/ANALYSIS.md"
+    },
+    {
+      "id": 5,
+      "title": "Specify startup timing attribution",
+      "dependencies": [
+        1
+      ],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-05/ANALYSIS.md"
+    },
+    {
+      "id": 6,
+      "title": "Specify worker birth evidence",
+      "dependencies": [
+        2
+      ],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-06/ANALYSIS.md"
+    },
+    {
+      "id": 7,
+      "title": "Specify effect acceptance contract",
+      "dependencies": [
+        3
+      ],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-07/ANALYSIS.md"
+    },
+    {
+      "id": 8,
+      "title": "Specify operator state consistency",
+      "dependencies": [
+        4
+      ],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-08/ANALYSIS.md"
+    },
+    {
+      "id": 9,
+      "title": "Compare admission and worker critical paths",
+      "dependencies": [
+        5,
+        6
+      ],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-09/ANALYSIS.md"
+    },
+    {
+      "id": 10,
+      "title": "Compare settlement and visible completion",
+      "dependencies": [
+        7,
+        8
+      ],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-10/ANALYSIS.md"
+    },
+    {
+      "id": 11,
+      "title": "Map restart and retained result behavior",
+      "dependencies": [
+        5,
+        7
+      ],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-11/ANALYSIS.md"
+    },
+    {
+      "id": 12,
+      "title": "Map resource usage and task readiness",
+      "dependencies": [
+        6,
+        8
+      ],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-12/ANALYSIS.md"
+    },
+    {
+      "id": 13,
+      "title": "Define dependency failure propagation proof",
+      "dependencies": [
+        9,
+        11
+      ],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-13/ANALYSIS.md"
+    },
+    {
+      "id": 14,
+      "title": "Define scope collision and derived directory proof",
+      "dependencies": [
+        9,
+        12
+      ],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-14/ANALYSIS.md"
+    },
+    {
+      "id": 15,
+      "title": "Define archive and replay proof",
+      "dependencies": [
+        10,
+        11
+      ],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-15/ANALYSIS.md"
+    },
+    {
+      "id": 16,
+      "title": "Define cross-surface freshness proof",
+      "dependencies": [
+        10,
+        12
+      ],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-16/ANALYSIS.md"
+    },
+    {
+      "id": 17,
+      "title": "Assemble execution correctness acceptance matrix",
+      "dependencies": [
+        13,
+        14
+      ],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-17/ANALYSIS.md"
+    },
+    {
+      "id": 18,
+      "title": "Assemble settlement visibility acceptance matrix",
+      "dependencies": [
+        15,
+        16
+      ],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-18/ANALYSIS.md"
+    },
+    {
+      "id": 19,
+      "title": "Rank repairs using both acceptance matrices",
+      "dependencies": [
+        17,
+        18
+      ],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-19/ANALYSIS.md"
+    },
+    {
+      "id": 20,
+      "title": "Produce final evidence-linked repair decision",
+      "dependencies": [
+        19
+      ],
+      "file": "docs/execution/active/dogfood-comparison/twenty/task-20/ANALYSIS.md"
+    }
+  ],
+  "singleWorkerCount": 1,
+  "twentyConcurrencyCeiling": 4
+}

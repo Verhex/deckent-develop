@@ -1,0 +1,14 @@
+
+ RUN  v3.2.7 /tmp/deckent-r18-762-repair
+
+ ✓ tests/orchestra/execution-effect-landing-coordinator.test.ts (38 tests) 875ms
+   ✓ execution effect landing coordinator > bounds quarantine evidence after a late failure in a large operation set  627ms
+ ✓ tests/orchestra/spawn-backend-docker-mounts.test.ts (93 tests) 453ms
+ ✓ tests/orchestra/execution-effect-native-adapter.test.ts (37 tests) 4135ms
+   ✓ execution effect native adapter > transfers a large multi-chunk source through the real Docker and native adapters  3819ms
+
+ Test Files  3 passed (3)
+      Tests  168 passed (168)
+   Start at  14:58:15
+   Duration  5.25s (transform 3.51s, setup 45ms, collect 5.42s, tests 5.46s, environment 0ms, prepare 92ms)
+

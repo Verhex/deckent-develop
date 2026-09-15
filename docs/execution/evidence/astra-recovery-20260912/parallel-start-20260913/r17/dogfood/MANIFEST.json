@@ -1,0 +1,53 @@
+{
+  "observedAt": "2026-09-14T10:00:07.488393+00:00",
+  "files": [
+    {
+      "path": "ANALYSIS.md",
+      "sha256": "58fa0302e79a08a56bfcc1cbdd16d2d23bf3b3641ad6edcc392c28069d3c121c"
+    },
+    {
+      "path": "EXIT.json",
+      "sha256": "8c62a06c9f277e7430ed494e504aa61a02660121ac617e3c32fc619fe1511603"
+    },
+    {
+      "path": "START.json",
+      "sha256": "0900001f80806d9dfd0129a13ae4657ebca123ed41c0363508dc6ed6c9909dc9"
+    },
+    {
+      "path": "job.json",
+      "sha256": "e3e1d99096797f8effd70b1a988846803e1a309e8bd10568f4818c9f7eddd5b0"
+    },
+    {
+      "path": "monitor.py",
+      "sha256": "05bb656f95fa9638ca3140de10650bb991042aaf2a3c64b4e7f243eefd5c7e45"
+    },
+    {
+      "path": "resources.jsonl",
+      "sha256": "b4eba9090421e094e791f05a5f2ee20f60c09d451d55715ae41d89f369ccd547"
+    },
+    {
+      "path": "sprint-761-events.jsonl",
+      "sha256": "2526cb98cfd48230a537d1d0788a20c2da7bb05e5d37d551d1d52aa8d274df96"
+    },
+    {
+      "path": "sprint-761-terminal-receipt.json",
+      "sha256": "38ba82e6cf1c6f7668a7075699c184e1d2e911ddc86204996bbda0a46ed6f5bd"
+    },
+    {
+      "path": "start.log",
+      "sha256": "de589bd2bd2aea02f3d7078051c4ff2d0ac1dfa9bf3e9a28d9233e158ec4fa8a"
+    },
+    {
+      "path": "status-after.json",
+      "sha256": "b9a0628b28df6c916efc8ecf59a3e7e5535615829a8d0a41f028b286e4613a89"
+    },
+    {
+      "path": "task-761-001.accepted-result.json",
+      "sha256": "72486143013a18be1400a78f3d95022a3d136a73d7636cecc2559503f20e2c88"
+    },
+    {
+      "path": "task-761-001.result",
+      "sha256": "3a96f5af70fa5a38edbb673bcb2aeb7aa39db95f7265d4a5f2352fde321312de"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "utc": "2026-09-14T13:55:55.365351+00:00",
+  "changes": [
+    {
+      "path": "src/orchestra/execution-effect-landing-coordinator.ts",
+      "beforeSha256": "da4412bf233b4e0b1376c64018078c94f4531e252d695a9279804acd6675ec2b",
+      "afterSha256": "e51efb0d76144aa4b012acdc13d031c62d68f95f8d1c2e6688f09a76f4a133f1"
+    },
+    {
+      "path": "src/core/execution-effect-persistence-contract.ts",
+      "beforeSha256": "3e5796cf96c3b8073c972e2b72e0cb6c725fd976c89a8eff9e848d5049951c49",
+      "afterSha256": "4f82ece683ccd6289a9f40b31c56475ce35bba8ac02cd2aace6075a48dc29004"
+    },
+    {
+      "path": "src/orchestra/execution-effect-native-adapter.ts",
+      "beforeSha256": "a0e9dc4f8073a47f9172e877459e0b12617c9844a1562a6119150e3eb3de1da2",
+      "afterSha256": "22af5153e639778baab52b2437737f9eb51503b87cf3720640cca43d8d354edf"
+    },
+    {
+      "path": "native/exec-authority/src/custody_posix.c",
+      "beforeSha256": "52be499b03870a6f87bb710251cb83e27ca5b9759221b667ea7d52a5150e1aa0",
+      "afterSha256": "81386655446cc0b31fb8c1f3fa5dc7c65afc30c67f6f7cc365edd53fcec17127"
+    },
+    {
+      "path": "tests/orchestra/execution-effect-landing-coordinator.test.ts",
+      "beforeSha256": "02755cd0f56cb7d8d27ec3d789030ce471ea2c2c2ad0dc3f91d74d2b3d1677e7",
+      "afterSha256": "f2384aeceed5bc1c893e3f6f6e235929640491dc944b4bf8c82aeb9278b33b41"
+    },
+    {
+      "path": "tests/orchestra/execution-effect-native-adapter.test.ts",
+      "beforeSha256": "5b895f605a9058e35d3ceb13ccdb5b8b28648033f948ae430d97063d9e54d1bb",
+      "afterSha256": "f746acecd03994e78c276b86588f19faf7814f81d3d56d2993fec13812ee9b2e"
+    },
+    {
+      "path": "tests/core/execution-effect-persistence-contract.test.ts",
+      "beforeSha256": "3f460f389697da41be1596e2a88cc56ebc2fc9fe65b56a529c12bd1145c07f5a",
+      "afterSha256": "023f2d98e26ca20c77d74a7d1a150e11efd8e046d47c76e8a7ab37c4e336742d"
+    }
+  ],
+  "commit": false
+}

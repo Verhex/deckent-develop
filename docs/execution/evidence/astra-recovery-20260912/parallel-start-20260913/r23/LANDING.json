@@ -1,0 +1,15 @@
+{
+  "utc": "2026-09-14T15:01:11.863857+00:00",
+  "cas": true,
+  "files": {
+    "src/core/task-attempt-custody-store.ts": "63368528f5e0c11d76b182235103ad1151689800ad0e4f08948e9a2dd9c957ed",
+    "src/core/file-lock.ts": "3d338d9b858c4768b614551f48b158296b0b44fcdf94af1eb4dbffddac07f967",
+    "src/orchestra/spawn-backend-docker.ts": "4ad9bd8eba622915b656e9ff68b895eb0d313719a9e15a72b2e12f6f9cc924dd",
+    "src/orchestra/sprint-recovery-operation.ts": "c8a96ea45c70109dd4acc07765213ef80e7f51a4d3d1789eb2d92fffdf9888e4",
+    "src/cli/commands/recover.ts": "05508604015f0738d76ee8917236ad85ac8c9e8af459c3c3a536d66eba0a854f",
+    "src/cli/helpers/messages.ts": "2d98185a702f78ed1da7b0befe27278c61a541db561c9bfacf913c63e04eee0d",
+    "tests/core/task-attempt-custody-store.test.ts": "0b03054a4656a3bd9c698ea411cfeb6c938e2e1ebf54afa72cdaed974f89cdfb",
+    "tests/orchestra/sprint-recovery-operation.test.ts": "3d91c1acab431daae5b518dcdc23c5b5602e0f0f3255c2978ccafe4b78b620a5",
+    "src/orchestra/spawn-backend.ts": "23111a6572633f95fc9c5cf014484fe621066aac184a7d537e3d72aaa7a515ce"
+  }
+}

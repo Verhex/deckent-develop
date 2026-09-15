@@ -1,0 +1,256 @@
+{
+  "utc": "2026-09-14T12:54:08.437Z",
+  "binary": {
+    "status": "allow",
+    "reason": "matching-build-identity"
+  },
+  "runtime": {
+    "schemaVersion": 1,
+    "lifecycle": "ABORTED",
+    "active": false,
+    "resumable": false,
+    "sprintId": "sprint-762",
+    "phase": "EXECUTE",
+    "status": "ABORTED",
+    "reason": null,
+    "recoveryCommand": null,
+    "finalizeCommand": null,
+    "coordinator": "absent",
+    "conflicts": [],
+    "recoveryReconciliation": {
+      "version": 1,
+      "sprintId": "sprint-762",
+      "evidence": {
+        "checkpointPresent": false,
+        "terminalReceipt": {
+          "version": 1,
+          "sprintId": "sprint-762",
+          "runId": "sprint-762",
+          "coordinatorGeneration": 2,
+          "terminalOutcome": "ABORTED",
+          "logicalSettlementDigest": "2bc0eba8d9580f1dbd3b2a57842265312333ef8124163d2cd673be8803b1d97b",
+          "priorAuthorityVersion": 0,
+          "authorityVersion": 1
+        },
+        "terminalReceiptConflict": null
+      },
+      "state": "consistent",
+      "mismatch": null,
+      "remediation": null
+    }
+  },
+  "admission": {
+    "schemaVersion": 1,
+    "authority": "deckent.clean.active-execution.v1",
+    "decision": "ALLOW",
+    "code": "CLEAN_ACTIVE_EXECUTION_CLEAR",
+    "projectRootDigest": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+    "reasons": [],
+    "projections": [
+      {
+        "surface": "run-flow",
+        "id": "2f42f845-acaa-418e-9f2e-1f946cd5a91c",
+        "rawStatus": "DETACHED_RUNNING",
+        "effectiveStatus": "STALE_DEAD",
+        "authority": "process-liveness",
+        "evidenceRefs": [
+          ".deckent/runtime/run-flow-store/2f42f845-acaa-418e-9f2e-1f946cd5a91c.handle.jsonl"
+        ]
+      },
+      {
+        "surface": "run-flow",
+        "id": "63aedcaf-7573-484c-9ad6-dc4b0e4fda9f",
+        "rawStatus": "DETACHED_RUNNING",
+        "effectiveStatus": "STALE_DEAD",
+        "authority": "process-liveness",
+        "evidenceRefs": [
+          ".deckent/runtime/run-flow-store/63aedcaf-7573-484c-9ad6-dc4b0e4fda9f.handle.jsonl"
+        ]
+      },
+      {
+        "surface": "run-flow",
+        "id": "a7e3c2d2-cd53-4b30-822b-5f79e14f4f5f",
+        "rawStatus": "DETACHED_RUNNING",
+        "effectiveStatus": "STALE_DEAD",
+        "authority": "process-liveness",
+        "evidenceRefs": [
+          ".deckent/runtime/run-flow-store/a7e3c2d2-cd53-4b30-822b-5f79e14f4f5f.handle.jsonl"
+        ]
+      },
+      {
+        "surface": "run-job",
+        "id": "run-mnomfzeq",
+        "rawStatus": "RUNNING",
+        "effectiveStatus": "STALE",
+        "authority": "adjacent-execution-authority",
+        "evidenceRefs": [
+          ".deckent/runtime/jobs/run-mnomfzeq.json"
+        ]
+      },
+      {
+        "surface": "run-job",
+        "id": "run-mp3qgy0b",
+        "rawStatus": "RUNNING",
+        "effectiveStatus": "STALE",
+        "authority": "adjacent-execution-authority",
+        "evidenceRefs": [
+          ".deckent/runtime/jobs/run-mp3qgy0b.json"
+        ]
+      },
+      {
+        "surface": "run-job",
+        "id": "run-mp3x8bm3",
+        "rawStatus": "RUNNING",
+        "effectiveStatus": "STALE",
+        "authority": "adjacent-execution-authority",
+        "evidenceRefs": [
+          ".deckent/runtime/jobs/run-mp3x8bm3.json"
+        ]
+      },
+      {
+        "surface": "run-job",
+        "id": "run-mp3xpqai",
+        "rawStatus": "RUNNING",
+        "effectiveStatus": "STALE",
+        "authority": "adjacent-execution-authority",
+        "evidenceRefs": [
+          ".deckent/runtime/jobs/run-mp3xpqai.json"
+        ]
+      },
+      {
+        "surface": "run-job",
+        "id": "run-mp3xq48s",
+        "rawStatus": "RUNNING",
+        "effectiveStatus": "STALE",
+        "authority": "adjacent-execution-authority",
+        "evidenceRefs": [
+          ".deckent/runtime/jobs/run-mp3xq48s.json"
+        ]
+      },
+      {
+        "surface": "run-job",
+        "id": "run-mp47cm54",
+        "rawStatus": "RUNNING",
+        "effectiveStatus": "STALE",
+        "authority": "adjacent-execution-authority",
+        "evidenceRefs": [
+          ".deckent/runtime/jobs/run-mp47cm54.json"
+        ]
+      },
+      {
+        "surface": "run-job",
+        "id": "sprint-1774372905891",
+        "rawStatus": "RUNNING",
+        "effectiveStatus": "STALE",
+        "authority": "adjacent-execution-authority",
+        "evidenceRefs": [
+          ".deckent/runtime/jobs/sprint-1774372905891.json"
+        ]
+      },
+      {
+        "surface": "run-job",
+        "id": "sprint-1774518414470",
+        "rawStatus": "RUNNING",
+        "effectiveStatus": "STALE",
+        "authority": "adjacent-execution-authority",
+        "evidenceRefs": [
+          ".deckent/runtime/jobs/sprint-1774518414470.json"
+        ]
+      },
+      {
+        "surface": "run-job",
+        "id": "sprint-1775137674743",
+        "rawStatus": "RUNNING",
+        "effectiveStatus": "STALE",
+        "authority": "adjacent-execution-authority",
+        "evidenceRefs": [
+          ".deckent/runtime/jobs/sprint-1775137674743.json"
+        ]
+      },
+      {
+        "surface": "run-job",
+        "id": "sprint-1775645251541",
+        "rawStatus": "RUNNING",
+        "effectiveStatus": "STALE",
+        "authority": "adjacent-execution-authority",
+        "evidenceRefs": [
+          ".deckent/runtime/jobs/sprint-1775645251541.json"
+        ]
+      },
+      {
+        "surface": "run-job",
+        "id": "sprint-1776143355175",
+        "rawStatus": "RUNNING",
+        "effectiveStatus": "STALE",
+        "authority": "adjacent-execution-authority",
+        "evidenceRefs": [
+          ".deckent/runtime/jobs/sprint-1776143355175.json"
+        ]
+      },
+      {
+        "surface": "run-job",
+        "id": "sprint-1776160612606",
+        "rawStatus": "RUNNING",
+        "effectiveStatus": "STALE",
+        "authority": "adjacent-execution-authority",
+        "evidenceRefs": [
+          ".deckent/runtime/jobs/sprint-1776160612606.json"
+        ]
+      },
+      {
+        "surface": "run-job",
+        "id": "sprint-1776233719361",
+        "rawStatus": "RUNNING",
+        "effectiveStatus": "STALE",
+        "authority": "adjacent-execution-authority",
+        "evidenceRefs": [
+          ".deckent/runtime/jobs/sprint-1776233719361.json"
+        ]
+      },
+      {
+        "surface": "run-job",
+        "id": "sprint-1776255236722",
+        "rawStatus": "RUNNING",
+        "effectiveStatus": "STALE",
+        "authority": "adjacent-execution-authority",
+        "evidenceRefs": [
+          ".deckent/runtime/jobs/sprint-1776255236722.json"
+        ]
+      },
+      {
+        "surface": "run-job",
+        "id": "sprint-1776347467563",
+        "rawStatus": "RUNNING",
+        "effectiveStatus": "STALE",
+        "authority": "adjacent-execution-authority",
+        "evidenceRefs": [
+          ".deckent/runtime/jobs/sprint-1776347467563.json"
+        ]
+      },
+      {
+        "surface": "run-job",
+        "id": "sprint-1776358979460",
+        "rawStatus": "RUNNING",
+        "effectiveStatus": "STALE",
+        "authority": "adjacent-execution-authority",
+        "evidenceRefs": [
+          ".deckent/runtime/jobs/sprint-1776358979460.json"
+        ]
+      }
+    ],
+    "inspected": {
+      "taskFiles": 0,
+      "heartbeatFiles": 0,
+      "workerPidFiles": 0,
+      "sprintPidFiles": 0,
+      "processEntries": 5,
+      "receiptRows": 0,
+      "spawnLockFiles": 0,
+      "executionLockFiles": 0,
+      "jobFiles": 592,
+      "runFlowFiles": 408,
+      "missionRows": 10
+    },
+    "disposedOrphans": []
+  }
+}

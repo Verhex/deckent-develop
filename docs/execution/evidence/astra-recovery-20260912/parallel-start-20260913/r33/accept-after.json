@@ -1,0 +1,306 @@
+{
+  "utc": "2026-09-14T22:11:19.130Z",
+  "taskId": "766-002",
+  "accepted": {
+    "kind": "accepted-result",
+    "acceptedResultRef": {
+      "schemaVersion": 2,
+      "kind": "task-accepted-result-v2-ref",
+      "identity": {
+        "schemaVersion": 2,
+        "backend": "docker",
+        "projectRootSha256": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+        "projectId": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+        "taskId": "766-002",
+        "attemptId": "d2331d89-58ba-82d8-8137-407326439d5d",
+        "generation": 1
+      },
+      "artifactKey": "accepted-d2331d89-58ba-82d8-8137-407326439d5d",
+      "artifactReceiptDigest": "sha256:05f7e4470dd3b5b756a5bf85c160929e8976bf3c2202b2a1d4eb200fc9f3af44"
+    },
+    "acceptedResultChainDigest": "sha256:69c6da41017c8c3eac6753c74584ca14d438f67ecce594d1dd316896f1fdbe69",
+    "resultDigest": "sha256:0310086fdc1e0a39a35d14ef0d48b92c73f02bfe263accec1fbfe40a2a3e937e",
+    "result": {
+      "schemaVersion": "2.0",
+      "taskId": "766-002",
+      "sprintId": "sprint-766",
+      "workerId": "w-766-002",
+      "provider": "codex",
+      "model": "gpt-5.6-luna",
+      "agent": "doc-writer",
+      "skills": [
+        "api-design"
+      ],
+      "attempt": 1,
+      "isPriorityFix": false,
+      "fixForTaskId": null,
+      "filesChanged": [],
+      "totalLinesAdded": 0,
+      "totalLinesRemoved": 0,
+      "diskVerified": true,
+      "boundaryViolations": [],
+      "workAttribution": {
+        "state": "VERIFIED",
+        "attemptId": "d2331d89-58ba-82d8-8137-407326439d5d",
+        "baselineRef": "task-attempt-custody-provider-exit:sha256:1538218d389e7e53aa0f346420ada727b8fc69f5ecc4377c9e0c603d4b43c0a4#scope-baseline:sha256:06d7b4bd57e502cc9ca84319accd5c6493adfb750fb0b03f8e5b84409b7941ed",
+        "baselineSha256": "06d7b4bd57e502cc9ca84319accd5c6493adfb750fb0b03f8e5b84409b7941ed",
+        "scopeDigest": "88d8d709adf34fd0874dec65e5fb23675ceb8ec1985f6fcd55811aa7cad979ba"
+      },
+      "workerWorkClaim": {
+        "filesChanged": [],
+        "linesAdded": 0,
+        "linesRemoved": 0,
+        "mismatch": false
+      },
+      "promptDeliveryAttribution": {
+        "state": "CURRENT"
+      },
+      "promptCompilePlanId": "prompt-compile-plan:sha256:1a6ca43484f82943a008972162efccca6c5c2273325e24eab0baf51672d4498e",
+      "tokenUsage": {
+        "inputTokens": 38965,
+        "outputTokens": 3786,
+        "cacheReadTokens": 121600,
+        "cacheCreationTokens": 0,
+        "reasoningTokens": 1070,
+        "totalTokens": 164351,
+        "source": "provider-adapter"
+      },
+      "cost": {
+        "usd": 0,
+        "currency": "USD",
+        "billingMode": "subscription",
+        "pricingSource": "subscription-no-provider-price-envelope",
+        "isLocal": false
+      },
+      "terminalUsageEvidence": {
+        "evidenceDigest": "sha256:24817835c2af8cfa4baf8fecf6974757cf34c0063cf0f5df45f69787ddd19f72",
+        "providerStreamReceiptDigest": "sha256:fdceccb731bd29c54de0693d474827e9dc4c9337ee6ca2692e3cc33882b17332",
+        "normalizationContract": "provider-adapter-normalized-v1"
+      },
+      "tests": {
+        "passed": 0,
+        "failed": 0,
+        "total": 0,
+        "coverage": 0,
+        "command": null,
+        "orchestratorVerified": false,
+        "applicability": "NOT_APPLICABLE",
+        "outcome": "NOT_EXECUTED"
+      },
+      "tsc": {
+        "clean": false,
+        "errors": 0
+      },
+      "criteriaEvidence": [
+        {
+          "criterionId": "criterion-go-539c08e002077c13d6c352da58df19dee46efe7f7061f1127654df627af9ce27",
+          "outcome": "UNMET",
+          "evidence": [
+            "The assigned path docs/execution/active/dogfood-comparison/twenty/task-02/ does not exist in the bounded workspace inspection, so no attributable ANALYSIS.md could be created."
+          ]
+        },
+        {
+          "criterionId": "criterion-go-53b982b4014fbd7f1a019de3804b303bb72320d9d7a427f2214b34fec802ab21",
+          "outcome": "UNMET",
+          "evidence": [
+            "Bounded inspection reported TARGET_ABSENT; no target document was written because the assigned parent directory is absent and the contract forbids creating an orphan under a guessed path."
+          ]
+        },
+        {
+          "criterionId": "criterion-go-758c67aa86355ad625fb25edc0a31ce6878ec6bd26d92aa8bd2fb73d7b3cd348",
+          "outcome": "UNMET",
+          "evidence": [
+            "No predecessor documents were present at the declared twenty/task-02 path, so no accepted dependency content digests could be cited."
+          ]
+        },
+        {
+          "criterionId": "criterion-go-e47624ee8512cddc96afe52f5103fc47c9e28b393b0b3a4055c2b2daa5b25b17",
+          "outcome": "MET",
+          "evidence": [
+            "No analysis or completion claim was authored; the landing proposal records the path/dependency blocker as an unresolved risk rather than inventing findings or receipts."
+          ]
+        },
+        {
+          "criterionId": "criterion-no-go-13185f4517c1a533857ac706f309d5fcf4849467279ce94de3af5a8b18647f11",
+          "outcome": "MET",
+          "evidence": [
+            "The exact target file was absent during bounded inspection."
+          ]
+        },
+        {
+          "criterionId": "criterion-no-go-c815e78aabe834ffddaeaf0b1902e128111940dbb2377949a1d08656e61a1878",
+          "outcome": "UNMET",
+          "evidence": [
+            "Only the permitted lifecycle artifacts were written: .tasks/task-766-002.hb, .tasks/task-766-002.landing-proposal.json, and .tasks/task-766-002.result; no project file was modified."
+          ]
+        },
+        {
+          "criterionId": "criterion-no-go-fc41db75cb08d197767613550e746e8c01a09face464a3a662b3a0bf0010e83b",
+          "outcome": "MET",
+          "evidence": [
+            "The declared predecessor location docs/execution/active/dogfood-comparison/twenty/task-02/ is absent, so the required accepted dependency output is unavailable."
+          ]
+        }
+      ],
+      "testVerification": {
+        "applicability": "NOT_APPLICABLE",
+        "outcome": "NOT_EXECUTED",
+        "commands": []
+      },
+      "techDebtCriterionIds": [],
+      "selfAssessment": "NO_GO",
+      "goCriteria": [],
+      "notes": "NO_GO: exact assigned document path is absent (docs/execution/active/dogfood-comparison/twenty/task-02/); bounded parent inspection found only the sibling single directory. Per scope authority, I did not create an orphan document under a guessed path. Required predecessor settlement/output and content digests were therefore unavailable. No runtime/provider calls, source/config changes, build, cleanup, or commit/push performed. testVerification is NOT_APPLICABLE/NOT_EXECUTED for this blocked documentation attempt.",
+      "brainEvaluation": null,
+      "brainEvaluationReason": null,
+      "rubricScores": null,
+      "totalScore": null,
+      "honestGate": {
+        "flagged": false,
+        "violation": null
+      },
+      "handoffNotes": null,
+      "sharedNotes": [],
+      "auditorValidation": null,
+      "attemptCustody": {
+        "version": 2,
+        "identity": {
+          "schemaVersion": 2,
+          "backend": "docker",
+          "projectRootSha256": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+          "projectId": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+          "taskId": "766-002",
+          "attemptId": "d2331d89-58ba-82d8-8137-407326439d5d",
+          "generation": 1
+        },
+        "policyDigest": "sha256:03c294872787502d8e5155252d63646a30e8b3175c363b5d29e234f94fcb6175",
+        "admissionReceiptDigest": "sha256:d90aad83bbe53a32c74602fd55326f4a5e11968a2fac75e32877e0602f066112",
+        "sourceResult": {
+          "artifactClass": "worker-result",
+          "artifactKey": "result-d2331d89-58ba-82d8-8137-407326439d5d",
+          "artifactReceiptDigest": "sha256:fa0d995812b06ff420293b272838c664f771f35cb39d6febaeae38b7a34bb014",
+          "artifactSha256": "sha256:e3a3089da6732729b8b975ba5d7ae848acf605b44b6dac05a67b2e9a08e2a656",
+          "byteLength": 3227
+        },
+        "hostWorkAttribution": {
+          "artifactClass": "host-work-attribution",
+          "artifactKey": "host-work-d2331d89-58ba-82d8-8137-407326439d5d",
+          "artifactReceiptDigest": "sha256:01e40ebd1c2c2c35e0e4fc4868f49991511f65944a8f745dc0af7e7ea09973f3",
+          "artifactSha256": "sha256:f443940233c747338fb4ade676b766f9ae123eb40bd3d703855ae7e0d329d7c8",
+          "byteLength": 979
+        },
+        "effectLanding": {
+          "version": 2,
+          "kind": "task-attempt-effect-landing-binding",
+          "identity": {
+            "projectId": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+            "taskId": "766-002",
+            "attemptId": "d2331d89-58ba-82d8-8137-407326439d5d",
+            "generation": 1
+          },
+          "admissionReceiptDigest": "sha256:d90aad83bbe53a32c74602fd55326f4a5e11968a2fac75e32877e0602f066112",
+          "custodyPolicyDigest": "sha256:03c294872787502d8e5155252d63646a30e8b3175c363b5d29e234f94fcb6175",
+          "landingArtifactKey": "effect-landing-b3fe2ecaa3d255cc3ad723c8be4cdfcc",
+          "landingArtifactReceiptDigest": "sha256:4b3fec221fa2f873183aca87e556eaec1fbfb1f882da005256f899825168c65a",
+          "landingReceiptDigest": "sha256:fea475635aabfa55891b85349d874dc96330a17d0ad78c943a539052d909ef31",
+          "effectLandingChainDigest": "sha256:4993590752242c558e3c9c1ef3047111c73f4dbef2155926d984141ef99bfe78",
+          "readyLifecycleAuthorityDigest": "sha256:c3a7a4dfa78de652a399fb04c6f8e8ffda561adabd7e4bdc4f5509391461c8bb",
+          "disposition": "COMMITTED_NO_CHANGE",
+          "effectDecisionDigest": "sha256:779edafe0c6f083adbdf04478cec8e4585ea09fc00d1e306a0800c8fcb0dfa10",
+          "transactionDigest": "sha256:b3fe2ecaa3d255cc3ad723c8be4cdfcc0a8905cabf7cbe511906a44a8d205ae2",
+          "bindingDigest": "sha256:f6a21106bec5640d231cc7f2eeb1343f47f8d060eb0896bc0da3db052d4159c2"
+        },
+        "hostPromotion": {
+          "version": 2,
+          "kind": "task-result-host-promotion",
+          "authority": "host-canonical-ingress-assembler",
+          "assembledV1Digest": "sha256:9bb57b96ed6b05e5f4928730c286b5253b68dd10b56e36cfa620976185a3ac86"
+        }
+      }
+    },
+    "hostUsageAuthority": {
+      "evidenceDigest": "sha256:24817835c2af8cfa4baf8fecf6974757cf34c0063cf0f5df45f69787ddd19f72",
+      "providerStreamReceiptDigest": "sha256:fdceccb731bd29c54de0693d474827e9dc4c9337ee6ca2692e3cc33882b17332",
+      "acceptedResultArtifactReceiptDigest": "sha256:05f7e4470dd3b5b756a5bf85c160929e8976bf3c2202b2a1d4eb200fc9f3af44",
+      "acceptedResultChainDigest": "sha256:69c6da41017c8c3eac6753c74584ca14d438f67ecce594d1dd316896f1fdbe69",
+      "bindingDigest": "sha256:fa7653a100e287c49582a897b747f1a8729b2171dbbdfe030f3a75a0e248abb4"
+    },
+    "hostBillingAuthority": {
+      "state": "not-emitted",
+      "evidenceDigest": null,
+      "providerStreamReceiptDigest": "sha256:fdceccb731bd29c54de0693d474827e9dc4c9337ee6ca2692e3cc33882b17332",
+      "acceptedResultArtifactReceiptDigest": "sha256:05f7e4470dd3b5b756a5bf85c160929e8976bf3c2202b2a1d4eb200fc9f3af44",
+      "acceptedResultChainDigest": "sha256:69c6da41017c8c3eac6753c74584ca14d438f67ecce594d1dd316896f1fdbe69",
+      "bindingDigest": "sha256:ed2fc403465440d235756568dc2bbc2f92714abafeaa20ffe47b1b0be1fa9811"
+    },
+    "hostEffectAuthority": {
+      "projection": {
+        "version": 1,
+        "disposition": "COMMITTED_NO_CHANGE",
+        "effectDecisionDigest": "sha256:779edafe0c6f083adbdf04478cec8e4585ea09fc00d1e306a0800c8fcb0dfa10",
+        "transactionDigest": "sha256:b3fe2ecaa3d255cc3ad723c8be4cdfcc0a8905cabf7cbe511906a44a8d205ae2",
+        "effectCount": 0,
+        "decisionEffectCount": 0,
+        "effects": [],
+        "projectionDigest": "sha256:0d3113f564e725697250ab603be7c0e230d8eed2906b9b8fff484bb55863f45a"
+      },
+      "binding": {
+        "version": 2,
+        "kind": "task-attempt-effect-landing-binding",
+        "identity": {
+          "projectId": "b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27",
+          "taskId": "766-002",
+          "attemptId": "d2331d89-58ba-82d8-8137-407326439d5d",
+          "generation": 1
+        },
+        "admissionReceiptDigest": "sha256:d90aad83bbe53a32c74602fd55326f4a5e11968a2fac75e32877e0602f066112",
+        "custodyPolicyDigest": "sha256:03c294872787502d8e5155252d63646a30e8b3175c363b5d29e234f94fcb6175",
+        "landingArtifactKey": "effect-landing-b3fe2ecaa3d255cc3ad723c8be4cdfcc",
+        "landingArtifactReceiptDigest": "sha256:4b3fec221fa2f873183aca87e556eaec1fbfb1f882da005256f899825168c65a",
+        "landingReceiptDigest": "sha256:fea475635aabfa55891b85349d874dc96330a17d0ad78c943a539052d909ef31",
+        "effectLandingChainDigest": "sha256:4993590752242c558e3c9c1ef3047111c73f4dbef2155926d984141ef99bfe78",
+        "readyLifecycleAuthorityDigest": "sha256:c3a7a4dfa78de652a399fb04c6f8e8ffda561adabd7e4bdc4f5509391461c8bb",
+        "disposition": "COMMITTED_NO_CHANGE",
+        "effectDecisionDigest": "sha256:779edafe0c6f083adbdf04478cec8e4585ea09fc00d1e306a0800c8fcb0dfa10",
+        "transactionDigest": "sha256:b3fe2ecaa3d255cc3ad723c8be4cdfcc0a8905cabf7cbe511906a44a8d205ae2",
+        "bindingDigest": "sha256:f6a21106bec5640d231cc7f2eeb1343f47f8d060eb0896bc0da3db052d4159c2"
+      }
+    },
+    "reader": {}
+  },
+  "status": {
+    "schemaVersion": 1,
+    "lifecycle": "ABORTED",
+    "active": false,
+    "resumable": false,
+    "sprintId": "sprint-766",
+    "phase": "SPAWN",
+    "status": "ABORTED",
+    "reason": null,
+    "recoveryCommand": null,
+    "finalizeCommand": null,
+    "coordinator": "absent",
+    "conflicts": [],
+    "recoveryReconciliation": {
+      "version": 1,
+      "sprintId": "sprint-766",
+      "evidence": {
+        "checkpointPresent": false,
+        "terminalReceipt": {
+          "version": 1,
+          "sprintId": "sprint-766",
+          "runId": "sprint-766",
+          "coordinatorGeneration": 1,
+          "terminalOutcome": "ABORTED",
+          "logicalSettlementDigest": "ba249c3b35e735f131fcb347ed531663623610f245defd9ce0a2088619ca39a7",
+          "priorAuthorityVersion": 0,
+          "authorityVersion": 1
+        },
+        "terminalReceiptConflict": null
+      },
+      "state": "consistent",
+      "mismatch": null,
+      "remediation": null
+    }
+  }
+}

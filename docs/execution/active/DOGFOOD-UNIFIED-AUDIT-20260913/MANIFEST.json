@@ -1,0 +1,294 @@
+{
+  "observedAt": "2026-09-12T23:32:19.347658+00:00",
+  "head": "c9a81dc6b9bd77cd90bf09aa6998a94a2d482b0a",
+  "workingTree": "dirty; hashes pin current source, not HEAD-only content",
+  "auditKind": "bounded static tracing plus retained prior live evidence; no fresh execution",
+  "trackedCount": 6568,
+  "sourceTracedFiles": 25,
+  "domains": {
+    "alp-discipline": 13,
+    "assets": 1,
+    "deckent-hub": 66,
+    "design": 36,
+    "documentation": 771,
+    "examples": 3,
+    "fallback-rules": 1,
+    "follow-up-works": 4,
+    "host-or-repository-config": 343,
+    "native": 8,
+    "production/agent": 53,
+    "production/agents": 29,
+    "production/api": 45,
+    "production/cli": 268,
+    "production/connectors": 64,
+    "production/core": 598,
+    "production/dashboard": 139,
+    "production/desktop": 85,
+    "production/extensions": 4,
+    "production/index.ts": 1,
+    "production/intelligence": 15,
+    "production/mcp": 61,
+    "production/mcp-client": 4,
+    "production/monitor": 6,
+    "production/nervous": 34,
+    "production/orchestra": 253,
+    "production/providers": 23,
+    "production/sdk": 2,
+    "production/training": 4,
+    "proof": 15,
+    "repository-state-or-policy": 171,
+    "root-config-and-docs": 26,
+    "scripts": 172,
+    "tests/agent": 97,
+    "tests/agents": 53,
+    "tests/analytics": 4,
+    "tests/api": 112,
+    "tests/approvals": 3,
+    "tests/audit": 1,
+    "tests/audits": 1,
+    "tests/backends": 2,
+    "tests/blueprint": 4,
+    "tests/brain": 1,
+    "tests/build": 2,
+    "tests/catalog": 4,
+    "tests/cli": 732,
+    "tests/config": 4,
+    "tests/connectors": 95,
+    "tests/core": 693,
+    "tests/dashboard": 85,
+    "tests/docker": 4,
+    "tests/docs": 34,
+    "tests/e2e": 30,
+    "tests/extensions": 4,
+    "tests/fixtures": 6,
+    "tests/github": 5,
+    "tests/governance": 11,
+    "tests/helpers": 19,
+    "tests/hermeticity": 5,
+    "tests/integration": 38,
+    "tests/intelligence": 10,
+    "tests/kpi": 13,
+    "tests/load": 2,
+    "tests/mcp": 87,
+    "tests/mcp-client": 3,
+    "tests/monitor": 19,
+    "tests/native": 1,
+    "tests/nervous": 63,
+    "tests/orchestra": 812,
+    "tests/providers": 51,
+    "tests/release": 6,
+    "tests/root": 3,
+    "tests/scripts": 107,
+    "tests/sdk": 3,
+    "tests/security": 7,
+    "tests/skills": 1,
+    "tests/smoke": 1,
+    "tests/training": 5,
+    "tests/unit": 4,
+    "tests/workflows": 3
+  },
+  "unresolvedReferencePaths": [],
+  "artifacts": [
+    {
+      "path": "src/cli/commands/start.ts",
+      "sha256": "f64410a0094ab437e3f5a5c0b930ec200550c4aea746f788b7bd6b1c0fd960d8",
+      "bytes": 73516
+    },
+    {
+      "path": "src/cli/helpers/exact-sprint-runtime.ts",
+      "sha256": "3d495b774b68a17589e1014d7477925d647a55a5b903e764b4ede7fb5aa4898c",
+      "bytes": 5751
+    },
+    {
+      "path": "src/orchestra/exact-plan-start-service.ts",
+      "sha256": "adaffa8c7f716bb34a082ca73b9f168557143357425a1115e074ecc4af2d4110",
+      "bytes": 60735
+    },
+    {
+      "path": "src/orchestra/sprint-controller.ts",
+      "sha256": "7cf1f955d385a39aa564281b869787621eb438e213203a0da25c47fbf63e5925",
+      "bytes": 193984
+    },
+    {
+      "path": "src/orchestra/run-proposal-compiler.ts",
+      "sha256": "82aa73128e417f406699160bb87edf55ca2e03196ba326b403f5f2194d636732",
+      "bytes": 25484
+    },
+    {
+      "path": "src/orchestra/spawn-backend.ts",
+      "sha256": "d424c276b7f1aeef530478433ce6d44db2bddeb56151a2d8343d7d3e43269002",
+      "bytes": 64644
+    },
+    {
+      "path": "src/orchestra/spawn-backend-docker.ts",
+      "sha256": "be2f8c5db8e408d2b19c923f01b17b56b94b830208f6eb97780f4fcd90bbf218",
+      "bytes": 1107742
+    },
+    {
+      "path": "src/core/run-status-read-model.ts",
+      "sha256": "108fa5054de652f9cd3bb2e2cb4a52d01278f95a1824cc9563d061a7cc49ab02",
+      "bytes": 21113
+    },
+    {
+      "path": "src/cli/commands/status.ts",
+      "sha256": "b8a7f15166c5a18f0323c4594511c14e2f5fb06594370bfa00a723d697afc428",
+      "bytes": 64986
+    },
+    {
+      "path": "src/cli/helpers/run-state-feed.ts",
+      "sha256": "06c8b75f7a612bc0a007ab1496e2baac1b4f67d59809aded99773033ea320ddf",
+      "bytes": 23901
+    },
+    {
+      "path": "src/mcp/tools/status.ts",
+      "sha256": "fb7474ff5c8bb09aa4b85a06de5fbbcc9083eb8919b6954ee865eafcf8b69a16",
+      "bytes": 24991
+    },
+    {
+      "path": "src/api/status-reconcile.ts",
+      "sha256": "35f468c0682f765e856169dbac83de168d7a96147203bf4c5f51ecfffec9372a",
+      "bytes": 8759
+    },
+    {
+      "path": "src/desktop/src/renderer/shell/api-client.ts",
+      "sha256": "df1d18226a2d35f1f25b1b66d84fb525c0244fc3008f363c946fb83b672fad94",
+      "bytes": 23813
+    },
+    {
+      "path": "src/desktop/src/renderer/shell/RunsView.tsx",
+      "sha256": "6181d88f0f37b20e68d46eac080e88ca53584059bddd8d849e023850fbb1730f",
+      "bytes": 4541
+    },
+    {
+      "path": "src/api/run-flow-event-stream.ts",
+      "sha256": "b70409c4faa390c840044d25eed1797d1f8b307afc5b132955e0292228df8a4c",
+      "bytes": 11139
+    },
+    {
+      "path": "src/api/run-flow-routes.ts",
+      "sha256": "6a4d75265f1cab053b44f101d2279558bea8946726abcc9c46e026547e66ca7a",
+      "bytes": 26153
+    },
+    {
+      "path": "src/orchestra/run-flow-coordinator.ts",
+      "sha256": "545c090667cfefa45777efad50651e2e2336dba57607c285f12697f1b83b21a4",
+      "bytes": 39943
+    },
+    {
+      "path": "src/api/tenant-scope.ts",
+      "sha256": "6b194a50879ad646fc8f8e7076323140a125bfca1b0cacdaa9d8072c9495ed6a",
+      "bytes": 3640
+    },
+    {
+      "path": "src/api/autonomous-endpoint.ts",
+      "sha256": "d57a60e0d9a8b03fb00c38997c6d5df857cf98e3db9b9549e2a2682fac5a0615",
+      "bytes": 12888
+    },
+    {
+      "path": "src/nervous/bootstrap.ts",
+      "sha256": "689d38e7438534885c6d81ca4b7bbae6faf6a518a0a87642034a16ee6fd3a8df",
+      "bytes": 17165
+    },
+    {
+      "path": "src/mcp/tools/approvals.ts",
+      "sha256": "a5b16934fe168fc6b6bcc92f1bfb55b4cac7aca0d4d90e9f51b9bd3cbe1ce4fa",
+      "bytes": 7262
+    },
+    {
+      "path": "src/mcp/tools/start.ts",
+      "sha256": "c93c275dfb3e660529b0edc16624e41d59e95d244c676702308f230a81a3ef4e",
+      "bytes": 34658
+    },
+    {
+      "path": "src/orchestra/autonomous/mission-store/mission-engine-wire.ts",
+      "sha256": "4c608f106800935257d69d6afac7372f5fca4714929b4f6da6a312cdb6e83e97",
+      "bytes": 29469
+    },
+    {
+      "path": "src/orchestra/autonomous/execute-dispatcher.ts",
+      "sha256": "9c9bc2568234dec53708d37e63d3b8c7ecb48c1bf2d25a9ee191e5ab4506743b",
+      "bytes": 42938
+    },
+    {
+      "path": "src/orchestra/process-runtime.ts",
+      "sha256": "f065cdabca9cd0f2d40418963f82b3e6a55905b975a4f3205b6eec01ba723d34",
+      "bytes": 14576
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/dogfood-canary-752/RESULT.md",
+      "sha256": "56dd4111630e8c874c6f27b3d3e0d8099108398737470cbfee3783fb4d05bf80",
+      "bytes": 2489
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/dogfood-canary-752/MANIFEST.json",
+      "sha256": "1f4884308431c84da39aa6b73db59d4077860c0862ba6aa5e917c209f84d1eac",
+      "bytes": 1181
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1-released-unaccepted/RESULT.md",
+      "sha256": "00d546a50454c6f5c67d70de4394ce49ddff52b13a15ad3a0339576031f7fc25",
+      "bytes": 3893
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1-released-unaccepted/MANIFEST.json",
+      "sha256": "cf0d499e9dd363f1d69082a3056d576438d4270c49ae78d97d579d49764c35f5",
+      "bytes": 3286
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1e-manifest-sharing/RESULT.md",
+      "sha256": "9f6f9bdd301505230a74e69ad64574b83905ffe75cf66501aa3738928db4151e",
+      "bytes": 1849
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1e-manifest-sharing/MANIFEST.json",
+      "sha256": "e1f2008a0d557f7c9c47648767bb05d09bf9fb2a43d4df14f28b31482847f8b6",
+      "bytes": 1473
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1e-read-amplification/RESULT.md",
+      "sha256": "ee11ae94ceba261f808567b4d6d0ce0b6e1f60ed0d9d633607c6f3d396115d48",
+      "bytes": 2622
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1e-read-amplification/MANIFEST.json",
+      "sha256": "953b599853680e0013f62cd85316809f3476ceb1c01189c7a4d1787ba42e3af5",
+      "bytes": 1876
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1-image/RESULT.md",
+      "sha256": "743c0850e225fd12f1106bb192df9fbde20ec6222fd18011f65490332aeeb978",
+      "bytes": 2623
+    },
+    {
+      "path": "docs/execution/evidence/astra-recovery-20260912/r1-image/MANIFEST.json",
+      "sha256": "ad0d8ce5ff43ff5713d64d0a08a0e619e95a3510c159a3717f1aefd3303103cb",
+      "bytes": 3090
+    },
+    {
+      "path": "docs/execution/active/DOGFOOD-UNIFIED-AUDIT-20260913/PLAN.md",
+      "sha256": "fe9cbb90cf0892cd062f542c77e4e881d1d361a03679e5bd103e1841d44b57d3",
+      "bytes": 3434
+    },
+    {
+      "path": "docs/execution/active/DOGFOOD-UNIFIED-AUDIT-20260913/REPORT.md",
+      "sha256": "d5447f266e42a0a4e0ab4c0bf095dc7932e52dd3add84cf77d722ade7669dde4",
+      "bytes": 18282
+    },
+    {
+      "path": "docs/execution/active/DOGFOOD-UNIFIED-AUDIT-20260913/INVENTORY.jsonl",
+      "sha256": "ea9bf1c4c75e9658d05ee6f708c0795fd5a8f73a8b7fd64c36de80995593ea37",
+      "bytes": 1054427
+    },
+    {
+      "path": "docs/execution/active/DOGFOOD-UNIFIED-AUDIT-20260913/UNTRACKED.json",
+      "sha256": "1d36b9daade2208b188f219ffeff99fd9524460ee3e2ad349ce1d089175e45f3",
+      "bytes": 4437
+    }
+  ],
+  "limits": [
+    "Inventory does not imply whole-file review.",
+    "No live cross-platform or all-surface validation in this audit.",
+    "Credentials and raw memory DB excluded.",
+    "No tests, builds, runs, cleanup, product edits, commit or push in this audit."
+  ]
+}

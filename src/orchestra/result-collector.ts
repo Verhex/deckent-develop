@@ -1,3 +1,4 @@
+import { isResumableTaskAuthorityHold } from './task-result-authority.js';
 // ═══ Result Collector ═════════════════════════════════════════════
 // Extracted from sprint-controller.ts — result collection, queue management,
 // and worker prompt resolution for queue processing.
@@ -1342,6 +1343,7 @@ export async function waitForResults(
   timeoutMs?: number,
   queue?: Task[],
   spawnOpts?: {
+    canAdmitDispatch?: () => boolean;
     autoApprove?: boolean;
     spawnBackend?: SpawnBackend;
     attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
@@ -1389,6 +1391,10 @@ export async function waitForResults(
   // born-452 tick-armor: a same-error escalation ceiling — see the main loop below.
   const MAX_CONSECUTIVE_SAME_TICK_ERRORS = 5;
   const startTime = Date.now();
+  const inheritedAdmissionGate = spawnOpts?.canAdmitDispatch;
+  const canAdmitDispatch = (): boolean => (unlimited || Date.now() - startTime < timeout)
+    && inheritedAdmissionGate?.() !== false;
+  spawnOpts = { ...spawnOpts, canAdmitDispatch };
   let lastProgressLog = startTime;
   const results: TaskResult[] = [];
   const appendCommittedResult = (result: TaskResult): void => {
@@ -1401,6 +1407,29 @@ export async function waitForResults(
   const taskMap = new Map(sprint.tasks.map(t => [t.id, t]));
   const collected = new Set<string>();
   const authorityFailedTaskIds = new Set<string>();
+  const held = new Set<string>();
+  const recordResumableHold = (taskId: string, authority: TaskResultAuthorityRead<TaskResult>): boolean => {
+    if (!isResumableTaskAuthorityHold(authority)) return false;
+    held.add(taskId);
+    const task = taskMap.get(taskId);
+    if (task) task.status = TaskStatus.PAUSED;
+    recordTaskAuthorityHold(taskId);
+    return true;
+  };
+  const allCollectedOrHeld = (): boolean => [...taskIds].every(id => collected.has(id) || held.has(id));
+  const blockedByHeld = (): Set<string> => {
+    const blocked = new Set(held);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const task of sprint.tasks) {
+        if (blocked.has(task.id) || collected.has(task.id) || task.status !== TaskStatus.PENDING) continue;
+        if (task.dependencies.some(id => blocked.has(id))) { blocked.add(task.id); changed = true; }
+      }
+    }
+    return blocked;
+  };
+
   const recordTaskAuthorityHold = (taskId: string): void => {
     if (authorityFailedTaskIds.has(taskId)) return;
     authorityFailedTaskIds.add(taskId);
@@ -1708,6 +1737,8 @@ export async function waitForResults(
         newlyCollected.push(taskId);
         continue;
       }
+      if (recordResumableHold(taskId, authority)) continue;
+      held.delete(taskId);
       let collectorRead: CollectorResultRead;
       try { collectorRead = readCollectorResult(authority, taskId); }
       catch (error) {
@@ -2062,6 +2093,7 @@ export async function waitForResults(
   // escape hatch — operators can re-pin the old wave-barrier semantics
   // by setting the env var without changing any source code.
   const maybeRespawn = async (): Promise<void> => {
+    if (!canAdmitDispatch()) return;
     if (process.env.DECKENT_LEGACY_FIFO === '1') return;
     if (!config?.dependency_pipeline_enabled) return;
     // The heavyweight respawn path cannot yet filter by provider. Once one
@@ -2198,6 +2230,7 @@ export async function waitForResults(
   // task was already TASK_ASSIGN'd, this is a no-op.
   // Returns true when a new spawn was emitted, false on guard hit or error.
   const spawnIfNotAssigned = async (nextTask: Task): Promise<boolean> => {
+    if (!canAdmitDispatch()) return false;
     if (assignedTaskIds.has(nextTask.id)) return false;
     if (providerDispatchHolds.has(resolveTaskProvider(nextTask))) return false;
     const collisionBlockers = findActiveWriteCollisions(nextTask, sprint.tasks, collected);
@@ -2349,6 +2382,7 @@ export async function waitForResults(
     } catch (e) { debugLog('collectResults:taskBudgetHold', e); }
   };
   const drainNervousRespawns = async (): Promise<void> => {
+    if (!canAdmitDispatch()) return;
     if (!config?.nervous_system?.worker_respawn) return;
     for (const reqTaskId of drainRespawnRequests(projectRoot)) {
       const task = taskMap.get(reqTaskId);
@@ -2397,9 +2431,11 @@ export async function waitForResults(
       const nextTask = pickFromQueue(remainingQueue, assignedTaskIds);
       if (!nextTask) break; // queue exhausted — preserve "no kill when no work" contract
       try {
-        const lifecycleOwner = resolveTaskLifecycleOwner(taskId);
-        if (lifecycleOwner) lifecycleOwner.kill(taskId);
-        else killWorker(taskId);
+        if (!spawnOpts?.exactDockerRegistry?.isExactTask(taskId)) {
+          const lifecycleOwner = resolveTaskLifecycleOwner(taskId);
+          if (lifecycleOwner) lifecycleOwner.kill(taskId);
+          else killWorker(taskId);
+        }
       } catch (e) { debugLog('processQueue:killWorker', e); }
       await spawnIfNotAssigned(nextTask);
     }
@@ -2616,6 +2652,10 @@ export async function waitForResults(
    * deadlock because parked tasks intentionally have no synthetic result.
    */
   const shouldYieldToDependencyRepair = (): boolean => {
+    if (held.size > 0) {
+      const blocked = blockedByHeld();
+      if ([...taskIds].every(id => collected.has(id) || blocked.has(id))) return true;
+    }
     const unfinished = sprint.tasks.filter(task => !collected.has(task.id));
     const inFlightCount = sprint.tasks.filter(task =>
       task.status === TaskStatus.EXECUTING
@@ -2713,7 +2753,7 @@ export async function waitForResults(
       const maxWorkers = config ? resolveEffectiveWorkers(config, getSystemProfile()) : 0;
       return Math.max(0, maxWorkers - currentlyExecuting);
     },
-    getCostStop: () => runBudgetHold || (costGuard?.shouldStopDispatch() ?? false),
+    getCostStop: () => !canAdmitDispatch() || runBudgetHold || (costGuard?.shouldStopDispatch() ?? false),
     spawnDeps: {
       projectRoot,
       sprintFallbackId: sprint.id,
@@ -2730,6 +2770,10 @@ export async function waitForResults(
         : {}),
     },
     killWorker: (taskId: string) => {
+      // Collected exact attempts already crossed their backend-owned settlement
+      // boundary. Legacy completed-task cleanup must not issue a second kill.
+      if (!canAdmitDispatch()) return;
+      if (collected.has(taskId) && spawnOpts?.exactDockerRegistry?.isExactTask(taskId)) return;
       const lifecycleOwner = resolveTaskLifecycleOwner(taskId);
       if (lifecycleOwner) lifecycleOwner.kill(taskId);
       else killWorker(taskId);
@@ -2775,7 +2819,7 @@ export async function waitForResults(
   await cascadeSkipDeadBlocked();
   await finalizeShadowTick(shadowTickInitial);
   if (shouldYieldToDependencyRepair()) return results;
-  if (collected.size === taskIds.size) return results;
+  if (allCollectedOrHeld()) return results;
 
   // IPC dual-mode: register HEARTBEAT listeners for any channels in registry
   const ipcWakeup = { resolve: (_: void) => {}, pending: false };
@@ -2891,7 +2935,7 @@ export async function waitForResults(
         // NOT_DISPATCHED via the existing deadline path. Inert when the guard is
         // disabled (costGuard undefined → the condition is always true), so the
         // default dispatch sequence below is byte-for-byte unchanged.
-        if (!runBudgetHold && (!costGuard || !costGuard.shouldStopDispatch())) {
+        if (canAdmitDispatch() && !runBudgetHold && (!costGuard || !costGuard.shouldStopDispatch())) {
           // SCHED5: same injected schedulerDriver as the initial tick above
           // (see its construction comment). Legacy engine runs the exact
           // ADR-064/Sprint 165/Sprint 272 sequence below unchanged; reducer
@@ -2943,7 +2987,7 @@ export async function waitForResults(
           throw tickErr instanceof Error ? tickErr : new Error(signature);
         }
       }
-      if (collected.size === taskIds.size) break;
+      if (allCollectedOrHeld()) break;
       if (shouldYieldToDependencyRepair()) break;
       // born-562 — cost-guard completion: once the guard has stopped new
       // dispatch, complete as soon as every already-dispatched (in-flight) task
@@ -2983,7 +3027,7 @@ export async function waitForResults(
           ? new Set([...taskIds].filter(taskId => !spawnOpts.isExactTaskAuthority!(taskId)))
           : new Set<string>();
         const exactCollected = new Set(
-          [...collected].filter(taskId => exactTaskIds.has(taskId)),
+          [...collected, ...held].filter(taskId => exactTaskIds.has(taskId)),
         );
         if (exactTaskIds.size > 0 && !spawnOpts.resolveExactAttemptIpcAuthority) {
           throw createExecutionAuthorityError(
@@ -3032,8 +3076,10 @@ export async function waitForResults(
             debugLog('waitForResults:exactIpcProjectionHoldEvent', error);
           }
         }
-        if (report.holds.length > 0) {
-          const hold = report.holds[0]!;
+        const unresolvedIpcHolds = report.holds.filter(hold =>
+          !recordResumableHold(hold.taskId, readResultAuthority(hold.taskId)));
+        if (unresolvedIpcHolds.length > 0) {
+          const hold = unresolvedIpcHolds[0]!;
           // Completion may have retired the private IPC authority after a capture
           // failure. Preserve the canonical result failure before the IPC symptom.
           const resultAuthority = readResultAuthority(hold.taskId);
@@ -3101,6 +3147,8 @@ export async function waitForResults(
         collected.add(taskId);
         continue;
       }
+      if (recordResumableHold(taskId, finalAuthority)) continue;
+      held.delete(taskId);
       const finalRead = readCollectorResult(finalAuthority, taskId);
       if (finalRead.result) {
         const result = finalRead.result;

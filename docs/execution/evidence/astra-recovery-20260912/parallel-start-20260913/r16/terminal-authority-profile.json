@@ -1,0 +1,14 @@
+{
+  "startedAt": "2026-09-14T08:55:37.578Z",
+  "endedAt": "2026-09-14T08:56:19.550Z",
+  "elapsedMs": 41971.269464000005,
+  "cpu": {
+    "user": 38196691,
+    "system": 6268717
+  },
+  "maxRSSKiB": 874512,
+  "state": "current",
+  "reason": null,
+  "verdict": "DONE",
+  "kind": "readonly-production-terminal-authority-single-call"
+}

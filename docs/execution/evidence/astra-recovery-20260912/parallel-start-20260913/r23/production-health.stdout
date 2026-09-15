@@ -1,0 +1,54 @@
+{
+  "utc": "2026-09-14T15:07:56.718Z",
+  "elapsedMs": 346925.041472,
+  "health": {
+    "state": "ready",
+    "unresolved": [],
+    "recoveryListReceiptDigest": "sha256:54f124e0a438036b07d2b7888f040665990db43f2e41c2607cf45a0f03c02235"
+  },
+  "status": {
+    "schemaVersion": 1,
+    "lifecycle": "ABORTED",
+    "active": false,
+    "resumable": false,
+    "sprintId": "sprint-762",
+    "phase": "EXECUTE",
+    "status": "ABORTED",
+    "reason": null,
+    "recoveryCommand": null,
+    "finalizeCommand": null,
+    "coordinator": "absent",
+    "conflicts": [],
+    "recoveryReconciliation": {
+      "version": 1,
+      "sprintId": "sprint-762",
+      "evidence": {
+        "checkpointPresent": false,
+        "terminalReceipt": {
+          "version": 1,
+          "sprintId": "sprint-762",
+          "runId": "sprint-762",
+          "coordinatorGeneration": 2,
+          "terminalOutcome": "ABORTED",
+          "logicalSettlementDigest": "2bc0eba8d9580f1dbd3b2a57842265312333ef8124163d2cd673be8803b1d97b",
+          "priorAuthorityVersion": 0,
+          "authorityVersion": 1
+        },
+        "terminalReceiptConflict": null
+      },
+      "state": "consistent",
+      "mismatch": null,
+      "remediation": null
+    }
+  },
+  "maintenance": {
+    "state": "absent"
+  },
+  "memory": {
+    "rss": 3939803136,
+    "heapTotal": 234278912,
+    "heapUsed": 98261528,
+    "external": 42708241,
+    "arrayBuffers": 25650690
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "utc": "2026-09-14T17:09:34.630591+00:00",
+  "files": {
+    "run-command.py": "ad78b0da3f647056bec726a0be6cec27b8071c3347236c2d2821e85135722cdd",
+    "post-finalize-attempts.json": "27d2ad63996d83acfc547d37eaf8e8aa15b745235aeaa034e89fff1083f87f9e",
+    "finalize.json": "b9e5bbcaba71569a92629771a28a91cb7d165735e83acf5a622c8bf1302dcefd",
+    "attempts.stdout": "8dbf4abe3cd7958213ad0d6b8743803baf0384380d36472bd6494a0df85873ec",
+    "RESULT.md": "9237654e2c1688ace321bf926a397d25c987efec3a13497f2c630ce1cfdd431c",
+    "status.json": "2902c9b4b055b6e94354b82dd015cec2be61cdad20444646298acf6c50f24f1f",
+    "finalize.stdout": "d0e7fc5a1e5f151ce59b6d23b02c180a0805127e53803ea961f627614396c123",
+    "finalize.stderr": "f5028817f0cfa8828d2849c71180b5459916a3bccc7402c20561a36b7afa0246"
+  }
+}

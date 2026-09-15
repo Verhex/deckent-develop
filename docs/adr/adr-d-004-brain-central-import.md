@@ -163,3 +163,11 @@ pending those.
 - **Cross-ref:** ADR-D-006 (the god-object split created the Brain-family organs) · ADR-G-014 (Spawn Backend — provider-adapter wrapping) · ADR-G-008 (provider adapters) · ADR-027→ADR-G-014 (hybrid spawn) · ADR-094 (enforcement-engine flag-gated vein) · ADR-G-019 (ADR-D contributor convention under the taxonomy) · LOCALE-W / ADR-G-004 (i18n-architecture — the `messages.ts` relocation, W9).
 - **Born work-items:** ADR-008-W · CORE-W1 · ORCH-W1 · API-W1 (LAYER-1 inversion cleanup) · D004-W9 (MESSAGES-CORE i18n root-cause) · D004-W5 (exception-registry data-file) · D004-W6 (hard graph gate + full-edge scan) · D004-W7 (shim audit) · D004-W8 (capability relocation, candidate).
 - **Direction / anchoring:** `CLAUDE.md` and `docs/reference/api-surface.md` (Module Import Rules); `src/orchestra/authority-enforcer.ts` (`checkAdr008` — the live core→orchestra check).
+
+## Amendment (2026-09-15) — refactor-cutover baseline re-anchor
+
+**Status:** accepted (owner Alperen).
+
+`DECISION_REF=owner-live-2026-09-15-refactor-cutover-dogfood-off`. The maintained graph had outgrown the July ratchet anchor and main failed the gate. The owner authorized re-anchoring the measurement baseline at the refactor cutover: 90 atoms / 17 SCCs → 90 atoms / 20 SCCs. Delta evidence: `docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r45/LAYER-SHIMS-DELTA.json`; original baseline preserved alongside it.
+
+The shrink command was attempted first and refused because new crossing atoms existed; its failure is preserved in layer-shims-shrink.log. Only the baseline key was removed before the canonical --init-baseline writer regenerated it. No shim exception, topology, authority, ownership, sourcePolicy or manifestContract changed. Contracts C1–C4 remain unchanged; this moves the measurement anchor, not the architectural obligations. Refactor layering milestones must shrink this baseline; subsequent growth remains fail-closed. No product closure or debt resolution is claimed.

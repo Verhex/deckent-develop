@@ -169,7 +169,7 @@ describe('readline / line degradation — numbered lines and typed-argument reso
   it('pickerLinesFor renders title, numbered rows with facts and state, and the typed hint', () => {
     const lines = pickerLinesFor(SPEC, EN, resolvePickerGlyphs(true), '/model');
     expect(lines[0]).toBe(EN.title.model);
-    expect(lines[1]).toBe('  1) claude-fable-5-1  claude · premium  [current]');
+    expect(lines[1]).toBe('  1) claude-fable-5-1  claude | premium  [current]');
     expect(lines[3]).toBe(`  3) gpt-5.6-sol  openai  [blocked: ${EN.blocked['MODEL_INACTIVE']}]`);
     expect(lines[lines.length - 1]).toBe(EN.typedHint.replace('{command}', '/model'));
   });

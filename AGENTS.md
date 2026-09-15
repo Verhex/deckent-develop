@@ -11,7 +11,7 @@
 
 <!-- DECKENT-DEV-CONTROL:START -->
 SCHEMA_VERSION=1
-DOGFOOD_MODE=ON
+DOGFOOD_MODE=OFF
 WORKSPACE_MODE=MAIN
 DELIVERY_MODE=DIRECT_MAIN
 PR_REQUIRED=false
@@ -21,7 +21,7 @@ LOCAL_VERIFICATION_MODE=REQUIRED
 EXECUTION_AUTHORITY=CODEX
 ANALYSIS_AUTHORITY=CODEX
 OWNER_AUTHORITY=ALPEREN
-DECISION_REF=owner-live-2026-08-23-repo-hygiene-complete-dogfood-on
+DECISION_REF=owner-live-2026-09-15-refactor-cutover-dogfood-off
 <!-- DECKENT-DEV-CONTROL:END -->
 
 > Yukarıdaki blok aktif repo-development mode değerlerinin TEK persisted projection'ıdır
@@ -256,3 +256,18 @@ enjekte edilmez; worker persona authority'si `.deckent/agents/<id>/PROMPT.md` zi
 ## Live Status
 Canlı sprint, debt, agent performance ve ADR durumu için: `.brain/exports/summary.md` (auto-generated her sprint sonu).
 Komutlar: `deckent status`, `deckent history`, `deckent retro`, `deckent recall "<sorgu>"`.
+
+## Codex oturum verimliliği (owner-approved 2026-09-13)
+
+- Her oturum bir somut outcome etrafında ilerler. İlgisiz yeni outcome için mevcut işin güvenli
+  kapanışından sonra yeni oturum kullan; sırf context büyüdü diye işi yarıda bırakma.
+- Devam eden işte authority transfer gerekiyorsa `deckent-versioned-handoff` protokolünü uygula.
+  Tamamlanan iş sonrası kısa sonuç/kanıt/sonraki iş özeti yeterlidir; özet execution authority değildir.
+- Değişmeyen authority ve büyük belgeleri aynı oturumda tekrar bütünüyle yükleme. Kaynak değişimini
+  kontrol et, ilgili bölüm ve dependency'leri oku; belirsizlik varsa kapsamı genişlet.
+- Astra için host varsayılanı `medium` ve Standard'dır; zor muhakemede `high` ihtiyaç bazlı seçilir.
+  Bu host tercihi Deckent worker/Brain effective routing policy'sini değiştirmez.
+- Token/output/task bütçesi nedeniyle otomatik erken bitiş ekleme. Büyük çıktıları görev odaklı
+  sorgularla oku; gerekli kanıtı veya doğrulamayı atlama.
+- Deckent, GitHub ve OpenAI Docs yeteneklerini koru. İlgisiz skill/plugin'i sırf mevcut diye yükleme;
+  proje için devre dışı bırakılan bir yetenek gerçekten gerektiğinde adını ve ihtiyacı açıkça belirt.

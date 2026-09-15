@@ -283,12 +283,15 @@ export interface ExactAttemptIpcPrivateAnswerPublisher {
   }): ExactAttemptIpcPrivateAnswerPublication;
 }
 
+export type ExactAttemptIpcTransientCause = 'CUSTODY_READ_DEADLINE';
+
 export type ExactAttemptIpcQuestionAuthorityState =
   | {
       readonly state: 'question-ready';
       readonly authority: ExactAttemptIpcQuestionAuthority;
       readonly answerPublisher: ExactAttemptIpcPrivateAnswerPublisher;
     }
+  | { readonly state: 'unavailable'; readonly taskId: string; readonly transient: true; readonly cause: ExactAttemptIpcTransientCause }
   | { readonly state: 'absent'; readonly identity: TaskAttemptCustodyIdentityV2 }
   | {
       readonly state: 'answered';
@@ -313,6 +316,7 @@ export interface ExactAttemptIpcCheckReport {
   /** Compatibility read-model debt only. These observations never override
    * private delivery authority or become a task execution HOLD. */
   readonly projectionHolds: ExactAttemptIpcProjectionHold[];
+  readonly unavailable?: Array<{ readonly taskId: string; readonly transient: true; readonly cause: ExactAttemptIpcTransientCause }>;
 }
 
 export interface ExactAttemptIpcProjectionHold {
@@ -879,6 +883,14 @@ function snapshotExactAttemptIpcAuthorityState(
     || stateDescriptor.enumerable !== true
   ) throw new ExactAttemptIpcHold('PRIVATE_IPC_AUTHORITY_UNAVAILABLE');
   const state = stateDescriptor.value;
+  if (state === 'unavailable') {
+    if (!isExactDataRecord(value, ['state', 'taskId', 'transient', 'cause'])
+      || value['taskId'] !== expectedTaskId || value['transient'] !== true
+      || value['cause'] !== 'CUSTODY_READ_DEADLINE') {
+      throw new ExactAttemptIpcHold('PRIVATE_IPC_AUTHORITY_UNAVAILABLE');
+    }
+    return Object.freeze({ state, taskId: expectedTaskId, transient: true, cause: 'CUSTODY_READ_DEADLINE' });
+  }
   if (state === 'not-dispatched') {
     if (
       !isExactDataRecord(value, ['state', 'taskId', 'attemptCount'])
@@ -1886,6 +1898,7 @@ export async function checkExactAttemptWorkerQuestions(
     notDispatched: [] as string[],
     holds: [] as Array<{ taskId: string; reasonCode: ExactAttemptIpcHoldReason }>,
     projectionHolds: [] as ExactAttemptIpcProjectionHold[],
+    unavailable: [] as Array<{ taskId: string; transient: true; cause: ExactAttemptIpcTransientCause }>,
   };
   const registryState = requireExactAttemptIpcTransientRegistry(
     options.transientRegistry,
@@ -1908,6 +1921,11 @@ export async function checkExactAttemptWorkerQuestions(
       continue;
     }
     const state = resolveExactAttemptIpcAuthoritySnapshot(options.resolveAuthority, taskId);
+    if (state.state === 'unavailable') {
+      report.pending.push(taskId);
+      report.unavailable.push({ taskId, transient: true, cause: state.cause });
+      continue;
+    }
     if (state.state === 'not-dispatched') {
       clearExactAttemptIpcTransientTask(entries, taskId);
       report.notDispatched.push(taskId);

@@ -12,8 +12,9 @@ audit finding does not admit an outcome or authorize implementation.
 
 ## Evidence method
 
-- Inventory every tracked file and assign each exactly one primary review domain. Classify
-  untracked, runtime, generated, large, and binary artifacts separately.
+- Inventory files relevant to the stated audit boundaries and follow their producer/consumer
+  dependencies. Inventory every tracked file only for a repository-wide audit. Classify relevant
+  untracked, runtime, generated, large, and binary artifacts separately; state coverage limits.
 - Trace claims through producer → durable state → consumer → entrypoint/ingress → effective
   policy/config. Distinguish production wiring from tests, mocks, fixtures, and documentation.
 - Read source and tests as evidence, but do not run tests, builds, Deckent flows, cleanup, recovery,

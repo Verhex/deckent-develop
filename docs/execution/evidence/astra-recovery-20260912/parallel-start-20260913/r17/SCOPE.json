@@ -1,0 +1,25 @@
+{
+  "kind": "ADR-D-007",
+  "identity": "R17-TERMINAL-READ-SNAPSHOT",
+  "outcome": "MASTER3178/parent120",
+  "dogfoodHealth": "DEGRADED",
+  "reason": "Single terminal revalidation40s; registered native host-proof missing blocks normal runtime repair admission. Existing approved recovery chain and current owner explicitly authorizes application then dogfood.",
+  "authorizedAt": "2026-09-14T09:25:06.701642+00:00",
+  "files": [
+    "src/orchestra/spawn-backend-docker.ts"
+  ],
+  "baselineSha256": "8abdb37d80fc20184d8cbc1b5e5e365226a42056b31c024f6f5845af66472b22",
+  "negative": [
+    "auth",
+    "runtime mutation",
+    "receipt mutation",
+    "native code",
+    "terminal lane",
+    "global cache",
+    "commit",
+    "push"
+  ],
+  "proof": "3 independent snapshot repeats + existing snapshot/security tests + tsc + built public read revalidator then real start",
+  "budget": "one implementation pass; no unchanged retry; existing100k entries/64MiB/10s envelope; no budget increase",
+  "return": "normal start dogfood after built public reader proof"
+}

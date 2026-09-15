@@ -50,6 +50,8 @@ import {
 } from '../core/task-attempt-custody-store.js';
 import {
   createExecutionEffectLandingJournalCapabilityV1,
+  readExecutionEffectLandingPartialJournalV1,
+  type ExecutionEffectLandingPartialJournalV1,
   type ExecutionEffectLandingJournalAdapterV1,
   type ExecutionEffectLandingJournalArtifactV1,
 } from './execution-effect-landing-coordinator.js';
@@ -739,6 +741,27 @@ export class ExecutionEffectStoreAdapterV1 {
 
   /** Read-only semantic proof for a committed journal whose resource release
    * and accepted-result stages have not been published. */
+  /** Read-only proof for an interrupted landing; deliberately does not create
+   * a committed recovery anchor or a terminal/accepted result. */
+  readPartialLandingJournal(transactionDigest: Sha256Digest): ExecutionEffectLandingPartialJournalV1 | null {
+    const ready = this.#readLifecyclePublication('READY_FOR_LANDING');
+    if (!ready) return null;
+    const proof = readExecutionEffectLandingPartialJournalV1({ transactionDigest, journal: this.journal });
+    if (proof.state !== 'PARTIAL_JOURNAL') return null;
+    const transaction = proof.prepared.transaction;
+    if (transaction.projectId !== this.#identity.projectId
+      || transaction.taskId !== this.#identity.taskId
+      || transaction.attemptId !== this.#identity.attemptId
+      || transaction.generation !== this.#identity.generation
+      || transaction.attemptDigest !== ready.authority.workspaceSnapshot.attemptDigest
+      || transaction.baselineManifestDigest !== ready.authority.baselineManifest.digest
+      || transaction.finalManifestDigest !== ready.authority.finalManifest.digest
+      || transaction.containmentDecisionDigest !== ready.authority.decision.decisionDigest) {
+      throw new TypeError('Partial landing journal differs from durable READY authority');
+    }
+    return proof;
+  }
+
   readCommittedReleasePendingEvidence(): TaskAttemptCustodyEffectCommittedReleasePendingEvidenceV2 | null {
     if (this.readLatestReleaseProgress() !== null) return null;
     return this.#readCommittedJournalEvidence('COMMITTED_JOURNAL_RELEASE_PENDING');

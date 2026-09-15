@@ -213,6 +213,28 @@ function writeOriginalTask(root: string, task: Task): void {
   writeFileSync(join(root, '.tasks', `task-${task.id}.json`), JSON.stringify(task, null, 2), 'utf-8');
 }
 
+describe('execute admission cutoff', () => {
+  it('refuses a closed dispatch window before prompt, provider or task mutation', async () => {
+    const root = makeTmpDir('sched-deadline');
+    try {
+      const task = makeTask('deadline-unrun');
+      const before = JSON.stringify(task);
+      const backend = makeMockBackend();
+      const prompt = vi.fn(async () => 'must not compile');
+      const result = await executeSpawnTask({ task }, baseDeps(root, {
+        backend, resolveAgentPrompt: prompt,
+        spawnOpts: { canAdmitDispatch: () => false },
+      }));
+      expect(result).toMatchObject({ kind: 'not-dispatched', reasonCode: 'EXECUTE_DISPATCH_WINDOW_CLOSED' });
+      expect(prompt).not.toHaveBeenCalled();
+      expect(backend.calls).toHaveLength(0);
+      expect(backend.kill).not.toHaveBeenCalled();
+      expect(JSON.stringify(task)).toBe(before);
+      expect(existsSync(join(root, '.tasks', `task-${task.id}.json`))).toBe(false);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+});
+
 describe('executeSpawnTask — provider-authority ingress', () => {
   let root: string;
 
@@ -880,7 +902,7 @@ describe('executeSpawnTask — exact normal-Docker publication order', () => {
     });
   });
 
-  it('keeps public task/receipt absent through prepare+dispatch and publishes only after RELEASED', async () => {
+  it.each(['ambiguous', 'preparation-hold'] as const)('keeps public task/receipt absent through dispatch including %s', async holdKind => {
     const task = makeTask('700-EXACT', {
       provider: 'claude',
       productionWiringApplicability: deriveProductionWiringApplicability({
@@ -1239,7 +1261,7 @@ describe('executeSpawnTask — exact normal-Docker publication order', () => {
       privateIdentity: ambiguousIdentity,
     };
     const ambiguousOutcome = {
-      kind: 'ambiguous' as const,
+      kind: holdKind,
       admissionRef: {
         ...zeroWorkOutcome.admissionRef,
         dispatchRequestId: ambiguousCustodyRef.dispatchRequestId,
@@ -1247,8 +1269,7 @@ describe('executeSpawnTask — exact normal-Docker publication order', () => {
       },
       custodyRef: ambiguousCustodyRef,
       reasonCode: 'MOUNT_RECONCILIATION_REQUIRED' as const,
-      reconciliationReceipt: { ref: digest, digest },
-      projectionFence: digest,
+      ...(holdKind === 'ambiguous' ? { reconciliationReceipt: { ref: digest, digest }, projectionFence: digest } : {}),
     };
     backend.prepareExactDockerCustody.mockResolvedValueOnce({
       kind: 'exact-docker-custody-prepared' as const,
@@ -1440,6 +1461,98 @@ describe('executeSpawnTask — exact normal-Docker publication order', () => {
       reasonCode: 'LANDING_PROPOSAL_CAPTURE_HOLD:PROPOSAL_MISSING:capture',
     });
     expect(backend.awaitExactDockerAcceptedResult).toHaveBeenCalledOnce();
+  });
+
+  it('re-reads held release evidence and rejects foreign or no-longer-current evidence without inventing a result', async () => {
+    const digest = `sha256:${'a'.repeat(64)}` as const;
+    const identity = { schemaVersion: 2 as const, backend: 'docker' as const,
+      projectRootSha256: 'b'.repeat(64), projectId: 'project-test',
+      taskId: '700-RELEASE-HOLD', attemptId: 'release-attempt', generation: 1 };
+    const query = { custodyRef: { dispatchRequestId: `dreq-${'c'.repeat(64)}`,
+      identity, admissionReceiptDigest: digest, admissionRefDigest: digest,
+      providerStartReceipt: { ref: digest, digest } },
+      releaseReceipt: { ref: digest, digest }, providerStartReceipt: { ref: digest, digest },
+      projectionFence: digest } as const;
+    const backend = makeMockBackend();
+    backend.awaitExactDockerAcceptedResult = vi.fn(async () => ({
+      kind: 'capture-hold' as const, reasonCode: 'EFFECT_RELEASE_HOLD' as const,
+      custodyRef: query.custodyRef, releaseReceipt: query.releaseReceipt, projectionFence: digest,
+    }));
+    const evidence = { classification: 'RECOVERABLE_EXHAUSTED' as const,
+      taskId: identity.taskId, attemptId: identity.attemptId, generation: 1,
+      admissionRefDigest: digest, replayReceiptDigest: digest, outcomeReceiptDigest: digest,
+      predecessorProgressDigest: digest, finalProgressDigest: digest,
+      code: 'RELEASE_VOLUME_DELETE_UNCONFIRMED' };
+    const readEvidence = vi.fn<NonNullable<SpawnBackend['readExactDockerReleaseHoldEvidence']>>(() => evidence);
+    backend.readExactDockerReleaseHoldEvidence = readEvidence;
+    const registry = createExactNormalDockerExecutionRegistry(root);
+    registry.registerReleased(identity.taskId, backend, query);
+    await expect(registry.awaitTaskResultAuthority(identity.taskId)).resolves.toMatchObject({
+      state: 'authority-hold', result: null, holdEvidence: evidence,
+    });
+    expect(registry.readExactHoldEvidence(identity.taskId)).toEqual(evidence);
+    readEvidence.mockReturnValue({ ...evidence, attemptId: 'foreign-attempt' });
+    expect(registry.readExactHoldEvidence(identity.taskId)).toBeNull();
+    expect(registry.readTaskResultAuthority(identity.taskId).holdEvidence).toBeUndefined();
+    readEvidence.mockReturnValue(null);
+    expect(registry.readTaskResultAuthority(identity.taskId)).toMatchObject({
+      state: 'authority-hold', result: null,
+    });
+    expect(registry.readTaskResultAuthority(identity.taskId).holdEvidence).toBeUndefined();
+  });
+
+  it('rehydrates cold release HOLD query, preserves contradictions and enforces containment', async () => {
+    const digest = `sha256:${'a'.repeat(64)}` as const;
+    const identity = { schemaVersion: 2 as const, backend: 'docker' as const,
+      projectRootSha256: 'b'.repeat(64), projectId: 'project-test',
+      taskId: 'cold-release', attemptId: 'attempt-cold', generation: 1 };
+    const query = { custodyRef: { dispatchRequestId: `dreq-${'c'.repeat(64)}`, identity,
+      admissionReceiptDigest: digest, admissionRefDigest: digest,
+      providerStartReceipt: { ref: digest, digest } }, releaseReceipt: { ref: digest, digest },
+      providerStartReceipt: { ref: digest, digest }, projectionFence: digest } as const;
+    const backend = makeMockBackend();
+    const evidence = { classification: 'RECOVERABLE_EXHAUSTED' as const,
+      taskId: identity.taskId, attemptId: identity.attemptId, generation: 1,
+      admissionRefDigest: digest, replayReceiptDigest: digest, outcomeReceiptDigest: digest,
+      predecessorProgressDigest: digest, finalProgressDigest: digest, code: 'RELEASE_VOLUME_DELETE_UNCONFIRMED' };
+    backend.readExactDockerReleaseHoldEvidence = vi.fn(() => evidence);
+    backend.reconcilePendingAttempts = vi.fn(async () => ({ adopted: [], closedNotDispatched: [],
+      closedAbsentAfterExit: [], retiredLanded: [], resumedContinuations: [], exactEntries: [],
+      held: [{ kind: 'spawn-backend-recovery-hold' as const, backend: 'docker' as const,
+        taskId: identity.taskId, dispatchRequestId: query.custodyRef.dispatchRequestId,
+        admissionRefDigest: digest, authorityState: 'RECOVERY_ENTRY_FAILED' as const,
+        reasonCode: 'ENTRY_RECONCILIATION_FAILED' as const, query }],
+    }));
+    backend.workerInventoryState = vi.fn(() => 'unknown');
+    const registry = createExactNormalDockerExecutionRegistry(root);
+    registry.registerHold(identity.taskId, 'initial-unavailable', backend);
+    await expect(registry.reconcileExactLifecycle('resume')).resolves.toHaveLength(1);
+    expect(registry.readTaskResultAuthority(identity.taskId)).toMatchObject({ state: 'authority-hold', holdEvidence: evidence });
+    expect(backend.readExactDockerReleaseHoldEvidence).toHaveBeenCalledWith(query);
+    await expect(registry.reconcileExactLifecycle('contain')).rejects.toThrow('EXACT_CONTAINMENT_INCOMPLETE');
+    backend.workerInventoryState = vi.fn(() => 'absent');
+    await expect(registry.reconcileExactLifecycle('contain')).resolves.toHaveLength(1);
+    registry.registerHold(identity.taskId, 'registry-conflict', backend, { holdClassification: 'AUTHORITY_CONTRADICTION' });
+    await expect(registry.reconcileExactLifecycle('resume')).rejects.toThrow('EXACT_LIFECYCLE_RESUME_HOLD');
+    expect(registry.readTaskResultAuthority(identity.taskId).holdClassification).toBe('AUTHORITY_CONTRADICTION');
+  });
+
+  it('excludes only proven terminal history from this run while preserving containment checks', async () => {
+    const backend = makeMockBackend();
+    backend.reconcilePendingAttempts = vi.fn(async () => ({ adopted: [], closedNotDispatched: [],
+      closedAbsentAfterExit: [], retiredLanded: [], resumedContinuations: [], exactEntries: [], held: [] }));
+    backend.workerInventoryState = vi.fn(() => 'absent');
+    const registry = createExactNormalDockerExecutionRegistry(root);
+    registry.registerHold('old-task', 'old-chain-conflict', backend, { holdClassification: 'AUTHORITY_CONTRADICTION' });
+    const scope = { currentTaskIds: new Set(['current-task']), isHistoricalForeignTask: (id: string) => id === 'old-task' };
+    await expect(registry.reconcileExactLifecycle('resume', scope)).resolves.toHaveLength(1);
+    expect(registry.readTaskResultAuthority('old-task').holdClassification).toBe('AUTHORITY_CONTRADICTION');
+    expect(registry.snapshotHistoricalUnsettleableAttempts().get('old-task')?.reasonCode).toBe('run-excluded-historical:old-chain-conflict');
+    await expect(registry.reconcileExactLifecycle('resume')).rejects.toThrow('EXACT_LIFECYCLE_RESUME_HOLD');
+    await expect(registry.reconcileExactLifecycle('resume', { ...scope, isHistoricalForeignTask: () => false })).rejects.toThrow('EXACT_LIFECYCLE_RESUME_HOLD');
+    await expect(registry.reconcileExactLifecycle('resume', { ...scope, currentTaskIds: new Set(['old-task']) })).rejects.toThrow('EXACT_LIFECYCLE_RESUME_HOLD');
+    backend.workerInventoryState = vi.fn(() => 'unknown');
+    await expect(registry.reconcileExactLifecycle('contain', scope)).rejects.toThrow('EXACT_CONTAINMENT_INCOMPLETE');
   });
 
   it('turns missing exact dependency authority into a durable registry HOLD', async () => {

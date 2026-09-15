@@ -1,0 +1,10 @@
+{
+  "observedAt": "2026-09-15T13:58:03.406063+00:00",
+  "sha256": {
+    "src/orchestra/result-collector.ts": "c6b3ea1bf634aa637061ee5d6ab5ba6fa57dfdfb525ebd519b50b34cb031e675",
+    "src/orchestra/sprint-controller.ts": "6f8e16dc5623dd9a9f870da45f7c01c5cd01b3fecd67553773cadcce37b5f7a0",
+    "src/orchestra/sprint-checkpoint.ts": "4c81280a2ed8092648acd06cb556c2d646e90c14d56df6e4620e9de7522c3f17",
+    "src/orchestra/scheduler-effects.ts": "d59ec8070b3ddb0138222383015f8b357d49b09f8dbb6e0b005d244f7c54b194",
+    "src/orchestra/spawn-backend-docker.ts": "72e1c81bdbd040148cf752b23e23493d27886bc0d730f1b7ef38abff06e4b4d8"
+  }
+}

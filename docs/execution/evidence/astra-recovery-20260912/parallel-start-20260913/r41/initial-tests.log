@@ -1,0 +1,26 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/orchestra/exact-docker-release-recovery.test.ts (6 tests) 5ms
+ ✓ tests/orchestra/exact-held-containment-barrier.test.ts (3 tests) 10ms
+[scheduler-effects] task 700-005-fix: routing-lineage-missing: original task does-not-exist (fix target for 700-005-fix) could not be read at /tmp/sched3-inherit-db999e20/.tasks/task-does-not-exist.json — spawn blocked
+[scheduler-effects] task 700-006-fix: routing-lineage-missing: original task 700-006 JSON is corrupt: Expected property name or '}' in JSON at position 2 (line 1 column 3) — spawn blocked
+stdout | tests/orchestra/scheduler-spawn-executor.test.ts > waitForResults — queue-completion trigger (processQueue) delegates to executeSpawnTask > spawns the queued fix-task with inherited routing fields and persists task-<id>.json (behavior a + b, live wiring)
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/scheduler-spawn-executor.test.ts > waitForResults — queue-completion trigger (processQueue) delegates to executeSpawnTask > propagates one provider-authority HOLD instead of retrying a queued task
+[deckent] scheduler engine: legacy
+
+stdout | tests/orchestra/scheduler-spawn-executor.test.ts > waitForResults — dep-ready trigger (dispatchReadyTasks) delegates to executeSpawnTask > spawns a dependency-ready fix-task with inherited routing fields and persists task-<id>.json (behavior a + b, live wiring)
+[deckent] scheduler engine: legacy
+
+ ✓ tests/orchestra/scheduler-spawn-executor.test.ts (37 tests) 2175ms
+   ✓ executeSpawnTask — exact normal-Docker publication order > preserves and freshly revalidates a current terminal across accepted recovery ownership transfer  1002ms
+   ✓ waitForResults — queue-completion trigger (processQueue) delegates to executeSpawnTask > spawns the queued fix-task with inherited routing fields and persists task-<id>.json (behavior a + b, live wiring)  304ms
+   ✓ waitForResults — dep-ready trigger (dispatchReadyTasks) delegates to executeSpawnTask > spawns a dependency-ready fix-task with inherited routing fields and persists task-<id>.json (behavior a + b, live wiring)  303ms
+
+ Test Files  3 passed (3)
+      Tests  46 passed (46)
+   Start at  13:26:46
+   Duration  5.72s (transform 3.63s, setup 54ms, collect 7.51s, tests 2.19s, environment 0ms, prepare 135ms)
+

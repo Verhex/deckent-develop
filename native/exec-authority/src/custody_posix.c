@@ -7708,6 +7708,7 @@ typedef enum deckent_effect_mutation_kind {
   DECKENT_EFFECT_MUTATION_REPLACE = 3,
   DECKENT_EFFECT_MUTATION_DELETE = 4,
   DECKENT_EFFECT_MUTATION_MODE = 5,
+  DECKENT_EFFECT_MUTATION_REUSE_DIRECTORY = 6,
 } deckent_effect_mutation_kind;
 
 typedef enum deckent_effect_entry_kind {
@@ -7751,7 +7752,7 @@ static bool effect_parse_operation_envelope(
   uint32_t path_length;
   if (bytes == NULL || operation == NULL || length < DECKENT_EFFECT_OPERATION_HEADER_BYTES
       || memcmp(bytes, "DEE2", 4u) != 0 || bytes[4] != 1u || bytes[5] < 1u
-      || bytes[5] > 5u || bytes[6] > 2u || bytes[7] > 2u
+      || bytes[5] > 6u || bytes[6] > 2u || bytes[7] > 2u
       || (effect_read_be32(bytes + 8u) & ~0777u) != 0u
       || (effect_read_be32(bytes + 12u) & ~0777u) != 0u
       || effect_read_be32(bytes + 20u) != 0u) goto invalid;
@@ -7785,6 +7786,10 @@ static bool effect_parse_operation_envelope(
   if ((operation->kind == DECKENT_EFFECT_MUTATION_ADD_DIRECTORY
         && (operation->pre_kind != DECKENT_EFFECT_ENTRY_ABSENT
           || operation->post_kind != DECKENT_EFFECT_ENTRY_DIRECTORY))
+      || (operation->kind == DECKENT_EFFECT_MUTATION_REUSE_DIRECTORY
+        && (operation->pre_kind != DECKENT_EFFECT_ENTRY_DIRECTORY
+          || operation->post_kind != DECKENT_EFFECT_ENTRY_DIRECTORY
+          || operation->pre_mode != operation->post_mode))
       || (operation->kind == DECKENT_EFFECT_MUTATION_ADD
         && (operation->pre_kind != DECKENT_EFFECT_ENTRY_ABSENT
           || operation->post_kind != DECKENT_EFFECT_ENTRY_REGULAR_FILE))
@@ -8180,6 +8185,8 @@ static bool effect_apply_one(
       throw_typed(env, DECKENT_EFFECT_ERROR_RECONCILE_AMBIGUOUS,
         "execution-effect delete durability is ambiguous"); goto done;
     }
+  } else if (operation->kind == DECKENT_EFFECT_MUTATION_REUSE_DIRECTORY) {
+    /* Identity-checked directory reuse performs no chmod or namespace mutation. */
   } else {
     int target_fd = openat(parent_fd, name, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
     if (target_fd < 0 || fchmod(target_fd, operation->post_mode) != 0
@@ -8195,6 +8202,8 @@ static bool effect_apply_one(
         DECKENT_EFFECT_MAX_FILE_BYTES, &observed_kind, &observed_identity,
         observed_identity_digest, observed_content_digest)
       || observed_kind != operation->post_kind
+      || (operation->kind == DECKENT_EFFECT_MUTATION_REUSE_DIRECTORY
+        && !effect_digest_matches_raw(observed_identity_digest, operation->pre_identity_digest))
       || (observed_kind != DECKENT_EFFECT_ENTRY_ABSENT
         && (observed_identity.status.st_mode & 0777) != operation->post_mode)
       || (observed_kind == DECKENT_EFFECT_ENTRY_REGULAR_FILE
@@ -8322,7 +8331,8 @@ static bool effect_post_matches(
     return true;
   }
   if ((identity.status.st_mode & 0777) != operation->post_mode) return true;
-  if (operation->kind == DECKENT_EFFECT_MUTATION_MODE
+  if ((operation->kind == DECKENT_EFFECT_MUTATION_MODE
+       || operation->kind == DECKENT_EFFECT_MUTATION_REUSE_DIRECTORY)
       && !effect_digest_matches_raw(identity_digest,
         operation->pre_identity_digest)) return true;
   if (kind == DECKENT_EFFECT_ENTRY_REGULAR_FILE

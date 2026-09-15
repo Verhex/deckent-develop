@@ -1,0 +1,23 @@
+{
+  "utc": "2026-09-14T14:29:54.659048+00:00",
+  "outcome": "3178 / RECOVERY-DO-DOGFOOD-001",
+  "authority": "owner-approved ADR-D-007",
+  "health": "DEGRADED",
+  "scope": "Verify durable partial journal with existing semantic parsers; share verification with reconcile; exact prerequisite to ABORTED_PARTIAL_EFFECT disposition.",
+  "writePaths": [
+    "src/orchestra/execution-effect-landing-coordinator.ts",
+    "tests/orchestra/execution-effect-landing-coordinator.test.ts",
+    "src/orchestra/execution-effect-store-adapter.ts"
+  ],
+  "before": {
+    "src/orchestra/execution-effect-landing-coordinator.ts": "e51efb0d76144aa4b012acdc13d031c62d68f95f8d1c2e6688f09a76f4a133f1",
+    "tests/orchestra/execution-effect-landing-coordinator.test.ts": "f2384aeceed5bc1c893e3f6f6e235929640491dc944b4bf8c82aeb9278b33b41",
+    "src/orchestra/execution-effect-store-adapter.ts": "10540ce26089fb9c7ac3f8ac2a3e4ed4d5abd1b0dc5ca721df7fd1e0eb430577"
+  },
+  "protected": [
+    "runtime/auth",
+    "memory.db",
+    "Cursor terminal lane"
+  ],
+  "returnBoundary": "Partial effect retention through product then max4 real start"
+}

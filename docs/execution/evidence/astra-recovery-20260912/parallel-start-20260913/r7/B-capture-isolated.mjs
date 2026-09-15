@@ -1,0 +1,35 @@
+import { resolveExactDockerEffectCaptureRunner } from '/tmp/deckent-r4-757-repair/dist/orchestra/exact-docker-command-transport.js';
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import path from 'node:path';
+import { runExactDockerWorkspaceCommand } from '/tmp/deckent-r4-757-repair/dist/orchestra/exact-docker-workspace-command.js';
+import { buildExactDockerNativeSnapshotArgs } from '/tmp/deckent-r4-757-repair/dist/orchestra/spawn-backend-docker.js';
+const root='/home/alperen/deckent-dev';
+const source=fs.readFileSync(root+'/src/orchestra/spawn-backend-docker.ts','utf8');
+const helper=source.match(/const EXACT_DOCKER_EFFECT_CAPTURE_HELPER = String.raw`([\s\S]*?)`;/)?.[1];
+if (!helper) throw Error('helper missing');
+const base='/home/alperen/.local/state/deckent/runtime/task-attempt-custody/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27/v2/projects/c382ed0187fa864185980851b324b929c3193aec707454b98fb40ef88dcdcf29/b38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27';
+const task='758-001'; const attempt='139f645b-e8ae-80e1-8470-101cf1dc3783';
+const dir=base+'/tasks/'+crypto.createHash('sha256').update(task).digest('hex')+'/attempts/'+attempt+'/generations/1/artifacts/execution-effect-lifecycle-authority';
+const authorityPath=path.join(dir,fs.readdirSync(dir).find(n=>n.endsWith('-provider.bin')));
+const authorityBytes=fs.readFileSync(authorityPath); const authority=JSON.parse(authorityBytes).semanticProjection;
+const evidence=root+'/docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913/r7';
+const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
+const scope={at:new Date().toISOString(),id:'R7-B-CAPTURE-ISOLATED-001',outcome:'MASTER3178',health:'DEGRADED',authority:'owner approved A-E continuation',task,attempt,budget:{helperAttempts:1,timeoutMs:60000},readScope:[authorityPath,authority.workspacePlan.volumeName,authority.workspacePlan.imageReference],writeScope:['temporary probe container tmpfs',evidence],negativeScope:['no workspace writes','no provider calls','no sprint start','no receipt or runtime mutation','no retained resource deletion'],helperSha256:hash(helper),authoritySha256:hash(authorityBytes),productionDifferences:['workspace mount readonly','isolated host probe with deliberate 65s parent event-loop stall after 500ms; synthetic stall is not historical proof'],returnBoundary:'root cause evidence before bounded repair and real dogfood'};
+fs.writeFileSync(evidence+'/B-CAPTURE-ISOLATED-SCOPE.json',JSON.stringify(scope,null,2)+'\n');
+const inspection=await runExactDockerWorkspaceCommand({command:'docker',args:['inspect','--format','{{.State.Running}}','deckent-x-'+attempt],stdin:Buffer.alloc(0),timeoutMs:10000,stdoutCeiling:1024,stderrCeiling:1024});
+if(inspection.status!==0 || inspection.stdout.toString().trim()!=='false') throw Error('retained worker not stopped');
+const deadline=Date.now()+60000;
+const encoded=Buffer.from(JSON.stringify({limits:{...authority.captureLimits,deadlineUnixMs:deadline},deadlineUnixMs:deadline})).toString('base64url');
+const args=['run','--rm','--network','none','--read-only','--cap-drop','ALL','--user','1000:1000','--security-opt','no-new-privileges','--memory','2g','--memory-swap','2g','--pids-limit','256','--tmpfs','/tmp:size=64m,mode=0700',...buildExactDockerNativeSnapshotArgs(1000,1000),'--mount',`type=volume,src=${authority.workspacePlan.volumeName},dst=/workspace,volume-nocopy,readonly`,authority.workspacePlan.imageReference,'node','--input-type=module','-e',helper,encoded];
+const pending=resolveExactDockerEffectCaptureRunner(runExactDockerWorkspaceCommand)({command:'docker',args,stdin:Buffer.alloc(0),timeoutMs:60000,stdoutCeiling:20*1024*1024,stderrCeiling:64*1024});
+await new Promise(r=>setTimeout(r,500));
+const stallStart=performance.now();
+Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,65000);
+const stallMs=performance.now()-stallStart;
+const result=await pending;
+let parsed=null; try {const v=JSON.parse(result.stdout.toString()); parsed={keys:Object.keys(v),nativeCaptureKeys:Object.keys(v.nativeCapture??{}),entryCount:v.nativeCapture?.entryCount,totalBytes:v.nativeCapture?.totalBytes};}catch{}
+// Diagnostic error names/codes only: never preserve arbitrary private stderr.
+const errorCodes=[...new Set(result.stderr.toString().match(/\b(?:E[A-Z_]{3,60}|[A-Za-z]+Error)\b/g)??[])];
+const out={at:new Date().toISOString(),task,attempt,stallMs,diagnostic:result.diagnostic,status:result.status,signal:result.signal,error:result.error,overflow:result.overflow,stdoutSha256:hash(result.stdout),stderrSha256:hash(result.stderr),errorCodes,parsed,productClosure:'HOLD; diagnostic probe only'};
+fs.writeFileSync(evidence+'/B-CAPTURE-ISOLATED-RESULT.json',JSON.stringify(out,null,2)+'\n'); console.log(JSON.stringify(out));

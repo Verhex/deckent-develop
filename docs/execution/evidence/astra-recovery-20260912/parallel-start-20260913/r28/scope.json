@@ -1,0 +1,27 @@
+{
+  "utc": "2026-09-14T18:50:04.631530+00:00",
+  "recovery": "R28",
+  "outcome": "MASTER3178 / parent120",
+  "health": "DEGRADED",
+  "authority": "owner live fix before20-task",
+  "writes": [
+    "src/orchestra/sprint-controller.ts",
+    "src/orchestra/scheduler-effects.ts",
+    "src/orchestra/result-evaluator.ts",
+    "tests/orchestra/exact-controller-terminal-fanin.test.ts",
+    "tests/orchestra/result-evaluator-derived-directory.test.ts"
+  ],
+  "boundary": "official start20tasks max4; no source edits while live",
+  "protected": [
+    "auth",
+    "memory.db",
+    "immutable receipts",
+    "Cursor lane"
+  ],
+  "verification": {
+    "tests": 219,
+    "testExit": 0,
+    "tscExit": 0
+  },
+  "operationalProbeError": "status probe during dist rebuild exit1 ERR_MODULE_NOT_FOUND; repeat only after build completes"
+}

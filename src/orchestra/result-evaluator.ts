@@ -9,7 +9,7 @@ import {
   type TaskResultV2,
 } from '../core/task-result-schema.js';
 import { readFile, readdir, stat } from 'node:fs/promises';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
+import { statSync, readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { isAbsolute, join, posix, resolve } from 'node:path';
 import type { Task, TaskResult, EvaluationRubric, RubricScore, EvaluationResult, NoGoCategory } from '../core/types.js';
 import { TaskEvaluation } from '../core/types.js';
@@ -1094,14 +1094,17 @@ function extractFirstNumber(text: string, patterns: readonly RegExp[]): number |
 }
 
 function readChangedFile(result: TaskResult): string | null {
-  const first = result.filesChanged?.[0];
-  if (!first) return null;
-  try {
-    return readFileSync(first, 'utf-8');
-  } catch (e) {
-    debugLog('readChangedFile:readFileSync', e);
-    return null;
+  for (const path of result.filesChanged ?? []) {
+    try {
+      // Effect projections can include derived directories and removed entries.
+      // Rubrics require actual file content, not the first projection entry.
+      if (!statSync(path).isFile()) continue;
+      return readFileSync(path, 'utf-8');
+    } catch (e) {
+      debugLog('readChangedFile:readFileSync', e);
+    }
   }
+  return null;
 }
 
 /**
@@ -1149,7 +1152,7 @@ export function scoreWordCount(result: TaskResult, task: Task): RubricScore {
 
 /**
  * Score audit reports by structural completeness: headings, lists/tables,
- * and minimum length. Reads the first filesChanged entry; if unreadable,
+ * and minimum length. Reads the first readable regular file in filesChanged; if none is available,
  * falls back to notes-based heuristic to avoid hard-failing the evaluator.
  */
 export function scoreAuditCompleteness(result: TaskResult, _task: Task): RubricScore {

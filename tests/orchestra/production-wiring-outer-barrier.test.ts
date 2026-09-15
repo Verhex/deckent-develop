@@ -416,3 +416,17 @@ describe('resolveSprintTerminalHandoff staged-settlement gate', () => {
     expect(handoff.state).toBe('AUTHORIZED');
   });
 });
+
+
+it('blocks a non-staged sprint with EFFECT_HOLD while preserving independent settled work', () => {
+  const verdict = resolveOuterStagedSettlementBarrier({ sprintId: 'held-sprint',
+    tasks: [task('a'), task('b'), task('c')],
+    evaluations: new Map([['a', TaskEvaluation.EFFECT_HOLD], ['b', TaskEvaluation.DONE]]),
+    results: [result('b')],
+  });
+  expect(verdict.state).toBe('BLOCKED');
+  if (verdict.state !== 'BLOCKED') throw new Error('must block');
+  expect(verdict.effectHeldTaskIds).toEqual(['a']);
+  expect(verdict.preservedSettledTaskIds).toEqual(['b']);
+  expect(describeStagedSettlementBlock(verdict)).toBe('a:EFFECT_HOLD');
+});

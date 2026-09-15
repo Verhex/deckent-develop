@@ -1018,6 +1018,12 @@ export interface ExecutionLockRecoveryResult {
   readonly projectionCleanup: 'completed' | 'uncertain';
 }
 
+export interface ExecutionLockRecoveryResolution {
+  readonly recovered: ExecutionLockQuarantineInfo;
+  readonly audit: ExecutionLockQuarantineAuditEvent;
+  readonly lineage: readonly ExecutionLockQuarantineAuditEvent[];
+}
+
 export interface ExecutionLockMountIdentity {
   readonly projectDev: string;
   readonly projectIno: string;
@@ -6657,6 +6663,102 @@ export function readCompletedExecutionLockBoundary(
   );
 }
 
+function recoveredExecutionLockBoundaryFromDb(
+  db: DatabaseType,
+  quarantineId: string,
+): ExecutionLockRecoveryResolution | null {
+  const events = loadExecutionLockQuarantineAuditChain(db, quarantineId);
+  if (events.length === 0) return null;
+  const recoveries = events.filter(event => event.action === 'recovered');
+  // An existing but unfinished/completed boundary is not a recovered boundary.
+  if (recoveries.length === 0) return null;
+  const audit = recoveries[0]!;
+  const quarantines = events.filter(event => event.action === 'quarantined');
+  const quarantineEvent = quarantines[0];
+  const recovered = quarantineEvent && 'lock' in quarantineEvent.payload
+    ? quarantineEvent.payload : null;
+  const lineage = executionLockBoundaryAuditLineage(events, quarantineId);
+  const preceding = lineage
+    ? [lineage.boundary, ...lineage.resumes] : [];
+  const latestAt = preceding.reduce((latest, entry) =>
+    entry.occurredAt > latest ? entry.occurredAt : latest, '');
+  if (recoveries.length !== 1 || quarantines.length !== 1
+    || events.length !== preceding.length + 2
+    || !recovered || !quarantineEvent
+    || recovered.state !== 'quarantined'
+    || recovered.quarantinedAt !== quarantineEvent.occurredAt
+    || (lineage === null && recovered.enteredAt < recovered.lock.acquiredAt)
+    || quarantineEvent.occurredAt < recovered.enteredAt
+    || quarantineEvent.occurredAt < latestAt
+    || (lineage !== null && (
+      !executionLockIsExactRenewalOf(lineage.currentLock, recovered.lock)
+      || !('enteredAt' in lineage.boundary.payload)
+      || recovered.enteredAt !== lineage.boundary.payload.enteredAt
+    ))
+    || audit.taskId !== recovered.lock.taskId
+    || audit.ownerId !== recovered.lock.ownerId
+    || !executionLockFencingTokenEquals(audit.fencingToken, recovered.lock.fencingToken)
+    || !('attestedAt' in audit.payload)
+    || audit.occurredAt !== audit.payload.attestedAt
+    || audit.occurredAt < quarantineEvent.occurredAt) {
+    throw new ExecutionLockError(
+      `Execution recovery audit chain is invalid for task ${audit.taskId}`,
+      audit.taskId, 'malformed',
+    );
+  }
+  const quarantine = db.prepare(`
+    SELECT quarantine_id FROM execution_lock_quarantine WHERE quarantine_id = ?
+  `).get(quarantineId);
+  const active = loadExecutionLockActiveRow(db, audit.taskId);
+  if (quarantine !== undefined || (active
+    && active.ownerId === audit.ownerId
+    && executionLockFencingTokenEquals(active.fencingToken, audit.fencingToken))) {
+    throw new ExecutionLockError(
+      `Recovered execution boundary retains active authority for task ${audit.taskId}`,
+      audit.taskId, 'malformed',
+    );
+  }
+  return { recovered, audit, lineage: [...preceding, quarantineEvent, audit] };
+}
+
+/** Resolve historical recovery from canonical storage, never from an exported
+ * receipt or projection absence. Recovery is not successful effect completion.
+ * This returns evidence only: the consumer must bind the recovered fencing
+ * generation to its own transaction before using it.
+ * Uses the existing authority transaction (including schema/anchor validation).
+ */
+export function readRecoveredExecutionLockBoundaryEvidence(
+  projectRoot: string,
+  quarantineId: string,
+): ExecutionLockRecoveryResolution | null {
+  if (!EXECUTION_LOCK_UUID_PATTERN.test(quarantineId)) {
+    throw new ExecutionLockError('Execution boundary id is invalid', 'unknown', 'invalid-input');
+  }
+  return withExecutionLockMutation(projectRoot,
+    db => recoveredExecutionLockBoundaryFromDb(db, quarantineId));
+}
+
+export function readRecoveredExecutionLockBoundary(
+  projectRoot: string,
+  exactRecoveredLock: ExecutionLockInfo,
+  quarantineId: string,
+): ExecutionLockRecoveryResolution | null {
+  const expected = normalizeExecutionLockHandle(exactRecoveredLock);
+  if (!EXECUTION_LOCK_UUID_PATTERN.test(quarantineId)) {
+    throw new ExecutionLockError('Execution boundary id is invalid', expected.taskId, 'invalid-input');
+  }
+  return withExecutionLockMutation(projectRoot, db => {
+    const resolution = recoveredExecutionLockBoundaryFromDb(db, quarantineId);
+    if (resolution && JSON.stringify(resolution.recovered.lock) !== JSON.stringify(expected)) {
+      throw new ExecutionLockError(
+        `Execution recovery generation differs for task ${expected.taskId}`,
+        expected.taskId, 'ownership-lost',
+      );
+    }
+    return resolution;
+  });
+}
+
 function completedExecutionLockBoundaryResultFromDb(
   db: DatabaseType,
   quarantineId: string,
@@ -7717,7 +7819,14 @@ export function recoverQuarantinedExecutionLock(
     appendExecutionLockQuarantineAudit(db, audit);
     deleteExecutionLockQuarantineRow(db, quarantine);
     deleteExecutionLockActiveRow(db, canonical);
-    return { recovered: quarantine, audit };
+    const durableRecovery = recoveredExecutionLockBoundaryFromDb(db, quarantine.quarantineId);
+    if (!durableRecovery || durableRecovery.audit.eventId !== audit.eventId) {
+      throw new ExecutionLockError(
+        `Execution recovery terminal audit was not verified for task ${expected.taskId}`,
+        expected.taskId, 'malformed',
+      );
+    }
+    return { recovered: durableRecovery.recovered, audit: durableRecovery.audit };
   });
   try {
     options.terminalCommitObserver?.({

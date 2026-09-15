@@ -14,6 +14,51 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint761] - 2026-09-14
+
+### Added
+
+- Pin production terminal revalidation snapshot isolation and fail-closed behavior
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
+## [sprint760] - 2026-09-14
+
+### Added
+
+- Measure native custody read amplification and define the exact guarded repair
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
+## [sprint759] - 2026-09-13
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 1 total, 0 done, 0 tech debt, 1 no-go_
+
+## [sprint756] - 2026-09-13
+
+### Added
+
+- No completed tasks
+
+
+_Tasks: 8 total, 0 done, 0 tech debt, 8 no-go_
+
+## [sprint755] - 2026-09-13
+
+### Added
+
+- Repair transient rotation recovery and amortized writer checks
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
 ## [sprint724] - 2026-09-05
 
 ### Added

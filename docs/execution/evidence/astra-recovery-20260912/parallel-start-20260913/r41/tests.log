@@ -1,0 +1,11 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/orchestra/exact-held-containment-barrier.test.ts (6 tests) 15ms
+ ✓ tests/orchestra/spawn-backend-docker-mounts.test.ts (93 tests) 437ms
+
+ Test Files  2 passed (2)
+      Tests  99 passed (99)
+   Start at  13:27:51
+   Duration  5.43s (transform 3.11s, setup 32ms, collect 7.46s, tests 452ms, environment 0ms, prepare 62ms)
+

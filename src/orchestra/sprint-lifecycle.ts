@@ -1,3 +1,4 @@
+import { isResumableTaskAuthorityHold } from './task-result-authority.js';
 // ═══ Sprint Lifecycle ══════════════════════════════════════════════
 // Extracted from sprint-controller.ts — lifecycle management functions:
 //   BrainError, PauseState, interrupt state management,
@@ -147,7 +148,7 @@ export async function pauseSprintExact(
   registry: ExactNormalDockerExecutionRegistryV2,
   options?: ExactLifecycleReconcileOptionsV1,
 ): Promise<PauseState> {
-  await prepareExactSprintLifecycle(registry, 'contain', options);
+  await prepareExactSprintLifecycle(registry, 'contain', { ...options, currentTaskIds: new Set(sprint.tasks.map(task => task.id)) });
   for (const task of sprint.tasks) {
     if (!registry.isExactTask(task.id)) continue;
     const resultAuthority = registry.readTaskResultAuthority(task.id);
@@ -179,6 +180,7 @@ export async function pauseSprintExact(
         `EXACT_PAUSE_ACTIVE_ATTEMPT_HOLD:${task.id}`,
       );
     }
+    if (isResumableTaskAuthorityHold(resultAuthority)) continue;
     if (resultAuthority.state === 'authority-hold') {
       throw new DeckentError(
         'DECKENT_E077',
@@ -194,8 +196,9 @@ export async function resumeSprintExact(
   projectRoot: string,
   sprint: Sprint,
   registry: ExactNormalDockerExecutionRegistryV2,
+  options?: ExactLifecycleReconcileOptionsV1,
 ): Promise<PauseState | null> {
-  await prepareExactSprintLifecycle(registry, 'resume');
+  await prepareExactSprintLifecycle(registry, 'resume', { ...options, currentTaskIds: new Set(sprint.tasks.map(task => task.id)) });
   return resumeSprint(projectRoot, sprint, registry);
 }
 
@@ -207,8 +210,10 @@ function exactLifecycleCheckpointAuthorities(
   const sprintTaskIds = new Set(sprint.tasks.map(task => task.id));
   const current = new Map<string, ExactAcceptedResultTerminalAuthorityV2>();
   for (const [taskId, authority] of registry.snapshotExactTerminalAuthorities()) {
+    if (!sprintTaskIds.has(taskId)) continue;
     if (authority.state !== 'current') {
-      if (registry.readTaskResultAuthority(taskId).state !== 'authority-hold') continue;
+      const resultAuthority = registry.readTaskResultAuthority(taskId);
+      if (resultAuthority.state !== 'authority-hold' || isResumableTaskAuthorityHold(resultAuthority)) continue;
       throw new DeckentError(
         'DECKENT_E077',
         `EXACT_LIFECYCLE_CHECKPOINT_AUTHORITY_HOLD:${taskId}:${authority.reasonCode}`,
@@ -859,6 +864,7 @@ export function pauseSprint(
           `EXACT_PAUSE_UNCONTAINED_ATTEMPT_HOLD:${task.id}:${authority.state}`,
         );
       }
+      if (isResumableTaskAuthorityHold(authority)) continue;
       if (authority.state === 'authority-hold') {
         throw new DeckentError(
           'DECKENT_E077',
@@ -1163,6 +1169,7 @@ export function resumeSprint(
           : TaskStatus.DONE;
       } else if (exactDockerRegistry?.isExactTask(task.id)) {
         const authority = exactDockerRegistry.readTaskResultAuthority(task.id);
+        if (isResumableTaskAuthorityHold(authority)) continue;
         if (authority.state === 'authority-hold') {
           throw new DeckentError(
             'DECKENT_E077',

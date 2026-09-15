@@ -38,7 +38,7 @@ function renderCaught(label: string, error: Error | string, describeError?: (err
 describe('ReplErrorBoundary i18n wiring (born-529)', () => {
   it('run.tsx passes the label prop from getMessage(\'tui.render_error\', lang) — not left unset/hardcoded', () => {
     const src = readFileSync(join(ROOT, 'src', 'cli', 'repl', 'run.tsx'), 'utf-8');
-    expect(src).toMatch(/<ReplErrorBoundary label=\{t\(['"]tui\.render_error['"]\)\}[^>]*>/);
+    expect(src).toMatch(/<ReplErrorBoundary label=\{terminalLabel\(['"]tui\.render_error['"]\)\}[^>]*>/);
     // Guard against regressing to the old bare form.
     expect(src).not.toMatch(/<ReplErrorBoundary>\s*\n\s*<ReplApp/);
   });
@@ -79,7 +79,7 @@ describe('ReplErrorBoundary i18n wiring (born-529)', () => {
 
   it('run.tsx injects a catalog-backed error describer alongside the label', () => {
     const src = readFileSync(join(ROOT, 'src', 'cli', 'repl', 'run.tsx'), 'utf-8');
-    expect(src).toMatch(/<ReplErrorBoundary label=\{t\(['"]tui\.render_error['"]\)\} describeError=\{buildReplErrorDescriber\(lang\)\}>/);
+    expect(src).toMatch(/<ReplErrorBoundary label=\{terminalLabel\(['"]tui\.render_error['"]\)\}[^>]*describeError=\{buildReplErrorDescriber\(lang, terminalGlyphs\)\}/);
   });
 
   for (const lang of ['tr', 'en'] as const) {

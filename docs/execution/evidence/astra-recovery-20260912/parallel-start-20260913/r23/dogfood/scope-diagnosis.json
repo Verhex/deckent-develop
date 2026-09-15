@@ -1,0 +1,115 @@
+{
+  "utc": "2026-09-14T15:10:07.878Z",
+  "tasks": [
+    {
+      "id": "1",
+      "scope": {
+        "filesWrite": [
+          "docs/execution/active/parallel-4-post-recovery-762/startup/ANALYSIS.md"
+        ],
+        "directories": [
+          "docs/execution/active/parallel-4-post-recovery-762/startup/"
+        ]
+      }
+    },
+    {
+      "id": "2",
+      "scope": {
+        "filesWrite": [
+          "docs/execution/active/parallel-4-post-recovery-762/settlement/ANALYSIS.md"
+        ],
+        "directories": [
+          "docs/execution/active/parallel-4-post-recovery-762/settlement/"
+        ]
+      }
+    },
+    {
+      "id": "3",
+      "scope": {
+        "filesWrite": [
+          "docs/execution/active/parallel-4-post-recovery-762/archive/ANALYSIS.md"
+        ],
+        "directories": [
+          "docs/execution/active/parallel-4-post-recovery-762/archive/"
+        ]
+      }
+    },
+    {
+      "id": "4",
+      "scope": {
+        "filesWrite": [
+          "docs/execution/active/parallel-4-post-recovery-762/dashboard/ANALYSIS.md"
+        ],
+        "directories": [
+          "docs/execution/active/parallel-4-post-recovery-762/dashboard/"
+        ]
+      }
+    }
+  ],
+  "result": {
+    "ok": false,
+    "reason": "SCOPE_GATE_SUSPECT",
+    "suspects": [
+      {
+        "taskId": "1",
+        "path": "docs/execution/active/parallel-4-post-recovery-762/startup/ANALYSIS.md",
+        "role": "write",
+        "classification": "suspect",
+        "reason": "no such file and its directory 'docs/execution/active/parallel-4-post-recovery-762/startup' is not in the repo"
+      },
+      {
+        "taskId": "2",
+        "path": "docs/execution/active/parallel-4-post-recovery-762/settlement/ANALYSIS.md",
+        "role": "write",
+        "classification": "suspect",
+        "reason": "no such file and its directory 'docs/execution/active/parallel-4-post-recovery-762/settlement' is not in the repo"
+      },
+      {
+        "taskId": "3",
+        "path": "docs/execution/active/parallel-4-post-recovery-762/archive/ANALYSIS.md",
+        "role": "write",
+        "classification": "suspect",
+        "reason": "no such file and its directory 'docs/execution/active/parallel-4-post-recovery-762/archive' is not in the repo"
+      },
+      {
+        "taskId": "4",
+        "path": "docs/execution/active/parallel-4-post-recovery-762/dashboard/ANALYSIS.md",
+        "role": "write",
+        "classification": "suspect",
+        "reason": "no such file and its directory 'docs/execution/active/parallel-4-post-recovery-762/dashboard' is not in the repo"
+      }
+    ],
+    "verdicts": [
+      {
+        "taskId": "1",
+        "path": "docs/execution/active/parallel-4-post-recovery-762/startup/ANALYSIS.md",
+        "role": "write",
+        "classification": "suspect",
+        "reason": "no such file and its directory 'docs/execution/active/parallel-4-post-recovery-762/startup' is not in the repo"
+      },
+      {
+        "taskId": "2",
+        "path": "docs/execution/active/parallel-4-post-recovery-762/settlement/ANALYSIS.md",
+        "role": "write",
+        "classification": "suspect",
+        "reason": "no such file and its directory 'docs/execution/active/parallel-4-post-recovery-762/settlement' is not in the repo"
+      },
+      {
+        "taskId": "3",
+        "path": "docs/execution/active/parallel-4-post-recovery-762/archive/ANALYSIS.md",
+        "role": "write",
+        "classification": "suspect",
+        "reason": "no such file and its directory 'docs/execution/active/parallel-4-post-recovery-762/archive' is not in the repo"
+      },
+      {
+        "taskId": "4",
+        "path": "docs/execution/active/parallel-4-post-recovery-762/dashboard/ANALYSIS.md",
+        "role": "write",
+        "classification": "suspect",
+        "reason": "no such file and its directory 'docs/execution/active/parallel-4-post-recovery-762/dashboard' is not in the repo"
+      }
+    ],
+    "resolutions": [],
+    "message": "Scope gate: 4 write path(s) do not exist and look like a typo or wrong directory:\n  • [1] docs/execution/active/parallel-4-post-recovery-762/startup/ANALYSIS.md (no such file and its directory 'docs/execution/active/parallel-4-post-recovery-762/startup' is not in the repo)\n  • [2] docs/execution/active/parallel-4-post-recovery-762/settlement/ANALYSIS.md (no such file and its directory 'docs/execution/active/parallel-4-post-recovery-762/settlement' is not in the repo)\n  • [3] docs/execution/active/parallel-4-post-recovery-762/archive/ANALYSIS.md (no such file and its directory 'docs/execution/active/parallel-4-post-recovery-762/archive' is not in the repo)\n  • [4] docs/execution/active/parallel-4-post-recovery-762/dashboard/ANALYSIS.md (no such file and its directory 'docs/execution/active/parallel-4-post-recovery-762/dashboard' is not in the repo)\nIf these are intentional new files, override with acknowledgeScopePaths=true (MCP) / --force-scope (CLI). If a path should be an existing file, fix the DIRECTIVES scope before spawning."
+  }
+}

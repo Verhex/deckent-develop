@@ -1,0 +1,20 @@
+{
+  "startedAt": "2026-09-14T14:59:58.433918+00:00",
+  "endedAt": "2026-09-14T14:59:59.199792+00:00",
+  "elapsedSeconds": 0.7658791639987612,
+  "exitCode": 1,
+  "command": [
+    "node",
+    "/tmp/deckent-r18-762-repair/dist/cli/entry.js",
+    "recover",
+    "sprint-762",
+    "--retain-aborted-partial",
+    "dreq-8252f4be5c0bf0c1c6a475926ed7fce186469bb119ababcf5f8cd875339abff3",
+    "--effect-transaction",
+    "sha256:c20efb30993a836f2ac1cf3d8509bf74129540105b83275e471b6a5a6185a94f",
+    "--retain-started-failed",
+    "dreq-8252f4be5c0bf0c1c6a475926ed7fce186469bb119ababcf5f8cd875339abff3",
+    "--dry-run",
+    "--json"
+  ]
+}

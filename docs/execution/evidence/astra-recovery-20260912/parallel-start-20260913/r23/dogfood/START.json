@@ -1,0 +1,1 @@
+{"utc": "2026-09-14T15:09:11.452212+00:00", "pid": 1381331, "command": ["node", "dist/cli/entry.js", "start", "--auto-approve"]}

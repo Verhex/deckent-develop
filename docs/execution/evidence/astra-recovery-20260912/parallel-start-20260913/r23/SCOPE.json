@@ -1,0 +1,28 @@
+{
+  "utc": "2026-09-14T14:47:33.400603+00:00",
+  "outcome": "3178 / RECOVERY-DO-DOGFOOD-001",
+  "authority": "owner-approved ADR-D-007",
+  "scope": "ABORTED_PARTIAL_EFFECT retention: Store immutable marker, conflict/resurrection guards, exact recovery ingress, native empty-derived-directory/stopped resource proof, health consumer. Nonempty/other effects explicitly HOLD. No result acceptance or replay.",
+  "writePaths": [
+    "src/core/task-attempt-custody-store.ts",
+    "src/core/file-lock.ts",
+    "src/orchestra/spawn-backend-docker.ts",
+    "src/orchestra/sprint-recovery-operation.ts",
+    "src/cli/commands/recover.ts",
+    "src/cli/helpers/messages.ts",
+    "tests/core/task-attempt-custody-store.test.ts",
+    "tests/orchestra/sprint-recovery-operation.test.ts",
+    "src/orchestra/spawn-backend.ts"
+  ],
+  "before": {
+    "src/core/task-attempt-custody-store.ts": "a0ac403cd35cb7293a59864cee86bee3b701a31cd1d1c475b8e12ca2401cc0b8",
+    "src/core/file-lock.ts": "0ed988a93ec6976e155e74cbec5b488c0fe4fcd60af3ea9f2832e37706447016",
+    "src/orchestra/spawn-backend-docker.ts": "71a69f71184804ced214df2506028fd8c0961fc421ac696665e9f48190ab571d",
+    "src/orchestra/sprint-recovery-operation.ts": "be1f030d68ca21cca99980bb40737665b6ce0cc3c7e704233bb2f2011971ac46",
+    "src/cli/commands/recover.ts": "e6383ae1373d0f00e058b8dbccd50b39e5cb1e5e2c39344ce6f938fbbc0e388e",
+    "src/cli/helpers/messages.ts": "0e57cbc1c02eb07831f73e1b4f1a95fdd5942f5ca38f4e51d72d228586b1ef18",
+    "tests/core/task-attempt-custody-store.test.ts": "499a007bdf7bc1d69f5805bdc4c00c4fe289a304c6e3aff8cf6593bb88d0bf80",
+    "tests/orchestra/sprint-recovery-operation.test.ts": "d29d506de750d18ca8c7068d8821380579b779011835b22f764df26b78864389",
+    "src/orchestra/spawn-backend.ts": "d424c276b7f1aeef530478433ce6d44db2bddeb56151a2d8343d7d3e43269002"
+  }
+}

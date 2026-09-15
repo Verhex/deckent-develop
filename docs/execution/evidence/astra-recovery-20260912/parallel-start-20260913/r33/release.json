@@ -1,0 +1,11 @@
+{
+  "startedAt": "2026-09-14T22:09:24.759419+00:00",
+  "endedAt": "2026-09-14T22:10:50.103054+00:00",
+  "elapsedSeconds": 89.13434390799375,
+  "exitCode": 0,
+  "command": [
+    "node",
+    "/tmp/deckent-r33/release.mjs",
+    "--apply"
+  ]
+}

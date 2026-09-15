@@ -11,7 +11,7 @@ Coverage: npx vitest run --coverage
 Dashboard: deckent web
 
 ## MCP Tools
-<!-- DECKENT:CONTRACT id="tools" schema="1" sha256="a2b7041affc08bfc3479820e5e55b6dcb4347c1d2359f3a3c9ecc9d39e76abb1" -->
+<!-- DECKENT:CONTRACT id="tools" schema="1" sha256="fa8bfe9b22fe823f5ca56e484bbc5bb16965ddac0ec6931ccd3572a344fbabe2" -->
 Bu tablo canonical MCP TOOL_CATALOG üzerinden üretilir; dosya adları asla tool olarak yorumlanmaz.
 
 | MCP Adı | Etki | Onay | Idempotent |
@@ -35,7 +35,7 @@ Bu tablo canonical MCP TOOL_CATALOG üzerinden üretilir; dosya adları asla too
 | `deckent_help` | salt-okunur | effect class gereği zorunlu değil | evet |
 | `deckent_agent_list` | salt-okunur | effect class gereği zorunlu değil | evet |
 | `deckent_skill_list` | salt-okunur | effect class gereği zorunlu değil | evet |
-| `deckent_checkpoint` | değiştirici | runtime policy gereği zorunlu | hayır |
+| `deckent_checkpoint` | salt-okunur | effect class gereği zorunlu değil | evet |
 | `deckent_docs` | değiştirici | runtime policy gereği zorunlu | evet |
 | `deckent_explain` | salt-okunur | effect class gereği zorunlu değil | evet |
 | `deckent_memory_query` | salt-okunur | effect class gereği zorunlu değil | evet |

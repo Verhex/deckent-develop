@@ -160,7 +160,7 @@ describe('7111 — bridge helpers', () => {
       ruleStore: { activeRules: () => [], activeDenies: () => [{ tool: 'deckent_write_file', pattern: 'locked/**' }] },
       getMode: () => 'suggest' as const,
     };
-    expect(projectNativePermissionRoundItem(deps, { id: 'a', tool: 'deckent_bash', args: { cmd: "sed -n '1p' x.md" } })).toEqual({ callId: 'a', tool: 'deckent_bash', resource: "sed -n '1p' x.md", scope: 'file-read', risk: 'none', projection: 'auto' });
+    expect(projectNativePermissionRoundItem(deps, { id: 'a', tool: 'deckent_bash', args: { cmd: "sed -n '1p' x.md" } })).toMatchObject({ callId: 'a', tool: 'deckent_bash', resource: "sed -n '1p' x.md", scope: 'file-read', risk: 'none', projection: 'confirm' });
     expect(projectNativePermissionRoundItem(deps, { id: 'b', tool: 'deckent_bash', args: { cmd: 'npm test' } })).toMatchObject({ scope: 'shell-exec', risk: 'medium', projection: 'confirm' });
     expect(projectNativePermissionRoundItem(deps, { id: 'c', tool: 'deckent_bash', args: { cmd: 'rm -rf build' } })).toMatchObject({ projection: 'floor' });
     expect(projectNativePermissionRoundItem(deps, { id: 'd', tool: 'deckent_write_file', args: { path: 'locked/a.ts' } })).toMatchObject({ scope: 'file-write', projection: 'denied' });

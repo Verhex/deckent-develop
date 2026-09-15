@@ -100,7 +100,7 @@ export type ExactExecutionContinuationDispatchResult =
     }>
   | Readonly<{
       state: 'ambiguous';
-      dispatch: Extract<ExactDockerCustodyDispatchOutcomeV2, { kind: 'ambiguous' }>;
+      dispatch: Extract<ExactDockerCustodyDispatchOutcomeV2, { kind: 'ambiguous' | 'preparation-hold' }>;
     }>;
 
 /**
@@ -173,7 +173,7 @@ export async function dispatchExactExecutionContinuation(
   if (dispatch.kind === 'not-dispatched') {
     return Object.freeze({ state: 'not-dispatched', dispatch });
   }
-  if (dispatch.kind === 'ambiguous') {
+  if (dispatch.kind === 'ambiguous' || dispatch.kind === 'preparation-hold') {
     return Object.freeze({ state: 'ambiguous', dispatch });
   }
   if (

@@ -1,3 +1,4 @@
+import { isResumableTaskAuthorityHold } from './task-result-authority.js';
 // ═══ Sprint Spawner ════════════════════════════════════════════════
 // Extracted from sprint-controller.ts — worker spawn functions:
 //   spawnWorkers(), respawnEligibleTasks(), validateTaskDependencies(),
@@ -1682,6 +1683,7 @@ export async function respawnEligibleTasks(
   sprint: Sprint,
   config: ResolvedConfig,
   spawnOpts?: {
+    canAdmitDispatch?: () => boolean;
     autoApprove?: boolean;
     spawnBackend?: SpawnBackend;
     attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
@@ -1993,9 +1995,12 @@ export async function respawnEligibleTasks(
     if (spawnOpts?.exactDockerRegistry) {
       const snapshot = spawnOpts.exactDockerRegistry.snapshotExactTerminalAuthorities();
       const current = new Map<string, ExactAcceptedResultTerminalAuthorityV2>();
+      const currentTaskIds = new Set(sprint.tasks.map(task => task.id));
       for (const [taskId, authority] of snapshot) {
+        if (!currentTaskIds.has(taskId)) continue;
         if (authority.state !== 'current') {
-          if (spawnOpts.exactDockerRegistry.readTaskResultAuthority(taskId).state !== 'authority-hold') {
+          const resultAuthority = spawnOpts.exactDockerRegistry.readTaskResultAuthority(taskId);
+          if (resultAuthority.state !== 'authority-hold' || isResumableTaskAuthorityHold(resultAuthority)) {
             continue;
           }
           throw new DeckentError(

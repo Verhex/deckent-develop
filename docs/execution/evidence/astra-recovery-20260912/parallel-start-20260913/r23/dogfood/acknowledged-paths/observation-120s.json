@@ -1,0 +1,19 @@
+{
+  "utc": "2026-09-14T15:12:36.736810+00:00",
+  "elapsedSeconds": 125.49962284899084,
+  "pid": 1382412,
+  "process": {
+    "State": "R (running)",
+    "VmHWM": "1724592 kB",
+    "VmRSS": "1716184 kB"
+  },
+  "observedAt": "2026-09-14T15:12:39.788363+00:00",
+  "taskFiles": [
+    "repair-queue-authority.json"
+  ],
+  "dockerListing": {
+    "exitCode": 0,
+    "stdout": "local-llm Up 27 hours (healthy)\n"
+  },
+  "observation": "120s checkpoint: CLI running; no worker/task birth observed; no kill or retry issued"
+}

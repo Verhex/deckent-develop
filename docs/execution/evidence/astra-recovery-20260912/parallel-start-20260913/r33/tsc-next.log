@@ -1,0 +1,11 @@
+src/orchestra/spawn-backend-docker.ts(13400,12): error TS1005: ')' expected.
+src/orchestra/spawn-backend-docker.ts(14044,3): error TS1472: 'catch' or 'finally' expected.
+src/orchestra/spawn-backend-docker.ts(14045,10): error TS1005: ',' expected.
+src/orchestra/spawn-backend-docker.ts(14046,4): error TS1005: ';' expected.
+src/orchestra/spawn-backend-docker.ts(14047,11): error TS1005: ':' expected.
+src/orchestra/spawn-backend-docker.ts(14047,86): error TS1005: ',' expected.
+src/orchestra/spawn-backend-docker.ts(14048,11): error TS1005: ':' expected.
+src/orchestra/spawn-backend-docker.ts(14050,6): error TS1005: ',' expected.
+src/orchestra/spawn-backend-docker.ts(14051,9): error TS1003: Identifier expected.
+src/orchestra/spawn-backend-docker.ts(14051,21): error TS1005: ',' expected.
+src/orchestra/spawn-backend-docker.ts(14051,56): error TS1005: ';' expected.

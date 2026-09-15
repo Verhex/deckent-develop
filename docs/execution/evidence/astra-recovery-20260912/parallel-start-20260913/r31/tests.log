@@ -1,0 +1,10 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/orchestra/exact-docker-observation.test.ts (25 tests) 9ms
+
+ Test Files  1 passed (1)
+      Tests  25 passed (25)
+   Start at  23:29:36
+   Duration  1.40s (transform 93ms, setup 17ms, collect 63ms, tests 9ms, environment 0ms, prepare 48ms)
+

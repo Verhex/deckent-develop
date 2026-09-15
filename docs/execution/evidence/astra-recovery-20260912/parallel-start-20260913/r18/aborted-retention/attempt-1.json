@@ -1,0 +1,7 @@
+{
+  "exitCode": 1,
+  "reason": "invalid-input",
+  "message": "Execution lock recovery attestation is stale or mismatched",
+  "cause": "Evidence refs were not codepoint sorted, rejected by parseExecutionLockEvidenceRefs before verifier or recovery commit",
+  "fix": "sort evidenceRefs using default codepoint ordering"
+}

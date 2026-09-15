@@ -1,0 +1,8 @@
+{
+  "utc": "2026-09-14T14:21:13.488183+00:00",
+  "cas": true,
+  "files": {
+    "src/core/file-lock.ts": "0ed988a93ec6976e155e74cbec5b488c0fe4fcd60af3ea9f2832e37706447016",
+    "tests/core/task-execution-fence.test.ts": "eb8b165be91827c410f7c10fd4e4e9fde6f0cb11d10f10ddc36dcee3b66f1d77"
+  }
+}

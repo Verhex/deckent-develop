@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "terminalOutcome": "COMPLETE",
+  "publicationState": {
+    "version": 1,
+    "sprintId": "sprint-761",
+    "runId": "892960cf-9961-4e1e-a326-2b8f998ac799",
+    "coordinatorGeneration": 1,
+    "authorityVersion": 1,
+    "receipt": {
+      "version": 1,
+      "sprintId": "sprint-761",
+      "runId": "892960cf-9961-4e1e-a326-2b8f998ac799",
+      "coordinatorGeneration": 1,
+      "terminalOutcome": "COMPLETE",
+      "logicalSettlementDigest": "12ffec3d622e9997aa30299ddd24d994cc595a11dc41a531dfef0fe3fa33e82e",
+      "priorAuthorityVersion": 0,
+      "authorityVersion": 1
+    }
+  },
+  "receipt": {
+    "version": 1,
+    "sprintId": "sprint-761",
+    "runId": "892960cf-9961-4e1e-a326-2b8f998ac799",
+    "coordinatorGeneration": 1,
+    "terminalOutcome": "COMPLETE",
+    "logicalSettlementDigest": "12ffec3d622e9997aa30299ddd24d994cc595a11dc41a531dfef0fe3fa33e82e",
+    "priorAuthorityVersion": 0,
+    "authorityVersion": 1
+  },
+  "terminalEvidence": {
+    "version": 1,
+    "summary": {
+      "logicalTaskCount": 1,
+      "observedAttemptCount": 1,
+      "completedLogicalTaskCount": 1,
+      "settledAttemptCount": 0,
+      "activeOrUnsettledAttemptCount": 0,
+      "partialResultCount": 0,
+      "attributionExclusionCount": 0,
+      "holdCount": 0
+    },
+    "cleanupEligibility": {
+      "state": "CANDIDATE",
+      "candidate": true,
+      "reasons": []
+    },
+    "holds": [],
+    "coordinatorEvidence": [
+      {
+        "evidenceId": "sprint-terminal-receipt",
+        "kind": "terminal-receipt",
+        "state": "VERIFIED",
+        "evidenceRef": "terminal-receipt:sha256:d96635c9fae4d6febbf6d7694ab4f794798d8a095caf5203d06e9e221d59338b",
+        "requiredForCleanup": true
+      }
+    ],
+    "attributionExclusions": []
+  },
+  "logicalProgress": {
+    "done": 1,
+    "active": 0,
+    "blocked": 0,
+    "total": 1,
+    "attemptCount": 1,
+    "lineages": [
+      {
+        "logicalTaskId": "761-001",
+        "attemptIds": [
+          "761-001"
+        ],
+        "attemptCount": 1,
+        "status": "done"
+      }
+    ]
+  },
+  "terminalTruth": {
+    "completedLineages": 1,
+    "policySkippedLineages": 0,
+    "cascadeSkippedLineages": 0
+  },
+  "lineageUsage": [
+    {
+      "logicalRootTaskId": "761-001",
+      "billingAuthority": "subscription",
+      "attempts": [
+        {
+          "id": "c32c9ef3-6136-88bf-80b7-02b5534c8b4b",
+          "taskId": "761-001",
+          "logicalRootTaskId": "761-001",
+          "inputTokens": 67836,
+          "outputTokens": 7778,
+          "cacheReadTokens": 430208,
+          "cacheCreationTokens": 0,
+          "referenceCostUsd": 0
+        }
+      ],
+      "tokenUsage": {
+        "inputTokens": 67836,
+        "outputTokens": 7778,
+        "cacheReadTokens": 430208,
+        "cacheCreationTokens": 0
+      },
+      "referenceCostUsd": 0,
+      "billedUsd": {
+        "state": "known",
+        "usd": 0
+      }
+    }
+  ],
+  "exactCustodyDigests": [
+    {
+      "taskId": "761-001",
+      "attemptId": "c32c9ef3-6136-88bf-80b7-02b5534c8b4b",
+      "generation": 1,
+      "admissionReceiptDigest": "sha256:e625471e76c3aa354db9fe75c36ec5847acef585c76ff37d2203f21cbef3fa8b",
+      "acceptedResultArtifactReceiptDigest": "sha256:b56ec5a2e785a8e278377e44d0614227bb6026140550ad7c392edb1f653b9823",
+      "acceptedResultChainDigest": "sha256:e55adf1301c724be7e714374a23cd3c72f7122844933843920366df0b26266c7",
+      "resultDigest": "sha256:a623834c5e00727cb113ea021f82122da7227b77ba8fd288253579186953cfb7",
+      "evaluationArtifactReceiptDigest": "sha256:9c254b97babd3541e3804b5dd81434d424e0f8d2b8757f8e88a6413381cd501c",
+      "evaluationChainDigest": "sha256:0a9766fb137420b83529da216cc290f49dc8accdf0f35d10d73cf546b6f77022",
+      "evaluationReceiptDigest": "sha256:fa7ef18b1f227d8088c75deaa749b4f40a34ed55a9a5cd924b30570fe43979a6",
+      "finalizerArtifactReceiptDigest": "sha256:7e05ebd0c2b7e747fc8b984cfbb2e332c8e52a831978d5b7fd8a7f8b2d5d48b6",
+      "finalizerChainDigest": "sha256:1926c81fc68cf4fc0c11595665adb8e2c06ab96e44598fa58e8efbe1d0e7b289",
+      "finalizerReceiptDigest": "sha256:cc3919f0749c1f5a5043a7de95e539564253b039b62f6468e6e587315c96307f",
+      "settlementArtifactReceiptDigest": "sha256:b38814b2c2e499fbaa2e07f9655a599ddcf49c476bee48794771165a21c04281",
+      "settlementDigest": "sha256:28eff5f4ab7abeaeecbf49c0ef532bb587bafb943134ad370c310920c69e7b7a"
+    }
+  ],
+  "writtenAt": "2026-09-14T09:56:10.572Z"
+}

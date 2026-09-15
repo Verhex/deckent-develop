@@ -1,0 +1,52 @@
+
+> deckent@0.100.0 lint
+> tsc --noEmit && tsc --noEmit -p src/dashboard && npm run lint:gates
+
+
+> deckent@0.100.0 lint:gates
+> node scripts/lint-cli-mcp-parity.mjs && node scripts/lint-no-model-literal.mjs && node scripts/lint-i18n-hardcode.mjs && node scripts/lint-layer-shims.mjs && node scripts/lint-test-hermeticity.mjs && node scripts/verify-gitignore.mjs && node scripts/routing-distribution.mjs --ci && node scripts/lint-desktop-api-sync.mjs && node scripts/lint-operation-catalog.mjs && node scripts/lint-manifests.mjs && node scripts/builtins-drift-check.mjs --check && node scripts/lint-master-plan.mjs --check && node scripts/lint-closure-dispositions.mjs && node scripts/lint-sprint-archive-writers.mjs && node scripts/lint-config-writers.mjs && node scripts/lint-acceptance-confirmation-authority.mjs && node scripts/lint-approval-lifecycle-authority.mjs && node scripts/lint-recovery-truth-authority.mjs && node scripts/update-readme-stats.mjs --check && node scripts/build-design-tokens.mjs --check && node scripts/lint-operating-policy.mjs && node scripts/lint-doc-command-truth.mjs && node scripts/audit-operation-ingress.mjs --check && node scripts/lint-script-registry.mjs && node scripts/lint-terminal-readability.mjs
+
+
+┌────────────────────────────────────────────────────────────────┐
+│ CLI ↔ MCP Parity Gate (baseline-ratchet)                       │
+└────────────────────────────────────────────────────────────────┘
+
+  CLI commands scanned : 81
+  MCP tools scanned    : 51
+  cli-shared description bindings scanned : 44
+  inputSchema field .describe() sites     : 215 (catalog 215, literal 0, unknown 0)
+
+────────────────────────────────────────────────────────────────
+  Known-intentional gaps (baseline): 41 CLI-only + 1 MCP-only + 0 description-key + 0 field-description
+
+────────────────────────────────────────────────────────────────
+  ✓ No NEW parity gaps beyond the accepted baseline.
+
+────────────────────────────────────────────────────────────────
+
+[no-model-literal] ✓ no new canonical literal, runtime legacy alias, or actionable docs alias — 0 source + 0 Markdown sites sanctioned (grandfathered)
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ i18n Hardcode Lint (gate)                                              │
+└────────────────────────────────────────────────────────────────────────┘
+
+  Files scanned  : 130  (117 src/cli/commands + 13 src/desktop/src/main)
+  Description scan: 164 .description() targets (117 src/cli/commands + 1 src/cli/index.ts + 46 src/mcp/tools), 46 description: targets (src/mcp/tools), 117 desc: targets (src/cli/commands slash catalog)
+  Hits (gated)   : 0  (+30 allowlisted)
+  Surface scan   : 118 .option/.argument/.helpOption/.addHelpText targets — 0 literal(s), ratchet ceiling 370
+
+────────────────────────────────────────────────────────────────────────
+  ✓ No hardcoded natural-language strings found in CLI commands or desktop main.
+
+────────────────────────────────────────────────────────────────────────
+  ✓ i18n gate clean.
+────────────────────────────────────────────────────────────────────────
+
+[layer-shims] ✓ full graph clean (1499 files, 7516 local edges)
+[hermetic-lint] PROGRESS graph files=2537 edges=14284 depth=0 elapsedMs=3001
+[hermetic-lint] PROGRESS graph files=2538 edges=14289 depth=0 elapsedMs=3002
+[hermetic-lint] PROGRESS graph files=2539 edges=14297 depth=0 elapsedMs=3003
+[hermetic-lint] PROGRESS graph files=2540 edges=14306 depth=0 elapsedMs=3005
+[hermetic-lint] PROGRESS graph files=2541 edges=14317 depth=0 elapsedMs=3007
+[hermetic-lint] PROGRESS graph files=3000 edges=16983 depth=0 elapsedMs=3567
+[hermetic-lint] ERROR: Maximum call stack size exceeded

@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 /tmp/deckent-r18-762-repair
+
+ ✓ tests/orchestra/execution-effect-landing-coordinator.test.ts (39 tests) 933ms
+   ✓ execution effect landing coordinator > bounds quarantine evidence after a late failure in a large operation set  672ms
+ ✓ tests/orchestra/execution-effect-lock-adapter.test.ts (8 tests) 946ms
+
+ Test Files  2 passed (2)
+      Tests  47 passed (47)
+   Start at  15:28:16
+   Duration  3.00s (transform 864ms, setup 37ms, collect 1.17s, tests 1.88s, environment 0ms, prepare 71ms)
+

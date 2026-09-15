@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 /home/alperen/deckent-dev
+
+ ✓ tests/core/run-status-authority.test.ts (19 tests) 904ms
+ ✓ tests/core/run-status-read-model.test.ts (16 tests) 320ms
+ ✓ tests/orchestra/exact-controller-terminal-fanin.test.ts (48 tests) 849ms
+
+ Test Files  3 passed (3)
+      Tests  83 passed (83)
+   Start at  18:29:55
+   Duration  6.72s (transform 3.66s, setup 40ms, collect 5.82s, tests 2.07s, environment 0ms, prepare 109ms)
+

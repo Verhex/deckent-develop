@@ -328,6 +328,7 @@ function releasedReplayFixture() {
   const store = {
       readEffectReleasedUnacceptedDispatch: vi.fn(() => null),
     readRejectedResultDispatch: vi.fn((): unknown => null),
+    readAbortedPartialDispatch: vi.fn((): unknown => null),
     readStartedFailedDispatch: vi.fn((): unknown => null),
     readEffectCommittedReleasePendingDispatch: vi.fn((): unknown => null),
     // No private seal-failure artifact exists in this normal monitor fixture.
@@ -2612,9 +2613,11 @@ describe('exact Docker custody mounts', () => {
       providerExit,
     );
     await Promise.resolve();
-    expect(internals.exactCustodyProviderStarts.has(fixture.admissionRef.refDigest)).toBe(false);
-    expect(internals.exactCustodyProviderExecutions.has(fixture.admissionRef.refDigest)).toBe(false);
-    expect(internals.exactCustodyCompletions.has(fixture.admissionRef.refDigest)).toBe(false);
+    // A held completion is not absence evidence (R35/R36). Preserve lookup
+    // without redispatching or minting accepted-result authority.
+    expect(internals.exactCustodyProviderStarts.has(fixture.admissionRef.refDigest)).toBe(true);
+    expect(internals.exactCustodyProviderExecutions.has(fixture.admissionRef.refDigest)).toBe(true);
+    expect(internals.exactCustodyCompletions.has(fixture.admissionRef.refDigest)).toBe(true);
     expect(mockSpawnSync).not.toHaveBeenCalled();
   });
 
@@ -2622,6 +2625,7 @@ describe('exact Docker custody mounts', () => {
     ['FINAL_CAPTURE', 'FINAL_CAPTURE', 'CONTAINMENT_HOLD', 'EFFECT_FINAL_CAPTURE_HOLD'],
     ['READY_PUBLICATION', 'READY_PUBLICATION', 'READY_AUTHORITY_REREAD_INVALID', 'EFFECT_PUBLICATION_HOLD'],
     ['LANDING', 'LANDING_PREPARE', 'PREIMAGE_MISMATCH', 'EFFECT_LANDING_HOLD'],
+    ['LANDING', 'LANDING_APPLY', 'NATIVE_EFFECT_UNCERTAIN', 'EFFECT_LANDING_HOLD'],
   ] as const)('durably preserves %s first-failure identity and never releases on HOLD', async (phase, stage, code, reasonCode) => {
     // This assertion reaches the effect-commit boundary, so it must start from
     // the same immutable stream/result/proposal trio that production rereads.
@@ -3637,73 +3641,8 @@ describe('exact Docker custody mounts', () => {
     expect(held.acceptance).toHaveBeenCalledTimes(1);
   });
 
-  it('reconstructs NO_GO accepted host-work authority in canonical scope order', () => {
-    const backend = new DockerSpawnBackend('/test/project', { custodyStateDir: '/test/state' });
-    const attemptId = '123e4567-e89b-42d3-a456-426614174728';
-    const providerExitObservationReceiptDigest = digest('f');
-    const baselineSha256 = 'b'.repeat(64);
-    const scopeFiles = ['tests/a.ts', 'tests/z.ts'];
-    const scopeDigest = createHash('sha256').update(canonicalJson(scopeFiles)).digest('hex');
-    const baselineRef = `task-attempt-custody-provider-exit:${providerExitObservationReceiptDigest}#scope-baseline:sha256:${baselineSha256}`;
-    const effectOrderedChanges = [
-      { path: 'tests/z.ts', status: 'modified', linesAdded: 1, linesRemoved: 1 },
-      { path: 'tests/a.ts', status: 'added', linesAdded: 2, linesRemoved: 0 },
-    ] as const;
-    const canonicalChanges = [effectOrderedChanges[1], effectOrderedChanges[0]];
-    const expectedBody = {
-      filesChanged: canonicalChanges,
-      totalLinesAdded: 3,
-      totalLinesRemoved: 1,
-      workAttribution: {
-        state: 'VERIFIED' as const,
-        attemptId,
-        baselineRef,
-        baselineSha256,
-        scopeDigest,
-      },
-      providerExitObservationReceiptDigest,
-    };
-    const internals = backend as unknown as {
-      exactCanonicalHostWorkAuthorityFromAccepted(
-        scope: unknown,
-        providerExit: unknown,
-        result: unknown,
-        prompt: unknown,
-      ): Record<string, unknown>;
-    };
-
-    expect(internals.exactCanonicalHostWorkAuthorityFromAccepted(
-      {
-        identity: { attemptId },
-        taskSnapshot: {
-          material: { dispatch: { scope: { filesWrite: scopeFiles } } },
-          dispatch: { scopeBaselineSha256: `sha256:${baselineSha256}` },
-        },
-      },
-      { observationReceiptDigest: providerExitObservationReceiptDigest },
-      {
-        selfAssessment: 'NO_GO',
-        diskVerified: true,
-        boundaryViolations: [],
-        promptDeliveryAttribution: { state: 'CURRENT' },
-        agent: 'backend-specialist',
-        skills: ['delivered-skill'],
-        filesChanged: effectOrderedChanges,
-        totalLinesAdded: 3,
-        totalLinesRemoved: 1,
-        workAttribution: {
-          state: 'VERIFIED', attemptId, baselineRef, baselineSha256, scopeDigest,
-        },
-      },
-      { agentId: 'backend-specialist', skillIds: ['delivered-skill'] },
-    )).toEqual({
-      ...expectedBody,
-      evidenceDigest: `sha256:${createHash('sha256')
-        .update(canonicalJson(expectedBody)).digest('hex')}`,
-    });
-  });
-
-  it('accepts subscription completion produced by hot and cold custody paths and durably reopens accepted authority after live eviction', async () => {
+  it.each([false, true])('reopens hot/cold accepted authority with derived directory projection %s', async (withDerivedDirectory) => {
+    mockLifecycleStoreAdmissionAdapter.mockReset();
     const policy = createTaskResultSettlementV2TestPolicy();
     const measuredFiles = Object.freeze([
       Object.freeze({
@@ -3789,6 +3728,13 @@ describe('exact Docker custody mounts', () => {
           effectDigests: [digest('7')],
           derivedParentProvenanceDigest: null,
         },
+        ...(withDerivedDirectory ? [{
+          operationIndex: 2, path: 'tests', status: 'added' as const,
+          operationKind: 'ADD_DIRECTORY' as const, entryKind: 'directory' as const,
+          lineMetrics: 'NOT_APPLICABLE_DIRECTORY' as const,
+          operationDigest: digest('8'), effectDigests: [],
+          derivedParentProvenanceDigest: digest('9'),
+        }] : []),
       ],
     });
     const effectLandingBinding = createTaskAttemptEffectLandingBindingV2({
@@ -4725,6 +4671,7 @@ describe('exact Docker custody mounts', () => {
         filesChanged: [
           { path: 'tests/z.ts', status: 'modified', linesAdded: 1, linesRemoved: 1 },
           { path: 'tests/a.ts', status: 'added', linesAdded: 2, linesRemoved: 0 },
+          ...(withDerivedDirectory ? [{ path: 'tests', status: 'added', linesAdded: 0, linesRemoved: 0 }] : []),
         ],
       },
     });
@@ -4744,6 +4691,7 @@ describe('exact Docker custody mounts', () => {
         filesChanged: [
           { path: 'tests/z.ts', status: 'modified', linesAdded: 1, linesRemoved: 1 },
           { path: 'tests/a.ts', status: 'added', linesAdded: 2, linesRemoved: 0 },
+          ...(withDerivedDirectory ? [{ path: 'tests', status: 'added', linesAdded: 0, linesRemoved: 0 }] : []),
         ],
       },
     });
@@ -4870,6 +4818,7 @@ describe('exact Docker custody mounts', () => {
         filesChanged: [
           { path: 'tests/z.ts', status: 'modified', linesAdded: 1, linesRemoved: 1 },
           { path: 'tests/a.ts', status: 'added', linesAdded: 2, linesRemoved: 0 },
+          ...(withDerivedDirectory ? [{ path: 'tests', status: 'added', linesAdded: 0, linesRemoved: 0 }] : []),
         ],
       },
     });

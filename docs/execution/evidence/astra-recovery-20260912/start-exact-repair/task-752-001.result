@@ -1,0 +1,97 @@
+{
+  "taskId": "752-001",
+  "workerId": "w-752-001",
+  "promptCompilePlanId": "prompt-compile-plan:sha256:fe874fb1e1e559ce7b34bfaa95ec7fdd0128bbef1a349b4e860eb818e02468f1",
+  "filesChanged": [],
+  "linesAdded": 0,
+  "linesRemoved": 0,
+  "testsPassed": false,
+  "testVerification": {
+    "applicability": "REQUIRED",
+    "outcome": "NOT_EXECUTED",
+    "commands": []
+  },
+  "criteriaEvidence": [
+    {
+      "criterionId": "criterion-go-174026d22eb680e8cbe95d9c520469d78b6b5c8c743d8907b7c84d8662900d1b",
+      "outcome": "UNVERIFIED",
+      "evidence": ["Execution did not start because attemptId/backend heartbeat identity authority was explicitly unavailable."]
+    },
+    {
+      "criterionId": "criterion-go-2f383c6022ff9e45b0c9cb056d300627af19a84cd2b9b0876a3aeae74477af8a",
+      "outcome": "UNVERIFIED",
+      "evidence": ["The prompt states host runtime routing evidence does not exist at compile time; no bound runtime invocation evidence was available."]
+    },
+    {
+      "criterionId": "criterion-go-7f92d66c3269893d04a13c95d86d0f7ca768fd5ec7473a7465d1e9e2abd467c5",
+      "outcome": "UNVERIFIED",
+      "evidence": ["No source inspection, mutation, or test execution occurred."]
+    },
+    {
+      "criterionId": "criterion-go-97bbbaf95b68a3606560d0d72158e6772c2a35be4a26a97c2775c6bee4c711b9",
+      "outcome": "UNMET",
+      "evidence": ["The required Vitest command was not executed because execution could not lawfully begin without heartbeat identity authority."]
+    },
+    {
+      "criterionId": "criterion-go-a7e5b385aed555f67f58a9bf057f6f3e8dc0bc475becb6daa945c2e4f2bef963",
+      "outcome": "UNVERIFIED",
+      "evidence": ["No implementation was performed."]
+    },
+    {
+      "criterionId": "criterion-go-b1d861b68d6fcb5071a86697061bcc22bdcc81f641ea541307607484c8285eae",
+      "outcome": "UNVERIFIED",
+      "evidence": ["No project files changed and transient-failure tests were not run."]
+    },
+    {
+      "criterionId": "criterion-go-b8d00826c9bde7ad228078bef9607d841c9dc3d630e29f12e0a1a25441f90448",
+      "outcome": "UNVERIFIED",
+      "evidence": ["The worker result contains typed incomplete evidence; independent host execution cannot be claimed by the worker."]
+    },
+    {
+      "criterionId": "criterion-go-d21e301502e7875bc2b0d01c62f177cb7bae659e904eb53cc76cff1aaf38e9bf",
+      "outcome": "UNVERIFIED",
+      "evidence": ["Metric exact-once behavior and API compatibility were not inspected or tested."]
+    },
+    {
+      "criterionId": "criterion-go-d654e46661cff363af7bcc32e80bfb05fb0ad35c1841e7daca54d30034219379",
+      "outcome": "UNVERIFIED",
+      "evidence": ["Same-session transient recovery was not implemented or tested."]
+    },
+    {
+      "criterionId": "criterion-no-go-11b588a0d1ee99694892a09753bac932d84132a1a4e6d02b6117d4ee74d2bfb9",
+      "outcome": "UNMET",
+      "evidence": ["Unavailable authority is reported as NO_GO, not as complete; no provider or host evidence is fabricated."]
+    },
+    {
+      "criterionId": "criterion-no-go-2120e849fc0dcd9ab3caf9f791814b7abf24429c21d5750d160730442399d626",
+      "outcome": "UNVERIFIED",
+      "evidence": ["Existing rotation behavior was not inspected because execution was held before startup."]
+    },
+    {
+      "criterionId": "criterion-no-go-6d390b6b96af93c9d4cd2a4c472e0e664259122847d254dc78a17263d6dd3dcf",
+      "outcome": "UNMET",
+      "evidence": ["No source files were changed, so this attempt introduced no metric loss, duplication, threshold, or out-of-scope source write."]
+    },
+    {
+      "criterionId": "criterion-no-go-fc594d10a78178485c24651ed7bb614e0a6d0eabb7fe3b8d2e9133e6c8314e00",
+      "outcome": "MET",
+      "evidence": ["The requested implementation was not performed because mandatory startup identity authority was unavailable."]
+    }
+  ],
+  "coverage": 0,
+  "selfAssessment": "NO_GO",
+  "techDebtCriterionIds": [],
+  "productionWiringEvidence": {
+    "version": 1,
+    "contractDigest": "70ab2aba53128268eea1b4eddc98aa3880127fc0a7c1e9b8fc2997e86580421c",
+    "observedBy": "worker",
+    "evidence": {
+      "state": "incomplete",
+      "reasonCode": "not-executed",
+      "evidenceRefs": [
+        "HEARTBEAT_IDENTITY_HOLD: attemptId/backend were not host-bound"
+      ]
+    }
+  },
+  "notes": "NO_GO: mandatory heartbeat attemptId/backend identity authority was explicitly not host-bound. The contract forbids writing an ambiguous legacy heartbeat, so execution stopped before source inspection, mutation, or verification. No heartbeat was written.\nUNWIRED: deckent.observability.metrics-append — worker execution/inspection authority unavailable until host binds attemptId and backend.\nUNWIRED: deckent.observability-rotation.size-triggered-rotation — worker execution/inspection authority unavailable until host binds attemptId and backend.\nUNWIRED: deckent.observability.record-metric — worker execution/inspection authority unavailable until host binds attemptId and backend.\nUNWIRED: deckent.config.observability-rotation-policy — worker execution/inspection authority unavailable until host binds attemptId and backend.\ndocImpact: none; no source or documentation changes were made."
+}

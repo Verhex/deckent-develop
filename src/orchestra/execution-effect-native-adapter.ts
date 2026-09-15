@@ -2115,9 +2115,12 @@ function parentIdentityDigest(
     if (parent.entry.state !== 'PRESENT') fail('AUTHORITY_MISMATCH', 'parent-preimage');
     return parent.entry.objectIdentityDigest as ExecutionEffectPersistenceDigest;
   }
-  const dependency = dependencies[parent.operationIndex];
-  if (!dependency || dependency.operationDigest !== parent.operationDigest
-    || dependencies.filter(receipt => receipt.operationDigest === parent.operationDigest).length !== 1) {
+  // The coordinator supplies only this operation's dependencies, not the full
+  // transaction receipt array. operationIndex belongs to the transaction; bind
+  // the compact dependency set by its exact operation identity instead.
+  const matching = dependencies.filter(receipt => receipt.operationDigest === parent.operationDigest);
+  const dependency = matching[0];
+  if (!dependency || matching.length !== 1) {
     fail('AUTHORITY_MISMATCH', 'parent-dependency');
   }
   const state = dependency.entryPostimages.find(post => post.path === parent.path)?.entry;
@@ -2140,7 +2143,7 @@ function operationEnvelope(
   const result = Buffer.alloc(200 + path.byteLength);
   result.write('DEE2', 0, 'ascii');
   result[4] = 1;
-  result[5] = ({ ADD_DIRECTORY: 1, ADD: 2, REPLACE: 3, DELETE: 4, MODE: 5 } as const)[operation.kind];
+  result[5] = ({ ADD_DIRECTORY: 1, REUSE_DIRECTORY: 6, ADD: 2, REPLACE: 3, DELETE: 4, MODE: 5 } as const)[operation.kind];
   result[6] = entryKind(pre);
   result[7] = entryKind(post);
   result.writeUInt32BE(entryMode(pre), 8);

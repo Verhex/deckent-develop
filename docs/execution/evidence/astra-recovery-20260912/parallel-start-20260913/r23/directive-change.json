@@ -1,0 +1,7 @@
+{
+  "utc": "2026-09-14T15:08:23.758639+00:00",
+  "before": "bb3c9c1b17ece4fcfaf8a6c41d752b5c919c1138917c0bd1c595321d6fb29034",
+  "after": "66a1f5a99f967d7781707726d7a7ab9d9da08c7c44b22791efd6980e085c6eae",
+  "purpose": "Owner-admitted max4 real dogfood canary; independent useful analysis outputs after R23 recovery",
+  "sharedAncestorInitiallyAbsent": true
+}

@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 /tmp/deckent-r18-762-repair
+
+ ✓ tests/core/execution-effect-persistence-contract.test.ts (10 tests) 65ms
+ ✓ tests/orchestra/execution-effect-landing-coordinator.test.ts (41 tests) 875ms
+   ✓ execution effect landing coordinator > bounds quarantine evidence after a late failure in a large operation set  612ms
+
+ Test Files  2 passed (2)
+      Tests  51 passed (51)
+   Start at  16:49:02
+   Duration  2.61s (transform 489ms, setup 32ms, collect 600ms, tests 940ms, environment 0ms, prepare 72ms)
+

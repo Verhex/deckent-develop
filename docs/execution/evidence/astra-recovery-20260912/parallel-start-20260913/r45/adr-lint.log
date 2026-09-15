@@ -1,0 +1,6 @@
+
+> deckent@0.100.0 lint:adr
+> node scripts/adr-validator.mjs
+
+
+✓ ADR validation passed: 52 ADRs validated

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { readFileSync, writeSync } from 'node:fs';
-import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runInNewContext } from 'node:vm';
@@ -27,6 +27,7 @@ import {
 import { compileExecutionEffectWritePolicy } from '../../src/core/execution-write-scope-policy.js';
 import {
   createExecutionEffectDependencyResourceV1,
+  createExecutionEffectLandingDerivedParentProvenanceV1,
   createExecutionEffectWorkspaceResourceV1,
   createExecutionEffectWorkspaceSnapshotSealV1,
   executionEffectLandingOperationDigestV1,
@@ -1125,7 +1126,7 @@ describe('execution effect native adapter', () => {
         await runDocker(['volume', 'create', volumeName]);
         volumeCreated = true;
         const sourceBytes = deterministicSourceBytes(527_378);
-        const sourcePath = 'src/large-source.ts';
+        const sourcePath = 'docs/execution/active/shared/settlement/ANALYSIS.md';
         const ownerUid = process.getuid?.() ?? 1000;
         const ownerGid = process.getgid?.() ?? 1000;
         const populateScript = String.raw`
@@ -1135,12 +1136,12 @@ describe('execution effect native adapter', () => {
           const gid = Number(process.argv[3]);
           const bytes = Buffer.allocUnsafe(size);
           for (let index = 0; index < size; index += 1) bytes[index] = (index * 31 + 7) % 251;
-          mkdirSync('/workspace/src', { recursive: true, mode: 0o755 });
-          writeFileSync('/workspace/src/large-source.ts', bytes, { mode: 0o644 });
-          chmodSync('/workspace/src/large-source.ts', 0o644);
+          mkdirSync('/workspace/docs/execution/active/shared/settlement', { recursive: true, mode: 0o755 });
+          writeFileSync('/workspace/docs/execution/active/shared/settlement/ANALYSIS.md', bytes, { mode: 0o644 });
+          chmodSync('/workspace/docs/execution/active/shared/settlement/ANALYSIS.md', 0o644);
           chownSync('/workspace', uid, gid);
-          chownSync('/workspace/src', uid, gid);
-          chownSync('/workspace/src/large-source.ts', uid, gid);
+          chownSync('/workspace/docs/execution/active/shared/settlement', uid, gid);
+          chownSync('/workspace/docs/execution/active/shared/settlement/ANALYSIS.md', uid, gid);
         `;
         await runDocker([
           'run', '--rm', '--name', populationContainer,
@@ -1182,6 +1183,86 @@ describe('execution effect native adapter', () => {
           expect(staged.contentDigest).toBe(sha256(sourceBytes));
           expect(capturedBytes.equals(sourceBytes)).toBe(true);
           expect(fixture.adapter.verifyStagedSource(staged)).toBe(true);
+          await mkdir(join(projectRoot, 'docs/execution/active'), { recursive: true });
+          let priorReceipt: ReturnType<typeof fixture.adapter.applyOperation> | undefined;
+          let priorOperation: ExecutionEffectLandingOperationV1 | undefined;
+          let previousDirectoryReceipt: ReturnType<typeof fixture.adapter.applyOperation> | undefined;
+          let directoryEntry = { path: '', kind: 'directory' as const, mode: 0o755 };
+          for (const [index, path] of ['docs/execution/active/shared', 'docs/execution/active/shared/settlement'].entries()) {
+            const parent = path.slice(0, path.lastIndexOf('/'));
+            const parentEntry = directoryEntry;
+            directoryEntry = { path, kind: 'directory' as const, mode: 0o755 };
+            const expectedBody = { state: 'PRESENT' as const, entry: directoryEntry };
+            const dirBody = {
+              version: 1 as const, index, kind: 'ADD_DIRECTORY' as const, path,
+              effectDigests: [], derivedParent: createExecutionEffectLandingDerivedParentProvenanceV1({
+                path, childEffectDigests: [sha256('effect')],
+              }), stagedSource: null,
+              entryPreimages: [{ path, entry: createExecutionEffectLandingEntryStateV1({ entry: null }) }],
+              entryPostimages: [{ path, entry: { ...expectedBody,
+                stateDigest: domainDigest('execution-effect-landing-expected-entry-state-v1', expectedBody) } }],
+              parentAuthorities: priorOperation ? [{ path: parent, source: 'OPERATION_POSTIMAGE' as const,
+                operationIndex: priorOperation.index, operationDigest: priorOperation.operationDigest,
+                expectedDirectory: parentEntry }] : [{ path: parent, source: 'PREPARED_PREIMAGE' as const,
+                entry: fixture.adapter.inspectProjectEntry(parent) }],
+            };
+            const operation = { ...dirBody, operationDigest: executionEffectLandingOperationDigestV1(dirBody) };
+            priorReceipt = fixture.adapter.applyOperation({ operation, dependencyReceipts: priorReceipt ? [priorReceipt] : [] });
+            priorOperation = operation;
+            // A second landing may use this exact directory without mutating it.
+            const beforeReuse = await stat(join(projectRoot, path));
+            const observed = fixture.adapter.inspectProjectEntry(path);
+            const reuseBody = { ...dirBody, kind: 'REUSE_DIRECTORY' as const,
+              entryPreimages: [{path, entry: observed}] };
+            const reuse = { ...reuseBody, operationDigest: executionEffectLandingOperationDigestV1(reuseBody) };
+            const dependencies = index === 0 ? [] : [previousDirectoryReceipt!];
+            const reused = fixture.adapter.applyOperation({operation: reuse, dependencyReceipts: dependencies});
+            expect(reused.entryPostimages[0]!.entry).toEqual(observed);
+            expect(fixture.adapter.reconcileOperation({operation: reuse, dependencyReceipts: dependencies}).state).toBe('APPLIED');
+            const afterReuse = await stat(join(projectRoot, path));
+            expect(afterReuse.ino).toBe(beforeReuse.ino);
+            expect(afterReuse.ctimeMs).toBe(beforeReuse.ctimeMs);
+            const wrongIdentityBody = { ...reuseBody, entryPreimages: [{path, entry: createExecutionEffectLandingEntryStateV1({entry: directoryEntry, objectIdentityDigest: sha256('foreign-directory'), linkCount: null})}] };
+            const wrongIdentity = {...wrongIdentityBody, operationDigest: executionEffectLandingOperationDigestV1(wrongIdentityBody)};
+            expect(() => fixture.adapter.applyOperation({operation: wrongIdentity, dependencyReceipts: dependencies})).toThrow();
+            expect(fixture.adapter.reconcileOperation({operation: wrongIdentity, dependencyReceipts: dependencies}).state).toBe('AMBIGUOUS');
+            previousDirectoryReceipt = priorReceipt;
+          }
+          const absent = createExecutionEffectLandingEntryStateV1({ entry: null });
+          const expectedBody = Object.freeze({ state: 'PRESENT' as const, entry: fixture.entry });
+          const expected = Object.freeze({
+            ...expectedBody,
+            stateDigest: domainDigest('execution-effect-landing-expected-entry-state-v1', expectedBody),
+          });
+          const body = Object.freeze({
+            version: 1 as const,
+            index: 2,
+            kind: 'ADD' as const,
+            path: fixture.entry.path,
+            effectDigests: Object.freeze([sha256('effect')]),
+            derivedParent: null,
+            stagedSource: staged,
+            entryPreimages: Object.freeze([{ path: fixture.entry.path, entry: absent }]),
+            entryPostimages: Object.freeze([{ path: fixture.entry.path, entry: expected }]),
+            parentAuthorities: Object.freeze([{
+              path: directoryEntry.path, source: 'OPERATION_POSTIMAGE' as const, operationIndex: 1,
+              operationDigest: priorOperation!.operationDigest, expectedDirectory: directoryEntry,
+            }]),
+          });
+          const operation: ExecutionEffectLandingOperationV1 = Object.freeze({
+            ...body,
+            operationDigest: executionEffectLandingOperationDigestV1({
+              ...body,
+              stagedSource: { stageAuthorityDigest: staged.stageAuthorityDigest },
+            }),
+          });
+          expect(() => fixture.adapter.applyOperation({ operation, dependencyReceipts: [] }))
+            .toThrow('AUTHORITY_MISMATCH');
+          expect(() => fixture.adapter.applyOperation({ operation, dependencyReceipts: [priorReceipt!, priorReceipt!] }))
+            .toThrow('AUTHORITY_MISMATCH');
+          expect(fixture.adapter.inspectProjectEntry(sourcePath)).toEqual(absent);
+          fixture.adapter.applyOperation({ operation, dependencyReceipts: [priorReceipt!] });
+          expect(readFileSync(join(projectRoot, sourcePath))).toEqual(sourceBytes);
         }
       } finally {
         await runDocker(['rm', '-f', populationContainer], { allowFailure: true });

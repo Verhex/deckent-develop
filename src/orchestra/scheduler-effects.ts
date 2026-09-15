@@ -1,3 +1,5 @@
+import { isResumableTaskAuthorityHold } from './task-result-authority.js';
+import type { ExactDockerReleaseHoldEvidence } from './exact-docker-release-outcome.js';
 // ═══ Scheduler Effects — Canonical Spawn Executor (SCHED3, dilim-3) ═══════
 // docs/analysis/scheduler-unify-design-2026-07-11.md — Sprint-3 slice
 // ("cascadeSkipped ve fix-task routing koruma garantisi").
@@ -319,6 +321,8 @@ type ExactNormalDockerRegistryEntry =
   | Readonly<{
       state: 'hold';
       reasonCode: string;
+      query?: ExactDockerCustodyTerminalQueryV2;
+      holdClassification?: 'AUTHORITY_CONTRADICTION';
       /** Safe, Store-verified capture summary for operator-facing HOLD readers. */
       diagnosticReason?: string;
       rejected?: ExactDockerRejectedResultV2;
@@ -356,6 +360,8 @@ function providerAdapterLifecycleOwner(
  * injects that decision; omitting it keeps every legacy call byte-identical.
  */
 export interface ExactLifecycleReconcileOptionsV1 {
+  /** Exact caller-owned run membership; absence preserves project-wide checks. */
+  readonly currentTaskIds?: ReadonlySet<string>;
   /**
    * `true` only when the task is PROVEN to belong to an earlier run that is
    * durably terminal. Unprovable origin, the current run, and a concurrent or
@@ -451,6 +457,7 @@ export interface ExactNormalDockerExecutionRegistryV2 {
     taskId: string,
     reasonCode: string,
     backend?: SpawnBackend,
+    details?: { query?: ExactDockerCustodyTerminalQueryV2; holdClassification?: 'AUTHORITY_CONTRADICTION' },
   ): void;
   registerLegacy(
     taskId: string,
@@ -484,13 +491,15 @@ export interface ExactNormalDockerExecutionRegistryV2 {
   snapshotHistoricalUnsettleableAttempts(): ReadonlyMap<string, Readonly<{
     readonly reasonCode: string;
     readonly retiredAt: string;
+    readonly disposition?: 'RUN_EXCLUDED_RETAINED';
   }>>;
-  snapshotExactTerminalAuthorities(): ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead>;
+  snapshotExactTerminalAuthorities(taskIds?: ReadonlySet<string>): ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead>;
   rehydrateRecovery(report: SpawnBackendRecoveryReport, backend: SpawnBackend): void;
   reconcileExactLifecycle(
     mode: 'resume' | 'contain',
     options?: ExactLifecycleReconcileOptionsV1,
   ): Promise<readonly SpawnBackendRecoveryReport[]>;
+  readExactHoldEvidence(taskId: string): ExactDockerReleaseHoldEvidence | null;
   readTaskResultAuthority(taskId: string): TaskResultAuthorityRead<TaskResult>;
   awaitTaskResultAuthority(taskId: string): Promise<TaskResultAuthorityRead<TaskResult>>;
   resolveExactAttemptIpcAuthority(taskId: string): ExactAttemptIpcQuestionAuthorityState;
@@ -518,6 +527,7 @@ export function createExactNormalDockerExecutionRegistry(
   const historicalUnsettleable = new Map<string, Readonly<{
     readonly reasonCode: string;
     readonly retiredAt: string;
+    readonly disposition?: 'RUN_EXCLUDED_RETAINED';
   }>>();
   const terminalWaits = new Map<string, Promise<void>>();
   /** One project-wide adoption scan per backend kind, regardless of task-local instances. */
@@ -688,6 +698,16 @@ export function createExactNormalDockerExecutionRegistry(
       heldTaskIds: Object.freeze(heldTaskIds),
     });
   };
+  const readExactHoldEvidence = (taskId: string): ExactDockerReleaseHoldEvidence | null => {
+    const entry = entries.get(taskId);
+    if (!entry || entry.state !== 'hold' || !entry.query) return null;
+    const evidence = entry.backend?.readExactDockerReleaseHoldEvidence?.(entry.query) ?? null;
+    const identity = entry.query.custodyRef.identity;
+    if (!evidence || evidence.taskId !== taskId || evidence.taskId !== identity.taskId
+      || evidence.attemptId !== identity.attemptId || evidence.generation !== identity.generation
+      || evidence.admissionRefDigest !== entry.query.custodyRef.admissionRefDigest) return null;
+    return evidence;
+  };
   const readTaskResultAuthority = (
     taskId: string,
   ): TaskResultAuthorityRead<TaskResult> => {
@@ -709,12 +729,15 @@ export function createExactNormalDockerExecutionRegistry(
       };
     }
     if (entry.state === 'hold') {
+      const holdEvidence = readExactHoldEvidence(taskId);
       return {
         state: 'authority-hold',
         result: null,
         settlementRef: null,
         rawResultPath,
         holdReason: entry.diagnosticReason ?? entry.reasonCode,
+        ...(entry.holdClassification ? { holdClassification: entry.holdClassification } : {}),
+        ...(holdEvidence ? { holdEvidence } : {}),
       };
     }
     const acceptedAuthority = exactAcceptedAuthority(entry.query, entry.accepted);
@@ -958,6 +981,7 @@ export function createExactNormalDockerExecutionRegistry(
           entries.set(taskId, Object.freeze({
             state: 'hold',
             reasonCode: 'EXACT_DISPATCH_REGISTRY_REPLAY_MISMATCH',
+          holdClassification: 'AUTHORITY_CONTRADICTION' as const,
             backend: backend ?? null,
             lifecycleOwner: backend ?? null,
           }));
@@ -999,6 +1023,7 @@ export function createExactNormalDockerExecutionRegistry(
         entries.set(taskId, Object.freeze({
           state: 'hold',
           reasonCode: outcome.reasonCode,
+          query,
           ...(outcome.captureDiagnostic === undefined
             ? {}
             : { diagnosticReason: captureDiagnostic ?? 'EXACT_CAPTURE_DIAGNOSTIC_INVALID' }),
@@ -1044,6 +1069,7 @@ export function createExactNormalDockerExecutionRegistry(
           entries.set(taskId, Object.freeze({
             state: 'hold',
             reasonCode: 'EXACT_NOT_DISPATCHED_REGISTRY_REPLAY_MISMATCH',
+          holdClassification: 'AUTHORITY_CONTRADICTION' as const,
             backend: backend ?? null,
             lifecycleOwner: backend ?? null,
           }));
@@ -1057,6 +1083,7 @@ export function createExactNormalDockerExecutionRegistry(
         entries.set(taskId, Object.freeze({
           state: 'hold',
           reasonCode: 'EXACT_NOT_DISPATCHED_REGISTRY_REPLAY_MISMATCH',
+          holdClassification: 'AUTHORITY_CONTRADICTION' as const,
           backend: backend ?? ('backend' in current ? current.backend : null),
           lifecycleOwner: backend ?? ('lifecycleOwner' in current
             ? current.lifecycleOwner : null),
@@ -1078,6 +1105,7 @@ export function createExactNormalDockerExecutionRegistry(
       taskId: string,
       reasonCode: string,
       backend?: SpawnBackend,
+      details?: { query?: ExactDockerCustodyTerminalQueryV2; holdClassification?: 'AUTHORITY_CONTRADICTION' },
     ): void {
       const current = entries.get(taskId);
       const currentOwner = current && 'lifecycleOwner' in current
@@ -1086,6 +1114,9 @@ export function createExactNormalDockerExecutionRegistry(
       entries.set(taskId, Object.freeze({
         state: 'hold',
         reasonCode,
+        ...(details?.query ? { query: details.query } : current && 'query' in current ? { query: current.query } : {}),
+        ...(details?.holdClassification || (current?.state === 'hold' && current.holdClassification)
+          ? { holdClassification: 'AUTHORITY_CONTRADICTION' as const } : {}),
         backend: backend ?? (current && 'backend' in current ? current.backend : null),
         lifecycleOwner: backend ?? currentOwner,
       }));
@@ -1099,6 +1130,7 @@ export function createExactNormalDockerExecutionRegistry(
         entries.set(taskId, Object.freeze({
           state: 'hold',
           reasonCode: 'EXECUTION_MODE_AUTHORITY_CHANGED',
+          holdClassification: 'AUTHORITY_CONTRADICTION' as const,
           backend: current && 'backend' in current ? current.backend : null,
           lifecycleOwner: 'lifecycleOwner' in current
             ? current.lifecycleOwner
@@ -1147,12 +1179,14 @@ export function createExactNormalDockerExecutionRegistry(
     snapshotHistoricalUnsettleableAttempts(): ReadonlyMap<string, Readonly<{
       readonly reasonCode: string;
       readonly retiredAt: string;
+    readonly disposition?: 'RUN_EXCLUDED_RETAINED';
     }>> {
       return new Map(historicalUnsettleable);
     },
-    snapshotExactTerminalAuthorities(): ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead> {
+    snapshotExactTerminalAuthorities(taskIds?: ReadonlySet<string>): ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead> {
       const snapshot = new Map<string, ExactAcceptedTaskTerminalAuthorityRead>();
       for (const [taskId, entry] of entries) {
+        if (taskIds && !taskIds.has(taskId)) continue;
         if (entry.state === 'legacy') continue;
         snapshot.set(taskId, readExactTerminalAuthority(taskId));
       }
@@ -1162,20 +1196,20 @@ export function createExactNormalDockerExecutionRegistry(
       if (!recoveryOwners.has(backend.name)) recoveryOwners.set(backend.name, backend);
       const collapsed = collapseRecoveredGenerationChains(report.exactEntries ?? []);
       for (const taskId of collapsed.heldTaskIds) {
-        this.registerHold(taskId, 'EXACT_RECOVERY_GENERATION_CHAIN_MISMATCH', backend);
+        this.registerHold(taskId, 'EXACT_RECOVERY_GENERATION_CHAIN_MISMATCH', backend, { holdClassification: 'AUTHORITY_CONTRADICTION' });
       }
       for (const recovered of collapsed.latest) {
         if (recovered.kind === 'not-dispatched') {
           const predecessor = predecessorFromNotDispatched(recovered.authority);
           if (!predecessor || recovered.taskId !== predecessor.identity.taskId) {
-            this.registerHold(recovered.taskId, 'EXACT_RECOVERY_NOT_DISPATCHED_MISMATCH', backend);
+            this.registerHold(recovered.taskId, 'EXACT_RECOVERY_NOT_DISPATCHED_MISMATCH', backend, { holdClassification: 'AUTHORITY_CONTRADICTION' });
             continue;
           }
           const current = entries.get(recovered.taskId);
           if (current && (current.state !== 'not-dispatched'
             || (current.authority !== null
               && JSON.stringify(current.authority) !== JSON.stringify(recovered.authority)))) {
-            this.registerHold(recovered.taskId, 'EXACT_RECOVERY_REGISTRY_CONFLICT', backend);
+            this.registerHold(recovered.taskId, 'EXACT_RECOVERY_REGISTRY_CONFLICT', backend, { holdClassification: 'AUTHORITY_CONTRADICTION' });
             continue;
           }
           entries.set(recovered.taskId, Object.freeze({
@@ -1190,9 +1224,10 @@ export function createExactNormalDockerExecutionRegistry(
         if (recovered.kind === 'released') {
           const current = entries.get(recovered.taskId);
           if (current) {
-            if (current.state !== 'pending'
-              || JSON.stringify(current.query) !== JSON.stringify(recovered.query)) {
-              this.registerHold(recovered.taskId, 'EXACT_RECOVERY_REGISTRY_CONFLICT', backend);
+            if ((current.state !== 'pending' && current.state !== 'hold')
+              || (current.state === 'hold' && current.holdClassification === 'AUTHORITY_CONTRADICTION')
+              || !('query' in current) || JSON.stringify(current.query) !== JSON.stringify(recovered.query)) {
+              this.registerHold(recovered.taskId, 'EXACT_RECOVERY_REGISTRY_CONFLICT', backend, { holdClassification: 'AUTHORITY_CONTRADICTION' });
               continue;
             }
             entries.delete(recovered.taskId);
@@ -1202,15 +1237,16 @@ export function createExactNormalDockerExecutionRegistry(
         }
         const reread = backend.readExactDockerAcceptedResult?.(recovered.accepted.reader);
         if (!reread || JSON.stringify(reread) !== JSON.stringify(recovered.accepted)) {
-          this.registerHold(recovered.taskId, 'EXACT_RECOVERY_ACCEPTED_REPLAY_MISMATCH', backend);
+          this.registerHold(recovered.taskId, 'EXACT_RECOVERY_ACCEPTED_REPLAY_MISMATCH', backend, { holdClassification: 'AUTHORITY_CONTRADICTION' });
           continue;
         }
         const current = entries.get(recovered.taskId);
-        if (current && (current.state !== 'accepted'
+        if (current && !((current.state === 'hold' && current.holdClassification !== 'AUTHORITY_CONTRADICTION'
+          && JSON.stringify(current.query) === JSON.stringify(recovered.query))) && (current.state !== 'accepted'
           || JSON.stringify(current.query) !== JSON.stringify(recovered.query)
           || JSON.stringify(exactAcceptedAuthority(current.query, current.accepted))
             !== JSON.stringify(exactAcceptedAuthority(recovered.query, recovered.accepted)))) {
-          this.registerHold(recovered.taskId, 'EXACT_RECOVERY_REGISTRY_CONFLICT', backend);
+          this.registerHold(recovered.taskId, 'EXACT_RECOVERY_REGISTRY_CONFLICT', backend, { holdClassification: 'AUTHORITY_CONTRADICTION' });
           continue;
         }
         let terminal = current?.state === 'accepted' ? current.terminal : null;
@@ -1253,6 +1289,12 @@ export function createExactNormalDockerExecutionRegistry(
         }
       }
       const reports: SpawnBackendRecoveryReport[] = [];
+      const currentTaskIds = options?.currentTaskIds ? new Set(options.currentTaskIds) : null;
+      const excludedHistory = new Set<string>();
+      const isProvenForeignHistory = (taskId: string): boolean => {
+        if (!currentTaskIds || currentTaskIds.has(taskId) || !options?.isHistoricalForeignTask) return false;
+        try { return options.isHistoricalForeignTask(taskId) === true; } catch { return false; }
+      };
       for (const backend of backends.values()) {
         if (!backend.reconcilePendingAttempts) {
           for (const [taskId, entry] of entries) {
@@ -1285,10 +1327,32 @@ export function createExactNormalDockerExecutionRegistry(
             );
             continue;
           }
-          heldForThisRun += 1;
-          this.registerHold(hold.taskId, hold.reasonCode, backend);
+          const queryMismatch = hold.query !== undefined && (
+            hold.query.custodyRef.identity.taskId !== hold.taskId
+            || hold.query.custodyRef.dispatchRequestId !== hold.dispatchRequestId
+            || hold.query.custodyRef.admissionRefDigest !== hold.admissionRefDigest);
+          this.registerHold(hold.taskId, hold.reasonCode, backend, {
+            ...(hold.query && !queryMismatch ? { query: hold.query } : {}),
+            ...(queryMismatch ? { holdClassification: 'AUTHORITY_CONTRADICTION' as const } : {}),
+            ...(hold.holdClassification ? { holdClassification: hold.holdClassification } : {}),
+          });
+          if (!isResumableTaskAuthorityHold(readTaskResultAuthority(hold.taskId))
+            && !isProvenForeignHistory(hold.taskId)) heldForThisRun += 1;
         }
-        if (heldForThisRun > 0) {
+        // Keep historical authority in the registry, but do not attribute a
+        // proven earlier terminal run's contradiction to this run. This is not
+        // physical containment or permission to delete historical state.
+        for (const [taskId, entry] of entries) {
+          if (entry.state !== 'hold' || entry.backend !== backend || !isProvenForeignHistory(taskId)) continue;
+          excludedHistory.add(taskId);
+          historicalUnsettleable.set(taskId, Object.freeze({
+            reasonCode: `run-excluded-historical:${entry.reasonCode}`, retiredAt: new Date().toISOString(),
+            disposition: 'RUN_EXCLUDED_RETAINED' as const,
+          }));
+        }
+        if (heldForThisRun > 0 || [...entries].some(([taskId, entry]) => entry.state === 'hold'
+          && entry.backend === backend && !excludedHistory.has(taskId)
+          && entry.holdClassification === 'AUTHORITY_CONTRADICTION')) {
           throw new DeckentError('DECKENT_E091', `EXACT_LIFECYCLE_${mode.toUpperCase()}_HOLD`);
         }
         if (mode === 'contain') {
@@ -1304,6 +1368,7 @@ export function createExactNormalDockerExecutionRegistry(
       }
       return Object.freeze(reports);
     },
+    readExactHoldEvidence,
     readTaskResultAuthority,
     async awaitTaskResultAuthority(taskId: string): Promise<TaskResultAuthorityRead<TaskResult>> {
       await terminalWaits.get(taskId);
@@ -1381,6 +1446,8 @@ export interface SpawnTaskDeps {
   /** Optional — legacy/test callers may omit config entirely (see result-collector.ts). */
   config: ResolvedConfig | undefined;
   spawnOpts?: {
+    /** Rechecked for each admission; never grants execution authority. */
+    canAdmitDispatch?: () => boolean;
     autoApprove?: boolean;
     spawnBackend?: SpawnBackend;
     attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
@@ -1446,7 +1513,7 @@ export type SpawnDisposition = SpawnDispositionExecutionIdentity & (
       kind: 'ambiguous';
       taskId: string;
       reasonCode: string;
-      exactDispatchOutcome?: Extract<ExactDockerCustodyDispatchOutcomeV2, { kind: 'ambiguous' }>;
+      exactDispatchOutcome?: Extract<ExactDockerCustodyDispatchOutcomeV2, { kind: 'ambiguous' | 'preparation-hold' }>;
     }
   | { kind: 'exact-dependency-authority-hold'; taskId: string }
   | { kind: 'routing-lineage-missing'; taskId: string; fixForTaskId: string; detail: string }
@@ -1834,6 +1901,12 @@ export async function executeSpawnTask(
 ): Promise<SpawnDisposition> {
   const { task, taskTimeoutSeconds } = effect;
   const { projectRoot, sprintFallbackId, config, spawnOpts, backend } = deps;
+  if (spawnOpts?.canAdmitDispatch?.() === false) {
+    return {
+      ...preDispatchExecutionIdentity(task, backend, deps.exactDockerRegistry),
+      kind: 'not-dispatched', taskId: task.id, reasonCode: 'EXECUTE_DISPATCH_WINDOW_CLOSED',
+    };
+  }
 
   const repairDisposition = resolveRepairDispatchDisposition(
     projectRoot,
@@ -2254,6 +2327,14 @@ export async function executeSpawnTask(
       promptDeliveryAuthorityDigest: promptDeliveryAuthority.authorityDigest,
     });
     const dispatchRequestId = `dreq-${dispatchRequestDigest.slice('sha256:'.length)}`;
+    // Prompt/routing/provider checks may outlive the dispatch window. Check
+    // again before admitting custody; an admitted attempt keeps its own budget.
+    if (spawnOpts?.canAdmitDispatch?.() === false) {
+      return {
+        ...preDispatchExecutionIdentity(task, backend, deps.exactDockerRegistry),
+        kind: 'not-dispatched', taskId: task.id, reasonCode: 'EXECUTE_DISPATCH_WINDOW_CLOSED',
+      };
+    }
     const prepared = await exactBackend.prepareExactDockerCustody({
       dispatchRequestId,
       projectId: attendedExecutionProjectId(projectRoot),
@@ -2316,7 +2397,7 @@ export async function executeSpawnTask(
         exactDispatchOutcome: outcome,
       };
     }
-    if (outcome.kind === 'ambiguous') {
+    if (outcome.kind === 'ambiguous' || outcome.kind === 'preparation-hold') {
       exactRegistry.registerHold(task.id, outcome.reasonCode, exactBackend);
       return {
         ...resolvedExecutionIdentity,

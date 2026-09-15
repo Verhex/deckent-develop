@@ -1,0 +1,3 @@
+src/orchestra/exact-docker-command-transport.ts(67,66): error TS2322: Type 'Readonly<{ status: null; signal: null; stdout: Uint8Array<ArrayBuffer>; stderr: Uint8Array<ArrayBuffer>; error: true; overflow: false; diagnostic: { ...; }; }>' is not assignable to type 'ExactDockerWorkspaceCommandResultV1'.
+  The types of 'diagnostic.reason' are incompatible between these types.
+    Type 'string' is not assignable to type '"overflow" | "unavailable" | "timeout" | "exit" | "invalid-input" | "spawn-error" | "stdin-error" | "process-error"'.

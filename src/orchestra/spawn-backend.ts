@@ -1,3 +1,5 @@
+import type { ExactDockerReleaseStage, ExactDockerReleaseHoldEvidence } from './exact-docker-release-outcome.js';
+import type { ExactDockerCommandDiagnosticV1 } from './exact-docker-command-diagnostic.js';
 import { spawnSync } from 'node:child_process';
 import type { ModelType, ResolvedConfig } from '../core/types.js';
 import { getLoadedConfig } from '../core/config.js';
@@ -88,6 +90,7 @@ export interface SpawnBackendRecoveryReport {
    * absent. These attempts stay failed and unresolved; retention only prevents
    * the old provider attempt from being replayed during startup. */
   retainedCommittedUnsettled?: string[];
+  retainedAbortedPartial?: string[];
   retainedReleasedUnaccepted?: string[];
   /** Attempts whose custody chain is complete through `archive`. They are already
    * terminally settled history: recovery skips them instead of replaying a cold
@@ -165,6 +168,9 @@ export type SpawnBackendRecoveryHoldReasonCode =
   | 'ENTRY_RECONCILIATION_FAILED';
 
 export interface SpawnBackendRecoveryHold {
+  /** Exact producer query; backend evidence reader must still revalidate it. */
+  readonly query?: ExactDockerCustodyTerminalQueryV2;
+  readonly holdClassification?: 'AUTHORITY_CONTRADICTION';
   readonly kind: 'spawn-backend-recovery-hold';
   readonly backend: 'docker';
   readonly dispatchRequestId: string;
@@ -477,14 +483,15 @@ export type ExactDockerCustodyTerminalHoldReasonCodeV2 =
 
 export interface ExactDockerEffectFailureV1 {
   readonly state: 'HOLD';
-  readonly phase: 'FINAL_CAPTURE' | 'READY_PUBLICATION' | 'LANDING';
+  readonly phase: 'FINAL_CAPTURE' | 'READY_PUBLICATION' | 'LANDING' | 'RELEASE';
   readonly stage: 'LAUNCH_AUTHORITY' | 'CAPTURE_SESSION' | 'PROVIDER_STOPPED'
     | 'FINAL_CAPTURE' | 'READY_PUBLICATION' | 'NATIVE_CAPABILITY'
     | 'PREPARED_WORKSPACE' | 'LANDING_PREPARE' | 'LANDING_APPLY'
-    | 'TERMINAL_SEAL' | 'RECOVERY_ANCHOR';
+    | 'TERMINAL_SEAL' | 'RECOVERY_ANCHOR' | 'RELEASE';
   readonly code: string;
   readonly sourceEvidenceDigest: Sha256Digest | null;
   readonly capture: ExecutionEffectDockerFinalDiagnosticV1 | null;
+  readonly release?: Readonly<{ stage: ExactDockerReleaseStage; command: ExactDockerCommandDiagnosticV1 | null }>;
 }
 
 /** Immutable first-failure evidence, not result/landing/settlement authority. */
@@ -615,6 +622,12 @@ export type ExactDockerCustodyDispatchOutcomeV2 =
       projectionFence: Sha256Digest;
     }>
   | Readonly<{
+      kind: 'preparation-hold';
+      admissionRef: ExactDockerCustodyAdmissionRefV2;
+      custodyRef: ExactDockerCustodyIdentityRefV2;
+      reasonCode: 'MOUNT_RECONCILIATION_REQUIRED';
+    }>
+  | Readonly<{
       kind: 'ambiguous';
       admissionRef: ExactDockerCustodyAdmissionRefV2;
       custodyRef: ExactDockerCustodyIdentityRefV2;
@@ -690,6 +703,10 @@ export interface SpawnBackend {
   awaitExactDockerAcceptedResult?(
     query: ExactDockerCustodyTerminalQueryV2,
   ): Promise<ExactDockerAcceptResultOutcomeV2>;
+
+  readExactDockerReleaseHoldEvidence?(
+    query: ExactDockerCustodyTerminalQueryV2,
+  ): ExactDockerReleaseHoldEvidence | null;
 
   /** Read-only: true only for the same rejected bytes/custody, no acceptance, and an absent daemon execution. */
   verifyExactDockerRejectedResult?(

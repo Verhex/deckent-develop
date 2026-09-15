@@ -1,3 +1,4 @@
+import type { ExactDockerReleaseHoldEvidence } from './exact-docker-release-outcome.js';
 import { join } from 'node:path';
 
 import { TASKS_DIR } from '../core/constants.js';
@@ -95,6 +96,9 @@ export interface TaskResultAuthorityRead<T> {
   exactAuthority?: ExactTaskResultAuthorityMetadata;
   exactAcceptedAuthority?: ExactAcceptedTaskResultAuthorityMetadata;
   holdReason?: string;
+  /** Registry-owned contradiction, distinct from a durable release receipt. */
+  holdClassification?: 'AUTHORITY_CONTRADICTION';
+  holdEvidence?: ExactDockerReleaseHoldEvidence;
   attemptCount?: number;
 }
 
@@ -527,4 +531,11 @@ export function assertTaskResultAuthoritiesReady(
       `${context} HOLD: pending Docker result settlement for task(s) ${pendingTaskIds.join(', ')}`,
     );
   }
+}
+
+/** Missing evidence is unresolved, never affirmative contradiction evidence. */
+export function isResumableTaskAuthorityHold<T>(authority: TaskResultAuthorityRead<T>): boolean {
+  return authority.state === 'authority-hold'
+    && authority.holdClassification !== 'AUTHORITY_CONTRADICTION'
+    && authority.holdEvidence?.classification !== 'AUTHORITY_CONTRADICTION';
 }

@@ -1,0 +1,10 @@
+{
+  "startedAt": "2026-09-14T17:24:37.449827+00:00",
+  "endedAt": "2026-09-14T17:25:12.634358+00:00",
+  "elapsedSeconds": 36.508080771993264,
+  "exitCode": 0,
+  "command": [
+    "node",
+    "/tmp/deckent-r27/accept.mjs"
+  ]
+}

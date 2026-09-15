@@ -72,11 +72,15 @@ describe('buildReplLabels / buildApprovalLabels — lang=tr renders fully Turkis
   });
 
   it('ApprovalCard labels (hint/details/no-args/risk badges) render Turkish', () => {
-    expect(approvalTr.hint).toBe('(y = onayla · n = reddet · a = benzerlerini onayla · d = detay)');
-    expect(approvalTr.detailsHeading).toBe('Detaylar');
-    expect(approvalTr.noArgs).toBe('(argüman yok)');
+    expect(approvalTr.hint).toBe(getMessage('tui.approval_card.hint_authenticated', 'tr'));
+    expect(approvalTr.detailsHeading).toBe(getMessage('tui.approval_card_details_heading', 'tr'));
+    expect(approvalTr.noArgs).toBe(getMessage('tui.approval_card_no_args', 'tr'));
     expect(approvalTr.riskLabels).toEqual({
-      none: 'YOK', low: 'DÜŞÜK', medium: 'ORTA', high: 'YÜKSEK', critical: 'KRİTİK',
+      none: getMessage('tui.approval_risk_none', 'tr'),
+      low: getMessage('tui.approval_risk_low', 'tr'),
+      medium: getMessage('tui.approval_risk_medium', 'tr'),
+      high: getMessage('tui.approval_risk_high', 'tr'),
+      critical: getMessage('tui.approval_risk_critical', 'tr'),
     });
     // progress reuses tui.confirm_progress — an intentionally identical-across-
     // locales template, not a translation gap.
@@ -114,14 +118,21 @@ describe('buildReplLabels / buildApprovalLabels — lang=en stays byte-identical
 
   it('ApprovalCard labels match the pre-387-001 English strings exactly (the mechanism owns no default object since TERMINAL-TOOLS-002)', () => {
     // TERMINAL-TOOLS-012 added the required §4 `facts` group; the five original keys stay byte-identical.
-    const { facts: _facts, ...legacyEn } = approvalEn;
+    const { facts: _facts, status: _status, ...legacyEn } = approvalEn;
     expect(_facts.requester.length).toBeGreaterThan(0);
+    expect(_status.authenticating.length).toBeGreaterThan(0);
     expect(legacyEn).toEqual({
-      hint: '(y = approve · n = deny · a = approve similar · d = details)',
+      hint: getMessage('tui.approval_card.hint_authenticated', 'en'),
       progress: '[{index}/{total}]',
-      detailsHeading: 'Details',
-      noArgs: '(no arguments)',
-      riskLabels: { none: 'NONE', low: 'LOW', medium: 'MEDIUM', high: 'HIGH', critical: 'CRITICAL' },
+      detailsHeading: getMessage('tui.approval_card_details_heading', 'en'),
+      noArgs: getMessage('tui.approval_card_no_args', 'en'),
+      riskLabels: {
+        none: getMessage('tui.approval_risk_none', 'en'),
+        low: getMessage('tui.approval_risk_low', 'en'),
+        medium: getMessage('tui.approval_risk_medium', 'en'),
+        high: getMessage('tui.approval_risk_high', 'en'),
+        critical: getMessage('tui.approval_risk_critical', 'en'),
+      },
     });
   });
 });

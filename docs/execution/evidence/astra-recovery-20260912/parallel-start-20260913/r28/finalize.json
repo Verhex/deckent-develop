@@ -1,0 +1,14 @@
+{
+  "startedAt": "2026-09-14T18:48:46.686440+00:00",
+  "endedAt": "2026-09-14T18:48:52.810201+00:00",
+  "elapsedSeconds": 6.123763745999895,
+  "exitCode": 0,
+  "command": [
+    "node",
+    "dist/cli/entry.js",
+    "finalize",
+    "--sprint",
+    "sprint-765",
+    "--force"
+  ]
+}
