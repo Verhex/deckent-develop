@@ -1,0 +1,63 @@
+{
+  "_comment": "Accepted CLI↔MCP parity gaps. lint-cli-mcp-parity.mjs fails only on gaps NOT listed here. Regenerate: node scripts/lint-cli-mcp-parity.mjs --update-baseline",
+  "cliOnly": [
+    "archive",
+    "archive-debt",
+    "attach",
+    "bot",
+    "chat",
+    "confirmations",
+    "connect",
+    "cu-status",
+    "dashboard",
+    "do",
+    "evolve",
+    "features",
+    "finalize",
+    "flow",
+    "gateway",
+    "gateway-runtime",
+    "heartbeat",
+    "image",
+    "intelligence",
+    "limits",
+    "local-llm",
+    "mcp",
+    "mode",
+    "onboard",
+    "openrouter-probe",
+    "output",
+    "plugin",
+    "provider-authority",
+    "provider-observations",
+    "rbac",
+    "recall",
+    "remember",
+    "resources",
+    "resume",
+    "runs",
+    "serve",
+    "spawn",
+    "task",
+    "test",
+    "trace",
+    "upgrade"
+  ],
+  "mcpOnly": [
+    "deckent_feature_query"
+  ],
+  "descriptionKeyGaps": [],
+  "intentionalCliAuthority": {
+    "provider-observations": {
+      "risk": "Değiştir",
+      "capability": "provider-observation-migration",
+      "mcpPolicy": "forbidden",
+      "operations": [
+        "prepare",
+        "decide",
+        "apply"
+      ],
+      "reason": "MCP cannot prepare, decide, or apply provider observation migrations."
+    }
+  }
+}

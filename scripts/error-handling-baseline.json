@@ -1,0 +1,220 @@
+{
+  "version": 2,
+  "entries": [
+    {
+      "file": "src/cli/commands/autonomous-mission.ts",
+      "fingerprint": "90d8c25523ca7dcecfc660a9232b94154fc2726599bf18716660c08d54c18c0b",
+      "count": 1
+    },
+    {
+      "file": "src/cli/commands/chat-session.ts",
+      "fingerprint": "ad7d55c4da3af3a108f0952fd52ab630bac61964f177fc0fe24d3f8c8858b822",
+      "count": 1
+    },
+    {
+      "file": "src/cli/commands/spawn.ts",
+      "fingerprint": "4e205c138ee0991b7410d6f8557ba132ca15055c4b92712c97925a43c014c67f",
+      "count": 1
+    },
+    {
+      "file": "src/cli/commands/status.ts",
+      "fingerprint": "756147122524c7cf67ede58b85325fb36cf551329412823cef13d0330b9726a4",
+      "count": 2
+    },
+    {
+      "file": "src/core/agent-pool.ts",
+      "fingerprint": "af80eab64329f742b4a105800089a50b3ab8e33a9f259de77474e3d05d8560f8",
+      "count": 1
+    },
+    {
+      "file": "src/core/agent-types.ts",
+      "fingerprint": "038772d5e86b3645db7642c08f0715f180fe7c7843b965102e493247614c1c53",
+      "count": 1
+    },
+    {
+      "file": "src/core/config.ts",
+      "fingerprint": "62d1869b765bd17527d5995fdb0255b16b27672594aaf85adca5374fe725797f",
+      "count": 1
+    },
+    {
+      "file": "src/core/cross-verify-evidence-broker.ts",
+      "fingerprint": "5d7da5e6e14a92251a4ce37de75f8fab392876120e621dccde8ad1a851dec370",
+      "count": 1
+    },
+    {
+      "file": "src/core/cross-verify-evidence-broker.ts",
+      "fingerprint": "9d00b0c0cf10cb5fef92a27686e268c6aa99b6b70883158a921bff51a7233ea0",
+      "count": 1
+    },
+    {
+      "file": "src/core/observability-rotation.ts",
+      "fingerprint": "86a1b24a86a3664c69418fe6477e0190d484d3ffe81bf191fc240d2ae639e1f2",
+      "count": 1
+    },
+    {
+      "file": "src/core/plugin.ts",
+      "fingerprint": "af80eab64329f742b4a105800089a50b3ab8e33a9f259de77474e3d05d8560f8",
+      "count": 1
+    },
+    {
+      "file": "src/core/provider-auth-probe.ts",
+      "fingerprint": "a3241c62a577b1c76a3385f424fff6fd4663bbc43e9f4fae9b764e56d64e0239",
+      "count": 1
+    },
+    {
+      "file": "src/core/provider-execution-profile.ts",
+      "fingerprint": "1d2c6676f91c85fe420c46d3415b5ecb5be04e07dd1a10d589b68d8a76fef3b0",
+      "count": 1
+    },
+    {
+      "file": "src/core/run-flow-store.ts",
+      "fingerprint": "4355090967a4b29cbf5bea330ca0d4412b3c1da9732b6c6036fa94ce10b9af17",
+      "count": 1
+    },
+    {
+      "file": "src/core/skill-pool.ts",
+      "fingerprint": "af80eab64329f742b4a105800089a50b3ab8e33a9f259de77474e3d05d8560f8",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/autonomous/mission-store/goal-mission.ts",
+      "fingerprint": "f383c84d745848ee77c173b932c6cccfad1acbfe9c17c38d92bdb3a003e341fb",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/autonomous/reactive/reactive-map.ts",
+      "fingerprint": "19a2b02549ecaf0a63b1c9f4fb0a6b7a65e3d16b2ae2c7b1eab7913349d5f60c",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/autonomous/reactive/reactive-map.ts",
+      "fingerprint": "4cfc1b3b66f2103adefdd19194bb04124355ff031e178c5299e7b1d4dc25f84b",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/autonomous/reactive/reactive-map.ts",
+      "fingerprint": "6599eb5438d9759a9958c85f77558f3ec1ee4f990a13feb1b78670bcbae437f7",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/codex-spawn-readiness.ts",
+      "fingerprint": "2477e74151e7513a2bde38c5d91c729e2b2871d6f6c366b0ff6b60be150dba4e",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/managed-docs/docs-config.ts",
+      "fingerprint": "266ce8f931e0374b85f9614c45c8dd7b5dcce28e42f280e1a3675119f726cd48",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/managed-docs/docs-config.ts",
+      "fingerprint": "41f34943081afb2cd09566c9ffb767cea781c5487978bfe941a64a764d7a8402",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/managed-docs/docs-config.ts",
+      "fingerprint": "6b26d7bd41e97077fbb4b90bd6e42428233790b8cdfa9b70a58f1edf35091c02",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/monitor-adapter.ts",
+      "fingerprint": "536cf3643aaaeeea9a02e721e85599044909c789e4a0011a77fb7fe3914477ee",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/result-collector.ts",
+      "fingerprint": "50c374c5dfb76ac67c49e7bade2efd626bc21cf8cfc46af583c3c4edfdb0645f",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/runtime-budget-monitor.ts",
+      "fingerprint": "70c2e7e44a4c22f13ec6a23cdb4d1fcd32787760b10f4501ccc860ebe289d284",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/runtime-budget-monitor.ts",
+      "fingerprint": "8cecce21c5549be8d0875b5aa91f6bc50e51b4c48877db141e286ed594c27d50",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/runtime-budget-monitor.ts",
+      "fingerprint": "96e0baadcbce0124f5211960c97e86bda29264fcb48e3fbbdd60b8e5bbe7688f",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/runtime-budget-monitor.ts",
+      "fingerprint": "e4dc21f8045bc2cb2dc372b76a3957b63e53d8f4f2eb25c62c420703e66982da",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/spawn-backend-docker.ts",
+      "fingerprint": "24dd4362e4502e97d1f41878400982cbf544610b650e6875caae15986bb0f631",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/spawn-backend-docker.ts",
+      "fingerprint": "77a3632b8f47bdeaa9b5e92984aecd545b509507ec4dddc2ef1d266267a3f4c4",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/spawn-backend-docker.ts",
+      "fingerprint": "a87e65a6fd9ffe4e4694b552e9525e05536c283d4e92e544df685c45edcffb91",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/spawn-backend-docker.ts",
+      "fingerprint": "af512b4c637c7b49b2fdad02efdb6428d9b6ad06c35fd508ab4ed21d079aa4e1",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/spawn-backend-docker.ts",
+      "fingerprint": "fafa17cddf709a1b20387f1d6611942590a96051f94210ae1120bd75784c0938",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/sprint-checkpoint.ts",
+      "fingerprint": "3194576aafd14020a4f2118e93898a1272d5916c3773cddfadbc96519da4c3c7",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/sprint-checkpoint.ts",
+      "fingerprint": "c1f2910250f027f614f2d07c32082d3319f1b2eb201391d629686758adadf65f",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/sprint-controller.ts",
+      "fingerprint": "871d174c19e03b95a6a9ae4b2fb817520910d9c09cf38787503a8b28f87c7487",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/sprint-docs-helpers.ts",
+      "fingerprint": "b22e5da8e4db204bdae5ca1b1da263ac3401b8cd82dcf2aed657210c19971960",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/sprint-docs-updater.ts",
+      "fingerprint": "a233efd9bb4ed60bbd57a66d2e8f7bb06cba5bf0fd21ad5590b6c58df236b755",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/sprint-phases.ts",
+      "fingerprint": "50c374c5dfb76ac67c49e7bade2efd626bc21cf8cfc46af583c3c4edfdb0645f",
+      "count": 2
+    },
+    {
+      "file": "src/orchestra/sprint-utils.ts",
+      "fingerprint": "063f491fe6154161ece1ab60326158085f9517f49e97490b0df83f0b5a230610",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/task-mode-runner.ts",
+      "fingerprint": "50064b2e3efec2c2c3349e37f1bb77c0333603e304a94a6c9f93dc5e2c6f3993",
+      "count": 1
+    },
+    {
+      "file": "src/orchestra/task-mode-runner.ts",
+      "fingerprint": "7dbe65b67010d9b7b6f95d1b600659fc6714d5c0e856d30363358a36fef9a05a",
+      "count": 1
+    }
+  ]
+}
