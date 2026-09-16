@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "requestId": "aprcdb-dba89c0355ac0654f52a24e68e669329",
+  "claimRef": "approval:aprcdb-dba89c0355ac0654f52a24e68e669329",
+  "decision": "allow",
+  "subject": {
+    "kind": "closure-disposition-batch",
+    "tenantId": "main",
+    "projectId": "deckent",
+    "masterSnapshotDigest": "d599b4f8b7a956b6a96aed0b7fdfa86f73307e8330147373dcd3a7529bb2c26d",
+    "registryIntegrityDigest": "e1bd088989fa26ac4a10c809465871e923d26f968e3c3905ea7ea663368cf1f3",
+    "proposalDigest": "39a488a882effbfad810b7a017c75f9a6685656361b090e5fc1ac8abbcb7909c",
+    "unsignedManifestDigest": "dba89c0355ac0654f52a24e68e6693290bcec348509893e7562fa48ddcb8d5f9",
+    "eventCount": 2,
+    "seqIntervalStart": 1,
+    "seqIntervalEnd": 2
+  },
+  "authenticatedAt": "2026-08-17T16:23:55.414Z",
+  "decidedAt": "2026-08-17T16:23:55.414Z",
+  "authExpiresAt": "2026-08-17T16:33:55.414Z",
+  "attestation": {
+    "keyId": "closure-owner-genesis-v1",
+    "signature": "c+6f2mInxy3D6+efFY0lk4n7cIQsTcad3xvzDJSmv34W3Qs4+bdukG2AT1lXoCID+cvpu/IxCwzMQUjygyGNCQ=="
+  }
+}

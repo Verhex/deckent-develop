@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "deckent": {
+      "command": "deckent-mcp",
+      "args": [],
+      "timeout": 600
+    }
+  }
+}

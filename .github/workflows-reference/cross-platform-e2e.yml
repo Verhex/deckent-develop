@@ -1,0 +1,419 @@
+name: Cross-Platform E2E
+
+# Remote runner availability/quota is REMOTE_ADVISORY evidence, not product settlement.
+# Executed proof cells remain fail-closed; an unrun/queued cell never becomes success.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # merge_group: main'de merge queue rule'u aktif (Alperen, 2026-08-04) — required
+  # Validator Contract bacakları kuyruğun final merge result'ında da koşmak zorunda.
+  merge_group:
+  # 535: tren-dalı platform-kanıtı için açık tetik (gh workflow run -r <branch>)
+  workflow_dispatch:
+
+# Option E / Hole 3.2 (owner-approved 2026-08-12): same main-push mutual-cancellation
+# defect as ci.yml — per-SHA group for main, stale-run cancellation kept elsewhere.
+concurrency:
+  group: cross-platform-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.sha) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  e2e:
+    name: E2E — ${{ matrix.os }} / ${{ matrix.backend }}
+    # 535 (CI-ACTIONS-ECONOMY-001): macos-heavy legs ran on every PR and every
+    # merge-queue entry. They now run on main-push and explicit dispatch — a
+    # train that needs platform proof triggers `gh workflow run -r <branch>`.
+    # Validator Contract (the required check) is untouched and runs everywhere.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+        backend: [tmux, subprocess]
+        exclude:
+          - os: macos-latest
+            backend: subprocess
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: npm-shrinkwrap.json
+
+      - run: npm ci
+      - run: npm run ci:rebuild-native
+
+      # The clean maintenance authority is Linux/WSL-only until the approved
+      # Darwin adapter lands. Keep the guarded clean on Linux; on macOS, prove
+      # this is a fresh checkout before running the exact clean-less build
+      # payload. No clean bypass or authority downgrade is introduced.
+      - run: npm run build
+        if: runner.os == 'Linux'
+
+      - name: Build without clean on fresh macOS checkout
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -e dist ]; then
+            echo "::error::clean-less macOS build requires an absent dist/ directory"
+            exit 1
+          fi
+          # Source build only; macOS installed-package/native closure remains deferred.
+          npm run build:native
+          npx tsc
+          node scripts/copy-assets.mjs
+
+      - name: Install tmux (macOS)
+        if: matrix.backend == 'tmux' && matrix.os == 'macos-latest'
+        run: brew install tmux
+
+      - name: Install tmux (Ubuntu)
+        if: matrix.backend == 'tmux' && matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y tmux
+
+      - name: Verify tmux version
+        if: matrix.backend == 'tmux'
+        run: tmux -V
+
+      - name: Run cross-platform E2E tests
+        run: npx vitest run tests/e2e/cross-platform/ --reporter=verbose
+        timeout-minutes: 10
+        env:
+          DECKENT_E2E_BACKEND: ${{ matrix.backend }}
+          DECKENT_E2E_PLATFORM: ${{ matrix.os }}
+
+  # MASTER-CLI-SYMLINK-FLAKE-001 `X` evidence leg.
+  #
+  # The validator's entrypoint-identity contract (symlinked invocation must run, never exit 0
+  # silently) was previously provable on Linux only: the real-CLI case was gated on
+  # `process.platform === 'win32'` and tests/scripts/ ran in no platform matrix at all, so the
+  # `X` truth dimension could never move off 0 with real evidence.
+  #
+  # This leg runs the validator contract on all three declared native platforms. The suite
+  # itself measures symlink capability at runtime instead of assuming it, so a Windows runner
+  # without SeCreateSymbolicLinkPrivilege still records a typed, visible capability status
+  # rather than silently skipping. The validator is dependency-free, so no native rebuild is
+  # needed here.
+  #
+  # This matrix does not claim WSL2 proof. A hosted Ubuntu runner is not the owner's current WSL2
+  # host/filesystem. Current-WSL proof must run the compiled installed-package verifier on that
+  # exact host; until its receipt exists the WSL2 cell is an explicit HOLD.
+  #
+  # Windows status 2026-08-03: GATING. All three legs are blocking — 3/3 green with zero skips
+  # on e1eb9d0ea (73 passed (73) on ubuntu, macOS AND Windows). No `continue-on-error` here by
+  # design; that allowance existed for exactly two runs and was retired against real evidence.
+  #
+  # What those two runs bought, kept here so the eliminated causes are not re-investigated:
+  #
+  # Run 1 — ubuntu and macOS passed, Windows could not even parse the suite (`SyntaxError:
+  # Invalid or unexpected token` at the module import). The incompatibility pre-dated this leg:
+  # tests/scripts/ had never run in any platform matrix, so nothing could have caught it. Root
+  # cause (reproduced and ablated on Linux, not inferred): the repo had no .gitattributes, so
+  # Git for Windows' `core.autocrlf=true` gave the runner a CRLF working tree. Vite's SSR
+  # transform finds a script's shebang with `/^#!.*\n/`, which cannot match `\r\n` because `.`
+  # does not match CR — the file-start offset stays 0, hoisted `__vite_ssr_import__` statements
+  # land ABOVE the shebang, and the module runner's "blank the shebang if the code starts with
+  # `#`" guard therefore misses it, so `#!` survives into the evaluated function body. Fixed at
+  # the only layer we control: `.gitattributes` (`* text=auto eol=lf`), which overrides autocrlf
+  # on every host and covers all 93 shebang-bearing scripts rather than this one file. An
+  # earlier non-ASCII-escaping hypothesis was tested and DISPROVEN — do not re-try it.
+  #
+  # Run 2 — the suite ran on Windows for the first time (69/2/2) and exposed three further
+  # defects that no amount of Linux testing could have surfaced: an asymmetry in
+  # resolveEntrypointIdentity (canonical branch compared an un-normalized modulePath against a
+  # resolved entryPath while the lexical branch normalized both); a test that passed on Windows
+  # for the WRONG reason, returning false from path mangling rather than from the paths
+  # differing; and two symlink cases still gated on a blind `process.platform === 'win32'` guess
+  # that the run itself disproved, since the real-CLI symlink case passed on that same runner.
+  #
+  # Keeping the leg red-but-visible rather than deleting it is what produced all of the above:
+  # a red leg is honest, a deleted leg would have been a silent omission. It is now green and
+  # gating, so a regression in any of these is a build failure, not a discovery.
+  validator-contract:
+    name: Validator Contract — ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      # TRUST-ANCHOR-001: full history is REQUIRED, not an optimization. The validator
+      # verifies every active receipt's baselines against the parent of the commit that
+      # registered the receipt (`git log -S<id>`). On the default shallow clone
+      # (fetch-depth: 1) that registration commit is invisible for any receipt older than
+      # HEAD, the lookup would degrade to an HEAD anchor, and the exact same-patch forgery
+      # this check exists to stop would pass again. These three legs are the ruleset's
+      # required checks (20321963) — the enforcement guarantee lives here.
+      - uses: actions/checkout@v4
+        env:
+          # Inject into checkout's own Git subprocesses. COUNT=0 makes the
+          # setting Windows-only while preserving the shared matrix step.
+          GIT_CONFIG_COUNT: ${{ runner.os == 'Windows' && '1' || '0' }}
+          GIT_CONFIG_KEY_0: core.longpaths
+          GIT_CONFIG_VALUE_0: 'true'
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: npm-shrinkwrap.json
+
+      - run: npm ci
+
+      - name: Run MASTER validator contract suite
+        run: npx vitest run tests/scripts/lint-master-plan.test.ts --reporter=verbose
+
+  # WSL-note (TN-PROOF-SEAL): GitHub-hosted runners cannot prove the owner's current
+  # WSL2 host/filesystem. This job proves only the network-disabled Linux installed
+  # package cell. WSL2 requires a separate exact-host receipt from the same installed
+  # verifier. macOS and Windows-native package/runtime proof are deferred MASTER
+  # residuals; generic E2E/validator/probe observations above are not native success.
+  packed-install:
+    name: Linux Installed Native Package Proof
+    # 535 (CI-ACTIONS-ECONOMY-001): macos-heavy legs ran on every PR and every
+    # merge-queue entry. They now run on main-push and explicit dispatch — a
+    # train that needs platform proof triggers `gh workflow run -r <branch>`.
+    # Validator Contract (the required check) is untouched and runs everywhere.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            npm-shrinkwrap.json
+            src/dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - run: npm run ci:rebuild-native
+
+      - name: Install dashboard toolchain
+        run: npm ci --prefix src/dashboard --ignore-scripts
+
+      # build:all is the single canonical clean → pinned/offline native builder →
+      # TypeScript/assets → dashboard chain. No node-gyp/npx/download fallback.
+      - name: Build dist + packaged Linux native prebuild
+        run: npm run build:all
+
+      - name: Validate packed native inventory
+        run: npm run validate:publish
+
+      - name: Verify packed install networklessly with a fresh private prewarmed cache
+        shell: bash
+        env:
+          PACKED_NETWORKLESS_RECEIPT: ${{ runner.temp }}/linux-packed-networkless-receipt.json
+        run: |
+          set -euo pipefail
+          SOURCE_PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          node scripts/verify-packed-networkless-install.mjs --expected-environment linux --receipt-file "$PACKED_NETWORKLESS_RECEIPT"
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const receipt = JSON.parse(readFileSync(process.argv[1], "utf8"));
+            const sourcePackageVersion = process.argv[2];
+            const sha256 = /^sha256:[0-9a-f]{64}$/u;
+            const expectedTopLevelFields = [
+              "cacheAuthority",
+              "event",
+              "expectedEnvironmentKind",
+              "installedCliReceipt",
+              "installedNpmShrinkwrapSha256",
+              "installNetworkMode",
+              "nativeReceipt",
+              "schemaVersion",
+              "sourceNpmShrinkwrapSha256",
+              "tarballSha256",
+            ].sort();
+            const expectedInstalledCliFields = [
+              "event",
+              "outputSha256",
+              "packageVersion",
+              "schemaVersion",
+            ].sort();
+            const nativeReceipt = receipt.nativeReceipt;
+            const installedCliReceipt = receipt.installedCliReceipt;
+            if (JSON.stringify(Object.keys(receipt).sort()) !== JSON.stringify(expectedTopLevelFields)
+              || receipt.schemaVersion !== 1
+              || receipt.event !== "DECKENT_PACKED_NETWORKLESS_INSTALL_VERIFIED"
+              || receipt.expectedEnvironmentKind !== "linux"
+              || receipt.installNetworkMode !== "OFFLINE"
+              || receipt.cacheAuthority !== "FRESH_PRIVATE_PREWARMED"
+              || !sha256.test(receipt.sourceNpmShrinkwrapSha256)
+              || !sha256.test(receipt.installedNpmShrinkwrapSha256)
+              || receipt.installedNpmShrinkwrapSha256 !== receipt.sourceNpmShrinkwrapSha256
+              || !sha256.test(receipt.tarballSha256)
+              || JSON.stringify(Object.keys(installedCliReceipt ?? {}).sort()) !== JSON.stringify(expectedInstalledCliFields)
+              || installedCliReceipt?.schemaVersion !== 1
+              || installedCliReceipt.event !== "DECKENT_INSTALLED_CLI_VERIFIED"
+              || installedCliReceipt.packageVersion !== sourcePackageVersion
+              || !sha256.test(installedCliReceipt.outputSha256)
+              || nativeReceipt?.event !== "EXEC_AUTHORITY_NATIVE_INSTALLED_PACKAGE_VERIFIED"
+              || nativeReceipt.npmShrinkwrapSha256 !== receipt.sourceNpmShrinkwrapSha256
+              || nativeReceipt.platform !== "linux"
+              || nativeReceipt.environment?.environmentKind !== "linux"
+              || nativeReceipt.environment?.expectedEnvironmentKind !== "linux"
+              || nativeReceipt.installTimeNativeBuild !== "ABSENT"
+              || nativeReceipt.installTimeNativeDownload !== "ABSENT"
+              || nativeReceipt.lifecycle?.state !== "PUBLISHED_READ_VERIFIED") process.exit(1);
+          ' "$PACKED_NETWORKLESS_RECEIPT" "$SOURCE_PACKAGE_VERSION"
+
+      - name: Upload Linux packed-networkless receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: linux-packed-networkless-receipt
+          path: ${{ runner.temp }}/linux-packed-networkless-receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
+      # Copy dependency/install diagnostics into the workspace before upload.
+      - name: Collect diagnostics into workspace
+        if: failure()
+        shell: bash
+        run: |
+          set -u
+          mkdir -p xplat-diag
+          npm_cache_dir="$(npm config get cache 2>/dev/null)"
+          if [ -z "$npm_cache_dir" ]; then
+            npm_cache_dir="$HOME/.npm"
+          fi
+          if [ -d "${npm_cache_dir}/_logs" ]; then
+            cp -r "${npm_cache_dir}/_logs" xplat-diag/npm-logs || true
+          fi
+          cp .tasks/task-*.log xplat-diag/ 2>/dev/null || true
+          ls -la xplat-diag/ || true
+
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: linux-installed-native-diagnostics
+          # npm debug log (registry/pack/install failures) + any tmux
+          # logs produced before the strict installed verifier rejected the
+          # package. if-no-files-found keeps diagnostics separate from proof.
+          path: xplat-diag/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # W2 (PLATFORM-EXEC-AUTH-W2-PROBE-001): MEASUREMENT, NOT A GATE. Records the
+  # real-runner platform facts the W3/W4 native adapter designs depend on
+  # (docs/analysis/platform-execution-authority-adapters-2026-08-05.md §5 W2).
+  # Non-required by design; the probe exits 0 whenever it ran — every
+  # capability outcome is a recorded observation in the uploaded JSON artifact.
+  exec-auth-capability-probe:
+    name: Exec-Authority Capability Probe — ${{ matrix.os }}
+    # 535 (CI-ACTIONS-ECONOMY-001): macos-heavy legs ran on every PR and every
+    # merge-queue entry. They now run on main-push and explicit dispatch — a
+    # train that needs platform proof triggers `gh workflow run -r <branch>`.
+    # Validator Contract (the required check) is untouched and runs everywhere.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        env:
+          GIT_CONFIG_COUNT: ${{ runner.os == 'Windows' && '1' || '0' }}
+          GIT_CONFIG_KEY_0: core.longpaths
+          GIT_CONFIG_VALUE_0: 'true'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # Pure built-in Node — deliberately no npm ci; the probe must observe
+      # the raw platform, not the dependency tree.
+      - name: Run capability probe (measurement, not a gate)
+        shell: bash
+        run: |
+          mkdir -p probe-artifacts
+          PROBE_ARTIFACT_DIR=probe-artifacts node scripts/platform-probe/exec-authority-capability-probe.mjs
+          node --input-type=module -e '
+            import { readFileSync, readdirSync } from "node:fs";
+            const files = readdirSync("probe-artifacts").filter(name => name.startsWith("exec-auth-probe-"));
+            if (files.length !== 1) process.exit(1);
+            const artifact = JSON.parse(readFileSync(`probe-artifacts/${files[0]}`, "utf8"));
+            if (artifact.mode !== "measurement"
+              || artifact.evidenceClass !== "CAPABILITY_MEASUREMENT_ONLY"
+              || artifact.promotionEligible !== false
+              || artifact.nativeContract?.state !== "NOT_EVALUATED"
+              || artifact.nativeContract?.compiledBinaryLoaded !== false
+              || artifact.nativeContract?.installedPackageVerified !== false) process.exit(1);
+          '
+
+      # born-695: upload-artifact v4 rejects paths outside the workspace —
+      # the artifact dir stays workspace-relative on purpose.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exec-auth-probe-${{ matrix.os }}
+          path: probe-artifacts/exec-auth-probe-*.json
+          retention-days: 30
+
+  # Source/build supporting evidence only. Deferred macOS/Windows-native
+  # residuals are deliberately absent rather than simulated or promoted.
+  exec-auth-native-build:
+    name: Exec-Authority Linux Native Source Check (non-promotion)
+    # 535 (CI-ACTIONS-ECONOMY-001): macos-heavy legs ran on every PR and every
+    # merge-queue entry. They now run on main-push and explicit dispatch — a
+    # train that needs platform proof triggers `gh workflow run -r <branch>`.
+    # Validator Contract (the required check) is untouched and runs everywhere.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: npm-shrinkwrap.json
+
+      - name: npm ci (bounded retry)
+        shell: bash
+        run: |
+          set -uo pipefail
+          max_attempts=2
+          attempt=1
+          until npm ci; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "::error::npm ci failed after ${max_attempts} attempt(s)" >&2
+              exit 1
+            fi
+            attempt=$((attempt + 1))
+            sleep 30
+          done
+
+      - name: Build native addon with canonical pinned/offline builder
+        run: |
+          npm run clean:native
+          npm run build:native
+
+      - name: Run native primitive suite
+        run: npx vitest run tests/native/exec-authority-native.test.ts
+        env:
+          VITEST_MAX_FORKS: '2'
+
+      # Binding-backed ops-v2 parity is supporting Linux source evidence only.
+      - name: Run execution-authority adapter parity suite
+        run: npx vitest run tests/core/execution-authority-adapter-parity.test.ts
+        env:
+          VITEST_MAX_FORKS: '2'

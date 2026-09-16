@@ -1,0 +1,1492 @@
+{
+  "schemaVersion": 1,
+  "base": "origin/main",
+  "generatedAt": "2026-08-26T12:40:43.368Z",
+  "records": 57,
+  "passed": 57,
+  "failed": 0,
+  "checks": [
+    {
+      "id": "TSM-001",
+      "target": "tests/cli/commands/chat.test.ts",
+      "sources": [
+        "tests/cli/commands/chat.test.ts",
+        "tests/cli/chat.test.ts"
+      ],
+      "before": {
+        "tests": 19,
+        "assertions": 70
+      },
+      "after": {
+        "tests": 19,
+        "assertions": 70
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "TSM-002",
+      "target": "tests/cli/commands/chat-native.test.ts",
+      "sources": [
+        "tests/cli/commands/chat-native.test.ts",
+        "tests/cli/chat-native.test.ts"
+      ],
+      "before": {
+        "tests": 19,
+        "assertions": 39
+      },
+      "after": {
+        "tests": 19,
+        "assertions": 39
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "TSM-003",
+      "target": "tests/cli/commands/chat-slash-registry.test.ts",
+      "sources": [
+        "tests/cli/commands/chat-slash-registry.test.ts",
+        "tests/cli/chat-slash-registry.test.ts"
+      ],
+      "before": {
+        "tests": 39,
+        "assertions": 85
+      },
+      "after": {
+        "tests": 39,
+        "assertions": 85
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "TSM-004",
+      "target": "tests/cli/commands/dashboard.test.ts",
+      "sources": [
+        "tests/cli/commands/dashboard.test.ts",
+        "tests/cli/dashboard.test.ts"
+      ],
+      "before": {
+        "tests": 30,
+        "assertions": 56
+      },
+      "after": {
+        "tests": 30,
+        "assertions": 56
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "TSM-005",
+      "target": "tests/cli/helpers/error-handler.test.ts",
+      "sources": [
+        "tests/cli/helpers/error-handler.test.ts",
+        "tests/cli/error-handler.test.ts"
+      ],
+      "before": {
+        "tests": 27,
+        "assertions": 49
+      },
+      "after": {
+        "tests": 27,
+        "assertions": 49
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "TSM-006",
+      "target": "tests/cli/helpers/messages.test.ts",
+      "sources": [
+        "tests/cli/helpers/messages.test.ts",
+        "tests/cli/messages.test.ts"
+      ],
+      "before": {
+        "tests": 134,
+        "assertions": 228
+      },
+      "after": {
+        "tests": 134,
+        "assertions": 228
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "TSM-007",
+      "target": "tests/cli/repl/native-transport.test.ts",
+      "sources": [
+        "tests/cli/repl/native-transport.test.ts",
+        "tests/cli/native-transport.test.ts"
+      ],
+      "before": {
+        "tests": 13,
+        "assertions": 46
+      },
+      "after": {
+        "tests": 13,
+        "assertions": 46
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "TSM-008",
+      "target": "tests/cli/commands/onboard.test.ts",
+      "sources": [
+        "tests/cli/commands/onboard.test.ts",
+        "tests/cli/onboard.test.ts"
+      ],
+      "before": {
+        "tests": 31,
+        "assertions": 41
+      },
+      "after": {
+        "tests": 31,
+        "assertions": 41
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "TSM-009",
+      "target": "tests/cli/output.test.ts",
+      "sources": [
+        "tests/cli/commands/output.test.ts",
+        "tests/cli/helpers/output.test.ts"
+      ],
+      "before": {
+        "tests": 89,
+        "assertions": 134
+      },
+      "after": {
+        "tests": 89,
+        "assertions": 134
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "TSM-010",
+      "target": "tests/cli/commands/recall.test.ts",
+      "sources": [
+        "tests/cli/commands/recall.test.ts",
+        "tests/cli/recall.test.ts"
+      ],
+      "before": {
+        "tests": 14,
+        "assertions": 24
+      },
+      "after": {
+        "tests": 14,
+        "assertions": 24
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "TSM-011",
+      "target": "tests/cli/helpers/splash.test.ts",
+      "sources": [
+        "tests/cli/helpers/splash.test.ts",
+        "tests/cli/splash.test.ts"
+      ],
+      "before": {
+        "tests": 14,
+        "assertions": 17
+      },
+      "after": {
+        "tests": 14,
+        "assertions": 17
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "TSM-012",
+      "target": "tests/cli/helpers/sprint-summary-rich.test.ts",
+      "sources": [
+        "tests/cli/helpers/sprint-summary-rich.test.ts",
+        "tests/cli/sprint-summary-rich.test.ts"
+      ],
+      "before": {
+        "tests": 45,
+        "assertions": 106
+      },
+      "after": {
+        "tests": 45,
+        "assertions": 106
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "TSM-013",
+      "target": "tests/dashboard/terminal-api.test.ts",
+      "sources": [
+        "tests/dashboard/terminal-api.test.ts",
+        "tests/dashboard/terminal/terminal-api.test.ts"
+      ],
+      "before": {
+        "tests": 14,
+        "assertions": 21
+      },
+      "after": {
+        "tests": 14,
+        "assertions": 21
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "TSM-014",
+      "target": "tests/mcp/format.test.ts",
+      "sources": [
+        "tests/mcp/helpers/format.test.ts",
+        "tests/mcp/tools/format.test.ts"
+      ],
+      "before": {
+        "tests": 68,
+        "assertions": 116
+      },
+      "after": {
+        "tests": 68,
+        "assertions": 116
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "TSM-015",
+      "target": "tests/mcp/tools/help.test.ts",
+      "sources": [
+        "tests/mcp/tools/help.test.ts",
+        "tests/mcp/help.test.ts"
+      ],
+      "before": {
+        "tests": 26,
+        "assertions": 45
+      },
+      "after": {
+        "tests": 26,
+        "assertions": 45
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "TSM-016",
+      "target": "tests/mcp/tools/job-runner.test.ts",
+      "sources": [
+        "tests/mcp/tools/job-runner.test.ts",
+        "tests/mcp/job-runner.test.ts"
+      ],
+      "before": {
+        "tests": 20,
+        "assertions": 36
+      },
+      "after": {
+        "tests": 20,
+        "assertions": 36
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "TSM-017",
+      "target": "tests/mcp/resources.test.ts",
+      "sources": [
+        "tests/mcp/resources.test.ts",
+        "tests/mcp/resources/resources.test.ts"
+      ],
+      "before": {
+        "tests": 48,
+        "assertions": 92
+      },
+      "after": {
+        "tests": 48,
+        "assertions": 92
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "TSM-018",
+      "target": "tests/nervous/detectors/stale-worker.test.ts",
+      "sources": [
+        "tests/nervous/detectors/stale-worker.test.ts",
+        "tests/nervous/stale-worker.test.ts"
+      ],
+      "before": {
+        "tests": 9,
+        "assertions": 22
+      },
+      "after": {
+        "tests": 9,
+        "assertions": 22
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-001",
+      "target": "tests/agents/worker-approval-gate-real-wire.test.ts",
+      "sources": [
+        "tests/agents/worker-approval-gate-real-wire.test.ts",
+        "tests/agents/worker-approval-dispatcher-wire.test.ts"
+      ],
+      "before": {
+        "tests": 20,
+        "assertions": 40
+      },
+      "after": {
+        "tests": 20,
+        "assertions": 40
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-002",
+      "target": "tests/agents/worker-heartbeat-authority-wire.test.ts",
+      "sources": [
+        "tests/agents/worker-heartbeat-authority-wire.test.ts",
+        "tests/agents/adaptive-agent-wire.test.ts"
+      ],
+      "before": {
+        "tests": 13,
+        "assertions": 35
+      },
+      "after": {
+        "tests": 13,
+        "assertions": 35
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-003",
+      "target": "tests/agents/worker-verify-isolation-wire.test.ts",
+      "sources": [
+        "tests/agents/worker-verify-isolation-wire.test.ts",
+        "tests/agents/workergate-wire.test.ts"
+      ],
+      "before": {
+        "tests": 21,
+        "assertions": 37
+      },
+      "after": {
+        "tests": 21,
+        "assertions": 37
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-004",
+      "target": "tests/api/approval-lifecycle-runtime-wire.test.ts",
+      "sources": [
+        "tests/api/approval-lifecycle-runtime-wire.test.ts",
+        "tests/api/acceptance-confirmation-runtime-wire.test.ts"
+      ],
+      "before": {
+        "tests": 7,
+        "assertions": 26
+      },
+      "after": {
+        "tests": 7,
+        "assertions": 26
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-005",
+      "target": "tests/api/approval-expiry-wire.test.ts",
+      "sources": [
+        "tests/api/approval-expiry-wire.test.ts",
+        "tests/api/approval-history-wire.test.ts"
+      ],
+      "before": {
+        "tests": 16,
+        "assertions": 41
+      },
+      "after": {
+        "tests": 16,
+        "assertions": 41
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-006",
+      "target": "tests/api/terminal-audit-wire.test.ts",
+      "sources": [
+        "tests/api/terminal-audit-wire.test.ts",
+        "tests/api/terminal-config-wire.test.ts"
+      ],
+      "before": {
+        "tests": 14,
+        "assertions": 32
+      },
+      "after": {
+        "tests": 14,
+        "assertions": 32
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-007",
+      "target": "tests/api/server-tenant-scope-wire.test.ts",
+      "sources": [
+        "tests/api/server-tenant-scope-wire.test.ts",
+        "tests/api/terminal/server-command-guard-wire.test.ts"
+      ],
+      "before": {
+        "tests": 5,
+        "assertions": 11
+      },
+      "after": {
+        "tests": 5,
+        "assertions": 11
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-008",
+      "target": "tests/cli/autonomous-flow-wire.test.ts",
+      "sources": [
+        "tests/cli/autonomous-flow-wire.test.ts",
+        "tests/cli/flow-wire.test.ts"
+      ],
+      "before": {
+        "tests": 5,
+        "assertions": 11
+      },
+      "after": {
+        "tests": 5,
+        "assertions": 11
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-009",
+      "target": "tests/cli/calltool-exec-wire.test.ts",
+      "sources": [
+        "tests/cli/calltool-exec-wire.test.ts",
+        "tests/cli/tool-repl-wire.test.ts"
+      ],
+      "before": {
+        "tests": 34,
+        "assertions": 79
+      },
+      "after": {
+        "tests": 34,
+        "assertions": 79
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-010",
+      "target": "tests/cli/help-surface-wire.test.ts",
+      "sources": [
+        "tests/cli/help-surface-wire.test.ts",
+        "tests/cli/native-flag-wire.test.ts"
+      ],
+      "before": {
+        "tests": 29,
+        "assertions": 65
+      },
+      "after": {
+        "tests": 29,
+        "assertions": 65
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-011",
+      "target": "tests/cli/mcp-broker-wire.test.ts",
+      "sources": [
+        "tests/cli/mcp-broker-wire.test.ts",
+        "tests/cli/repl-mcp-wire.test.ts"
+      ],
+      "before": {
+        "tests": 27,
+        "assertions": 95
+      },
+      "after": {
+        "tests": 27,
+        "assertions": 95
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-012",
+      "target": "tests/cli/provider-limits-authoring-wire.test.ts",
+      "sources": [
+        "tests/cli/provider-limits-authoring-wire.test.ts",
+        "tests/cli/provider-limits-claude-docker-wire.test.ts"
+      ],
+      "before": {
+        "tests": 11,
+        "assertions": 35
+      },
+      "after": {
+        "tests": 11,
+        "assertions": 35
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-013",
+      "target": "tests/cli/repl-agentic-enterprise-wire.test.ts",
+      "sources": [
+        "tests/cli/repl-agentic-enterprise-wire.test.ts",
+        "tests/cli/repl-agentic-wire.test.ts"
+      ],
+      "before": {
+        "tests": 13,
+        "assertions": 59
+      },
+      "after": {
+        "tests": 13,
+        "assertions": 59
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-014",
+      "target": "tests/cli/repl-banner-wire.test.ts",
+      "sources": [
+        "tests/cli/repl-banner-wire.test.ts",
+        "tests/cli/repl-status-line-wire.test.ts"
+      ],
+      "before": {
+        "tests": 11,
+        "assertions": 16
+      },
+      "after": {
+        "tests": 11,
+        "assertions": 16
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-015",
+      "target": "tests/cli/repl-do-slash-wire.test.ts",
+      "sources": [
+        "tests/cli/repl-do-slash-wire.test.ts",
+        "tests/cli/repl-slash-wire.test.ts"
+      ],
+      "before": {
+        "tests": 9,
+        "assertions": 25
+      },
+      "after": {
+        "tests": 9,
+        "assertions": 25
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-016",
+      "target": "tests/cli/repl-slash-registry-wire.test.ts",
+      "sources": [
+        "tests/cli/repl-slash-registry-wire.test.ts",
+        "tests/cli/slash-mode-wire.test.ts"
+      ],
+      "before": {
+        "tests": 10,
+        "assertions": 38
+      },
+      "after": {
+        "tests": 10,
+        "assertions": 38
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-017",
+      "target": "tests/cli/repl-surface-wire.test.tsx",
+      "sources": [
+        "tests/cli/repl-surface-wire.test.tsx",
+        "tests/cli/repl/app-surface-wire.test.tsx"
+      ],
+      "before": {
+        "tests": 36,
+        "assertions": 89
+      },
+      "after": {
+        "tests": 36,
+        "assertions": 89
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-018",
+      "target": "tests/cli/app-approval-wire.test.tsx",
+      "sources": [
+        "tests/cli/app-approval-wire.test.tsx",
+        "tests/cli/repl/approval-xproc-wire.test.ts"
+      ],
+      "before": {
+        "tests": 18,
+        "assertions": 43
+      },
+      "after": {
+        "tests": 18,
+        "assertions": 43
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-019",
+      "target": "tests/cli/trace-wire.test.ts",
+      "sources": [
+        "tests/cli/trace-wire.test.ts",
+        "tests/cli/trn2-repl-trace-wire.test.ts"
+      ],
+      "before": {
+        "tests": 27,
+        "assertions": 61
+      },
+      "after": {
+        "tests": 27,
+        "assertions": 61
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-020",
+      "target": "tests/connectors/approval-clients-wire.test.ts",
+      "sources": [
+        "tests/connectors/approval-clients-wire.test.ts",
+        "tests/connectors/approval-clients-wire-sla.test.ts"
+      ],
+      "before": {
+        "tests": 21,
+        "assertions": 47
+      },
+      "after": {
+        "tests": 21,
+        "assertions": 47
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-021",
+      "target": "tests/connectors/capabilities/enablement-wire.test.ts",
+      "sources": [
+        "tests/connectors/capabilities/enablement-wire.test.ts",
+        "tests/connectors/capabilities/bootstrap-wire.test.ts"
+      ],
+      "before": {
+        "tests": 11,
+        "assertions": 18
+      },
+      "after": {
+        "tests": 11,
+        "assertions": 18
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-022",
+      "target": "tests/core/cfg-apr-wire.test.ts",
+      "sources": [
+        "tests/core/cfg-apr-wire.test.ts",
+        "tests/core/approval-probe-rule-wire.integration.test.ts"
+      ],
+      "before": {
+        "tests": 21,
+        "assertions": 42
+      },
+      "after": {
+        "tests": 21,
+        "assertions": 42
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-023",
+      "target": "tests/core/deck-broker-audit-wire.test.ts",
+      "sources": [
+        "tests/core/deck-broker-audit-wire.test.ts",
+        "tests/core/erp-1-readwire.test.ts"
+      ],
+      "before": {
+        "tests": 23,
+        "assertions": 63
+      },
+      "after": {
+        "tests": 23,
+        "assertions": 63
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-024",
+      "target": "tests/core/hook-dispatch-wire.test.ts",
+      "sources": [
+        "tests/core/hook-dispatch-wire.test.ts",
+        "tests/core/notify-wire.test.ts"
+      ],
+      "before": {
+        "tests": 24,
+        "assertions": 56
+      },
+      "after": {
+        "tests": 24,
+        "assertions": 56
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-025",
+      "target": "tests/core/provider-concurrency-admission-wire.test.ts",
+      "sources": [
+        "tests/core/provider-concurrency-admission-wire.test.ts",
+        "tests/core/models-dev-wire.test.ts"
+      ],
+      "before": {
+        "tests": 16,
+        "assertions": 38
+      },
+      "after": {
+        "tests": 16,
+        "assertions": 38
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-026",
+      "target": "tests/core/plugin-sandbox-wire.test.ts",
+      "sources": [
+        "tests/core/plugin-sandbox-wire.test.ts",
+        "tests/core/spawn-safety-wire.test.ts"
+      ],
+      "before": {
+        "tests": 30,
+        "assertions": 68
+      },
+      "after": {
+        "tests": 30,
+        "assertions": 68
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-027",
+      "target": "tests/nervous/nervous-apr-wire.test.ts",
+      "sources": [
+        "tests/nervous/nervous-apr-wire.test.ts",
+        "tests/nervous/panic-gate-wire.test.ts"
+      ],
+      "before": {
+        "tests": 15,
+        "assertions": 40
+      },
+      "after": {
+        "tests": 15,
+        "assertions": 40
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-028",
+      "target": "tests/orchestra/adaptive-agent-outcome-wire.test.ts",
+      "sources": [
+        "tests/orchestra/adaptive-agent-outcome-wire.test.ts",
+        "tests/orchestra/specialization-drift-wire.test.ts"
+      ],
+      "before": {
+        "tests": 13,
+        "assertions": 47
+      },
+      "after": {
+        "tests": 13,
+        "assertions": 47
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-029",
+      "target": "tests/orchestra/acceptance-all-branches-wire.test.ts",
+      "sources": [
+        "tests/orchestra/acceptance-all-branches-wire.test.ts",
+        "tests/orchestra/finalizer-cells-wire.test.ts"
+      ],
+      "before": {
+        "tests": 8,
+        "assertions": 33
+      },
+      "after": {
+        "tests": 8,
+        "assertions": 33
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-030",
+      "target": "tests/orchestra/allowlist-flag-wire.test.ts",
+      "sources": [
+        "tests/orchestra/allowlist-flag-wire.test.ts",
+        "tests/orchestra/tool-allowlist-wire.test.ts"
+      ],
+      "before": {
+        "tests": 18,
+        "assertions": 38
+      },
+      "after": {
+        "tests": 18,
+        "assertions": 38
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-031",
+      "target": "tests/orchestra/coordination-wire.test.ts",
+      "sources": [
+        "tests/orchestra/coordination-wire.test.ts",
+        "tests/orchestra/ctx-population-wire.test.ts"
+      ],
+      "before": {
+        "tests": 12,
+        "assertions": 24
+      },
+      "after": {
+        "tests": 12,
+        "assertions": 24
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-032",
+      "target": "tests/orchestra/docker-heartbeat-authority-wire.test.ts",
+      "sources": [
+        "tests/orchestra/docker-heartbeat-authority-wire.test.ts",
+        "tests/orchestra/docker-provider-observation-wire.test.ts"
+      ],
+      "before": {
+        "tests": 6,
+        "assertions": 29
+      },
+      "after": {
+        "tests": 6,
+        "assertions": 29
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-033",
+      "target": "tests/orchestra/handoff-recovery-wire.test.ts",
+      "sources": [
+        "tests/orchestra/handoff-recovery-wire.test.ts",
+        "tests/orchestra/handoff-prune-wire.test.ts"
+      ],
+      "before": {
+        "tests": 13,
+        "assertions": 34
+      },
+      "after": {
+        "tests": 13,
+        "assertions": 34
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-034",
+      "target": "tests/orchestra/metering-live-wire.test.ts",
+      "sources": [
+        "tests/orchestra/metering-live-wire.test.ts",
+        "tests/orchestra/resource-monitor-wire.test.ts"
+      ],
+      "before": {
+        "tests": 23,
+        "assertions": 56
+      },
+      "after": {
+        "tests": 23,
+        "assertions": 56
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-035",
+      "target": "tests/orchestra/prompt-evolution-retro-wire.test.ts",
+      "sources": [
+        "tests/orchestra/prompt-evolution-retro-wire.test.ts",
+        "tests/orchestra/prompt-evolution-wire.test.ts"
+      ],
+      "before": {
+        "tests": 15,
+        "assertions": 53
+      },
+      "after": {
+        "tests": 15,
+        "assertions": 53
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-036",
+      "target": "tests/orchestra/prompt-rollback-wire.test.ts",
+      "sources": [
+        "tests/orchestra/prompt-rollback-wire.test.ts",
+        "tests/orchestra/planner-smoke-wire.test.ts"
+      ],
+      "before": {
+        "tests": 10,
+        "assertions": 27
+      },
+      "after": {
+        "tests": 10,
+        "assertions": 27
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-037",
+      "target": "tests/orchestra/scheduler-collision-reorder-wire.test.ts",
+      "sources": [
+        "tests/orchestra/scheduler-collision-reorder-wire.test.ts",
+        "tests/orchestra/sprint-restart-reconcile-wire.test.ts"
+      ],
+      "before": {
+        "tests": 9,
+        "assertions": 17
+      },
+      "after": {
+        "tests": 9,
+        "assertions": 17
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-038",
+      "target": "tests/orchestra/sprint-finalizer-terminal-wire.test.ts",
+      "sources": [
+        "tests/orchestra/sprint-finalizer-terminal-wire.test.ts",
+        "tests/orchestra/sprint-terminal-controller-wire.test.ts"
+      ],
+      "before": {
+        "tests": 19,
+        "assertions": 75
+      },
+      "after": {
+        "tests": 19,
+        "assertions": 75
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    },
+    {
+      "id": "WIRE-039",
+      "target": "tests/orchestra/provider-routing-production-wire.test.ts",
+      "sources": [
+        "tests/orchestra/provider-routing-production-wire.test.ts",
+        "tests/orchestra/worker-approval-gate-wire.test.ts"
+      ],
+      "before": {
+        "tests": 13,
+        "assertions": 45
+      },
+      "after": {
+        "tests": 13,
+        "assertions": 45
+      },
+      "checks": {
+        "titles": true,
+        "testCount": true,
+        "assertionStructure": true,
+        "assertionCount": true,
+        "importModules": true,
+        "mockFactorySurface": true
+      },
+      "missingMockSurface": [],
+      "passed": true
+    }
+  ]
+}

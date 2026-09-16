@@ -1,0 +1,322 @@
+# Release VALIDATION workflow — NO automatic publish (0.100.0 rebaseline, 2026-08-14).
+#
+# Owner decision: canonical publishing is MANUAL. This workflow performs no `npm publish`
+# and creates no GitHub Release; it only builds, validates and attests, then stops. The
+# owner runs the publish by hand from a validated tree (see the owner-manual note at the
+# former publish step). Do NOT re-add an automatic publish or GitHub-Release step here
+# under any name. The historical born-608 "sole npm-publish authority" design (this file
+# being the only real-publish path) is retained below only as rationale; the real-publish
+# and Create-GitHub-Release steps have been removed.
+#
+# Chain order: install → dependency-audit → type-check → canonical native/full build →
+# validate:publish → offline installed-package native proof → smoke test-gate →
+# extract/validate changelog → dist + proof-receipt artifact upload.
+#
+# Three deliberate release-validation constraints:
+#
+# 1. `npm run build` → `npm run build:all`. Plain `build` (tsc + copy-assets) never built
+#    the dashboard (`src/dashboard` is a separate sub-package with its own deps/bundler —
+#    `build:all` additionally runs `build:dashboard`). Every previous release therefore
+#    published a package whose `deckent serve` dashboard was hollow.
+#
+#    `build:all` also owns the canonical pinned/offline exec-authority native
+#    builder. A workflow-local node-gyp or download fallback would be a second authority.
+#
+# 2. Test-gate is a minimal smoke, not a duplicate of ci.yml's full ~9-directory matrix.
+#    A tag is cut from a commit that was already fully gated by ci.yml on its merge to
+#    main — re-running the entire suite here is pure duplication cost, not new signal.
+#    Reusing ci.yml directly (`workflow_call`) would be cleaner but requires adding a
+#    `workflow_call` trigger to ci.yml, which is outside this task's write scope —
+#    tracked as a docImpact follow-up. The smoke here instead runs this task's own new
+#    governance pins (tests/governance/, which includes the release-workflow-unify pin
+#    asserting this exact single-publish-authority invariant) plus the fastest,
+#    foundational test slice (tests/core/) as a final sanity check before publishing.
+#
+# 3. This validation workflow does not publish or create a GitHub Release. The owner-manual
+#    action remains a separate authority boundary; uploaded artifacts are evidence, not a
+#    publish-success claim.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  # Least privilege (0.100.0 rebaseline): this workflow no longer publishes or creates a
+  # GitHub Release, so no repo-write grant and no OIDC provenance token are needed. It
+  # only builds, validates and attests — read-only.
+  contents: read
+  # actions: read — required by the "Verify CI attestation" step's `gh run list` call
+  # (REL-02 + REL-02B). Default GITHUB_TOKEN scopes collapse to `none` for any permission
+  # not explicitly listed once this block exists, so this must be named, not inherited.
+  actions: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.x'
+          cache: npm
+          cache-dependency-path: |
+            npm-shrinkwrap.json
+            src/dashboard/package-lock.json
+          registry-url: 'https://registry.npmjs.org'
+
+      # REL-01 (RC4A): a tag alone used to be sufficient to publish — no check that the
+      # tag, package.json, and both npm-shrinkwrap.json version authorities all agree on
+      # the version being shipped,
+      # and no check that this exact version isn't already occupying the registry (which
+      # would otherwise surface only as a confusing registry-side 403/409 mid-publish,
+      # after build/test time was already spent). Both checks run before any expensive
+      # step (install/build/test) so a mismatch fails fast.
+      - name: Verify release integrity (tag/package/shrinkwrap authority equality + registry occupancy)
+        run: |
+          set -euo pipefail
+
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          LOCK_VERSION=$(node -p "require('./npm-shrinkwrap.json').version")
+          LOCK_ROOT_PACKAGE_VERSION=$(node -p "require('./npm-shrinkwrap.json').packages[''].version")
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ] || [ "$TAG_VERSION" != "$LOCK_VERSION" ] || [ "$TAG_VERSION" != "$LOCK_ROOT_PACKAGE_VERSION" ]; then
+            echo "::error::REL-01 version-authority-mismatch — tag=v${TAG_VERSION} package.json=${PKG_VERSION} npm-shrinkwrap.json=${LOCK_VERSION} npm-shrinkwrap.json#packages[''].version=${LOCK_ROOT_PACKAGE_VERSION}. Tag, package manifest, shrinkwrap top-level, and shrinkwrap root-package versions MUST match exactly before a release tag may publish."
+            exit 1
+          fi
+          echo "REL-01 version authority equality verified: ${TAG_VERSION}"
+
+          # Registry-occupancy preflight — immutable-registry double-publish protection.
+          # A network/registry error here must not silently be treated as "safe to
+          # publish" (that would defeat the point), but it also must not falsely block a
+          # legitimate release on a registry hiccup — so an inconclusive check warns
+          # honestly and lets the actual publish step below be the final authority.
+          set +e
+          EXISTING_VERSION=$(npm view "deckent@${TAG_VERSION}" version 2>/tmp/npm-view-stderr.log)
+          NPM_VIEW_STATUS=$?
+          set -e
+          if [ "$NPM_VIEW_STATUS" -eq 0 ] && [ -n "$EXISTING_VERSION" ]; then
+            echo "::error::REL-01 registry-occupancy violation — deckent@${TAG_VERSION} already exists on the npm registry (immutable-registry double-publish protection). Bump the version and re-tag."
+            exit 1
+          fi
+          if [ "$NPM_VIEW_STATUS" -ne 0 ] && ! grep -qiE 'E404|not found' /tmp/npm-view-stderr.log; then
+            echo "::warning::registry-occupancy preflight could not be verified (network/registry error) — continuing honestly without blocking: $(tail -c 500 /tmp/npm-view-stderr.log)"
+          else
+            echo "REL-01 registry-occupancy preflight clear: deckent@${TAG_VERSION} not yet published"
+          fi
+
+      # REL-02 (RC4A) + REL-02B (RC5B, 415-002): a tag can be pushed to ANY commit —
+      # "main is already gated by CI" is not an executable guarantee for the commit a tag
+      # actually points at. This step demands positive proof: at least one successful run
+      # of EACH required workflow for this exact commit SHA, via the GitHub CLI
+      # (preinstalled on GitHub-hosted runners; GITHUB_TOKEN is sufficient given the
+      # `actions: read` permission above — no extra PAT needed).
+      # Attestation-kapsamı (attestation scope) = CI + XPLAT. Cross-Platform E2E carries
+      # the active Linux installed-package native receipt plus generic platform signals.
+      # It does NOT certify the deferred macOS/Windows-native residuals or the owner's
+      # current WSL2 host. This release job repeats the Linux installed proof locally so
+      # a workflow-level success containing measurement-only jobs cannot promote a
+      # missing binary. Either workflow attestation missing still blocks this validation
+      # run; remote CI quota/availability remains REMOTE_ADVISORY product evidence.
+      - name: Verify CI attestation for this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          CI_SUCCESS_COUNT=$(gh run list --repo "${GITHUB_REPOSITORY}" --commit "${GITHUB_SHA}" --workflow CI --json conclusion --jq '[.[] | select(.conclusion == "success")] | length')
+          if [ "${CI_SUCCESS_COUNT}" -lt 1 ]; then
+            echo "::error::REL-02 no successful CI run found for commit ${GITHUB_SHA} (required workflow: CI). A release tag MUST point at a commit that passed the full required CI suite before publish — tags can be pushed to any commit, so 'main is already gated' is not an executable guarantee. If this is unexpected, confirm the workflow token has 'actions: read' permission."
+            exit 1
+          fi
+          echo "REL-02 CI attestation verified: ${CI_SUCCESS_COUNT} successful CI run(s) for ${GITHUB_SHA}"
+
+          XPLAT_SUCCESS_COUNT=$(gh run list --repo "${GITHUB_REPOSITORY}" --commit "${GITHUB_SHA}" --workflow "Cross-Platform E2E" --json conclusion,event --jq '[.[] | select(.conclusion == "success" and (.event == "push" or .event == "workflow_dispatch"))] | length')
+          if [ "${XPLAT_SUCCESS_COUNT}" -lt 1 ]; then
+            echo "::error::REL-02B no successful Cross-Platform E2E run found for commit ${GITHUB_SHA} (required workflow: Cross-Platform E2E). The active Linux installed-package native proof must exist for this exact commit; measurement-only probe output and deferred macOS/Windows-native rows are not substitutes. If this is unexpected, confirm the workflow token has 'actions: read' permission."
+            exit 1
+          fi
+          echo "REL-02B Cross-Platform E2E attestation verified: ${XPLAT_SUCCESS_COUNT} successful Cross-Platform E2E run(s) for ${GITHUB_SHA}"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Rebuild native binding (better-sqlite3)
+        run: npm run ci:rebuild-native
+
+      - name: Install dashboard toolchain
+        run: npm ci --prefix src/dashboard --ignore-scripts
+
+      # SEC-05 (419-003): the CI `security` job's audit gate (npm audit --json, fail-closed,
+      # signed-exception allowlist — scripts/check-dependency-audit.mjs) never ran on the
+      # release chain; a release could publish with unaudited or newly-regressed high/critical
+      # dependency vulnerabilities. Placed after the CI/Cross-Platform-E2E attestation checks
+      # and dependency install (needs npm-shrinkwrap.json + node_modules present), before the
+      # expensive lint/build/test/publish steps — fail fast on a real finding.
+      - name: Dependency audit (fail-closed, signed-exception allowlist; SEC-05)
+        run: node scripts/check-dependency-audit.mjs
+
+      - name: Type check (lint)
+        run: npm run lint
+
+      # build:all owns the canonical clean → pinned/offline native builder →
+      # TypeScript/assets → dashboard chain. There is no node-gyp/npx/download fallback.
+      - name: Build
+        run: npm run build:all
+
+      # 8-gate readiness check: pack size, entry points, bin exec bits, dashboard
+      # bundle, ADR/link lint (scripts/validate-publish.mjs). See header chain-order note.
+      - name: Validate publish readiness
+        run: npm run validate:publish
+
+      - name: Prove packed Linux native package contract (networkless, fresh private cache)
+        shell: bash
+        env:
+          PACKED_NETWORKLESS_RECEIPT: ${{ runner.temp }}/release-linux-packed-networkless-receipt.json
+        run: |
+          set -euo pipefail
+          SOURCE_PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          node scripts/verify-packed-networkless-install.mjs --expected-environment linux --receipt-file "$PACKED_NETWORKLESS_RECEIPT"
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const receipt = JSON.parse(readFileSync(process.argv[1], "utf8"));
+            const sourcePackageVersion = process.argv[2];
+            const sha256 = /^sha256:[0-9a-f]{64}$/u;
+            const expectedTopLevelFields = [
+              "cacheAuthority",
+              "event",
+              "expectedEnvironmentKind",
+              "installedCliReceipt",
+              "installedNpmShrinkwrapSha256",
+              "installNetworkMode",
+              "nativeReceipt",
+              "schemaVersion",
+              "sourceNpmShrinkwrapSha256",
+              "tarballSha256",
+            ].sort();
+            const expectedInstalledCliFields = [
+              "event",
+              "outputSha256",
+              "packageVersion",
+              "schemaVersion",
+            ].sort();
+            const nativeReceipt = receipt.nativeReceipt;
+            const installedCliReceipt = receipt.installedCliReceipt;
+            if (JSON.stringify(Object.keys(receipt).sort()) !== JSON.stringify(expectedTopLevelFields)
+              || receipt.schemaVersion !== 1
+              || receipt.event !== "DECKENT_PACKED_NETWORKLESS_INSTALL_VERIFIED"
+              || receipt.expectedEnvironmentKind !== "linux"
+              || receipt.installNetworkMode !== "OFFLINE"
+              || receipt.cacheAuthority !== "FRESH_PRIVATE_PREWARMED"
+              || !sha256.test(receipt.sourceNpmShrinkwrapSha256)
+              || !sha256.test(receipt.installedNpmShrinkwrapSha256)
+              || receipt.installedNpmShrinkwrapSha256 !== receipt.sourceNpmShrinkwrapSha256
+              || !sha256.test(receipt.tarballSha256)
+              || JSON.stringify(Object.keys(installedCliReceipt ?? {}).sort()) !== JSON.stringify(expectedInstalledCliFields)
+              || installedCliReceipt?.schemaVersion !== 1
+              || installedCliReceipt.event !== "DECKENT_INSTALLED_CLI_VERIFIED"
+              || installedCliReceipt.packageVersion !== sourcePackageVersion
+              || !sha256.test(installedCliReceipt.outputSha256)
+              || nativeReceipt?.event !== "EXEC_AUTHORITY_NATIVE_INSTALLED_PACKAGE_VERIFIED"
+              || nativeReceipt.npmShrinkwrapSha256 !== receipt.sourceNpmShrinkwrapSha256
+              || nativeReceipt.platform !== "linux"
+              || nativeReceipt.environment?.environmentKind !== "linux"
+              || nativeReceipt.environment?.expectedEnvironmentKind !== "linux"
+              || nativeReceipt.installTimeNativeBuild !== "ABSENT"
+              || nativeReceipt.installTimeNativeDownload !== "ABSENT"
+              || nativeReceipt.lifecycle?.state !== "PUBLISHED_READ_VERIFIED") process.exit(1);
+          ' "$PACKED_NETWORKLESS_RECEIPT" "$SOURCE_PACKAGE_VERSION"
+
+      # Minimal smoke, not a duplicate of ci.yml's full matrix — see header note 2.
+      - name: Release smoke test-gate
+        env:
+          NODE_OPTIONS: '--max-old-space-size=8192'
+        run: |
+          npx vitest run tests/governance/
+          npx vitest run tests/core/
+        timeout-minutes: 5
+
+      # Reads the ROOT CHANGELOG.md (not docs/CHANGELOG.md — that mirror is a generated
+      # long-form archive; the root file is the canonical per-version release-notes
+      # source, see docs/release/release-checklist.md step 6). Exact-anchored: the old
+      # `^## \[?v?${VERSION}\]?|^## ${VERSION}` awk pattern had no end-boundary, so it
+      # would prefix-match e.g. VERSION=1.0.0-beta.1 against a "## v1.0.0-beta.1-sprintNNN"
+      # heading (this repo already has that exact naming convention — see the
+      # "v0.3.0-beta.1-sprint84" heading in CHANGELOG.md) and silently splice the wrong
+      # section into the GitHub Release. The lookahead below requires the version token to
+      # end at `]`, whitespace, or end-of-line. An empty section or duplicate heading now
+      # FAILS the step instead of silently falling back to a placeholder "Release vX.Y.Z"
+      # body — a real release must never ship with empty/wrong notes silently.
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          cat > /tmp/extract-changelog.mjs <<'NODEEOF'
+          import { readFileSync, writeFileSync } from 'node:fs';
+
+          const version = process.argv[2];
+          const changelog = readFileSync('CHANGELOG.md', 'utf8');
+          const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const headingRe = new RegExp(`^## \\[?v?${escaped}\\]?(?=[\\]\\s]|$)`);
+          const lines = changelog.split('\n');
+          const matchedLines = [];
+          for (let i = 0; i < lines.length; i++) {
+            if (headingRe.test(lines[i])) matchedLines.push(i);
+          }
+
+          if (matchedLines.length === 0) {
+            console.error(`release-notes FAIL: no CHANGELOG.md heading exact-matches version ${version}`);
+            process.exit(1);
+          }
+          if (matchedLines.length > 1) {
+            console.error(`release-notes FAIL: ${matchedLines.length} duplicate CHANGELOG.md headings exact-match version ${version} (0-indexed lines ${matchedLines.join(', ')})`);
+            process.exit(1);
+          }
+
+          const start = matchedLines[0] + 1;
+          let end = lines.length;
+          for (let i = start; i < lines.length; i++) {
+            if (/^## /.test(lines[i])) { end = i; break; }
+          }
+          const body = lines.slice(start, end).join('\n').trim();
+          if (!body) {
+            console.error(`release-notes FAIL: CHANGELOG.md section for version ${version} is empty — silent-empty release notes are forbidden`);
+            process.exit(1);
+          }
+          writeFileSync('/tmp/release-notes.txt', body + '\n');
+          console.log(`release-notes extracted for ${version} (${body.split('\n').length} lines)`);
+          NODEEOF
+          node /tmp/extract-changelog.mjs "$VERSION"
+          echo "notes_file=/tmp/release-notes.txt" >> "$GITHUB_OUTPUT"
+
+      # ── PUBLISH IS OWNER-MANUAL (0.100.0 rebaseline, 2026-08-14) ──────────────
+      # This workflow performs NO automatic package publish and creates NO GitHub Release.
+      # It only builds, validates, emits the exact packed-networkless receipt above, attests
+      # CI, and validates the CHANGELOG section, then stops. There is no npm-auth secret and no
+      # npm trusted-publishing/OIDC step here — that is why no OIDC provenance token is
+      # requested (see the permissions block above). Canonical publishing is a MANUAL
+      # owner action, run only from the exact validated tree whose native receipt succeeded:
+      #     npm run build:all && npm run validate:publish
+      #     npm publish --access public --ignore-scripts
+      # (No `--provenance`: it requires a supported CI/trusted-publishing environment and
+      # is not used for a local owner-manual publish; enabling it later is a separate
+      # protected-CI decision.) Do NOT re-add an automatic publish or GitHub-Release step
+      # here under any name (owner decision: tagless, no auto-publish, no GitHub Release).
+
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dist-${{ github.ref_name }}
+          path: |
+            dist/
+            ${{ runner.temp }}/release-linux-packed-networkless-receipt.json
+          retention-days: 30

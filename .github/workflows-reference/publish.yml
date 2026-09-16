@@ -1,0 +1,85 @@
+# RETIRED as a publish authority (born-608, task 407-001, P0 publish-blocker fix).
+#
+# Decision: this workflow and release.yml BOTH triggered on `push: tags: v*`, and this
+# workflow ALSO triggered on `release: types: [published]` — which release.yml itself
+# fires (it creates the GitHub Release). A single `git push --tags` could therefore run
+# `npm publish` from this file, from release.yml, AND a second time from this file's own
+# release-published trigger — a real double/triple-publish race, catastrophic for a
+# package registry that only accepts one publish per version.
+#
+# release.yml is now the SOLE npm-publish authority. This file is narrowed (not deleted)
+# to a standalone build+lint+test+dry-run readiness check — useful on its own merits
+# (catches packaging regressions even if release.yml's job never starts) but it MUST NOT
+# perform a real `npm publish` ever again. Triggers are left as-is (still fire on tag
+# push / release published) since running an extra read-only verification pass on those
+# events is harmless and keeps pre-existing trigger-shape assertions elsewhere valid;
+# only the mutating step was removed.
+#
+# `id-token: write` was dropped from permissions: it existed only for OIDC provenance
+# signing during a real `npm publish --provenance`, which no longer happens here —
+# least-privilege now that this workflow never uploads to the registry.
+
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.x'
+          cache: npm
+          cache-dependency-path: npm-shrinkwrap.json
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Rebuild native binding (better-sqlite3)
+        run: npm run ci:rebuild-native
+
+      - name: Type check
+        run: npm run lint
+
+      - name: Build (build:all — dashboard bundle required for validate:publish gates)
+        run: npm run build:all
+
+      # 8-gate readiness check: pack size, entry points, bin exec bits, dashboard
+      # bundle, ADR/link lint (scripts/validate-publish.mjs).
+      - name: Validate publish readiness
+        run: npm run validate:publish
+
+      - name: Run tests (staged to avoid OOM)
+        env:
+          NODE_OPTIONS: '--max-old-space-size=8192'
+        run: |
+          npx vitest run tests/core/ tests/agents/
+          npx vitest run tests/orchestra/ --pool=forks
+          npx vitest run tests/cli/
+          npx vitest run tests/mcp/ tests/api/ tests/integration/ tests/security/ tests/providers/ tests/monitor/ tests/docs/ tests/skills/ tests/analytics/ tests/scripts/
+        timeout-minutes: 15
+
+      # NOT a real publish — this workflow never uploads to the registry (see header).
+      # `npm publish --dry-run` does not perform any authenticated registry write (empirically
+      # verified: an unauthenticated dry-run against the real npmjs.org registry exits 0 with
+      # only a benign "requires you to be logged in (dry-run)" warning), so unlike the real
+      # publish in release.yml this step never needed a credential at all — SEC-06 (RC4A)
+      # removes the long-lived npm auth secret reference that was here.
+      - name: Dry run publish (validate package)
+        run: npm publish --dry-run --access public

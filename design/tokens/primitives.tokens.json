@@ -1,0 +1,239 @@
+{
+  "$description": "Deckent Design System — primitive katmanı (DTCG). SSOT: renk/font/radius/motion literal'lerinin TEK evi (design-tokens-pipeline skill kontratı, DESIGN-SYSTEM-001). Değerler 2026-07-31'de mevcut onaylı kaynaklardan bire-bir çıkarıldı: color.chart.* = src/desktop/src/shared/theme-tokens.ts PRIMITIVES (anahtar adları verbatim); color.decko.* = src/dashboard/src/index.css @theme. Yeni değer eklemek = tasarım kararı → Alperen onayı gerekir.",
+  "color": {
+    "$type": "color",
+    "chart": {
+      "$description": "Desktop watch primitives — theme-tokens.ts PRIMITIVES ile bire-bir (drift testi: src/desktop/tests/theme-tokens-gen-sync.test.ts).",
+      "novaDeep": { "$value": "#04080D" },
+      "novaRaised": { "$value": "#0A141D" },
+      "novaLine": { "$value": "#14242F" },
+      "novaText": { "$value": "#D7E7EE" },
+      "novaTextMuted": { "$value": "#6E8A98" },
+      "novaGlow": { "$value": "#38D3FF" },
+      "novaGlowBright": {
+        "$value": "#7BE8FF",
+        "$description": "589-A bright-glow; CAM GÖBEĞİ ailesi kalıcı seçimiyle (kimlik-turu 2026-07-31) kayıtlandı."
+      },
+      "novaGlowIdle": {
+        "$value": "#20748D",
+        "$description": "arc-idle katı-kompozit (novaGlow @.53 over novaDeep) — bg 3.77 / surface 3.49. Rol-turu 2026-08-01."
+      },
+      "novaGlowDeep": { "$value": "#04202B" },
+      "novaAmber": { "$value": "#E8B34C" },
+      "novaGo": { "$value": "#43E39A" },
+      "novaAbort": { "$value": "#FF6B5E" },
+      "buff": { "$value": "#F2EDDC" },
+      "buffRaised": { "$value": "#FBF8EC" },
+      "buffLine": { "$value": "#DDD5BC" },
+      "shallowWater": { "$value": "#BDD7E2" },
+      "deepSea": { "$value": "#0E2430" },
+      "deepSeaRaised": { "$value": "#13303F" },
+      "deepSeaLine": { "$value": "#235064" },
+      "seaText": { "$value": "#D8E4E9" },
+      "seaTextMuted": { "$value": "#7FA3B2" },
+      "seaAccentText": { "$value": "#0E2430" },
+      "night": { "$value": "#12151A" },
+      "nightRaised": { "$value": "#181C23" },
+      "nightLine": { "$value": "#2A303A" },
+      "nightText": { "$value": "#E3DAD2" },
+      "nightTextMuted": { "$value": "#9B948B" },
+      "nightAccent": { "$value": "#E2766B" },
+      "nightAccentBright": {
+        "$value": "#F0938A",
+        "$description": "accent-bright (night-watch): night 8.05 / raised 7.52, base-adımı 1.31. Rol-turu 2026-08-01."
+      },
+      "nightAccentIdle": {
+        "$value": "#935E5B",
+        "$description": "arc-idle katı-kompozit (nightAccentBright @.58 over night) — bg 3.48 / surface 3.25. Rol-turu 2026-08-01."
+      },
+      "nightAccentText": { "$value": "#1C0F0D" },
+      "ink": { "$value": "#2B2F33" },
+      "inkMuted": {
+        "$value": "#63676a",
+        "$description": "2026-08-01 a11y koyulaştırması (#6B6F72 idi): buff üstü 4.87:1 (AA)."
+      },
+      "magenta": { "$value": "#BD4278" },
+      "magentaBright": {
+        "$value": "#A93368",
+        "$description": "accent-bright (day-watch): açık zeminde vurgu = DERİN — buff 5.33 / buffRaised 5.87, base-adımı 1.25 (nova 1.24 ile simetrik). Rol-turu 2026-08-01."
+      },
+      "magentaIdle": {
+        "$value": "#B95C82",
+        "$description": "arc-idle katı-kompozit (magentaBright @.78 over buff) — bg 3.65 / surface 4.02. Rol-turu 2026-08-01."
+      },
+      "magentaSea": { "$value": "#E88FB9" },
+      "magentaSeaBright": {
+        "$value": "#F5A8CC",
+        "$description": "accent-bright (open-sea): deepSea 8.64 / raised 7.46, base-adımı 1.25. Rol-turu 2026-08-01."
+      },
+      "magentaSeaIdle": {
+        "$value": "#8F6E87",
+        "$description": "arc-idle katı-kompozit (magentaSeaBright @.56 over deepSea) — bg 3.61 / surface 3.12. Rol-turu 2026-08-01."
+      },
+      "brass": { "$value": "#A98F54" },
+      "paperOnMagenta": { "$value": "#FBF8EC" },
+      "go": { "$value": "#2F7D46" },
+      "caution": {
+        "$value": "#8F6212",
+        "$description": "2026-07-31 a11y koyulaştırması (#A8741A idi): caution-text/caution 5.03 ve caution/bg 4.57 — AA."
+      },
+      "abort": { "$value": "#C0453E" },
+      "nightGo": { "$value": "#7FA06A" },
+      "nightCaution": { "$value": "#C99A55" },
+      "nightAbort": { "$value": "#E2766B" },
+      "seaGo": { "$value": "#7FC78F" },
+      "seaCaution": { "$value": "#E0B368" },
+      "seaAbort": { "$value": "#F08A80" }
+    },
+    "decko": {
+      "$description": "Dashboard (Decko handoff) primitives — src/dashboard/src/index.css @theme değerleri.",
+      "zinc50": { "$value": "#fafafa" },
+      "zinc400": { "$value": "#a1a1aa" },
+      "zinc800": { "$value": "#27272a" },
+      "zinc900": { "$value": "#18181b" },
+      "zinc950": { "$value": "#09090b" },
+      "red500": { "$value": "#ef4444" },
+      "teal50": { "$value": "#eaf4ef" },
+      "teal100": { "$value": "#d9ece5" },
+      "teal200": { "$value": "#b6d8ce" },
+      "teal300": { "$value": "#8fcdbe" },
+      "teal400": { "$value": "#6fbcae" },
+      "teal500": { "$value": "#54a89c" },
+      "teal600": { "$value": "#3e9384" },
+      "teal700": { "$value": "#2f7568" },
+      "teal800": { "$value": "#246060" },
+      "teal900": { "$value": "#1a4a45" },
+      "tealBg": { "$value": "#11332d" },
+      "tealFg": { "$value": "#bfe6dc" },
+      "tealOnPrimary": { "$value": "#0d2420" },
+      "gold": { "$value": "#c0b46c" },
+      "goldSoft": { "$value": "#d6cb8c" },
+      "goldDeep": { "$value": "#9a8736" },
+      "goldTint": { "$value": "#1e1b0e" }
+    }
+  },
+  "font": {
+    "$type": "fontFamily",
+    "$description": "AKTİF font-rolleri — seçili sete alias (kimlik seçimi = set seçimi). FLIP 2026-07-31: eski set (Bricolage/Hanken/Geist/IBM Plex) reddedildi, «MAKİNE İZİ» canlı gerçek-veri doğrulamasıyla seçildi (kimlik-turu prototipi + Alperen onayı). Set değişimi = alias'ları başka fontSet'e çevirmek.",
+    "display": {
+      "$value": "{fontSet.makine-izi.display}",
+      "$description": "Display rolü → seçili set."
+    },
+    "body": {
+      "$value": "{fontSet.makine-izi.body}",
+      "$description": "Gövde rolü → seçili set (desktop + dashboard ortak)."
+    },
+    "data": {
+      "$value": "{fontSet.makine-izi.data}",
+      "$description": "Veri/mono rolü → seçili set."
+    },
+    "dashboardMono": {
+      "$value": "{fontSet.makine-izi.data}",
+      "$description": "2026-07-31 birleşimi: dashboard mono'su artık data rolüyle aynı (IBM Plex ayrımı emekli)."
+    }
+  },
+  "fontSet": {
+    "$description": "Seçilebilir font-setleri (kişiselleştirme kuralı: kimlik seçimi = token-seti; DESKTOP-CUSTOMIZE-001). makine-izi = SEÇİLİ set (Alperen 2026-07-31: aday-turu + gerçek-veri kimlik-turu doğrulaması + flip onayı). Dosyalar: design/fonts/makine-izi/ (OFL, latin+latin-ext, cmap-doğrulandı).",
+    "envanter-legacy": {
+      "$type": "fontFamily",
+      "$description": "Tarihî set (D4-0 mirası; 2026-07-31 reddiyle kimlik-emekli) — set-değiştirilebilirlik için SEÇİLEBİLİR kayıt (Alperen onayı 2026-08-01). Dosyalar renderer/fonts'ta.",
+      "display": { "$value": ["Bricolage Grotesque", "system-ui", "sans-serif"] },
+      "body": { "$value": ["Hanken Grotesk", "system-ui", "-apple-system", "Segoe UI", "sans-serif"] },
+      "data": { "$value": ["Geist Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"] }
+    },
+    "makine-izi": {
+      "$type": "fontFamily",
+      "display": {
+        "$value": ["Tektur", "system-ui", "sans-serif"],
+        "$description": "Kesik köşeli enstrümantal display (700)."
+      },
+      "body": {
+        "$value": ["Chakra Petch", "system-ui", "sans-serif"],
+        "$description": "Aynı DNA düşük dozda; gövde (400/600). Yaygınlık riski kartta beyanlı."
+      },
+      "data": {
+        "$value": ["Spline Sans Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+        "$description": "Keskin ama sakin veri yüzü (400/600, tabular)."
+      }
+    }
+  },
+  "radius": {
+    "$type": "dimension",
+    "control": {
+      "$value": "0.25rem",
+      "$description": "Squared-technical görünüm (index.css --radius)."
+    },
+    "panel": { "$value": "10px", "$description": "Floating/odak-panel köşesi (prototip-ölçüsü) — 2026-08-01 onay." },
+    "pill": { "$value": "999px", "$description": "Komuta-girdisi hap-formu." }
+  },
+  "size": {
+    "$type": "dimension",
+    "progressHairline": { "$value": "2px" },
+    "progressBold": { "$value": "6px" },
+    "progressRadialSm": { "$value": "40px" },
+    "progressRadialMd": { "$value": "64px" }
+  },
+  "space": {
+    "$type": "dimension",
+    "unit": {
+      "$value": "0.25rem",
+      "$description": "4px taban artımı — Tailwind v4 spacing artımlarıyla uyumlu; desktop el-CSS'i bu ritme yakınsar (wiring dilimi)."
+    },
+    "statuspillPadSmY": {
+      "$value": "3px",
+      "$description": "statuspill-pad-sm dikey (Alperen onayı 2026-07-31 — component-turu)."
+    },
+    "statuspillPadSmX": {
+      "$value": "8px",
+      "$description": "statuspill-pad-sm yatay (Alperen onayı 2026-07-31)."
+    },
+    "accentSwatch": { "$value": "28px", "$description": "Accent seçici swatch boyutu — 2026-08-01 onay." }
+  },
+  "duration": {
+    "$type": "duration",
+    "glide": {
+      "$value": "240ms",
+      "$description": "«Süzülme, sıçrama değil» — D4-0/NOVA belgeli geçiş süresi. reduced-motion: 0ms."
+    },
+    "riverArrive": { "$value": "450ms", "$description": "Nehir satır-doğuş süzülmesi — 2026-08-01 onay." },
+    "progressFlow": { "$value": "1600ms", "$description": "Indeterminate akış periyodu — yalnız gerçek süre-belirsizliğinde." }
+  },
+  "brightness": {
+    "$type": "number",
+    "$description": "Etkileşim parlaklık çarpanları (Alperen onayı 2026-07-31 — component-turu token-adayları; kanonik adlar: brightness-hover/active).",
+    "hover": { "$value": 1.18 },
+    "active": { "$value": 0.85 }
+  },
+  "alpha": {
+    "$type": "number",
+    "$description": "Accent-kanallı saydamlıklar (Alperen onayı 2026-07-31; kanonik adlar: accent-alpha-hover · glow-focus).",
+    "accentHover": { "$value": 0.28 },
+    "glowFocus": { "$value": 0.14 },
+    "glowText": {
+      "$value": "{alpha.glowFocus}",
+      "$description": "Nehir text-shadow ışıması — focus-ışımasıyla aynı yoğunluk (alias)."
+    },
+    "panelScrim": { "$value": 0.86, "$description": "Floating-panel zemini (surface-kanalı) — 2026-08-01 onay." },
+    "panelEdge": { "$value": 0.25, "$description": "Floating-panel kenarı (accent-kanalı)." },
+    "selectionOverlay": { "$value": 0.55, "$description": "Seçim-vurgusu — kanal = text rolü (beyaz emekli)." }
+  },
+  "blur": {
+    "$type": "dimension",
+    "panelFloat": { "$value": "6px", "$description": "Floating-panel backdrop-blur — 2026-08-01 onay." }
+  },
+  "opacity": {
+    "$type": "number",
+    "riverText": { "$value": 0.86, "$description": "Nehir satır-mürekkebi opaklığı — 2026-08-01 onay." },
+    "disabled": {
+      "$value": 0.45,
+      "$description": "opacity-disabled (Alperen onayı 2026-07-31). Disabled efektif-kontrast eşiği bu değerle sabitlenir — bilinen durum: danger .45'te 2.21:1 (a11y 2026-07-31 #2); yükseltme kararı ürünleşme-önkoşulu listesinde."
+    }
+  },
+  "easing": {
+    "$type": "cubicBezier",
+    "glide": {
+      "$value": [0, 0, 0.58, 1],
+      "$description": "CSS ease-out eşdeğeri (D4-0: «uzun ease-out»). Daha uzun-kuyruk varyant kararı accent-prototip turuna bağlı — sessiz değiştirme yok."
+    }
+  }
+}

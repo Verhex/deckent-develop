@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "source": "docs/design/skills",
+  "targets": [
+    ".claude/skills",
+    ".codex/skills"
+  ],
+  "skills": [
+    "deckent-design-dna",
+    "deckent-product-design",
+    "deckent-agentic-ux",
+    "deckent-visual-language",
+    "deckent-design-system",
+    "design-tokens-pipeline",
+    "deckent-workspace-design",
+    "deckent-terminal-design",
+    "deckent-enterprise-ux",
+    "deckent-design-critic"
+  ],
+  "retired": [
+    "ui-ux-pro-max"
+  ]
+}

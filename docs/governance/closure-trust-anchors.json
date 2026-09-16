@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "anchors": [
+    {
+      "keyId": "closure-owner-genesis-v1",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAu1p9o/Eo097m5GYFAbZRvBJ/gynlRTPbmEDU0WQohw8=\n-----END PUBLIC KEY-----\n",
+      "tenantId": "main",
+      "projectId": "deckent"
+    }
+  ]
+}

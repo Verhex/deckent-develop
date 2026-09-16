@@ -1,0 +1,20 @@
+[
+  { "id": "TSM-001", "target": "tests/cli/commands/chat.test.ts", "source": "tests/cli/chat.test.ts" },
+  { "id": "TSM-002", "target": "tests/cli/commands/chat-native.test.ts", "source": "tests/cli/chat-native.test.ts" },
+  { "id": "TSM-003", "target": "tests/cli/commands/chat-slash-registry.test.ts", "source": "tests/cli/chat-slash-registry.test.ts" },
+  { "id": "TSM-004", "target": "tests/cli/commands/dashboard.test.ts", "source": "tests/cli/dashboard.test.ts" },
+  { "id": "TSM-005", "target": "tests/cli/helpers/error-handler.test.ts", "source": "tests/cli/error-handler.test.ts" },
+  { "id": "TSM-006", "target": "tests/cli/helpers/messages.test.ts", "source": "tests/cli/messages.test.ts" },
+  { "id": "TSM-007", "target": "tests/cli/repl/native-transport.test.ts", "source": "tests/cli/native-transport.test.ts" },
+  { "id": "TSM-008", "target": "tests/cli/commands/onboard.test.ts", "source": "tests/cli/onboard.test.ts" },
+  { "id": "TSM-009", "target": "tests/cli/commands/output.test.ts", "source": "tests/cli/helpers/output.test.ts", "destination": "tests/cli/output.test.ts" },
+  { "id": "TSM-010", "target": "tests/cli/commands/recall.test.ts", "source": "tests/cli/recall.test.ts" },
+  { "id": "TSM-011", "target": "tests/cli/helpers/splash.test.ts", "source": "tests/cli/splash.test.ts" },
+  { "id": "TSM-012", "target": "tests/cli/helpers/sprint-summary-rich.test.ts", "source": "tests/cli/sprint-summary-rich.test.ts" },
+  { "id": "TSM-013", "target": "tests/dashboard/terminal-api.test.ts", "source": "tests/dashboard/terminal/terminal-api.test.ts" },
+  { "id": "TSM-014", "target": "tests/mcp/helpers/format.test.ts", "source": "tests/mcp/tools/format.test.ts", "destination": "tests/mcp/format.test.ts" },
+  { "id": "TSM-015", "target": "tests/mcp/tools/help.test.ts", "source": "tests/mcp/help.test.ts" },
+  { "id": "TSM-016", "target": "tests/mcp/tools/job-runner.test.ts", "source": "tests/mcp/job-runner.test.ts" },
+  { "id": "TSM-017", "target": "tests/mcp/resources.test.ts", "source": "tests/mcp/resources/resources.test.ts" },
+  { "id": "TSM-018", "target": "tests/nervous/detectors/stale-worker.test.ts", "source": "tests/nervous/stale-worker.test.ts" }
+]

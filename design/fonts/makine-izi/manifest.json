@@ -1,0 +1,78 @@
+{
+ "set": "makine-izi",
+ "status": "SELECTED_PENDING_REAL_DATA_VALIDATION",
+ "decision": "Alperen 2026-07-31: yon A (suanlik ok); token-flip gercek-veri prototip dogrulamasi sonrasi",
+ "license": "OFL 1.1 — kaynak: Google Fonts (fonts.google.com); latin + latin-ext (Turkce tam, cmap-dogrulandi)",
+ "files": [
+  {
+   "family": "Tektur",
+   "weight": "700",
+   "subset": "latin-ext",
+   "file": "Tektur-700-latin-ext.woff2",
+   "bytes": 9876
+  },
+  {
+   "family": "Tektur",
+   "weight": "700",
+   "subset": "latin",
+   "file": "Tektur-700-latin.woff2",
+   "bytes": 7592
+  },
+  {
+   "family": "Chakra Petch",
+   "weight": "400",
+   "subset": "latin-ext",
+   "file": "ChakraPetch-400-latin-ext.woff2",
+   "bytes": 8860
+  },
+  {
+   "family": "Chakra Petch",
+   "weight": "400",
+   "subset": "latin",
+   "file": "ChakraPetch-400-latin.woff2",
+   "bytes": 9756
+  },
+  {
+   "family": "Chakra Petch",
+   "weight": "600",
+   "subset": "latin-ext",
+   "file": "ChakraPetch-600-latin-ext.woff2",
+   "bytes": 9056
+  },
+  {
+   "family": "Chakra Petch",
+   "weight": "600",
+   "subset": "latin",
+   "file": "ChakraPetch-600-latin.woff2",
+   "bytes": 9968
+  },
+  {
+   "family": "Spline Sans Mono",
+   "weight": "400",
+   "subset": "latin-ext",
+   "file": "SplineSansMono-400-latin-ext.woff2",
+   "bytes": 20816
+  },
+  {
+   "family": "Spline Sans Mono",
+   "weight": "400",
+   "subset": "latin",
+   "file": "SplineSansMono-400-latin.woff2",
+   "bytes": 36476
+  },
+  {
+   "family": "Spline Sans Mono",
+   "weight": "600",
+   "subset": "latin-ext",
+   "file": "SplineSansMono-600-latin-ext.woff2",
+   "bytes": 20816
+  },
+  {
+   "family": "Spline Sans Mono",
+   "weight": "600",
+   "subset": "latin",
+   "file": "SplineSansMono-600-latin.woff2",
+   "bytes": 36476
+  }
+ ]
+}
