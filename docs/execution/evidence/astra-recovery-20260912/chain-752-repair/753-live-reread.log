@@ -1,3 +1,0 @@
-{"at":"2026-09-13T10:40:25.752Z","stage":"accepted","state":"exact-accepted"}
-{"at":"2026-09-13T10:41:05.207Z","stage":"terminal","state":"current","guard":true,"sameAcceptedResult":true,"verdict":"DONE"}
-{"at":"2026-09-13T10:41:23.062Z","stage":"live-backend-representation","liveAvailable":true,"acceptedNullPrototype":true,"terminalNullPrototype":false,"deepEqual":false,"canonicalEqual":true}

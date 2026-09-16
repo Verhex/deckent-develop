@@ -1,2 +1,0 @@
-[master-plan] FAIL — 1 canonical invariant violation(s):
-  - REQUIRED_TEXT_PLACEHOLDER docs/MASTER-PLAN.md:1052 [RECOVERY-DO-DOGFOOD-001]: Evidence must be bounded, visible and semantically non-placeholder

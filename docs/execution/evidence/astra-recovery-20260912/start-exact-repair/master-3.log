@@ -1,3 +1,0 @@
-[master-plan] FAIL — 2 identity continuity violation(s):
-  - IDENTITY_DEFINITION_DRIFT [RECOVERY-DO-DOGFOOD-001]: immutable parent/program/outcome/acceptance/dependency/gate definition changed for RECOVERY-DO-DOGFOOD-001
-  - WORK_UPDATED_STALE [RECOVERY-DO-DOGFOOD-001]: Work ID RECOVERY-DO-DOGFOOD-001 changed priority/state/truth/evidence/blocker authority after its 2026-08-09 review date without advancing Updated

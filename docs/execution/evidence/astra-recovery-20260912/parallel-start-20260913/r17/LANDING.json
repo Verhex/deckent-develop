@@ -1,9 +1,0 @@
-{
-  "path": "src/orchestra/spawn-backend-docker.ts",
-  "sha256": "b4ba9af36ee87cee89e2eca38fccf7ebba69ccdd8f0f1940e2b08e95bbc3e760",
-  "baselineSha256": "8abdb37d80fc20184d8cbc1b5e5e365226a42056b31c024f6f5845af66472b22",
-  "tests": 46,
-  "testExit": 0,
-  "tscExit": 0,
-  "commit": false
-}

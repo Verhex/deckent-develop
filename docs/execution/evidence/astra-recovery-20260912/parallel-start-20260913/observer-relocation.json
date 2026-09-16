@@ -1,8 +1,0 @@
-{
-  "observedAt": "2026-09-13T14:16:03.014147+00:00",
-  "reason": "live observer files entered source population inventory; remove observer interference while retaining frozen source paths",
-  "liveLogs": "/tmp/deckent-parallel-start-20260913-live",
-  "frozenSnapshots": "docs/execution/evidence/astra-recovery-20260912/parallel-start-20260913",
-  "productProcessInterrupted": false,
-  "remainingLimitation": "source files already admitted may observe one transition mismatch; no immutable custody edited"
-}

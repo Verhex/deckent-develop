@@ -1,1 +1,0 @@
-src/cli/repl/native-transport.ts(604,38): error TS2339: Property 'models' does not exist on type '{ name: string; baseUrl?: string | undefined; endpoint?: string | undefined; }'.

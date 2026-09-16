@@ -1,8 +1,0 @@
-{"stage":"real-archive-read","i":0,"elapsedMs":2887.663101}
-{"stage":"real-archive-read","i":1,"elapsedMs":5602.598121}
-{"stage":"real-archive-read","i":2,"elapsedMs":8318.893650999998}
-{"stage":"real-archive-read","i":3,"elapsedMs":10985.523076}
-{"stage":"real-archive-read","i":4,"elapsedMs":13647.524859}
-{"stage":"real-archive-read","i":5,"elapsedMs":16407.26917}
-{"stage":"inspect","elapsedMs":16803.727938,"status":1,"signal":null,"stdout":"\n","stderr":"error: no such object: 957c72effe1343ced1347b25c310fc95ef3149a14bb50004077c9d6f625f90a5\n","error":false,"overflow":false}
-exitCode=0

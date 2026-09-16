@@ -1,6 +1,0 @@
-{
-  "path": "/tmp/deckent-760-followup/terminal-authority.cpuprofile",
-  "sha256": "6e1d6fe1254d64b0bf9421a45a7c58120ea5ee5b5466a9ffe6a39b0841b2bc5c",
-  "bytes": 38313778,
-  "note": "Raw V8 CPU profile retained outside repo; aggregated sample summary in profile-summary.json. Sampling is not exact call count."
-}

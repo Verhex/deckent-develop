@@ -1,5 +1,0 @@
-{
-  "note": "Model-name string-literal ratchet baseline (born-item 431-001). `sanctioned` = un-audited grandfathered source call sites; `sanctionedMarkdown` = actionable legacy aliases in current docs. A site absent from its matching multiset fails the gate. Canonical ids and aliases are derived dynamically from src/core/model-registry.ts, never copy-pasted here. Regenerate with --update.",
-  "sanctioned": [],
-  "sanctionedMarkdown": []
-}

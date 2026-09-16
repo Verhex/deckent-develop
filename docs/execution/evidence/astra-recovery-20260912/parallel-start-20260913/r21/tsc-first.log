@@ -1,5 +1,0 @@
-src/core/file-lock.ts(7781,9): error TS2451: Cannot redeclare block-scoped variable 'verified'.
-src/core/file-lock.ts(7810,11): error TS2451: Cannot redeclare block-scoped variable 'verified'.
-src/core/file-lock.ts(7811,31): error TS2339: Property 'audit' does not exist on type 'true'.
-src/core/file-lock.ts(7817,34): error TS2339: Property 'recovered' does not exist on type 'true'.
-src/core/file-lock.ts(7817,61): error TS2339: Property 'audit' does not exist on type 'true'.

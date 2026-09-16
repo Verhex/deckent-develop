@@ -1,6 +1,0 @@
-{
-  "path": "/tmp/deckent-r0-astra-20260912/planning-health.cpuprofile",
-  "bytes": 67302519,
-  "sha256": "cbb36a46df82635bd5ab42c7d7a2de72909d5d4f21556dc0149135b2b5f30f19",
-  "scope": "read-only planning-health CPU samples; inclusive stacks overlap"
-}

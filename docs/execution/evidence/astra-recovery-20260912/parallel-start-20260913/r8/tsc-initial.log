@@ -1,2 +1,0 @@
-src/orchestra/result-collector.ts(2745,7): error TS2448: Block-scoped variable 'questionBridgeWire' used before its declaration.
-src/orchestra/result-collector.ts(2750,17): error TS2448: Block-scoped variable 'questionBridgeWire' used before its declaration.

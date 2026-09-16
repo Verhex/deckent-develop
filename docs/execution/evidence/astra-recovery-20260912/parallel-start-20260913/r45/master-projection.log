@@ -1,7 +1,0 @@
-
-> deckent@0.100.0 docs:master-plan
-> node scripts/lint-master-plan.mjs --write
-
-[master-plan] FAIL — 2 canonical invariant violation(s):
-  - DEFERRED_AUTHORITY docs/MASTER-PLAN.md:1377 [RECOVERY-BORN-711-MACOS-NATIVE-CUSTODY-PROOF-001]: DEFERRED evidence must contain exactly reason=<non-empty>;review-date=<real future YYYY-MM-DD>
-  - DEFERRED_AUTHORITY docs/MASTER-PLAN.md:1378 [RECOVERY-BORN-711-WINDOWS-NATIVE-CUSTODY-PROOF-001]: DEFERRED evidence must contain exactly reason=<non-empty>;review-date=<real future YYYY-MM-DD>

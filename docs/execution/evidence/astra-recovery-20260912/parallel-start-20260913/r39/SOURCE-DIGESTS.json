@@ -1,8 +1,0 @@
-{
-  "observedAt": "2026-09-15T08:23:59.429718+00:00",
-  "sha256": {
-    "src/orchestra/ipc-registry.ts": "9d22ba2c1de070c0206566c7082b9f5356b444e829a753e1bab272b4dc606b50",
-    "src/orchestra/spawn-backend-docker.ts": "56f657a6b6b12ce90a2c697825b8145976aea7196918031224564f3474ddb8bc",
-    "tests/orchestra/spawn-backend-docker-ipc-authority.test.ts": "cee7eb96cbdc5113735d4ab5f0c38a52814b86d30cf1cf899192d8d180afce63"
-  }
-}

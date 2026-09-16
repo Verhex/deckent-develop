@@ -1,2 +1,0 @@
-src/orchestra/spawn-backend-docker.ts(18630,85): error TS2339: Property 'objectIdentityDigest' does not exist on type 'ExecutionEffectLandingEntryStateV1'.
-  Property 'objectIdentityDigest' does not exist on type 'Readonly<{ readonly state: "ABSENT"; readonly stateDigest: string; }>'.

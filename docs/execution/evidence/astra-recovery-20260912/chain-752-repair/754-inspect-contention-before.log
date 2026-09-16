@@ -1,8 +1,0 @@
-{"stage":"started","at":"2026-09-13T11:28:25.955Z"}
-{"stage":"real-archive-read","i":0,"elapsedMs":2453.755316}
-{"stage":"real-archive-read","i":1,"elapsedMs":4780.404321}
-{"stage":"real-archive-read","i":2,"elapsedMs":7097.190844}
-{"stage":"real-archive-read","i":3,"elapsedMs":9403.88581}
-{"stage":"real-archive-read","i":4,"elapsedMs":11706.128974}
-{"stage":"real-archive-read","i":5,"elapsedMs":14061.36134}
-{"stage":"inspect","elapsedMs":14061.734559999999,"status":null,"signal":null,"stdout":"","stderr":"","error":true,"overflow":false}

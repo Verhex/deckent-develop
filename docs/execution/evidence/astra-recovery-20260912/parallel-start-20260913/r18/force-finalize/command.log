@@ -1,7 +1,0 @@
-DECKENT_BINARY_IDENTITY_WARN: the build in `dist/` no longer matches this source checkout (reason: build-source-mismatch). Continuing — run `npm run build` so the CLI reflects your current source.
-Uyarı: 3 sürmekte olan görevle sonlandırma zorlanıyor.
-Error: Worker bulunamadı: 762-001
-Error: Worker bulunamadı: 762-002
-Error: Worker bulunamadı: 762-004
-Zaten sonlandırılmıştı: 3 worker sweep öncesinde zaten ölüydü (762-001, 762-002, 762-004)
-Run sprint-762, ABORTED olarak zorla kapatıldı: 3 logical taskın 0 tanesi tamamlanmıştı, 3 tanesi unresolved kaldı. Hiçbir unresolved lineage COMPLETE durumuna yükseltilmedi.

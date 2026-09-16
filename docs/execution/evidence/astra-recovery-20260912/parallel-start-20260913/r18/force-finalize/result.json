@@ -1,9 +1,0 @@
-{
-  "command": "node dist/cli/entry.js finalize --sprint sprint-762 --force",
-  "startedAt": "2026-09-14T12:38:52.224770+00:00",
-  "endedAt": "2026-09-14T12:38:57.739852+00:00",
-  "elapsedSeconds": 6.18992414000968,
-  "exitCode": 0,
-  "afterFiles": {},
-  "logSha256": "414e590347f9b3e3fe696ff76f1531c89d237787d80d7cd39711c69821e12fd8"
-}

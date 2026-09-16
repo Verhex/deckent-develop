@@ -1,8 +1,0 @@
-{
-  "observedAt": "2026-09-15T20:57:42.625481+00:00",
-  "sha256": {
-    ".deckent/settings/layer-shims.json": "e38d11ee414b8d10e1fd8e9d04c6bfffab4176f81b86e66f38f1148a911c56ae",
-    "docs/adr/adr-d-004-brain-central-import.md": "bc55018dca19a2c6a4296a150a9008955343201733082b96a1e7b6f789b061f3",
-    "scripts/lint-test-hermeticity.mjs": "10f6e7045ca5dc9b8cd043f52eb3267fcb35e219bcd6e9fa28c62593099b768c"
-  }
-}

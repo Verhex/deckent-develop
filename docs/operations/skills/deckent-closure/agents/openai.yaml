@@ -1,6 +1,0 @@
-interface:
-  display_name: "Deckent Closure"
-  short_description: "Close outcomes only with real production proof"
-  default_prompt: "Use $deckent-closure to verify this outcome against its production and custody proof contract."
-policy:
-  allow_implicit_invocation: true

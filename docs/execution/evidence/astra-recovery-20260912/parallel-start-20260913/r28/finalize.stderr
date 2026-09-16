@@ -1,2 +1,0 @@
-DECKENT_BINARY_IDENTITY_WARN: the build in `dist/` no longer matches this source checkout (reason: build-source-mismatch). Continuing — run `npm run build` so the CLI reflects your current source.
-Error: Worker bulunamadı: 765-001

@@ -1,6 +1,0 @@
-{"at": "2026-09-13T10:18:05.763937+00:00", "tasks": []}
-{"at": "2026-09-13T10:19:53.858906+00:00", "pid": 1012145, "State": "R (running)", "VmRSS": "3510044 kB", "io": {"rchar": 2393258057, "wchar": 6992526, "syscr": 170680, "syscw": 6285, "read_bytes": 69632, "write_bytes": 27582464, "cancelled_write_bytes": 20914176}, "tasks": []}
-{"at": "2026-09-13T10:25:01.813905+00:00", "sprint": "753", "task": "753-001", "custodyAttempt": "4c32963d-6386-842c-87da-f2b08cce229d", "providerExecutionAttempt": "70c23261-2dd0-882f-8075-24d681fb2abd", "observation": "Docker worker wrote host-bound heartbeat, changed permitted observability sources, declared verification 71/71 exit0; outer still active"}
-{"at": "2026-09-13T10:28:10.248086+00:00", "stage": "accepted-result", "task": "753-001", "chain": ["01-effect-landing.json", "02-accepted-result.json"], "outer": "running"}
-{"at": "2026-09-13T10:29:46.524171+00:00", "task": "753-001", "taskProjection": "EXECUTING", "terminalChain": true, "evaluationVerdict": "DONE", "outer": "running"}
-{"at": "2026-09-13T10:35:29.362517+00:00", "pid": 1012145, "VmHWM": "6060648 kB", "VmRSS": "6060648 kB", "VmSwap": "0 kB"}
